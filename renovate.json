@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
   "description": "Dependency-update policy for docker-autoheal. See docs/DEPENDENCY_MANAGEMENT.md for the full explanation of these choices.",
   "platformAutomerge": true,
   "packageRules": [
@@ -16,7 +16,7 @@
       "automerge": false
     },
     {
-      "description": "Pin Docker image tags to an immutable SHA256 digest as well as their human-readable tag/version (image:VERSION@sha256:DIGEST), for every Dockerfile and docker-compose image Renovate finds, wherever the registry supports digests.",
+      "description": "Pin Docker image tags to an immutable SHA256 digest as well as their human-readable tag/version (image:VERSION@sha256:DIGEST), for every Dockerfile and docker-compose image Renovate finds, wherever the registry supports digests. GitHub Actions get the equivalent treatment (owner/repo@<commit-sha> # vX.Y.Z) via the helpers:pinGitHubActionDigests preset extended above.",
       "matchDatasources": ["docker"],
       "pinDigests": true
     },

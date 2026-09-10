@@ -31,9 +31,16 @@ nothing there for it to track.
   `frontend/package-lock.json` (newly generated from those same ranges, not committed before this
   change) pins the exact resolved versions actually installed. `Dockerfile`'s frontend build stage
   uses `npm ci` (not `npm install`) so a build always installs exactly what's in the lockfile.
-- **GitHub Actions**: pinned to an explicit release tag (e.g. `actions/checkout@v4.4.0`) rather than
-  a floating major tag (`@v4`). This is the exact version each action already resolved to; nothing
-  was upgraded.
+- **GitHub Actions**: pinned to the full immutable commit SHA of the exact release each action was
+  already using, with a `# vX.Y.Z` comment for the human-readable version
+  (`actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0`), matching the convention
+  used by the reference repository named in issue #7 (`GhostWriters/docker-packt-cli`). Nothing was
+  upgraded - every SHA is the commit the action's existing version tag already pointed to.
+  `renovate.json` extends the `helpers:pinGitHubActionDigests` preset so Renovate both proactively
+  pins any future unpinned action the same way and keeps the SHA and version comment synchronised
+  on every update - this is native behaviour of Renovate's `github-actions` manager (verified with
+  a local `--dry-run=extract`: Renovate correctly reads each pinned `currentValue`/`currentDigest`
+  pair back out of the workflow files).
 - **Docker images**:
   - `Dockerfile` and `Dockerfile.simple`'s base images (`python:3.11-slim`, `node:18-alpine`) are
     pinned to their current tag **and** the SHA256 digest that tag currently resolves to, in the
@@ -106,12 +113,15 @@ couldn't read or change either of them:
 - **apt packages in the Dockerfiles** - not managed by Renovate without a custom regex manager,
   which felt like unnecessary complexity for a single `curl` install; flagged here rather than
   worked around.
-- **GitHub Actions are pinned to exact release tags, not commit SHAs.** Full SHA-pinning (with a
-  trailing `# vX.Y.Z` comment) is a stricter, increasingly common convention - the reference
-  repository named in issue #7 (`GhostWriters/docker-packt-cli`) does this for every action - but
-  the issue's own wording asks specifically for "explicit major/minor/patch references" for
-  Actions, distinct from the digest requirement it states for Docker images. Exact-tag pinning
-  satisfies that directly with a much smaller diff and is what Renovate's standard
-  `config:recommended` preset manages without extra configuration. If repo-wide SHA-pinning for
-  Actions is wanted instead, it's a small follow-up: add the `helpers:pinGitHubActionDigests`
-  preset to `renovate.json` and let Renovate open the pinning PRs.
+- **npm lockfile and Node 18.** `frontend/package-lock.json` was verified end-to-end with the real
+  `node:18-alpine`-equivalent version (Node 18.20.8, the final 18.x release, matching what
+  `node:18-alpine` resolves to): `npm ci` and `npm run build` both succeed and produce byte-identical
+  build output to a Node 22 build. `npm ci` does print `EBADENGINE` warnings (not errors) for nine
+  transitive packages that declare `engines.node >= 20` - all of them pulled in by
+  `vite-plugin-pwa`'s `workbox-build` (service-worker generation tooling) and one branch of ESLint's
+  toolchain. `vite.config.js` doesn't actually register `vite-plugin-pwa` as a Vite plugin (it's a
+  devDependency with nothing wiring it up - pre-existing, not introduced by this change), so that
+  code path never runs during `npm run build`, which is why the build is clean under Node 18 despite
+  the warnings. Worth knowing if `vite-plugin-pwa` is ever wired up in the future: at that point
+  `workbox-build`'s Node 20 requirement would become a real constraint on the Dockerfile's Node 18
+  build stage, and either the base image or the PWA tooling would need to move.
