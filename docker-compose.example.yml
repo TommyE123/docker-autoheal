@@ -48,7 +48,10 @@ services:
     labels:
       - "autoheal=true"
       - "description=API server with health check"
-    command: sh -c "pip install fastapi uvicorn && python -c \"
+    # Literal block scalar (not a plain scalar): the `: ` inside `def health():` reads as a
+    # YAML mapping separator to a strict parser (e.g. Renovate's) unless quoted this way.
+    command: |
+      sh -c "pip install fastapi uvicorn && python -c \"
       from fastapi import FastAPI;
       import uvicorn;
       app = FastAPI();

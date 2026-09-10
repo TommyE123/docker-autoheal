@@ -1,0 +1,30 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "description": "Dependency-update policy for docker-autoheal. See docs/DEPENDENCY_MANAGEMENT.md for the full explanation of these choices.",
+  "platformAutomerge": true,
+  "packageRules": [
+    {
+      "description": "Automerge routine, low-risk updates (patch/minor version bumps, digest refreshes, and Renovate's own version/digest 'pin' PRs) once all required CI checks on the PR have passed. GitHub's native auto-merge is used (platformAutomerge above), so this can never complete while a required status check is failing or pending.",
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Never automerge major version upgrades. These always get a normal PR for manual review, so they stay clearly distinguishable from routine updates.",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    },
+    {
+      "description": "Pin Docker image tags to an immutable SHA256 digest as well as their human-readable tag/version (image:VERSION@sha256:DIGEST), for every Dockerfile and docker-compose image Renovate finds, wherever the registry supports digests.",
+      "matchDatasources": ["docker"],
+      "pinDigests": true
+    },
+    {
+      "description": "swaya1125/docker-autoheal (referenced in docker-compose.yml) is this project's own published image, not a third-party dependency - see the comment next to that reference. Renovate should not manage it.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["swaya1125/docker-autoheal"],
+      "enabled": false
+    }
+  ]
+}
