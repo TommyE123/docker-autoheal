@@ -2,6 +2,10 @@ version: '3.8'
 
 services:
   autoheal:
+    # This is our own published image (built by .github/workflows/docker-publish.yml), not a
+    # third-party dependency, so it's intentionally excluded from Renovate management (see
+    # renovate.json) and kept on :latest so users who copy this file always deploy our newest
+    # release.
     image: swaya1125/docker-autoheal:latest
     container_name: docker-autoheal
     restart: unless-stopped

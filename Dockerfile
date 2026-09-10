@@ -3,15 +3,15 @@
 # ============================================
 # Stage 1: Build React Frontend
 # ============================================
-FROM node:18-alpine AS frontend-builder
+FROM node:18-alpine@sha256:8d6421d663b4c28fd3ebc498332f249011d118945588d0a35cb9bc4b8ca09d9e AS frontend-builder
 
 WORKDIR /frontend
 
-# Copy package files
+# Copy package files (including the lockfile, so `npm ci` gets exact, reproducible versions)
 COPY frontend/package*.json ./
 
-# Install all dependencies (including dev dependencies needed for build)
-RUN npm install
+# Install exactly what's in package-lock.json (including dev dependencies needed for build)
+RUN npm ci
 
 # Copy frontend source
 COPY frontend/ ./
@@ -22,7 +22,7 @@ RUN npm run build
 # ============================================
 # Stage 2: Python Application
 # ============================================
-FROM python:3.11-slim
+FROM python:3.11-slim@sha256:9534e5a8e315485d4061ed659af0fd78a284c015f9b73661b41d6bab25604534
 
 LABEL maintainer="Docker Auto-Heal Service"
 LABEL description="Automated container monitoring and healing service with React UI"
