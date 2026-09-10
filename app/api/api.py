@@ -429,7 +429,7 @@ async def unquarantine_container(container_id: str):
         config_manager.clear_restart_history(stable_id)
 
         event = AutoHealEvent(
-            timestamp=datetime.now(),
+            timestamp=datetime.now(timezone.utc),
             container_name=f"{container_name} ({stable_id})",
             container_id=info.get("full_id"),  # Store current ID for reference
             event_type="unquarantine",
@@ -586,13 +586,18 @@ async def add_health_check(health_check: HealthCheckConfig):
         if not docker_client:
             raise HTTPException(status_code=500, detail="Docker client not initialized")
 
-        # Get the container to resolve full container ID
+        # Get the container to resolve its stable identifier
         container = docker_client.get_container(health_check.container_id)
         if not container:
             raise HTTPException(status_code=404, detail="Container not found")
 
-        # Update the health check config with full container ID
-        health_check.container_id = container.id
+        info = docker_client.get_container_info(container)
+        stable_id = info.get("stable_id")
+
+        # Store by stable_id so the check survives container recreation
+        # (image updates, `docker compose up --force-recreate`, etc.),
+        # matching how restart counts and quarantine status are tracked.
+        health_check.container_id = stable_id
 
         config_manager.add_custom_health_check(health_check)
         return {"status": "success", "message": f"Health check added for container {health_check.container_id}"}
@@ -610,13 +615,14 @@ async def get_health_check(container_id: str):
         if not docker_client:
             raise HTTPException(status_code=500, detail="Docker client not initialized")
 
-        # Get the container to resolve full container ID
+        # Get the container to resolve its stable identifier
         container = docker_client.get_container(container_id)
         if not container:
             raise HTTPException(status_code=404, detail="Container not found")
 
-        full_container_id = container.id
-        health_check = config_manager.get_custom_health_check(full_container_id)
+        info = docker_client.get_container_info(container)
+        stable_id = info.get("stable_id")
+        health_check = config_manager.get_custom_health_check(stable_id)
         if not health_check:
             raise HTTPException(status_code=404, detail="No custom health check found for this container")
         return health_check
@@ -634,13 +640,14 @@ async def delete_health_check(container_id: str):
         if not docker_client:
             raise HTTPException(status_code=500, detail="Docker client not initialized")
 
-        # Get the container to resolve full container ID
+        # Get the container to resolve its stable identifier
         container = docker_client.get_container(container_id)
         if not container:
             raise HTTPException(status_code=404, detail="Container not found")
 
-        full_container_id = container.id
-        config_manager.remove_custom_health_check(full_container_id)
+        info = docker_client.get_container_info(container)
+        stable_id = info.get("stable_id")
+        config_manager.remove_custom_health_check(stable_id)
         return {"status": "success", "message": f"Health check removed for container {container_id}"}
     except HTTPException:
         raise
