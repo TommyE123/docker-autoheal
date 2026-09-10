@@ -27,7 +27,7 @@ services:
 
   # Test container 1: Healthy nginx
   nginx-healthy:
-    image: nginx:alpine
+    image: nginx:alpine@sha256:72ba65eb42c10344912a84ff42408db7d34f2feb642204570ab8fc5ffd29f1d3
     container_name: nginx-healthy
     restart: unless-stopped
     ports:
@@ -43,7 +43,7 @@ services:
 
   # Test container 2: Container that will fail (for testing restart)
   failing-container:
-    image: alpine:latest
+    image: alpine:latest@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
     container_name: failing-container
     restart: on-failure
     labels:
@@ -53,7 +53,7 @@ services:
 
   # Test container 3: Container with custom health check (HTTP)
   http-test:
-    image: python:3.11-alpine
+    image: python:3.11-alpine@sha256:0d55920083f1ce1e38ac292e2772f924b4f8bb4188d336c79bf66963039e6146
     container_name: http-test
     restart: unless-stopped
     labels:
@@ -70,7 +70,7 @@ services:
 
   # Test container 4: Redis with TCP health check
   redis-test:
-    image: redis:alpine
+    image: redis:alpine@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576
     container_name: redis-test
     restart: unless-stopped
     labels:
@@ -85,7 +85,7 @@ services:
 
   # Test container 5: Container not monitored (no label)
   nginx-no-autoheal:
-    image: nginx:alpine
+    image: nginx:alpine@sha256:72ba65eb42c10344912a84ff42408db7d34f2feb642204570ab8fc5ffd29f1d3
     container_name: nginx-no-autoheal
     restart: unless-stopped
     ports:

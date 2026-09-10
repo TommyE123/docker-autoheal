@@ -24,7 +24,7 @@ services:
   # Example 1: Web server with auto-monitoring
   # Will be automatically monitored when it starts
   web:
-    image: nginx:alpine
+    image: nginx:alpine@sha256:72ba65eb42c10344912a84ff42408db7d34f2feb642204570ab8fc5ffd29f1d3
     container_name: demo-web-server
     labels:
       - "autoheal=true"
@@ -43,7 +43,7 @@ services:
   # Example 2: API with custom health check
   # Auto-monitored with health endpoint
   api:
-    image: python:3.11-alpine
+    image: python:3.11-alpine@sha256:0d55920083f1ce1e38ac292e2772f924b4f8bb4188d336c79bf66963039e6146
     container_name: demo-api-server
     labels:
       - "autoheal=true"
@@ -72,7 +72,7 @@ services:
   # Example 3: Database - NOT auto-monitored
   # No autoheal label, so it won't be automatically monitored
   database:
-    image: postgres:14-alpine
+    image: postgres:14-alpine@sha256:727876d274666da0b92a445390ba093c84b8e9f8343e1c53cd4e9a7ab2d85310
     container_name: demo-database
     environment:
       POSTGRES_PASSWORD: example
@@ -86,7 +86,7 @@ services:
   # Example 4: Cache with auto-monitoring
   # Redis with automatic monitoring
   cache:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     container_name: demo-cache
     labels:
       - "autoheal=true"
@@ -104,7 +104,7 @@ services:
   # Example 5: Worker with auto-monitoring
   # Background worker that should be auto-restarted
   worker:
-    image: busybox:latest
+    image: busybox:latest@sha256:dc2d74b28e4cf8984fa52af1f39bc7c3d9c73760b41a74d629f5d11b1ab28616
     container_name: demo-worker
     labels:
       - "autoheal=true"
