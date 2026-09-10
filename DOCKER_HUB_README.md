@@ -1,12 +1,14 @@
 # Docker Auto-Heal Service
 
-[![Docker Pulls](https://img.shields.io/docker/pulls/swaya1125/docker-autoheal)](https://hub.docker.com/r/swaya1125/docker-autoheal)
-[![Docker Image Size](https://img.shields.io/docker/image-size/swaya1125/docker-autoheal/latest)](https://hub.docker.com/r/swaya1125/docker-autoheal)
-[![Version](https://img.shields.io/badge/version-1.1-blue)](https://github.com/swaya1125/docker-autoheal)
+A container monitoring and auto-healing service with a web dashboard, REST API, and
+Prometheus metrics. Docker Auto-Heal watches your containers and restarts the ones that
+fail or go unhealthy, with cooldowns, exponential backoff, and automatic quarantine for
+containers that keep failing.
 
-A production-ready Docker container monitoring and auto-healing service with a modern React web interface. Automatically monitors your Docker containers for failures and unhealthy states, restarting them intelligently based on configurable policies.
+Full documentation, including source, is at
+[github.com/TommyE123/docker-autoheal](https://github.com/TommyE123/docker-autoheal).
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 docker run -d \
@@ -19,85 +21,23 @@ docker run -d \
   swaya1125/docker-autoheal:latest
 ```
 
-**Access the Web UI:** http://localhost:3131
+**Web UI:** http://localhost:3131
 
-## 📦 What's Included
+## What's included
 
-- **Python 3.11** backend with FastAPI
-- **React 18** modern web interface with Vite
-- **Automated health monitoring** for all Docker containers
-- **Smart restart logic** with exponential backoff
-- **Prometheus metrics** endpoint on port 9090
-- **Persistent storage** in `/data` volume
+- Python 3.11 backend (FastAPI) + React 18 web UI (built with Vite)
+- Automated health monitoring: Docker-native health checks, plus optional HTTP/TCP/exec
+  custom checks
+- Smart restart logic: cooldowns, exponential backoff, restart thresholds, automatic
+  quarantine and auto-unquarantine
+- Prometheus metrics on a dedicated port
+- Notifications to Discord, Slack, Telegram, ntfy, Gotify, Pushover, or a generic webhook
+- All configuration and state stored in `/data`, editable through the web UI, the REST
+  API, or `config.json` directly — **there are no environment-variable settings**
 
-## 🌟 Key Features
-
-### Core Monitoring
-- ✅ Monitor containers by label (`autoheal=true`) or all containers
-- ✅ React to Docker health checks and container exit codes
-- ✅ Configurable health check intervals and timeouts
-- ✅ Custom health checks (HTTP, TCP, Exec)
-
-### Smart Restart Logic
-- ✅ Exponential backoff to prevent restart storms
-- ✅ Configurable cooldown periods between restarts
-- ✅ Maximum restart thresholds to prevent infinite loops
-- ✅ Automatic quarantine for containers that restart too frequently
-- ✅ Respect manual stops (exit code 0)
-
-### Web Interface
-- ✅ Real-time dashboard with all container statuses
-- ✅ Per-container auto-heal enable/disable
-- ✅ Live event log with restart history
-- ✅ Full configuration management through UI
-- ✅ Config export/import as JSON
-- ✅ Maintenance mode support
-
-### Enterprise Features
-- ✅ Persistent state across restarts (stored in `/data`)
-- ✅ Prometheus metrics for monitoring
-- ✅ Webhook alerts for critical events
-- ✅ Structured JSON logging
-- ✅ Configurable log levels (DEBUG, INFO, WARNING, ERROR)
-
-## 📋 Requirements
-
-- Docker Engine 20.10+
-- Docker socket access (`/var/run/docker.sock`)
-- Recommended: 2GB RAM, 1 CPU core
-
-## 🔧 Usage
-
-### Docker Run (Basic)
-
-```bash
-docker run -d \
-  --name docker-autoheal \
-  -v /var/run/docker.sock:/var/run/docker.sock:ro \
-  -p 3131:3131 \
-  swaya1125/docker-autoheal:latest
-```
-
-### Docker Run (Full Options)
-
-```bash
-docker run -d \
-  --name docker-autoheal \
-  --restart unless-stopped \
-  -v /var/run/docker.sock:/var/run/docker.sock:ro \
-  -v /path/to/data:/data \
-  -p 3131:3131 \
-  -p 9090:9090 \
-  -e AUTOHEAL_INTERVAL=30 \
-  -e AUTOHEAL_LOG_LEVEL=INFO \
-  swaya1125/docker-autoheal:latest
-```
-
-### Docker Compose
+## Enabling auto-healing
 
 ```yaml
-version: '3.8'
-
 services:
   autoheal:
     image: swaya1125/docker-autoheal:latest
@@ -105,19 +45,17 @@ services:
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./data:/data  # Persist configuration and state
+      - ./data:/data
     ports:
-      - "3131:3131"  # Web UI
-      - "9090:9090"  # Prometheus metrics
-    environment:
-      - AUTOHEAL_INTERVAL=30
-      - AUTOHEAL_LOG_LEVEL=INFO
+      - "3131:3131"   # Web UI
+      - "9090:9090"   # Prometheus metrics
+    labels:
+      - "autoheal=false"   # exclude Auto-Heal itself from monitoring
 
-  # Example monitored container
   webapp:
     image: nginx:latest
     labels:
-      autoheal: "true"  # Enable auto-healing for this container
+      autoheal: "true"     # monitor this container
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost"]
       interval: 30s
@@ -125,183 +63,73 @@ services:
       retries: 3
 ```
 
-Then start:
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
-## 🏷️ Container Labels
+Any container labelled `autoheal=true` is picked up automatically — both containers
+already running when Auto-Heal starts, and new ones as they start.
 
-Enable auto-healing on specific containers using labels:
+## Configuration
 
-```yaml
-services:
-  myapp:
-    image: myapp:latest
-    labels:
-      autoheal: "true"  # Enable monitoring
-      autoheal.stop.timeout: "30"  # Custom stop timeout
-```
+All settings are managed through the web UI at `http://localhost:3131` (Configuration
+tab) or the `/api/config*` REST endpoints — see the "Configuration" section of the
+[full documentation](https://github.com/TommyE123/docker-autoheal/blob/main/docs/user/configuration.md)
+for the complete field reference.
 
-### Available Labels
+Configuration is automatically persisted to `/data/config.json`. Export/import as JSON is
+available from the web UI.
 
-| Label | Description | Default |
-|-------|-------------|---------|
-| `autoheal` | Enable monitoring (`true` or `false`) | Matches config |
-| `autoheal.stop.timeout` | Seconds to wait before force-stopping | 10 |
-
-## ⚙️ Configuration
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `AUTOHEAL_INTERVAL` | Monitoring interval in seconds | 30 |
-| `AUTOHEAL_LOG_LEVEL` | Log level (DEBUG, INFO, WARNING, ERROR) | INFO |
-| `AUTOHEAL_LABEL_KEY` | Label key to filter containers | autoheal |
-| `AUTOHEAL_LABEL_VALUE` | Label value to filter containers | true |
-
-### Web UI Configuration
-
-All settings can be configured through the web interface at `http://localhost:3131`:
-
-- **Monitor Settings**: Interval, label filtering
-- **Restart Policies**: Cooldowns, max restarts, backoff strategies  
-- **Container Selection**: Whitelist/blacklist containers
-- **Alerts**: Webhook configuration
-- **Observability**: Metrics and logging settings
-
-### Config File
-
-Configuration is automatically persisted to `/data/config.json`. You can:
-- Export config as JSON from the web UI
-- Edit the file directly
-- Import config from JSON backup
-
-## 📊 Monitoring & Metrics
-
-### Prometheus Metrics
-
-Metrics are exposed on port 9090 at `/metrics`:
+## Monitoring & Metrics
 
 ```bash
+# Prometheus metrics
 curl http://localhost:9090/metrics
-```
 
-Available metrics:
-- Container restart counts
-- Health check failures
-- Quarantine events
-- Processing times
-
-### Health Check
-
-Service health endpoint:
-```bash
+# Service health
 curl http://localhost:3131/health
+
+# Interactive API docs (Swagger UI)
+http://localhost:3131/docs
 ```
 
-### Logs
-
-View logs:
 ```bash
 docker logs -f docker-autoheal
 ```
 
-Logs are also persisted to `/data/logs/autoheal.log`
+## Requirements
 
-## 🔍 Troubleshooting
+- Docker Engine 20.10+
+- Docker socket access (`/var/run/docker.sock`)
 
-### Container Not Being Monitored
+## Troubleshooting
 
-1. Check if container has the `autoheal=true` label (if label filtering is enabled)
-2. Verify container is not in the exclusion list
-3. Check logs: `docker logs docker-autoheal`
-4. Enable DEBUG logging: Set `AUTOHEAL_LOG_LEVEL=DEBUG`
+**Container not being monitored?**
+1. Check it has the `autoheal=true` label (unless "monitor all containers" is enabled).
+2. Check it isn't in the excluded list (Configuration tab).
+3. Check logs: `docker logs docker-autoheal` (set log level to `DEBUG` from the
+   Configuration tab for more detail).
 
-### Auto-Heal Service Won't Start
+**Won't start?** Verify the Docker socket is accessible and ports 3131/9090 are free.
 
-1. Verify Docker socket is accessible:
-   ```bash
-   docker run --rm -v /var/run/docker.sock:/var/run/docker.sock alpine ls -l /var/run/docker.sock
-   ```
-2. Check port availability (3131, 9090)
-3. Review logs for specific errors
+**Container quarantined?** It exceeded the configured restart threshold. View it in the
+Web UI, fix the underlying issue, and it will auto-unquarantine once healthy — or
+unquarantine it manually from the UI or `POST /api/containers/{id}/unquarantine`.
 
-### Container Quarantined
+Full troubleshooting guide:
+[docs/user/troubleshooting.md](https://github.com/TommyE123/docker-autoheal/blob/main/docs/user/troubleshooting.md)
 
-When a container restarts too frequently, it's automatically quarantined:
-1. View quarantined containers in the Web UI
-2. Investigate the root cause of failures
-3. Fix the underlying issue
-4. Unquarantine from the UI or API
+## Security
 
-## 🔐 Security
+This service requires read-only Docker socket access, which is a significant privilege.
+Recommended for production:
 
-### Docker Socket Access
+- Mount the socket read-only (`:ro`, as shown above)
+- Put the web UI behind a reverse proxy with authentication and TLS if exposing it beyond
+  a trusted network — Auto-Heal does not implement its own authentication
+- Restrict access to the Prometheus metrics port similarly
+- Keep regular configuration backups (export from the UI)
 
-This service requires read-only access to the Docker socket. While necessary for monitoring, this grants significant privileges. Best practices:
+## License
 
-- Use read-only socket mount: `:ro`
-- Run in isolated network segment
-- Limit access to the web UI (use reverse proxy with auth)
-- Review container logs regularly
-
-### Production Deployment
-
-For production:
-1. Use TLS for the web UI (reverse proxy recommended)
-2. Implement authentication (OAuth, basic auth via reverse proxy)
-3. Use Prometheus for metrics collection
-4. Set up alerting for quarantine events
-5. Regular config backups
-
-## 🏗️ Architecture
-
-```
-┌─────────────────────────────────────────┐
-│  Docker Auto-Heal Container             │
-│                                          │
-│  ┌────────────┐      ┌──────────────┐   │
-│  │ React UI   │─────►│ FastAPI      │   │
-│  │ (Port 3131)│      │ Backend      │   │
-│  └────────────┘      └──────┬───────┘   │
-│                             │           │
-│  ┌──────────────────────────▼────────┐  │
-│  │  Monitor Service                  │  │
-│  │  - Health checks                  │  │
-│  │  - Restart logic                  │  │
-│  │  - Event logging                  │  │
-│  └──────────────────┬────────────────┘  │
-│                     │                   │
-└─────────────────────┼───────────────────┘
-                      │
-                      ▼
-            /var/run/docker.sock
-                      │
-                      ▼
-            ┌─────────────────┐
-            │ Docker Engine   │
-            │ (Host System)   │
-            └─────────────────┘
-```
-
-## 📚 Additional Resources
-
-- **Documentation**: Full docs at [GitHub Repository]
-- **API Reference**: `http://localhost:3131/docs` (Swagger UI)
-- **Issues & Support**: [GitHub Issues]
-- **Changelog**: See GitHub releases
-
-## 📝 License
-
-MIT License - see LICENSE file for details
-
-## 🤝 Contributing
-
-Contributions welcome! Please see the GitHub repository for guidelines.
-
----
-
-**Built with ❤️ using Python, FastAPI, React, and Docker**
-
+MIT — see the [LICENSE](https://github.com/TommyE123/docker-autoheal/blob/main/LICENSE) file.

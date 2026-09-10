@@ -62,5 +62,5 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: ${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal
-          readme-filepath: ./docs/README.md
+          readme-filepath: ./DOCKER_HUB_README.md
 
