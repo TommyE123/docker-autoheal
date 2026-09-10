@@ -91,6 +91,10 @@ pnpm-lock.yaml
 
 # Coverage reports
 coverage/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
 *.lcov
 *.lcov.info
 
