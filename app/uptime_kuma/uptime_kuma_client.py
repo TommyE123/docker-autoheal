@@ -73,8 +73,10 @@ class UptimeKumaClient:
         monitors = {}
 
         # Parse monitor_status lines
-        # Format: monitor_status{monitor_name="My Monitor",monitor_url="https://example.com",monitor_hostname="",monitor_port=""} 1
-        status_pattern = r'monitor_status\{monitor_name="([^"]+)"[^}]*\}\s+(\d+)'
+        # Uptime-Kuma emits monitor_id (and any custom tags) before monitor_name, e.g.:
+        # monitor_status{monitor_id="5",monitor_name="My Monitor",monitor_url="https://example.com",monitor_hostname="",monitor_port=""} 1
+        # so monitor_name must be matched anywhere within the label set, not just as the first label.
+        status_pattern = r'monitor_status\{[^}]*monitor_name="([^"]+)"[^}]*\}\s+(\d+)'
 
         for match in re.finditer(status_pattern, metrics_text):
             monitor_name = match.group(1)
@@ -113,8 +115,10 @@ class UptimeKumaClient:
                         return None
 
                     text = await response.text()
-                    # Look for this specific monitor's status
-                    pattern = rf'monitor_status\{{monitor_name="{re.escape(monitor_name)}"[^}}]*\}}\s+(\d+)'
+                    # Look for this specific monitor's status. monitor_id (and any custom
+                    # tags) can precede monitor_name in the label set, so don't anchor to it
+                    # being the first label.
+                    pattern = rf'monitor_status\{{[^}}]*monitor_name="{re.escape(monitor_name)}"[^}}]*\}}\s+(\d+)'
                     match = re.search(pattern, text)
 
                     if match:

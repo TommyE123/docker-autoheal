@@ -7,11 +7,10 @@ keeping one on the instance, so the aiohttp layer is faked by monkeypatching
 (mirroring the approach in ``test_notification_manager.py``). No real network
 or WebSocket access is used.
 
-Note: parsing tests here use metrics text with ``monitor_name`` as the first
-label, matching what the current parsing regex actually looks for. Issue #26
-tracks a separate bug where real Uptime-Kuma output places other labels (e.g.
-``monitor_id``) before ``monitor_name``, which the current regex misses; a
-regression test for that belongs to #26/its fix, not here.
+Real Uptime-Kuma ``/metrics`` output emits ``monitor_id`` (and any custom
+tags) before ``monitor_name`` in the label set. ``TestParseMonitorsFromMetrics``
+covers that ordering (issue #26) alongside ``METRICS_TEXT``'s simpler,
+name-first layout.
 """
 
 import pytest
@@ -165,6 +164,25 @@ class TestGetAllMonitors:
 
         assert await client.get_all_monitors() == []
 
+    async def test_parses_monitors_with_monitor_id_label_before_name(self, monkeypatch):
+        """Regression test for #26 through the get_all_monitors() path used by
+        the Uptime-Kuma monitor refresh loop."""
+        text = (
+            'monitor_status{monitor_id="5",monitor_name="My Website",'
+            'monitor_type="http",monitor_url="https://example.com/",'
+            'monitor_hostname="",monitor_port=""} 1\n'
+            'monitor_status{monitor_id="6",monitor_name="Database",'
+            'monitor_type="tcp",monitor_url="",monitor_hostname="db.local",'
+            'monitor_port="5432"} 0\n'
+        )
+        _patch_session(monkeypatch, response=_FakeResponse(200, text))
+        client = UptimeKumaClient("http://kuma.example", "token")
+
+        monitors = await client.get_all_monitors()
+
+        names_to_status = {m["friendly_name"]: m["status"] for m in monitors}
+        assert names_to_status == {"My Website": 1, "Database": 0}
+
 
 class TestParseMonitorsFromMetrics:
     """Direct tests of the parsing logic, independent of the HTTP layer."""
@@ -191,6 +209,38 @@ class TestParseMonitorsFromMetrics:
         assert len(monitors) == 1
         # Later occurrence wins since entries are keyed by name in a dict.
         assert monitors[0]["status"] == 0
+
+    def test_monitor_id_label_before_monitor_name_is_parsed(self):
+        """Regression test for #26: real Uptime-Kuma output puts monitor_id
+        (and any custom tags) before monitor_name in the label set."""
+        client = UptimeKumaClient("http://kuma.example", "token")
+        text = (
+            'monitor_status{monitor_id="5",monitor_name="My Website",'
+            'monitor_type="http",monitor_url="https://example.com/",'
+            'monitor_hostname="",monitor_port=""} 1\n'
+            'monitor_status{monitor_id="6",monitor_name="Database",'
+            'monitor_type="tcp",monitor_url="",monitor_hostname="db.local",'
+            'monitor_port="5432"} 0\n'
+        )
+
+        monitors = client._parse_monitors_from_metrics(text)
+
+        by_name = {m["friendly_name"]: m["status"] for m in monitors}
+        assert by_name == {"My Website": 1, "Database": 0}
+
+    def test_custom_tags_before_monitor_name_are_parsed(self):
+        client = UptimeKumaClient("http://kuma.example", "token")
+        text = (
+            'monitor_status{env="prod",team="infra",monitor_id="1",'
+            'monitor_name="Tagged",monitor_type="http",monitor_url="",'
+            'monitor_hostname="",monitor_port=""} 1\n'
+        )
+
+        monitors = client._parse_monitors_from_metrics(text)
+
+        assert len(monitors) == 1
+        assert monitors[0]["friendly_name"] == "Tagged"
+        assert monitors[0]["status"] == 1
 
 
 @pytest.mark.asyncio
@@ -242,3 +292,14 @@ class TestGetMonitorStatusByName:
         client = UptimeKumaClient("http://kuma.example", "token")
 
         assert await client.get_monitor_status_by_name("DB (prod)") == 1
+
+    async def test_returns_status_when_monitor_id_precedes_name(self, monkeypatch):
+        """Regression test for #26."""
+        text = (
+            'monitor_status{monitor_id="5",monitor_name="My Website",'
+            'monitor_type="http"} 1\n'
+        )
+        _patch_session(monkeypatch, response=_FakeResponse(200, text))
+        client = UptimeKumaClient("http://kuma.example", "token")
+
+        assert await client.get_monitor_status_by_name("My Website") == 1
