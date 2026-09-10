@@ -429,7 +429,7 @@ async def unquarantine_container(container_id: str):
         config_manager.clear_restart_history(stable_id)
 
         event = AutoHealEvent(
-            timestamp=datetime.now(),
+            timestamp=datetime.now(timezone.utc),
             container_name=f"{container_name} ({stable_id})",
             container_id=info.get("full_id"),  # Store current ID for reference
             event_type="unquarantine",
