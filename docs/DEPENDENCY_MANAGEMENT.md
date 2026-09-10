@@ -31,6 +31,9 @@ nothing there for it to track.
   `frontend/package-lock.json` (newly generated from those same ranges, not committed before this
   change) pins the exact resolved versions actually installed. `Dockerfile`'s frontend build stage
   uses `npm ci` (not `npm install`) so a build always installs exactly what's in the lockfile.
+  Renovate's extraction correctly lists `frontend/package-lock.json` as the `lockFiles` entry for
+  `frontend/package.json` (checked with `--dry-run=extract`), which is what makes it update the
+  lockfile in step whenever it bumps a `package.json` entry.
 - **GitHub Actions**: pinned to the full immutable commit SHA of the exact release each action was
   already using, with a `# vX.Y.Z` comment for the human-readable version
   (`actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0`), matching the convention
@@ -46,6 +49,11 @@ nothing there for it to track.
     pinned to their current tag **and** the SHA256 digest that tag currently resolves to, in the
     form `image:tag@sha256:digest`. The tag stays as the human-readable version indicator; the
     digest makes the build reproducible and tamper-evident. Neither image's version was changed.
+    Tag and digest staying synchronised on every future update (never a stale digest against a
+    newer tag) is native behaviour of the `dockerfile` manager - its replace template always
+    writes `{{depName}}:{{newValue}}@{{newDigest}}` as one atomic edit (checked directly in the
+    installed `renovate` package's source, not assumed); the `docker-compose` manager reuses that
+    exact same extraction/replace code for Compose image references, so the two behave identically.
   - `docker-compose.yml`'s `autoheal` service intentionally keeps `swaya1125/docker-autoheal:latest`
     unpinned and un-managed by Renovate (see the comment next to it, and the `enabled: false`
     package rule in `renovate.json`) - it's this project's own published image, not a dependency,
@@ -85,6 +93,16 @@ Renovate automerges the PR
   looks like (or merges like) a routine patch update.
 - The existing `Unit Tests` workflow (`.github/workflows/tests.yml`, from #1/#2) is unchanged and
   remains the CI gate every Renovate PR runs against.
+- **Security updates**: GitHub-detected vulnerability alerts (Dependabot alert data) are enabled by
+  default under `config:recommended` - confirmed by reading the option's default (`enabled: true`,
+  inherited from Renovate's generic default) directly out of the installed `renovate` package, not
+  assumed. `renovate.json` doesn't touch `vulnerabilityAlerts` at all, so that default stands. A
+  vulnerability-fix PR is still just a patch/minor/major update with a `[SECURITY]` marker; it goes
+  through the exact same `matchUpdateTypes` automerge rule as any other update above, deliberately -
+  no separate `vulnerabilityAlerts.automerge` config was added, because the generic rule already
+  produces exactly the wanted policy: a patch/minor security fix automerges once CI passes, and a
+  security fix that needs a major bump still gets a normal, manually-reviewed PR like any other
+  major update.
 
 ### GitHub-side prerequisites (outside this PR)
 
