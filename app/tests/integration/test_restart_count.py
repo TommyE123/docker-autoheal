@@ -30,5 +30,5 @@ def test_restart_count_matches_docker_state(
     container.reload()
 
     info = real_docker_client.get_container_info(container)
-    assert info["restart_count"] == container.attrs["State"]["RestartCount"]
+    assert info["restart_count"] == container.attrs["State"].get("RestartCount", 0)
     assert info["restart_count"] >= 1
