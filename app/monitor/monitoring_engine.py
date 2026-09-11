@@ -797,9 +797,11 @@ class MonitoringEngine:
             event: Docker event dictionary
         """
         try:
-            # Extract container information from event
-            container_id = event.get("id")
+            # Extract container information from event. The Docker Events API
+            # carries the container ID under Actor.ID, not a top-level "id" -
+            # that field was reading as always-None against a real daemon.
             actor = event.get("Actor", {})
+            container_id = actor.get("ID")
             attributes = actor.get("Attributes", {})
             container_name = attributes.get("name", "unknown")
 
