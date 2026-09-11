@@ -33,10 +33,13 @@ try:
 except ImportError:  # pragma: no cover - docker is a runtime dependency of the app
     docker_sdk = None
 
+_INTEGRATION_DIR = Path(__file__).resolve().parent
+
 
 def pytest_collection_modifyitems(config, items):
     for item in items:
-        item.add_marker(pytest.mark.integration)
+        if _INTEGRATION_DIR in Path(item.fspath).resolve().parents:
+            item.add_marker(pytest.mark.integration)
 
 
 @pytest.fixture(scope="session")
