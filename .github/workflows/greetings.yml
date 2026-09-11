@@ -2,11 +2,6 @@ name: Greetings
 
 permissions: read-all
 
-# pull_request_target is used intentionally: actions/first-interaction needs
-# write access to comment on PRs opened from forks, which the plain
-# pull_request event can't provide. This workflow never checks out or
-# executes any PR-supplied code, so running with base-repo permissions here
-# is safe.
 on:
   pull_request_target:
     types:
