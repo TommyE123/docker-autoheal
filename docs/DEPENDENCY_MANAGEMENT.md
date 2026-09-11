@@ -54,10 +54,10 @@ nothing there for it to track.
     writes `{{depName}}:{{newValue}}@{{newDigest}}` as one atomic edit (checked directly in the
     installed `renovate` package's source, not assumed); the `docker-compose` manager reuses that
     exact same extraction/replace code for Compose image references, so the two behave identically.
-  - `docker-compose.yml`'s `autoheal` service intentionally keeps `swaya1125/docker-autoheal:latest`
-    unpinned and un-managed by Renovate (see the comment next to it, and the `enabled: false`
-    package rule in `renovate.json`) - it's this project's own published image, not a dependency,
-    and it's meant to give users who copy the compose file our newest release, not a frozen one.
+  - `docker-compose.yml`'s `autoheal` service intentionally keeps `tommye123/docker-autoheal:latest`
+    unpinned (see the comment next to it) - it's this project's own published image, not a
+    dependency, and it's meant to give users who copy the compose file our newest release, not a
+    frozen one.
   - `docker-compose.test.yml` and `docker-compose.example.yml` are manual/demo compose files (not
     used by CI or by the published image) and were left exactly as they were. Renovate's
     `docker-compose` manager will still pick up every image reference in them, and

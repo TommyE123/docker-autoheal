@@ -1,4 +1,4 @@
-name: Publish to Docker Hub
+name: Publish to Docker Hub & GHCR
 
 on:
   push:
@@ -14,6 +14,10 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout code
@@ -31,11 +35,20 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal
+          images: |
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal
+            ghcr.io/${{ github.repository_owner }}/docker-autoheal
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -62,5 +75,4 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: ${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal
-          readme-filepath: ./docs/README.md
-
+          readme-filepath: ./DOCKER_HUB_README.md
