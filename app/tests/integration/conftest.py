@@ -5,51 +5,40 @@ Unlike ``app/tests/unit``, these tests exercise the real Docker SDK and/or a
 running Auto-Heal service (``http://localhost:3131``). They are never
 collected by a plain ``pytest`` run (see ``pytest.ini``'s ``testpaths`` and
 ``docs/TESTING.md``) and every test here is skipped, rather than failed, when
-the resource it needs isn't available - so this suite is safe to run in an
-environment that only has some of those resources (e.g. Docker but no
-running service).
+the resource it needs isn't available.
 """
 
-import shutil
-import sys
-import tempfile
 import uuid
-from pathlib import Path
 
 import pytest
 import requests
 
-# Allow running pytest from anywhere in the repository.
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from app.docker_client.docker_client_wrapper import DockerClientWrapper
 
-from app.config.config_manager import AutoHealConfig, config_manager  # noqa: E402
-from app.docker_client.docker_client_wrapper import DockerClientWrapper  # noqa: E402
+# Reuse the unit suite's isolation fixture instead of duplicating it: it patches
+# the same global config_manager singleton, and integration tests that need
+# isolated local config (rather than a real running service's config) want
+# exactly the same behaviour.
+from app.tests.unit.conftest import isolated_config_manager  # noqa: F401
 
 AUTOHEAL_BASE_URL = "http://localhost:3131"
 
 try:
-    import docker as docker_sdk
+    import docker
 except ImportError:  # pragma: no cover - docker is a runtime dependency of the app
-    docker_sdk = None
+    docker = None
 
 
 @pytest.fixture(scope="session")
 def real_docker_client():
-    """
-    A ``DockerClientWrapper`` connected to the real Docker daemon.
-
-    Skips the test (rather than failing) when no daemon is reachable, so this
-    suite can still run in a sandbox that has Docker but not the compose
-    stack, or vice versa.
-    """
-    if docker_sdk is None:
+    """A DockerClientWrapper connected to the real Docker daemon. Skips if unreachable."""
+    if docker is None:
         pytest.skip("docker SDK is not installed")
 
     try:
         wrapper = DockerClientWrapper()
     except Exception as exc:
         pytest.skip(f"No Docker daemon available: {exc}")
-        return
 
     try:
         yield wrapper
@@ -69,62 +58,23 @@ def running_service():
 
 
 @pytest.fixture
-def isolated_config_manager():
-    """
-    Point the global ``config_manager`` singleton at a per-test temp directory.
-
-    Mirrors ``app/tests/unit/conftest.py``'s fixture of the same name so
-    integration tests that only need a real Docker daemon (not a running
-    service) never touch the real ``/data`` directory.
-    """
-    temp_dir = Path(tempfile.mkdtemp(prefix="autoheal-integration-test-"))
-
-    original = {
-        "DATA_DIR": config_manager.DATA_DIR,
-        "CONFIG_FILE": config_manager.CONFIG_FILE,
-        "EVENTS_FILE": config_manager.EVENTS_FILE,
-        "RESTART_COUNTS_FILE": config_manager.RESTART_COUNTS_FILE,
-        "QUARANTINE_FILE": config_manager.QUARANTINE_FILE,
-        "MAINTENANCE_FILE": config_manager.MAINTENANCE_FILE,
-        "_config": config_manager._config,
-        "_event_log": config_manager._event_log,
-        "_custom_health_checks": config_manager._custom_health_checks,
-        "_quarantined_containers": config_manager._quarantined_containers,
-        "_maintenance_mode": config_manager._maintenance_mode,
-        "_maintenance_start_time": config_manager._maintenance_start_time,
-    }
-
-    config_manager.DATA_DIR = temp_dir
-    config_manager._update_file_paths()
-    config_manager._config = AutoHealConfig()
-    config_manager._event_log = []
-    config_manager._custom_health_checks = {}
-    config_manager._quarantined_containers = set()
-    config_manager._maintenance_mode = False
-    config_manager._maintenance_start_time = None
-
-    try:
-        yield config_manager
-    finally:
-        for attribute, value in original.items():
-            setattr(config_manager, attribute, value)
-        shutil.rmtree(temp_dir, ignore_errors=True)
-
-
-@pytest.fixture
-def disposable_container(real_docker_client: DockerClientWrapper):
+def disposable_container(real_docker_client):
     """
     Factory fixture that runs throwaway containers and removes them afterwards.
 
+    Uses the Docker SDK directly rather than DockerClientWrapper: the app never
+    creates containers, only manages existing ones, so there's no wrapper method
+    for this. Depending on real_docker_client just reuses its "skip if no daemon"
+    check.
+
     Usage: ``container = disposable_container(image="nginx:alpine", labels={...})``
     """
+    client = docker.DockerClient(base_url="unix://var/run/docker.sock")
     created = []
 
     def _run(image: str = "nginx:alpine", **run_kwargs):
-        client = real_docker_client._client
         name = run_kwargs.pop("name", None) or f"autoheal-integration-{uuid.uuid4().hex[:12]}"
-        run_kwargs.setdefault("detach", True)
-        container = client.containers.run(image=image, name=name, **run_kwargs)
+        container = client.containers.run(image=image, name=name, detach=True, **run_kwargs)
         created.append(container)
         return container
 
@@ -134,5 +84,6 @@ def disposable_container(real_docker_client: DockerClientWrapper):
         for container in created:
             try:
                 container.remove(force=True)
-            except docker_sdk.errors.NotFound:
+            except docker.errors.NotFound:
                 pass  # already removed by the test itself
+        client.close()

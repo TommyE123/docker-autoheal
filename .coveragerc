@@ -8,7 +8,7 @@ omit =
 [report]
 show_missing = True
 skip_empty = True
-# Initial coverage floor. Raise deliberately as coverage improves; never
-# lower it to make a red build pass.
+# Coverage floor, raised from the initial 35% once real coverage cleared 60%.
+# Raise deliberately as coverage improves; never lower it to make a red build pass.
 precision = 0
-fail_under = 35
+fail_under = 60
