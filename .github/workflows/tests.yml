@@ -38,4 +38,4 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Run unit tests with coverage
-        run: pytest --cov=app --cov-report=term-missing
+        run: pytest --cov=app --cov-report=term-missing --cov-report=xml:coverage.xml
