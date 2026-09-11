@@ -38,6 +38,12 @@ def _wait_for_auto_monitor_event(container_id: str) -> bool:
 
 
 def test_container_with_autoheal_label_is_auto_monitored(running_service, disposable_container):
+    # Snapshot the real config before touching anything, so it can be restored
+    # exactly afterward - auto-monitoring will mutate containers.selected.
+    response = requests.get(f"{AUTOHEAL_BASE_URL}/api/config", timeout=5)
+    response.raise_for_status()
+    original_config = response.json()
+
     container_name = f"autoheal-automonitor-{uuid.uuid4().hex[:12]}"
     container = disposable_container(image="nginx:alpine", name=container_name, labels={"autoheal": "true"})
 
@@ -46,18 +52,6 @@ def test_container_with_autoheal_label_is_auto_monitored(running_service, dispos
             f"Expected an auto_monitor event for the labelled container within {POLL_TIMEOUT_SECONDS}s"
         )
     finally:
-        # Auto-monitoring adds the container (by name - it has no monitoring.id
-        # or compose labels) to the service's real containers.selected.
-        # POSTing enabled=False to /api/containers/select would move it to
-        # containers.excluded instead of clearing it, so edit config directly.
-        # Left unguarded deliberately: if this cleanup itself fails, the test
-        # must fail loudly (not just warn) rather than leave the running
-        # service silently modified. Python chains it with any AssertionError
-        # from above, so neither failure is lost.
-        response = requests.get(f"{AUTOHEAL_BASE_URL}/api/config", timeout=5)
-        response.raise_for_status()
-        config = response.json()
-        config["containers"]["selected"] = [
-            s for s in config["containers"]["selected"] if s != container_name
-        ]
-        requests.put(f"{AUTOHEAL_BASE_URL}/api/config", json=config, timeout=5).raise_for_status()
+        # Left unguarded deliberately: if restoring the original config fails,
+        # the test must fail loudly, not leave the running service modified.
+        requests.put(f"{AUTOHEAL_BASE_URL}/api/config", json=original_config, timeout=5).raise_for_status()
