@@ -61,15 +61,21 @@ def test_container_with_autoheal_label_is_auto_monitored(
             container.name in selected
         )
     finally:
-        # Auto-monitoring persists the container in config_manager's
-        # real containers.selected list. Deselect it so repeated test runs
-        # don't accumulate stale entries in the service's saved config.
+        # Auto-monitoring persists the container under its resolved identifier in
+        # containers.selected. POSTing enabled=False to /api/containers/select would
+        # move it into containers.excluded instead of clearing it - a different
+        # stale entry left behind - so remove it directly via PUT /api/config.
         try:
-            requests.post(
-                f"{AUTOHEAL_BASE_URL}/api/containers/select",
-                json={"container_ids": [container.id], "enabled": False},
-                timeout=5,
-            )
+            response = requests.get(f"{AUTOHEAL_BASE_URL}/api/config", timeout=5)
+            response.raise_for_status()
+            config = response.json()
+            config["containers"]["selected"] = [
+                identifier
+                for identifier in config["containers"]["selected"]
+                if identifier not in (container.id, container.name)
+                and not container.id.startswith(identifier)
+            ]
+            requests.put(f"{AUTOHEAL_BASE_URL}/api/config", json=config, timeout=5)
         except Exception:
             pass
 
