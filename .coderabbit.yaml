@@ -1,8 +1,16 @@
 # CodeRabbit configuration for docker-autoheal
 # https://docs.coderabbit.ai/reference/configuration
+#
+# This repository is public, so CodeRabbit provides free reviews forever
+# under its OSS offering (https://www.coderabbit.ai/oss). Nothing below
+# enables CodeRabbit Agent, Security Scan, usage-based reviews, or any
+# other paid add-on - those are separate, account-level opt-ins that
+# cannot be triggered by this file. `enable_free_tier` is pinned below to
+# make that intent explicit and audit-proof.
 
 language: "en-US"
 early_access: false
+enable_free_tier: true
 
 reviews:
   profile: "chill"
@@ -59,5 +67,9 @@ chat:
   auto_reply: true
 
 knowledge_base:
+  # scope "auto" is the CodeRabbit-documented default: it isolates
+  # learnings to this repo (public repos) vs. sharing org-wide (private
+  # repos). It is not plan-gated - confirmed against the official schema
+  # (https://coderabbit.ai/integrations/schema.v2.json) - so it stays.
   learnings:
     scope: "auto"
