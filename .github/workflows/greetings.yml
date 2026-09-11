@@ -1,0 +1,34 @@
+name: Greetings
+
+permissions: read-all
+
+on:
+  pull_request_target:
+    types:
+      - opened
+  issues:
+    types:
+      - opened
+
+jobs:
+  greeting:
+    name: Greet first-time contributors
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+    steps:
+      - name: First Interaction
+        uses: actions/first-interaction@1c4688942c71f71d4f5502a26ea67c331730fa4d # v3.1.0
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          issue_message: >
+            👋 Thanks for opening your first issue in docker-autoheal! A
+            maintainer will review it soon. If you're reporting a bug,
+            please include relevant logs, configuration, Docker version,
+            and steps to reproduce.
+          pr_message: >
+            👋 Thanks for your first pull request to docker-autoheal! A
+            maintainer will review it soon - please make sure the tests
+            are passing and the PR description clearly explains the
+            change.
