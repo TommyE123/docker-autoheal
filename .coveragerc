@@ -8,3 +8,9 @@ omit =
 [report]
 show_missing = True
 skip_empty = True
+# Coverage floor, pinned to the measured main-branch baseline (unit-test
+# suite only, `app` scope) as of the CI-foundation work in 2026-09. A PR
+# that drops total coverage below this fails the "Run unit tests" CI step.
+# Raise this deliberately, in the same PR that earns the improvement, as
+# coverage grows - never lower it to make a red build green.
+fail_under = 37

@@ -7,23 +7,38 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.11', '3.12']
 
     steps:
       - name: Checkout code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - name: Set up Python ${{ matrix.python-version }}
+      # The Dockerfile is the single source of truth for the Python runtime
+      # this project ships in production. Reading it here (instead of
+      # hard-coding a version, or testing a matrix of versions the product
+      # doesn't actually ship) keeps CI honest about what we're really
+      # testing, and keeps tracking Renovate's Dockerfile bumps automatically.
+      - name: Determine Python version from production Dockerfile
+        id: python-version
+        run: |
+          VERSION=$(sed -n 's/^FROM python:\([0-9]\+\.[0-9]\+\)-slim.*/\1/p' Dockerfile | head -n1)
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not determine the Python version from Dockerfile's base image (expected a 'FROM python:X.Y-slim...' line)" >&2
+            exit 1
+          fi
+          echo "Detected production Python version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python ${{ steps.python-version.outputs.version }} (matches production Dockerfile)
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ steps.python-version.outputs.version }}
           cache: pip
 
       - name: Install dependencies
@@ -32,12 +47,50 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Run unit tests with coverage
-        run: pytest --cov=app --cov-report=term-missing --cov-report=xml
+        run: |
+          set -o pipefail
+          pytest --cov=app --cov-report=term-missing --cov-report=xml --color=no | tee pytest-output.log
 
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: coverage-${{ matrix.python-version }}
+          name: unit-test-coverage
           path: coverage.xml
           if-no-files-found: ignore
+
+      # Coverage floor lives in .coveragerc (fail_under) so it's pinned to
+      # the measured main-branch baseline; the "Run unit tests" step above
+      # already fails the job if a PR drops below it. This step just
+      # surfaces that same number on the PR for visibility, best-effort.
+      - name: Extract coverage summary
+        if: always()
+        id: coverage
+        run: |
+          SUMMARY=$(grep -E "Total coverage: [0-9.]+%" pytest-output.log | tail -n1 || true)
+          echo "summary=$SUMMARY" >> "$GITHUB_OUTPUT"
+
+      - name: Report coverage on pull request
+        if: always() && github.event_name == 'pull_request' && steps.coverage.outputs.summary != ''
+        continue-on-error: true # best-effort only: GITHUB_TOKEN is read-only on fork PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          SUMMARY: ${{ steps.coverage.outputs.summary }}
+        run: |
+          MARKER="<!-- unit-test-coverage-report -->"
+          BODY=$(printf '%s\n### Unit test coverage\n\n%s\n\nMeasured for `app/` only (production code; test/support code is excluded). This check fails the build if coverage drops below the floor pinned in `.coveragerc` (`fail_under`).\n' "$MARKER" "$SUMMARY")
+          JSON_BODY=$(jq -n --arg body "$BODY" '{body: $body}')
+
+          ISSUE_API="https://api.github.com/repos/${REPO}/issues/${PR_NUMBER}/comments"
+          EXISTING_ID=$(curl -sS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "$ISSUE_API" \
+            | jq -r --arg marker "$MARKER" '[.[] | select(.body | startswith($marker))][0].id // empty')
+
+          if [ -n "$EXISTING_ID" ]; then
+            curl -sS -X PATCH -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${REPO}/issues/comments/${EXISTING_ID}" -d "$JSON_BODY" > /dev/null
+          else
+            curl -sS -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" \
+              "$ISSUE_API" -d "$JSON_BODY" > /dev/null
+          fi
