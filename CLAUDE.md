@@ -1,5 +1,34 @@
 # Repository conventions for Claude Code agents
 
+## Before making changes
+
+- Inspect the existing implementation, config and tests before proposing a change; prefer an existing repository pattern over inventing a new one.
+- For GitHub Actions, APIs, schemas or config formats, check current official docs or established examples rather than guessing syntax.
+
+## Keep changes focused
+
+- Do exactly what the issue/request requires. Don't bundle unrelated dependency bumps, refactors, lint fixes, or "while you're here" improvements into the same change.
+- Don't add new infrastructure when an existing GitHub/CI capability already solves the problem.
+
+## Tests for behaviour changes
+
+- Behaviour changes need tests where practical; a bug fix needs a regression test that demonstrates the problem.
+- Never weaken, remove or bypass a test (or raise a coverage threshold) just to get CI green — fix the cause instead.
+
+## Comments
+
+Keep comments minimal: only for non-obvious reasoning the code can't convey on its own, never a restatement of what the next line does.
+
+## Before declaring work complete
+
+- Run the relevant tests and linting for the files you changed, and check the final diff for unrelated changes.
+- Report only what you actually ran — don't claim a check passed if it wasn't run.
+
+## GitHub workflow
+
+- Check existing issues, PRs and workflows before creating or changing them.
+- Prefer a native GitHub Actions feature over a custom script/API call when one already provides the behaviour.
+
 ## Pull request titles (required)
 
 Every PR title must follow [Conventional Commits](https://www.conventionalcommits.org/) format, enforced by `.github/workflows/semantic-pr-title.yml` (`validate-title` check):
