@@ -13,4 +13,25 @@ skip_empty = True
 # that drops total coverage below this fails the "Run unit tests" CI step.
 # Raise this deliberately, in the same PR that earns the improvement, as
 # coverage grows - never lower it to make a red build green.
-fail_under = 37
+#
+# `precision` matters here, not just cosmetics: coverage.py's fail-under
+# check compares round(total, precision) against fail_under (see
+# coverage.results.should_fail_under). At the default precision (0),
+# round(total, 0) collapses anything from roughly 37.50% to 38.49% down to
+# "38", so a fail_under in that range never actually fails the build no
+# matter how much coverage drops within it - the exact gap this value is
+# meant to close. precision=2 makes the floor track the real, measured
+# 37.53% baseline (37.525987...%, rounded to 2dp) to within 0.01 of a
+# percentage point, rather than an integer that silently tolerated over a
+# point of regression.
+#
+# Set one hundredth below the raw measured baseline (37.525987...%, i.e.
+# 37.53% rounded) rather than exactly equal to it: pytest-cov's PASS/FAIL
+# terminal message (not the actual pass/fail exit code, which always uses
+# the rounded comparison above) compares the *unrounded* total against
+# fail_under, so fail_under == 37.53 exactly would print a spurious "FAIL"
+# on an unchanged, still-passing baseline build. 37.52 keeps both the exit
+# code and that message correct on today's baseline while still catching
+# any real drop of a hundredth of a point or more.
+precision = 2
+fail_under = 37.52

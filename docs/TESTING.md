@@ -30,20 +30,68 @@ tests and one-off scripts omitted).
 
 ## Coverage baseline
 
-`.coveragerc` pins a `fail_under` floor (currently 37%) to the coverage the
-unit-test suite actually measures on `main`. `pytest-cov` reads this
-automatically, so `pytest --cov=app ...` - locally or in CI - fails if total
-coverage drops below that floor, even if every test still passes. This is a
-ratchet, not a target: raise the number deliberately, in the same PR that
-earns the improvement, as coverage grows. Never lower it just to turn a red
-build green.
+Coverage regressions are enforced two ways, in order:
+
+1. **Relative, vs. `main` (primary).** On a pull request, the CI job
+   downloads `main`'s latest successful run's coverage number (see below)
+   and fails outright if this PR's is lower - equal or higher passes. This
+   is the real "a PR must not reduce coverage" policy: it catches any
+   regression, however small, regardless of how far above the absolute
+   floor it lands, and it moves automatically as `main`'s coverage moves
+   (nothing to remember to bump). It only reads GitHub's API (no write
+   access needed), so it runs identically on PRs from forks.
+2. **Absolute, in `.coveragerc` (secondary safety net).** `fail_under`
+   (currently 37.52%, at `precision = 2`) pins a floor to the coverage the
+   suite measured on `main` as of the CI-foundation work (37.53%, i.e.
+   37.525987...% unrounded). `pytest-cov` reads this automatically, so
+   `pytest --cov=app ...` - locally or in CI, PR or not - fails if total
+   coverage drops below that floor, even if every test still passes. This
+   catches the case the relative check can't: a first push straight to
+   `main` (or any run with no `main` baseline to compare against, e.g. this
+   repo's very first coverage-checked commit) still gets a floor. Like the
+   relative check, this is a ratchet, not a target: raise it deliberately,
+   in the same PR that earns the improvement, as coverage grows. Never
+   lower it just to turn a red build green.
+
+   Both `fail_under` and `precision` matter: coverage.py's actual pass/fail
+   check compares `round(total, precision)` against `fail_under`, so at the
+   default `precision` (0) a `fail_under` like `37` only fails once real
+   coverage drops below roughly 36.5% - over a point of undetected
+   regression. `precision = 2` tightens that blind spot to about a
+   hundredth of a point; `fail_under` is set one hundredth below the
+   rounded baseline (37.52, not 37.53) so an unchanged baseline build
+   reports a clean pass rather than a spurious "FAIL" in pytest-cov's
+   summary line.
 
 On every pull request, the CI job also posts (and keeps updated) a comment
-on the PR with the same "Total coverage: X%" line pytest-cov prints, so the
-number is visible without opening the Actions log. That comment is
-best-effort (it silently no-ops on fork PRs, where `GITHUB_TOKEN` is
-read-only) - the actual enforcement is the `fail_under` gate above, which
-always runs.
+showing both numbers and the outcome, e.g.:
+
+```
+| | Coverage |
+|---|---|
+| `main` | 37.53% |
+| This PR | 38.12% |
+| Change | +0.59% |
+
+Status: ✅ No coverage regression
+```
+
+GitHub's own "Code Quality" product does this natively (Cobertura upload,
+automatic PR-vs-default-branch comparison, a "max coverage drop" ruleset),
+but it's only available on GitHub Team (organization) and Enterprise Cloud
+plans - not personal-account repositories like this one, at any price - so
+it isn't usable here. This reproduces just the comparison, with plain REST
+API calls (no third-party coverage Action, no external service): every
+run's `unit-test-coverage` artifact now also carries a
+`coverage-percent.txt`, and the PR job downloads `main`'s latest successful
+run's copy of that file to diff against. Posting the comment itself is
+best-effort (silently no-ops on fork PRs, where `GITHUB_TOKEN` is
+read-only to write a comment) and separate from the enforcement step above,
+which isn't best-effort and doesn't need write access - a fork PR still
+gets a real pass/fail, just without the comment. If no `main` baseline
+artifact exists yet (e.g. the very first run), the regression check is
+skipped rather than failed, and the comment says so instead of showing a
+table.
 
 This baseline covers the **unit** suite only. If/when the integration suite
 (see below) starts running in CI, it should get its own coverage report

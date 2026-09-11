@@ -10,6 +10,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  actions: read # to look up main's latest coverage artifact for PR comparisons
 
 jobs:
   unit-tests:
@@ -47,50 +48,133 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Run unit tests with coverage
+        run: pytest --cov=app --cov-report=term-missing --cov-report=xml --color=no
+
+      # Same metric .coveragerc's `fail_under` gate just enforced above,
+      # re-extracted as a plain number so later steps can do arithmetic on
+      # it (and so the PR comment can never disagree with the gate).
+      - name: Compute coverage percentage
+        if: always()
+        id: coverage
         run: |
-          set -o pipefail
-          pytest --cov=app --cov-report=term-missing --cov-report=xml --color=no | tee pytest-output.log
+          if [ ! -f coverage.xml ]; then
+            echo "No coverage.xml produced (test run likely errored before collection); skipping."
+            exit 0
+          fi
+          python -m coverage json -o coverage.json -q
+          PCT=$(python -c "import json; print(round(json.load(open('coverage.json'))['totals']['percent_covered'], 2))")
+          echo "$PCT" > coverage-percent.txt
+          echo "percent=$PCT" >> "$GITHUB_OUTPUT"
 
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: unit-test-coverage
-          path: coverage.xml
+          path: |
+            coverage.xml
+            coverage-percent.txt
           if-no-files-found: ignore
 
-      # Coverage floor lives in .coveragerc (fail_under) so it's pinned to
-      # the measured main-branch baseline; the "Run unit tests" step above
-      # already fails the job if a PR drops below it. This step just
-      # surfaces that same number on the PR for visibility, best-effort.
-      - name: Extract coverage summary
-        if: always()
-        id: coverage
+      # No GitHub-native coverage product is usable here: GitHub Code
+      # Quality's PR coverage comparison requires GitHub Team or Enterprise
+      # Cloud, and this repository is a personal-account (not
+      # organization-owned) repo, so it's not eligible at any price. This
+      # reproduces the same "main vs PR" comparison ourselves via the
+      # ordinary REST API and the coverage-percent.txt uploaded above -
+      # no third-party coverage Action, no external service.
+      #
+      # This is the actual enforcement of "a PR must not reduce coverage
+      # vs main": unlike .coveragerc's fail_under (an absolute floor that
+      # stays fixed until someone deliberately raises it, and so can't
+      # catch a regression that lands above that floor), this compares
+      # against main's own latest measured number every time, so it always
+      # fails a real regression regardless of how far above the floor it
+      # is. It only reads (actions: read; no `contents`/`pull-requests`
+      # write), so it runs the same way on fork PRs, where GITHUB_TOKEN
+      # can't write - only the comment step below needs write access, and
+      # is kept separate for exactly that reason.
+      - name: Compare coverage with main branch
+        if: always() && github.event_name == 'pull_request' && steps.coverage.outputs.percent != ''
+        id: compare
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_PCT: ${{ steps.coverage.outputs.percent }}
         run: |
-          SUMMARY=$(grep -E "Total coverage: [0-9.]+%" pytest-output.log | tail -n1 || true)
-          echo "summary=$SUMMARY" >> "$GITHUB_OUTPUT"
+          API="https://api.github.com/repos/${REPO}"
+          AUTH_HEADER="Authorization: Bearer ${GH_TOKEN}"
+
+          MAIN_PCT=""
+          RUN_ID=$(curl -sS -H "$AUTH_HEADER" -H "Accept: application/vnd.github+json" \
+            "$API/actions/workflows/tests.yml/runs?branch=main&event=push&status=success&per_page=1" \
+            | jq -r '.workflow_runs[0].id // empty' || true)
+          if [ -n "$RUN_ID" ]; then
+            ARTIFACT_URL=$(curl -sS -H "$AUTH_HEADER" -H "Accept: application/vnd.github+json" \
+              "$API/actions/runs/${RUN_ID}/artifacts" \
+              | jq -r '[.artifacts[] | select(.name=="unit-test-coverage")][0].archive_download_url // empty' || true)
+            if [ -n "$ARTIFACT_URL" ]; then
+              curl -sS -L -H "$AUTH_HEADER" "$ARTIFACT_URL" -o main-coverage.zip
+              MAIN_PCT=$(unzip -p main-coverage.zip coverage-percent.txt 2>/dev/null | tr -d '[:space:]' || true)
+            fi
+          fi
+          echo "main_percent=$MAIN_PCT" >> "$GITHUB_OUTPUT"
+
+          if [ -z "$MAIN_PCT" ]; then
+            echo "No main-branch coverage baseline found yet (first run, or main hasn't been built with this check yet) - skipping the regression comparison."
+            echo "status=no-baseline" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CHANGE=$(python -c "print(f'{${PR_PCT} - ${MAIN_PCT}:+.2f}')")
+          echo "change=$CHANGE" >> "$GITHUB_OUTPUT"
+
+          if python -c "exit(0 if ${PR_PCT} >= ${MAIN_PCT} else 1)"; then
+            echo "status=pass" >> "$GITHUB_OUTPUT"
+            echo "PR coverage ${PR_PCT}% >= main coverage ${MAIN_PCT}% (change ${CHANGE}%) - no regression."
+          else
+            echo "status=fail" >> "$GITHUB_OUTPUT"
+            echo "::error::PR coverage ${PR_PCT}% is lower than main's ${MAIN_PCT}% (change ${CHANGE}%). A PR must not reduce coverage vs main."
+            exit 1
+          fi
 
       - name: Report coverage on pull request
-        if: always() && github.event_name == 'pull_request' && steps.coverage.outputs.summary != ''
+        if: always() && github.event_name == 'pull_request' && steps.coverage.outputs.percent != ''
         continue-on-error: true # best-effort only: GITHUB_TOKEN is read-only on fork PRs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          SUMMARY: ${{ steps.coverage.outputs.summary }}
+          PR_PCT: ${{ steps.coverage.outputs.percent }}
+          MAIN_PCT: ${{ steps.compare.outputs.main_percent }}
+          CHANGE: ${{ steps.compare.outputs.change }}
+          CMP_STATUS: ${{ steps.compare.outputs.status }}
         run: |
+          API="https://api.github.com/repos/${REPO}"
+          AUTH_HEADER="Authorization: Bearer ${GH_TOKEN}"
+
+          if [ "$CMP_STATUS" = "pass" ]; then
+            TABLE=$(printf '| | Coverage |\n|---|---|\n| `main` | %s%% |\n| This PR | %s%% |\n| Change | %s%% |\n\nStatus: ✅ No coverage regression\n' \
+              "$MAIN_PCT" "$PR_PCT" "$CHANGE")
+          elif [ "$CMP_STATUS" = "fail" ]; then
+            TABLE=$(printf '| | Coverage |\n|---|---|\n| `main` | %s%% |\n| This PR | %s%% |\n| Change | %s%% |\n\nStatus: ❌ Coverage regression - a PR must not reduce coverage below `main`\n' \
+              "$MAIN_PCT" "$PR_PCT" "$CHANGE")
+          else
+            TABLE=$(printf 'This PR: **%s%%**\n\n(No coverage baseline found yet for `main` - this may be the first run, so the regression check was skipped rather than failed.)\n' "$PR_PCT")
+          fi
+
           MARKER="<!-- unit-test-coverage-report -->"
-          BODY=$(printf '%s\n### Unit test coverage\n\n%s\n\nMeasured for `app/` only (production code; test/support code is excluded). This check fails the build if coverage drops below the floor pinned in `.coveragerc` (`fail_under`).\n' "$MARKER" "$SUMMARY")
+          BODY=$(printf '%s\n### Unit test coverage\n\n%s\n\nMeasured for `app/` only (production code; test/support code is excluded). A PR fails if its coverage is lower than `main`'"'"'s, or if it drops below the absolute floor pinned in `.coveragerc` (`fail_under`), whichever is stricter.\n' "$MARKER" "$TABLE")
           JSON_BODY=$(jq -n --arg body "$BODY" '{body: $body}')
 
-          ISSUE_API="https://api.github.com/repos/${REPO}/issues/${PR_NUMBER}/comments"
-          EXISTING_ID=$(curl -sS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "$ISSUE_API" \
+          ISSUE_API="$API/issues/${PR_NUMBER}/comments"
+          EXISTING_ID=$(curl -sS -H "$AUTH_HEADER" -H "Accept: application/vnd.github+json" "$ISSUE_API" \
             | jq -r --arg marker "$MARKER" '[.[] | select(.body | startswith($marker))][0].id // empty')
 
           if [ -n "$EXISTING_ID" ]; then
-            curl -sS -X PATCH -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" \
-              "https://api.github.com/repos/${REPO}/issues/comments/${EXISTING_ID}" -d "$JSON_BODY" > /dev/null
+            curl -sS -X PATCH -H "$AUTH_HEADER" -H "Accept: application/vnd.github+json" \
+              "$API/issues/comments/${EXISTING_ID}" -d "$JSON_BODY" > /dev/null
           else
-            curl -sS -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" \
+            curl -sS -X POST -H "$AUTH_HEADER" -H "Accept: application/vnd.github+json" \
               "$ISSUE_API" -d "$JSON_BODY" > /dev/null
           fi
