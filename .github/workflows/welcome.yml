@@ -17,6 +17,11 @@ jobs:
         uses: actions/first-interaction@1c4688942c71f71d4f5502a26ea67c331730fa4d # v3.1.0
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
+          # Required by the action even though this workflow only triggers
+          # on pull_request_target and never sends this message (issues are
+          # handled separately by welcome-issue.yml). Must be non-empty:
+          # getInput(..., {required: true}) throws on an empty string too.
+          issue_message: "Not used - this workflow only welcomes pull requests."
           pr_message: >
             👋 Thanks for your first pull request to docker-autoheal!
 
