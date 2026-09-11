@@ -1,9 +1,6 @@
 [run]
 source = app
 branch = True
-omit =
-    app/tests/*
-    app/scripts/*
 
 [report]
 show_missing = True
