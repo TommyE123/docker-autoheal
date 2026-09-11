@@ -3,24 +3,28 @@ Integration test for the auto-monitoring feature: containers started with the
 `autoheal=true` label should be discovered and added to monitoring
 automatically, and containers without it should not be.
 
-Converted from the root-level `test_auto_monitor.py` manual script, which
-printed progress to the console and prompted interactively (`input(...)`) to
-decide whether to clean up the containers it created. This version asserts
-on the outcome and always cleans up its own containers.
-
 Requires a real Docker daemon *and* a running Auto-Heal service reachable at
 http://localhost:3131 (the service is what performs the auto-monitoring this
-test observes via its API).
+test observes via its API). Cleans up containers.selected afterward; the
+auto_monitor event itself is left in the log, same as it would be from real
+usage - the API only exposes clearing the entire log, not one event.
 """
 
 import time
 import uuid
 
+import pytest
 import requests
 
 AUTOHEAL_BASE_URL = "http://localhost:3131"
 POLL_TIMEOUT_SECONDS = 30
 POLL_INTERVAL_SECONDS = 2
+
+pytestmark = pytest.mark.integration
+
+
+def _matches(identifier: str, container) -> bool:
+    return identifier in (container.id, container.name) or container.id.startswith(identifier)
 
 
 def _wait_for_auto_monitor_event(container_id: str, timeout: float = POLL_TIMEOUT_SECONDS) -> bool:
@@ -36,6 +40,23 @@ def _wait_for_auto_monitor_event(container_id: str, timeout: float = POLL_TIMEOU
             return True
         time.sleep(POLL_INTERVAL_SECONDS)
     return False
+
+
+def _deselect(container) -> None:
+    """
+    Undo auto-monitoring's effect on containers.selected. POSTing enabled=False
+    to /api/containers/select would move the container into containers.excluded
+    instead of clearing it - a different stale entry left behind - so edit the
+    config directly.
+    """
+    response = requests.get(f"{AUTOHEAL_BASE_URL}/api/config", timeout=5)
+    response.raise_for_status()
+    config = response.json()
+    config["containers"]["selected"] = [
+        identifier for identifier in config["containers"]["selected"] if not _matches(identifier, container)
+    ]
+    response = requests.put(f"{AUTOHEAL_BASE_URL}/api/config", json=config, timeout=5)
+    response.raise_for_status()
 
 
 def test_container_with_autoheal_label_is_auto_monitored(
@@ -56,28 +77,10 @@ def test_container_with_autoheal_label_is_auto_monitored(
 
         response = requests.get(f"{AUTOHEAL_BASE_URL}/api/config", timeout=5)
         response.raise_for_status()
-        selected = response.json().get("containers", {}).get("selected", [])
-        assert container.id in selected or any(container.id.startswith(s) for s in selected) or (
-            container.name in selected
-        )
+        selected = response.json()["containers"]["selected"]
+        assert any(_matches(identifier, container) for identifier in selected)
     finally:
-        # Auto-monitoring persists the container under its resolved identifier in
-        # containers.selected. POSTing enabled=False to /api/containers/select would
-        # move it into containers.excluded instead of clearing it - a different
-        # stale entry left behind - so remove it directly via PUT /api/config.
-        try:
-            response = requests.get(f"{AUTOHEAL_BASE_URL}/api/config", timeout=5)
-            response.raise_for_status()
-            config = response.json()
-            config["containers"]["selected"] = [
-                identifier
-                for identifier in config["containers"]["selected"]
-                if identifier not in (container.id, container.name)
-                and not container.id.startswith(identifier)
-            ]
-            requests.put(f"{AUTOHEAL_BASE_URL}/api/config", json=config, timeout=5)
-        except Exception:
-            pass
+        _deselect(container)
 
 
 def test_container_without_autoheal_label_is_not_auto_monitored(

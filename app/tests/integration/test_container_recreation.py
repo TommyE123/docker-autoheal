@@ -1,32 +1,23 @@
 """
-Integration test for the container-ID-vs-stable-ID tracking bug fix.
+Integration test for the container-ID-vs-stable-ID tracking bug: Docker
+assigns a new container ID on every recreation, so restart/quarantine state
+and monitoring selection must be tracked by a stable identifier instead.
+Fake-based unit coverage of the same logic lives in
+`test_monitoring_identity.py` / `test_restart_handling.py`; this validates it
+against a real Docker recreation rather than a simulated ID change.
 
-Historically, restart counts, quarantine status and monitoring selection were
-tracked by container ID. Since Docker assigns a brand new ID every time a
-container is recreated (e.g. `docker compose up` after an image update), that
-made the tracked state reset on every recreation. The fix tracks containers by
-a stable identifier (the `monitoring.id` label, the compose project/service
-pair, or the container name) instead.
-
-This is an end-to-end check against a real Docker daemon: it creates a real
-container, records restart/quarantine state against it, removes it, recreates
-a container with the same name (getting a new ID from Docker), and asserts
-that state and monitoring selection survive the recreation. Unit-level
-coverage of the same identifier logic against fakes lives in
-`app/tests/unit/test_monitoring_identity.py` and
-`test_restart_handling.py`; this test exists to validate the same behaviour
-against real Docker container recreation rather than a simulated ID change.
-
-Requires a real Docker daemon (able to pull/run `alpine:latest`); does not
-require a running Auto-Heal service.
+Requires a real Docker daemon; does not require a running Auto-Heal service.
 """
 
 import uuid
 
+import docker
 import pytest
 
 from app.docker_client.docker_client_wrapper import DockerClientWrapper
 from app.monitor.monitoring_engine import MonitoringEngine
+
+pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
@@ -95,8 +86,8 @@ def test_restart_history_and_monitoring_survive_recreation(
         try:
             container.reload()
             container.remove(force=True)
-        except Exception:
-            pass
+        except docker.errors.NotFound:
+            pass  # already removed earlier in the test
 
 
 def test_explicit_exclusion_persists_by_name_across_recreation(
@@ -127,5 +118,5 @@ def test_explicit_exclusion_persists_by_name_across_recreation(
         try:
             container.reload()
             container.remove(force=True)
-        except Exception:
-            pass
+        except docker.errors.NotFound:
+            pass  # already removed earlier in the test

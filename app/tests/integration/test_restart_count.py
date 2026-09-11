@@ -1,34 +1,46 @@
 """
 Integration test for reading Docker's native restart count.
 
-Converted from the root-level `test_restart_count.py` debug script, which
-printed `container.attrs` at several candidate locations against whatever
-containers happened to already be running on the host, with no assertions.
-`DockerClientWrapper.get_container_info` reads the count from
-`attrs["State"]["RestartCount"]`; this test creates a disposable container,
-forces Docker to restart it (bumping the real counter), and asserts the
-wrapper reports the same value Docker does - a real regression check instead
-of an exploratory print.
+A manual `container.restart()` does not increment Docker's RestartCount - it's
+specifically a count of restarts performed by Docker's own restart policy.
+Use a container with `--restart on-failure` that exits immediately, and let
+Docker restart it, to produce a real, deterministic increment.
 
 Requires a real Docker daemon; does not require a running Auto-Heal service.
 """
 
+import time
+
+import pytest
+
 from app.docker_client.docker_client_wrapper import DockerClientWrapper
 
+pytestmark = pytest.mark.integration
 
-def test_restart_count_matches_docker_state(
+RESTART_TIMEOUT_SECONDS = 15
+POLL_INTERVAL_SECONDS = 1
+
+
+def test_restart_count_reflects_a_policy_triggered_restart(
     real_docker_client: DockerClientWrapper, disposable_container
 ):
     container = disposable_container(
-        image="alpine:latest", command=["sleep", "300"]
+        image="alpine:latest",
+        command=["sh", "-c", "exit 1"],
+        restart_policy={"Name": "on-failure"},
     )
 
-    info = real_docker_client.get_container_info(container)
-    assert info["restart_count"] == 0
+    deadline = time.monotonic() + RESTART_TIMEOUT_SECONDS
+    restart_count = 0
+    while time.monotonic() < deadline:
+        info = real_docker_client.get_container_info(container)
+        restart_count = info["restart_count"]
+        if restart_count >= 1:
+            break
+        time.sleep(POLL_INTERVAL_SECONDS)
 
-    container.restart(timeout=5)
-    container.reload()
-
-    info = real_docker_client.get_container_info(container)
-    assert info["restart_count"] == container.attrs["State"].get("RestartCount", 0)
-    assert info["restart_count"] >= 1
+    assert restart_count >= 1, (
+        f"Expected Docker to have restarted the container at least once within "
+        f"{RESTART_TIMEOUT_SECONDS}s"
+    )
+    assert restart_count == container.attrs["RestartCount"]

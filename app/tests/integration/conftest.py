@@ -15,7 +15,6 @@ import sys
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Iterator
 
 import pytest
 import requests
@@ -32,14 +31,6 @@ try:
     import docker as docker_sdk
 except ImportError:  # pragma: no cover - docker is a runtime dependency of the app
     docker_sdk = None
-
-_INTEGRATION_DIR = Path(__file__).resolve().parent
-
-
-def pytest_collection_modifyitems(config, items):
-    for item in items:
-        if _INTEGRATION_DIR in Path(item.fspath).resolve().parents:
-            item.add_marker(pytest.mark.integration)
 
 
 @pytest.fixture(scope="session")
@@ -143,5 +134,5 @@ def disposable_container(real_docker_client: DockerClientWrapper):
         for container in created:
             try:
                 container.remove(force=True)
-            except Exception:
-                pass
+            except docker_sdk.errors.NotFound:
+                pass  # already removed by the test itself
