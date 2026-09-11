@@ -20,7 +20,6 @@ reviews:
   path_filters:
     - "!**/node_modules/**"
     - "!frontend/dist/**"
-    - "!frontend/public/**"
     - "!**/*.lock"
     - "!frontend/package-lock.json"
     - "!**/coverage.xml"
@@ -55,18 +54,6 @@ reviews:
       instructions: >
         Check that third-party actions are pinned to a full commit SHA (as
         already done in this repo) and that secrets aren't exposed in logs.
-
-  tools:
-    ruff:
-      enabled: true
-    eslint:
-      enabled: true
-    markdownlint:
-      enabled: true
-    yamllint:
-      enabled: true
-    hadolint:
-      enabled: true
 
 chat:
   auto_reply: true
