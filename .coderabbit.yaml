@@ -1,7 +1,7 @@
 # CodeRabbit configuration for docker-autoheal
 # https://docs.coderabbit.ai/reference/configuration
 
-language: "en-US"
+language: "en-GB"
 early_access: false
 enable_free_tier: true
 
