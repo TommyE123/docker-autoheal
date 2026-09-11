@@ -8,13 +8,7 @@ omit =
 [report]
 show_missing = True
 skip_empty = True
-# Absolute coverage floor (unit-test suite only, `app` scope): a deliberate
-# initial minimum, not a value pinned to whatever the suite happened to
-# measure. It exists as a secondary safety net for runs that have no
-# `main` baseline to compare against (see the "Compare coverage with main
-# branch" CI step, which is the primary, dynamic PR-vs-main regression
-# check and does not use this value). Raise this floor deliberately as
-# confidence in the suite grows - never lower it just to turn a red build
-# green.
+# Initial coverage floor. Raise deliberately as coverage improves; never
+# lower it to make a red build pass.
 precision = 0
 fail_under = 35

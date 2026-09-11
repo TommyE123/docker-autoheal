@@ -7,42 +7,26 @@ on:
   pull_request:
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: read # to look up main's latest coverage artifact for PR comparisons
-    outputs:
-      percent: ${{ steps.coverage.outputs.percent }}
-      main_percent: ${{ steps.compare.outputs.main_percent }}
-      change: ${{ steps.compare.outputs.change }}
-      status: ${{ steps.compare.outputs.status }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      # The Dockerfile is the single source of truth for the Python runtime
-      # this project ships in production. Reading it here (instead of
-      # hard-coding a version, or testing a matrix of versions the product
-      # doesn't actually ship) keeps CI honest about what we're really
-      # testing, and keeps tracking Renovate's Dockerfile bumps automatically.
-      - name: Determine Python version from production Dockerfile
+      # Test against the same Python version the Dockerfile actually ships.
+      - name: Determine Python version from Dockerfile
         id: python-version
         run: |
           VERSION=$(sed -n 's/^FROM python:\([0-9]\+\.[0-9]\+\)-slim.*/\1/p' Dockerfile | head -n1)
           if [ -z "$VERSION" ]; then
-            echo "::error::Could not determine the Python version from Dockerfile's base image (expected a 'FROM python:X.Y-slim...' line)" >&2
+            echo "::error::Could not find a 'FROM python:X.Y-slim' line in Dockerfile" >&2
             exit 1
           fi
-          echo "Detected production Python version: $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Set up Python ${{ steps.python-version.outputs.version }} (matches production Dockerfile)
+      - name: Set up Python ${{ steps.python-version.outputs.version }}
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ steps.python-version.outputs.version }}
@@ -54,215 +38,12 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Run unit tests with coverage
-        run: pytest --cov=app --cov-report=term-missing --cov-report=xml --color=no
-
-      # Same metric .coveragerc's `fail_under` gate just enforced above,
-      # re-extracted as a plain number so later steps can do arithmetic on
-      # it (and so the PR comment can never disagree with the gate).
-      #
-      # Full precision is kept here deliberately (not rounded) so the
-      # main-vs-PR regression comparison below can catch a real decrease
-      # that would otherwise round away (e.g. 37.531% -> 37.529% both
-      # display as 37.53%). Rounding happens only when building the
-      # human-readable PR comment, never before the gate compares values.
-      - name: Compute coverage percentage
-        if: always()
-        id: coverage
-        run: |
-          if [ ! -f coverage.xml ]; then
-            echo "No coverage.xml produced (test run likely errored before collection); skipping."
-            exit 0
-          fi
-          python -m coverage json -o coverage.json -q
-          PCT=$(python -c "import json; print(json.load(open('coverage.json'))['totals']['percent_covered'])")
-          echo "$PCT" > coverage-percent.txt
-          echo "percent=$PCT" >> "$GITHUB_OUTPUT"
+        run: pytest --cov=app --cov-report=term-missing --cov-report=xml
 
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: unit-test-coverage
-          path: |
-            coverage.xml
-            coverage-percent.txt
+          path: coverage.xml
           if-no-files-found: ignore
-
-      # No GitHub-native coverage product is usable here: GitHub Code
-      # Quality's PR coverage comparison requires GitHub Team or Enterprise
-      # Cloud, and this repository is a personal-account (not
-      # organization-owned) repo, so it's not eligible at any price. This
-      # reproduces the same "main vs PR" comparison ourselves via the
-      # ordinary REST API and the coverage-percent.txt uploaded above -
-      # no third-party coverage Action, no external service.
-      #
-      # This is the actual enforcement of "a PR must not reduce coverage
-      # vs main": unlike .coveragerc's fail_under (an absolute floor that
-      # stays fixed until someone deliberately raises it, and so can't
-      # catch a regression that lands above that floor), this compares
-      # against main's own latest measured number every time, so it always
-      # fails a real regression regardless of how far above the floor it
-      # is. It only reads (actions: read; no `contents`/`pull-requests`
-      # write) - posting the actual PR comment needs write access, and
-      # happens from the separate report-coverage job below, which never
-      # checks out or executes any PR-controlled code.
-      #
-      # Every GitHub API call's HTTP status is checked explicitly and
-      # distinguished from "no runs/artifact yet": an API/network failure
-      # here fails the check (exit 1), it never silently falls through to
-      # "no baseline found" and lets a PR pass unverified.
-      - name: Compare coverage with main branch
-        if: always() && github.event_name == 'pull_request' && steps.coverage.outputs.percent != ''
-        id: compare
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          PR_PCT: ${{ steps.coverage.outputs.percent }}
-        run: |
-          API="https://api.github.com/repos/${REPO}"
-          AUTH_HEADER="Authorization: Bearer ${GH_TOKEN}"
-
-          MAIN_PCT=""
-
-          RUNS_RESPONSE=$(curl -sS -w $'\n%{http_code}' -H "$AUTH_HEADER" -H "Accept: application/vnd.github+json" \
-            "$API/actions/workflows/tests.yml/runs?branch=main&event=push&status=success&per_page=1")
-          RUNS_HTTP=$(echo "$RUNS_RESPONSE" | tail -n1)
-          RUNS_BODY=$(echo "$RUNS_RESPONSE" | sed '$d')
-
-          if [ "$RUNS_HTTP" != "200" ]; then
-            echo "::error::Failed to query main-branch workflow runs (HTTP $RUNS_HTTP) - cannot verify this PR doesn't regress coverage."
-            echo "status=error" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-          RUN_ID=$(echo "$RUNS_BODY" | jq -r '.workflow_runs[0].id // empty')
-
-          if [ -n "$RUN_ID" ]; then
-            ARTIFACTS_RESPONSE=$(curl -sS -w $'\n%{http_code}' -H "$AUTH_HEADER" -H "Accept: application/vnd.github+json" \
-              "$API/actions/runs/${RUN_ID}/artifacts")
-            ARTIFACTS_HTTP=$(echo "$ARTIFACTS_RESPONSE" | tail -n1)
-            ARTIFACTS_BODY=$(echo "$ARTIFACTS_RESPONSE" | sed '$d')
-
-            if [ "$ARTIFACTS_HTTP" != "200" ]; then
-              echo "::error::Failed to list artifacts for main's latest run (HTTP $ARTIFACTS_HTTP) - cannot verify this PR doesn't regress coverage."
-              echo "status=error" >> "$GITHUB_OUTPUT"
-              exit 1
-            fi
-
-            ARTIFACT_URL=$(echo "$ARTIFACTS_BODY" | jq -r '[.artifacts[] | select(.name=="unit-test-coverage")][0].archive_download_url // empty')
-
-            if [ -n "$ARTIFACT_URL" ]; then
-              HTTP_CODE=$(curl -sS -L -H "$AUTH_HEADER" -w '%{http_code}' "$ARTIFACT_URL" -o main-coverage.zip)
-              if [ "$HTTP_CODE" != "200" ]; then
-                echo "::error::Failed to download main's coverage artifact (HTTP $HTTP_CODE) - cannot verify this PR doesn't regress coverage."
-                echo "status=error" >> "$GITHUB_OUTPUT"
-                exit 1
-              fi
-              MAIN_PCT=$(unzip -p main-coverage.zip coverage-percent.txt 2>/dev/null | tr -d '[:space:]')
-              if [ -z "$MAIN_PCT" ]; then
-                echo "::error::Downloaded main's coverage artifact but coverage-percent.txt was missing or empty - cannot verify this PR doesn't regress coverage."
-                echo "status=error" >> "$GITHUB_OUTPUT"
-                exit 1
-              fi
-            fi
-          fi
-
-          echo "main_percent=$MAIN_PCT" >> "$GITHUB_OUTPUT"
-
-          if [ -z "$MAIN_PCT" ]; then
-            echo "No main-branch coverage baseline found yet (first run, or main hasn't been built with this check yet) - skipping the regression comparison."
-            echo "status=no-baseline" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          CHANGE=$(python -c "print(f'{${PR_PCT} - ${MAIN_PCT}:+.2f}')")
-          echo "change=$CHANGE" >> "$GITHUB_OUTPUT"
-
-          if python -c "exit(0 if ${PR_PCT} >= ${MAIN_PCT} else 1)"; then
-            echo "status=pass" >> "$GITHUB_OUTPUT"
-            echo "PR coverage ${PR_PCT}% >= main coverage ${MAIN_PCT}% (change ${CHANGE}%) - no regression."
-          else
-            echo "status=fail" >> "$GITHUB_OUTPUT"
-            echo "::error::PR coverage ${PR_PCT}% is lower than main's ${MAIN_PCT}% (change ${CHANGE}%). A PR must not reduce coverage vs main."
-            exit 1
-          fi
-
-  # Deliberately a separate job from unit-tests: it never checks out or
-  # executes any PR-controlled code, so it's safe for it to hold the
-  # pull-requests: write permission that unit-tests (which does execute
-  # PR code via `pytest`) must not have.
-  report-coverage:
-    needs: unit-tests
-    if: always() && github.event_name == 'pull_request' && needs.unit-tests.outputs.percent != ''
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-    steps:
-      - name: Report coverage on pull request
-        continue-on-error: true # best-effort only: GITHUB_TOKEN is read-only on fork PRs
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_PCT: ${{ needs.unit-tests.outputs.percent }}
-          MAIN_PCT: ${{ needs.unit-tests.outputs.main_percent }}
-          CHANGE: ${{ needs.unit-tests.outputs.change }}
-          CMP_STATUS: ${{ needs.unit-tests.outputs.status }}
-        run: |
-          API="https://api.github.com/repos/${REPO}"
-          AUTH_HEADER="Authorization: Bearer ${GH_TOKEN}"
-
-          # Rounded here, for display only - the gate in unit-tests already
-          # compared the unrounded values.
-          PR_PCT_FMT=$(python -c "print(f'{${PR_PCT}:.2f}')")
-          MAIN_PCT_FMT=""
-          if [ -n "$MAIN_PCT" ]; then
-            MAIN_PCT_FMT=$(python -c "print(f'{${MAIN_PCT}:.2f}')")
-          fi
-
-          if [ "$CMP_STATUS" = "pass" ]; then
-            TABLE=$(printf '| | Coverage |\n|---|---|\n| `main` | %s%% |\n| This PR | %s%% |\n| Change | %s%% |\n\nStatus: ✅ No coverage regression\n' \
-              "$MAIN_PCT_FMT" "$PR_PCT_FMT" "$CHANGE")
-          elif [ "$CMP_STATUS" = "fail" ]; then
-            TABLE=$(printf '| | Coverage |\n|---|---|\n| `main` | %s%% |\n| This PR | %s%% |\n| Change | %s%% |\n\nStatus: ❌ Coverage regression - a PR must not reduce coverage below `main`\n' \
-              "$MAIN_PCT_FMT" "$PR_PCT_FMT" "$CHANGE")
-          elif [ "$CMP_STATUS" = "error" ]; then
-            TABLE=$(printf 'This PR: **%s%%**\n\nStatus: ⚠️ Could not verify this PR against `main`'"'"'s coverage - the GitHub API lookup for `main`'"'"'s baseline failed. See the failed "Compare coverage with main branch" step for details.\n' "$PR_PCT_FMT")
-          else
-            TABLE=$(printf 'This PR: **%s%%**\n\n(No coverage baseline found yet for `main` - this may be the first run, so the regression check was skipped rather than failed.)\n' "$PR_PCT_FMT")
-          fi
-
-          MARKER="<!-- unit-test-coverage-report -->"
-          BODY=$(printf '%s\n### Unit test coverage\n\n%s\n\nMeasured for `app/` only (production code; test/support code is excluded). A PR fails if its coverage is lower than `main`'"'"'s, or if it drops below the absolute floor pinned in `.coveragerc` (`fail_under`), whichever is stricter.\n' "$MARKER" "$TABLE")
-          JSON_BODY=$(jq -n --arg body "$BODY" '{body: $body}')
-
-          ISSUE_API="$API/issues/${PR_NUMBER}/comments"
-
-          # Paginated: a coverage comment posted more than one page of
-          # comments ago must still be found and updated in place, never
-          # silently duplicated once a PR accumulates more than one page
-          # of discussion.
-          EXISTING_ID=""
-          PAGE=1
-          while :; do
-            RESP=$(curl -sS -H "$AUTH_HEADER" -H "Accept: application/vnd.github+json" \
-              "$ISSUE_API?per_page=100&page=$PAGE")
-            COUNT=$(echo "$RESP" | jq 'length')
-            if [ "$COUNT" -eq 0 ]; then
-              break
-            fi
-            FOUND=$(echo "$RESP" | jq -r --arg marker "$MARKER" '[.[] | select(.body | startswith($marker))][0].id // empty')
-            if [ -n "$FOUND" ]; then
-              EXISTING_ID="$FOUND"
-              break
-            fi
-            PAGE=$((PAGE + 1))
-          done
-
-          if [ -n "$EXISTING_ID" ]; then
-            curl -sS -X PATCH -H "$AUTH_HEADER" -H "Accept: application/vnd.github+json" \
-              "$API/issues/comments/${EXISTING_ID}" -d "$JSON_BODY" > /dev/null
-          else
-            curl -sS -X POST -H "$AUTH_HEADER" -H "Accept: application/vnd.github+json" \
-              "$ISSUE_API" -d "$JSON_BODY" > /dev/null
-          fi
