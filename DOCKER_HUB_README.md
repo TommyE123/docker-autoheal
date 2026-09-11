@@ -11,6 +11,8 @@ A production-ready Docker container monitoring and auto-healing service with a m
 
 Images are published to both Docker Hub and GitHub Container Registry (GHCR) - use whichever you prefer.
 
+> **Note:** GHCR packages are private by default when first published. If `docker pull ghcr.io/tommye123/docker-autoheal` fails with an access/authentication error, the package hasn't been switched to public yet in its GitHub package settings (Package settings → Change visibility) - use the Docker Hub image below in the meantime, or `docker login ghcr.io` with a token that has read access.
+
 **Docker Hub:**
 ```bash
 docker run -d \
@@ -331,4 +333,3 @@ Contributions welcome! Please see the GitHub repository for guidelines.
 ---
 
 **Built with ❤️ using Python, FastAPI, React, and Docker**
-
