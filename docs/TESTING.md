@@ -4,7 +4,7 @@
 
 Unit tests live in `app/tests/unit/`. They run entirely against fakes and mocks:
 **no Docker daemon and no running Auto-Heal service are required**, and no
-external network calls are made.
+external network calls are made. This is what CI runs.
 
 An integration suite lives in `app/tests/integration/`. Those tests exercise a
 real Docker daemon and/or a running Auto-Heal service (`http://localhost:3131`)
@@ -26,6 +26,12 @@ pytest --cov=app --cov-report=term-missing
 
 Coverage settings live in `.coveragerc` (source `app`, branch coverage on,
 tests and one-off scripts omitted).
+
+## Coverage floor
+
+`.coveragerc` sets `fail_under = 35`: an initial floor, not a target. `pytest`
+fails if total coverage drops below it. Raise this deliberately as coverage
+improves - never lower it just to turn a red build green.
 
 ## Running the integration suite
 
@@ -118,5 +124,8 @@ The suite focuses on the monitoring engine and its restart/recovery behaviour:
 
 ## CI
 
-`.github/workflows/tests.yml` runs the suite with coverage on every push to
-`main` and on every pull request, against Python 3.11 and 3.12.
+`.github/workflows/tests.yml` runs the unit suite with coverage on every push
+to `main` and on every pull request, against the Python version the
+production `Dockerfile` uses (read from its `FROM python:X.Y-slim` line), so
+CI tests the runtime that actually ships. Coverage output is reported in the
+GitHub Actions job log.

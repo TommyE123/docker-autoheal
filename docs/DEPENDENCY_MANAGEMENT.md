@@ -88,6 +88,11 @@ Renovate automerges the PR
   merging it itself. GitHub only completes that merge once every required status check on the PR
   is green - so automerge structurally cannot complete while CI is failing or still running,
   and `renovate.json` never sets `requiredStatusChecks` to bypass that.
+- `rebaseWhen: "behind-base-branch"` makes Renovate keep every dependency-update branch rebased
+  onto `main` whenever `main` moves, instead of only rebasing when the branch has a merge conflict
+  (Renovate's default `"auto"` setting only forces this for branches that are already set to
+  automerge). This keeps update PRs - including `major` ones, which never automerge - testable
+  against the latest `main` and prevents them from going stale while waiting on CI/review.
 - Automerge is enabled only for `minor`, `patch`, `digest`, `pin`, and `pinDigest` updates. `major`
   updates always get a normal PR that a maintainer merges by hand, so a major version bump never
   looks like (or merges like) a routine patch update.
