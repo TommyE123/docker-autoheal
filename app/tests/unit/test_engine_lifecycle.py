@@ -16,11 +16,18 @@ from app.tests.unit.conftest import make_container
 
 
 def start_event(container_id: str, name: str) -> dict:
-    """Build a Docker ``container start`` event payload."""
+    """
+    Build a Docker ``container start`` event payload.
+
+    Matches the real Docker Events API shape: the container ID lives at
+    ``Actor.ID``, not a top-level ``id`` key (regression coverage for #78,
+    where reading ``event["id"]`` silently no-opped against real events).
+    """
     return {
-        "id": container_id,
-        "status": "start",
+        "Type": "container",
+        "Action": "start",
         "Actor": {"ID": container_id, "Attributes": {"name": name}},
+        "scope": "local",
     }
 
 
@@ -225,6 +232,33 @@ class TestProcessContainerStartEvent:
         await engine._process_container_start_event(start_event(container.id, "stack-web-1"))
 
         assert config_manager.get_config().containers.selected == ["stack_web"]
+
+    async def test_real_docker_daemon_event_shape_is_handled(self, engine, docker_client):
+        """
+        Regression test for #78.
+
+        A real Docker daemon ``start`` event has no top-level ``id`` key -
+        the container ID is only ever under ``Actor.ID``. The engine used to
+        read ``event["id"]``, which is always ``None`` against a real event
+        and made it silently return before doing anything or logging.
+        """
+        container, info = make_container(name="web", labels={"autoheal": "true"})
+        docker_client.add_container(container, info)
+        real_daemon_event = {
+            "Type": "container",
+            "Action": "start",
+            "Actor": {
+                "ID": container.id,
+                "Attributes": {"autoheal": "true", "image": "nginx:alpine", "name": "web"},
+            },
+            "scope": "local",
+            "time": 1700000000,
+            "timeNano": 1700000000000000000,
+        }
+
+        await engine._process_container_start_event(real_daemon_event)
+
+        assert config_manager.get_config().containers.selected == ["web"]
 
     async def test_monitoring_id_label_wins(self, engine, docker_client):
         container, info = make_container(

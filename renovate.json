@@ -25,9 +25,9 @@
       "pinDigests": true
     },
     {
-      "description": "swaya1125/docker-autoheal (referenced in docker-compose.yml) is this project's own published image, not a third-party dependency - see the comment next to that reference. Renovate should not manage it.",
+      "description": "tommye123/docker-autoheal (referenced in docker-compose.yml) is this project's own published image, not a third-party dependency - see the comment next to that reference. Renovate should not manage it.",
       "matchDatasources": ["docker"],
-      "matchPackageNames": ["swaya1125/docker-autoheal"],
+      "matchPackageNames": ["tommye123/docker-autoheal"],
       "enabled": false
     }
   ]
