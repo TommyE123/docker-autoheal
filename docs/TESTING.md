@@ -68,5 +68,5 @@ The suite focuses on the monitoring engine and its restart/recovery behaviour:
 `.github/workflows/tests.yml` runs the unit suite with coverage on every push
 to `main` and on every pull request, against the Python version the
 production `Dockerfile` uses (read from its `FROM python:X.Y-slim` line), so
-CI tests the runtime that actually ships. Coverage output goes to the job log
-and to a `coverage.xml` artifact.
+CI tests the runtime that actually ships. Coverage output is reported in the
+GitHub Actions job log.
