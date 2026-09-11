@@ -27,13 +27,8 @@ pytest --cov=app --cov-report=term-missing
 Coverage settings live in `.coveragerc` (source `app`, branch coverage on,
 tests and one-off scripts omitted).
 
-## Coverage floor
-
-`.coveragerc` sets `fail_under = 50` (raised from an initial 35% once the
-converted tests and the RestartCount regression test cleared that bar): a
-floor, not a target. `pytest` fails if total coverage drops below it. Raise
-this deliberately as coverage improves - never lower it just to turn a red
-build green.
+Coverage is reported to Codecov (see `.codecov.yml` and `.github/workflows/tests.yml`)
+rather than enforced locally - `.coveragerc` no longer sets a `fail_under` floor.
 
 ## Running the integration suite
 

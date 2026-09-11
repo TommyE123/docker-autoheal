@@ -13,7 +13,6 @@ http://localhost:3131.
 
 import time
 import uuid
-import warnings
 
 import pytest
 import requests
@@ -51,21 +50,14 @@ def test_container_with_autoheal_label_is_auto_monitored(running_service, dispos
         # or compose labels) to the service's real containers.selected.
         # POSTing enabled=False to /api/containers/select would move it to
         # containers.excluded instead of clearing it, so edit config directly.
-        # Caught rather than left to propagate: an exception raised here would
-        # otherwise replace (and hide) a real AssertionError from the test body,
-        # and there's nothing more this test can do about a live service that's
-        # unreachable during cleanup beyond surfacing it clearly.
-        try:
-            response = requests.get(f"{AUTOHEAL_BASE_URL}/api/config", timeout=5)
-            response.raise_for_status()
-            config = response.json()
-            config["containers"]["selected"] = [
-                s for s in config["containers"]["selected"] if s != container_name
-            ]
-            requests.put(f"{AUTOHEAL_BASE_URL}/api/config", json=config, timeout=5).raise_for_status()
-        except Exception as exc:
-            warnings.warn(
-                f"Cleanup failed to remove '{container_name}' from containers.selected on the "
-                f"running Auto-Heal service - remove it manually: {exc}",
-                stacklevel=2,
-            )
+        # Left unguarded deliberately: if this cleanup itself fails, the test
+        # must fail loudly (not just warn) rather than leave the running
+        # service silently modified. Python chains it with any AssertionError
+        # from above, so neither failure is lost.
+        response = requests.get(f"{AUTOHEAL_BASE_URL}/api/config", timeout=5)
+        response.raise_for_status()
+        config = response.json()
+        config["containers"]["selected"] = [
+            s for s in config["containers"]["selected"] if s != container_name
+        ]
+        requests.put(f"{AUTOHEAL_BASE_URL}/api/config", json=config, timeout=5).raise_for_status()
