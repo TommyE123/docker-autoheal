@@ -22,6 +22,16 @@ Set the title correctly when you open the PR — don't rely on a later retitle. 
 
 Renovate-authored PRs are covered separately by `renovate.json`'s `semanticCommits` setting, not by this file — Renovate doesn't read `CLAUDE.md`.
 
+## Pull requests need a linked issue
+
+If a PR changes application behavior or adds real scope (new feature, bug fix, refactor with user-visible effect, new CI/tooling capability), file a GitHub issue for it first — or confirm one already exists — and link the PR to it (`Closes #N` in the PR body). This keeps a traceable record of *why* a change happened, not just what changed.
+
+Exceptions (no issue required):
+- Renovate-authored PRs (automated, never have an issue by design).
+- Purely mechanical docs-only, config-only, or CI-only tweaks with no behavior change (e.g. fixing a PR title, a typo, a lint config value).
+
+When in doubt, file the issue — it's cheap, and it's what nearly every substantive change in this repo already does.
+
 ## Session titles (Claude Code app)
 
 When your task is driven by a specific GitHub issue, title your Claude Code session `Issue #N: <issue title>` (matching the issue's own title) so it's identifiable in the session list at a glance. If the task isn't tied to a single filed issue, a short descriptive title is fine.
