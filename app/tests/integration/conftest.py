@@ -37,7 +37,7 @@ def real_docker_client():
 
     try:
         wrapper = DockerClientWrapper()
-    except Exception as exc:
+    except docker.errors.DockerException as exc:
         pytest.skip(f"No Docker daemon available: {exc}")
 
     try:
@@ -81,9 +81,16 @@ def disposable_container(real_docker_client):
     try:
         yield _run
     finally:
-        for container in created:
-            try:
-                container.remove(force=True)
-            except docker.errors.NotFound:
-                pass  # already removed by the test itself
-        client.close()
+        removal_errors = []
+        try:
+            for container in created:
+                try:
+                    container.remove(force=True)
+                except docker.errors.NotFound:
+                    pass  # already removed by the test itself
+                except docker.errors.DockerException as exc:
+                    removal_errors.append(exc)
+        finally:
+            client.close()
+        if removal_errors:
+            raise removal_errors[0]
