@@ -4,6 +4,7 @@
   "description": "Dependency-update policy for docker-autoheal. See docs/DEPENDENCY_MANAGEMENT.md for the full explanation of these choices.",
   "forkProcessing": "enabled",
   "platformAutomerge": true,
+  "rebaseWhen": "behind-base-branch",
   "packageRules": [
     {
       "description": "Automerge routine, low-risk updates (patch/minor version bumps, digest refreshes, and Renovate's own version/digest 'pin' PRs) once all required CI checks on the PR have passed. GitHub's native auto-merge is used (platformAutomerge above), so this can never complete while a required status check is failing or pending.",
