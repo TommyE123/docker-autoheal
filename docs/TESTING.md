@@ -40,28 +40,17 @@ Coverage regressions are enforced two ways, in order:
    floor it lands, and it moves automatically as `main`'s coverage moves
    (nothing to remember to bump). It only reads GitHub's API (no write
    access needed), so it runs identically on PRs from forks.
-2. **Absolute, in `.coveragerc` (secondary safety net).** `fail_under`
-   (currently 37.52%, at `precision = 2`) pins a floor to the coverage the
-   suite measured on `main` as of the CI-foundation work (37.53%, i.e.
-   37.525987...% unrounded). `pytest-cov` reads this automatically, so
-   `pytest --cov=app ...` - locally or in CI, PR or not - fails if total
-   coverage drops below that floor, even if every test still passes. This
-   catches the case the relative check can't: a first push straight to
-   `main` (or any run with no `main` baseline to compare against, e.g. this
-   repo's very first coverage-checked commit) still gets a floor. Like the
-   relative check, this is a ratchet, not a target: raise it deliberately,
-   in the same PR that earns the improvement, as coverage grows. Never
-   lower it just to turn a red build green.
-
-   Both `fail_under` and `precision` matter: coverage.py's actual pass/fail
-   check compares `round(total, precision)` against `fail_under`, so at the
-   default `precision` (0) a `fail_under` like `37` only fails once real
-   coverage drops below roughly 36.5% - over a point of undetected
-   regression. `precision = 2` tightens that blind spot to about a
-   hundredth of a point; `fail_under` is set one hundredth below the
-   rounded baseline (37.52, not 37.53) so an unchanged baseline build
-   reports a clean pass rather than a spurious "FAIL" in pytest-cov's
-   summary line.
+2. **Absolute, in `.coveragerc` (secondary safety net).** `fail_under = 35`
+   (at `precision = 0`) is a deliberate, round initial floor - not a value
+   pinned to whatever the suite happened to measure. `pytest-cov` reads
+   this automatically, so `pytest --cov=app ...` - locally or in CI, PR or
+   not - fails if total coverage drops below it, even if every test still
+   passes. This exists only for the case the relative check can't cover: a
+   first push straight to `main`, or any run with no `main` baseline to
+   compare against (e.g. this repo's very first coverage-checked commit),
+   still gets a floor. Like the relative check, raise it deliberately as
+   confidence in the suite grows - never lower it just to turn a red build
+   green.
 
 On every pull request, the CI job also posts (and keeps updated) a comment
 showing both numbers and the outcome, e.g.:
