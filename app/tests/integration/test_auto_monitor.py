@@ -48,17 +48,30 @@ def test_container_with_autoheal_label_is_auto_monitored(
         ports={"80/tcp": None},
     )
 
-    assert _wait_for_auto_monitor_event(container.id), (
-        "Expected an auto_monitor event for the labelled container within "
-        f"{POLL_TIMEOUT_SECONDS}s"
-    )
+    try:
+        assert _wait_for_auto_monitor_event(container.id), (
+            "Expected an auto_monitor event for the labelled container within "
+            f"{POLL_TIMEOUT_SECONDS}s"
+        )
 
-    response = requests.get(f"{AUTOHEAL_BASE_URL}/api/config", timeout=5)
-    response.raise_for_status()
-    selected = response.json().get("containers", {}).get("selected", [])
-    assert container.id in selected or any(container.id.startswith(s) for s in selected) or (
-        container.name in selected
-    )
+        response = requests.get(f"{AUTOHEAL_BASE_URL}/api/config", timeout=5)
+        response.raise_for_status()
+        selected = response.json().get("containers", {}).get("selected", [])
+        assert container.id in selected or any(container.id.startswith(s) for s in selected) or (
+            container.name in selected
+        )
+    finally:
+        # Auto-monitoring persists the container in config_manager's
+        # real containers.selected list. Deselect it so repeated test runs
+        # don't accumulate stale entries in the service's saved config.
+        try:
+            requests.post(
+                f"{AUTOHEAL_BASE_URL}/api/containers/select",
+                json={"container_ids": [container.id], "enabled": False},
+                timeout=5,
+            )
+        except Exception:
+            pass
 
 
 def test_container_without_autoheal_label_is_not_auto_monitored(
