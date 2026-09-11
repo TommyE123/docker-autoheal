@@ -29,7 +29,7 @@ tests and one-off scripts omitted).
 
 ## Coverage floor
 
-`.coveragerc` sets `fail_under = 60` (raised from an initial 35% once real
+`.coveragerc` sets `fail_under = 50` (raised from an initial 35% once real
 coverage - error handling, configuration, notification channels, Docker
 client behaviour - cleared that bar): a floor, not a target. `pytest` fails
 if total coverage drops below it. Raise this deliberately as coverage
