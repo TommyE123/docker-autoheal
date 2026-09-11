@@ -7,11 +7,6 @@ removed from quarantine with an event logged.
 import pytest
 from datetime import datetime, timezone
 from unittest.mock import Mock, AsyncMock, patch
-import sys
-import os
-
-# Add parent directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 
 class TestAutoUnquarantine:
@@ -237,13 +232,4 @@ class TestAutoUnquarantine:
 
             # Verify unquarantine was NOT called (container is still unhealthy)
             mock_config.unquarantine_container.assert_not_called()
-
-
-def run_tests():
-    """Run all tests in this module"""
-    pytest.main([__file__, "-v"])
-
-
-if __name__ == "__main__":
-    run_tests()
 

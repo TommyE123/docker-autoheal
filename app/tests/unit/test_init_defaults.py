@@ -184,7 +184,3 @@ class TestInitDefaults:
         assert "\n" in content  # Has newlines
         assert "  " in content  # Has indentation
 
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
-
