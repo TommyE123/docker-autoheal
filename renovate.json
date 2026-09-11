@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
-  "description": "Dependency-update policy for docker-autoheal. See docs/DEPENDENCY_MANAGEMENT.md for the full explanation of these choices.",
+  "description": "Dependency-update policy for docker-autoheal. See docs/maintainer/dependency-management.md for the full explanation of these choices.",
   "forkProcessing": "enabled",
   "platformAutomerge": true,
   "packageRules": [

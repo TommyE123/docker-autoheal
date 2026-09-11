@@ -53,6 +53,21 @@ The suite focuses on the monitoring engine and its restart/recovery behaviour:
 * `recorded_sleeps` (autouse) replaces `asyncio.sleep`, so restart-backoff
   delays are recorded and asserted on rather than actually waited for.
 
+## Manual / integration scripts
+
+The Python scripts at the repository root (`test_notifications.py`,
+`test_proactive_scan.py`, `test_restart_count.py`, `test_uptime_kuma_api.py`) and the
+ad-hoc scripts under `app/tests/` (e.g. `test_service.py`, `test_auto_monitor.py`) are not
+part of the pytest suite — they require a running Docker Auto-Heal instance and, in some
+cases, live Docker containers or external services. Read each script's own docstring
+before running it; they're intended for manual verification during development, not CI.
+
+## Frontend
+
+There is currently no automated frontend test suite. `npm run lint` (ESLint) is defined in
+`frontend/package.json`, but there's no ESLint configuration file yet, so it doesn't
+currently run successfully — see [Frontend Development](frontend.md#linting).
+
 ## CI
 
 `.github/workflows/tests.yml` runs the suite with coverage on every push to
