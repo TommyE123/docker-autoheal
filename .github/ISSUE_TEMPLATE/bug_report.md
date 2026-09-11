@@ -24,35 +24,18 @@ What actually happened instead?
 2.
 3.
 
-## Environment
+## Image/tag
 
-- Autoheal version/image tag:
-- Docker version (`docker version`):
-- Host OS:
-- Deployment method (docker run / docker-compose / other):
-
-## Relevant configuration
-
-Autoheal environment variables / config relevant to the issue (redact secrets):
-
-```
-AUTOHEAL_INTERVAL=
-AUTOHEAL_LOG_LEVEL=
-...
-```
-
-## Affected container(s) and health status
-
-Container name/image, and output of `docker inspect --format='{{json .State.Health}}' <container>` if applicable.
+Which Autoheal image/tag are you using? (e.g. `latest`, or a specific version if not using `latest`)
 
 ## Relevant logs
 
-Autoheal logs around the time of the issue (redact secrets/sensitive data):
+Autoheal logs around the time of the issue. Please redact any secrets or sensitive information.
 
 ```
 paste logs here
 ```
 
-## Additional context
+## Additional context (optional)
 
-Anything else that might help diagnose the issue.
+Anything else that might help, e.g. relevant configuration, labels, or container health status. Please redact any secrets or sensitive information.

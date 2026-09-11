@@ -14,10 +14,10 @@ What problem are you trying to solve? What is the current limitation or pain poi
 
 Describe the change or feature you'd like to see.
 
-## Alternatives considered
+## Alternatives considered (optional)
 
 Any alternative solutions, workarounds, or existing features you've considered.
 
-## Additional context
+## Additional context (optional)
 
 Any other context, examples, or references that would help evaluate this request.
