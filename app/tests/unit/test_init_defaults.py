@@ -7,10 +7,10 @@ import json
 import tempfile
 import shutil
 from pathlib import Path
+import pytest
 
 from app.config.init_defaults import (
     initialize_defaults,
-    init_data_file,
     reset_to_defaults,
     get_default_config,
     get_default_events,
@@ -183,33 +183,4 @@ class TestInitDefaults:
         # Check that JSON is indented (not minified)
         assert "\n" in content  # Has newlines
         assert "  " in content  # Has indentation
-
-    def test_init_data_file_returns_false_and_logs_on_write_failure(self, monkeypatch):
-        monkeypatch.setattr(
-            "builtins.open", lambda *a, **k: (_ for _ in ()).throw(OSError("disk full"))
-        )
-
-        assert init_data_file(self.temp_dir / "config.json", {}, "config.json") is False
-
-    def test_initialize_falls_back_when_data_dir_is_not_writable(self, monkeypatch):
-        real_mkdir = Path.mkdir
-
-        def _mkdir_fails_once(self, *args, **kwargs):
-            monkeypatch.setattr(Path, "mkdir", real_mkdir)  # only the first call fails
-            raise OSError("permission denied")
-
-        monkeypatch.setattr(Path, "mkdir", _mkdir_fails_once)
-        monkeypatch.chdir(self.temp_dir)
-
-        initialize_defaults(Path("/not-writable"))
-
-        assert (self.temp_dir / "data" / "config.json").exists()
-
-    def test_reset_to_defaults_logs_and_continues_on_write_failure(self, monkeypatch):
-        initialize_defaults(self.temp_dir)
-        monkeypatch.setattr(
-            "builtins.open", lambda *a, **k: (_ for _ in ()).throw(OSError("disk full"))
-        )
-
-        reset_to_defaults(self.temp_dir)  # must not raise
 

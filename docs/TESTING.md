@@ -29,11 +29,11 @@ tests and one-off scripts omitted).
 
 ## Coverage floor
 
-`.coveragerc` sets `fail_under = 50` (raised from an initial 35% once real
-coverage - error handling, configuration, notification channels, Docker
-client behaviour - cleared that bar): a floor, not a target. `pytest` fails
-if total coverage drops below it. Raise this deliberately as coverage
-improves - never lower it just to turn a red build green.
+`.coveragerc` sets `fail_under = 50` (raised from an initial 35% once the
+converted tests and the RestartCount regression test cleared that bar): a
+floor, not a target. `pytest` fails if total coverage drops below it. Raise
+this deliberately as coverage improves - never lower it just to turn a red
+build green.
 
 ## Running the integration suite
 

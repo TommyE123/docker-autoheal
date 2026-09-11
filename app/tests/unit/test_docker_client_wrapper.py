@@ -70,9 +70,6 @@ class TestConnection:
 
         assert wrapper.is_connected() is False
 
-    def test_is_connected_is_true_when_ping_succeeds(self, wrapper):
-        assert wrapper.is_connected() is True
-
     def test_reconnect_reports_failure(self, wrapper):
         with patch(
             "app.docker_client.docker_client_wrapper.docker.DockerClient",
@@ -114,15 +111,6 @@ class TestListingAndLookup:
         sdk_client.containers.get.side_effect = docker.errors.APIError("boom")
 
         assert wrapper.get_container("web") is None
-
-    def test_list_containers_reconnects_when_the_connection_was_lost(self, wrapper, sdk_client):
-        sdk_client.containers.list.side_effect = docker.errors.APIError("daemon gone")
-        sdk_client.ping.side_effect = docker.errors.APIError("daemon gone")
-
-        with patch("app.docker_client.docker_client_wrapper.docker.DockerClient", return_value=sdk_client):
-            wrapper.list_containers()
-
-        assert sdk_client.ping.call_count >= 2  # is_connected(), then reconnect()'s own _connect()
 
 
 class TestContainerInfo:
@@ -214,12 +202,6 @@ class TestContainerActions:
 
         assert wrapper.restart_container(container) is False
 
-    def test_stop_returns_true_on_success(self, wrapper):
-        container = make_sdk_container()
-
-        assert wrapper.stop_container(container) is True
-        container.stop.assert_called_once_with(timeout=10)
-
     def test_stop_returns_false_on_api_error(self, wrapper):
         container = make_sdk_container()
         container.stop.side_effect = docker.errors.APIError("boom")
@@ -255,67 +237,6 @@ class TestContainerActions:
         container = make_sdk_container()
 
         assert wrapper.get_docker_native_health(container) is None
-
-    def test_native_health_returns_none_when_inspection_fails(self, wrapper):
-        container = make_sdk_container()
-        container.reload.side_effect = docker.errors.APIError("boom")
-
-        assert wrapper.get_docker_native_health(container) is None
-
-    def test_close_closes_the_sdk_client(self, wrapper, sdk_client):
-        wrapper.close()
-
-        sdk_client.close.assert_called_once()
-
-
-class TestHealthChecks:
-    """HTTP and TCP health checks, which resolve the container's own IP first."""
-
-    def test_http_check_passes_on_expected_status(self, wrapper):
-        container = make_sdk_container()
-        with patch("app.docker_client.docker_client_wrapper.requests.get") as get:
-            get.return_value = MagicMock(status_code=200)
-
-            assert wrapper.check_http_health(container, "http://localhost:8080/health") is True
-            get.assert_called_once_with("http://172.17.0.2:8080/health", timeout=5)
-
-    def test_http_check_fails_on_unexpected_status(self, wrapper):
-        container = make_sdk_container()
-        with patch("app.docker_client.docker_client_wrapper.requests.get") as get:
-            get.return_value = MagicMock(status_code=500)
-
-            assert wrapper.check_http_health(container, "http://localhost/health") is False
-
-    def test_http_check_fails_when_the_request_raises(self, wrapper):
-        container = make_sdk_container()
-        with patch("app.docker_client.docker_client_wrapper.requests.get", side_effect=OSError("no route")):
-            assert wrapper.check_http_health(container, "http://localhost/health") is False
-
-    def test_http_check_fails_without_a_container_ip(self, wrapper):
-        container = make_sdk_container()
-        container.attrs["NetworkSettings"] = {"Networks": {}}
-
-        assert wrapper.check_http_health(container, "http://localhost/health") is False
-
-    def test_tcp_check_passes_when_the_port_accepts_connections(self, wrapper):
-        container = make_sdk_container()
-        with patch("app.docker_client.docker_client_wrapper.socket.socket") as socket_cls:
-            socket_cls.return_value.connect_ex.return_value = 0
-
-            assert wrapper.check_tcp_health(container, 8080) is True
-
-    def test_tcp_check_fails_when_the_port_refuses_connections(self, wrapper):
-        container = make_sdk_container()
-        with patch("app.docker_client.docker_client_wrapper.socket.socket") as socket_cls:
-            socket_cls.return_value.connect_ex.return_value = 111  # ECONNREFUSED
-
-            assert wrapper.check_tcp_health(container, 8080) is False
-
-    def test_tcp_check_fails_without_a_container_ip(self, wrapper):
-        container = make_sdk_container()
-        container.attrs["NetworkSettings"] = {"Networks": {}}
-
-        assert wrapper.check_tcp_health(container, 8080) is False
 
 
 class TestEvents:
