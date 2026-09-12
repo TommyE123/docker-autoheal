@@ -61,7 +61,7 @@ from app.config.config_manager import (
     UptimeKumaMapping,
     config_manager,
 )
-from app.tests.unit.conftest import make_container
+from app.tests.unit.conftest import FakeUptimeKumaClient, make_container
 
 
 @pytest.fixture
@@ -395,24 +395,10 @@ class TestConfigurationEndpoints:
         assert updated.monitor.interval_seconds == original_interval
 
 
-class _FakeUptimeKumaClient:
-    """Stand-in for ``UptimeKumaClient`` with no real HTTP/WebSocket access."""
-
-    def __init__(self, connect_result: bool = True, monitors=None):
-        self._connect_result = connect_result
-        self._monitors = monitors if monitors is not None else []
-
-    async def connect(self) -> bool:
-        return self._connect_result
-
-    async def get_all_monitors(self):
-        return self._monitors
-
-
 @pytest.mark.asyncio
 class TestUptimeKumaConnection:
     async def test_successful_connection_reports_monitor_count(self, monkeypatch):
-        fake_client = _FakeUptimeKumaClient(connect_result=True, monitors=[{"id": 1}, {"id": 2}])
+        fake_client = FakeUptimeKumaClient(connect_result=True, monitors=[{"id": 1}, {"id": 2}])
         monkeypatch.setattr(
             "app.uptime_kuma.uptime_kuma_client.UptimeKumaClient",
             lambda *a, **k: fake_client,
@@ -426,7 +412,7 @@ class TestUptimeKumaConnection:
         assert result["monitor_count"] == 2
 
     async def test_failed_connection_reports_failure_without_raising(self, monkeypatch):
-        fake_client = _FakeUptimeKumaClient(connect_result=False)
+        fake_client = FakeUptimeKumaClient(connect_result=False)
         monkeypatch.setattr(
             "app.uptime_kuma.uptime_kuma_client.UptimeKumaClient",
             lambda *a, **k: fake_client,
@@ -443,7 +429,7 @@ class TestUptimeKumaIntegration:
         docker_client, _engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, info)
-        fake_client = _FakeUptimeKumaClient(
+        fake_client = FakeUptimeKumaClient(
             monitors=[{"friendly_name": "web"}, {"friendly_name": "unrelated"}]
         )
         monkeypatch.setattr(
