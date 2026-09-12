@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   autoheal:
@@ -12,12 +12,12 @@ services:
     # Mount Docker socket to access Docker API
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./data:/data  # Persistent data storage (config, events, logs)
+      - ./data:/data # Persistent data storage (config, events, logs)
 
     # Port mappings
     ports:
-      - "3131:3131"  # Web UI (React)
-      - "9090:9090"  # Prometheus metrics
+      - "3131:3131" # Web UI (React)
+      - "9090:9090" # Prometheus metrics
 
     # Environment variables (optional, can be configured via UI)
     environment:
@@ -50,4 +50,3 @@ services:
   #     timeout: 5s
   #     retries: 3
   #     start_period: 10s
-
