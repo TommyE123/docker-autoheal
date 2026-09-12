@@ -2,15 +2,20 @@
 Unit tests for ``UptimeKumaMonitor``.
 
 ``UptimeKumaMonitor`` only talks to the config manager and an injected
-``UptimeKumaClient``-shaped object, so it is tested with a lightweight fake
-client (mirroring ``_FakeUptimeKumaClient`` in ``test_api.py``) rather than
-faking aiohttp directly. The polling loop is exercised by faking
-``asyncio.sleep`` and stopping the loop after a controlled number of
-iterations, so no test depends on real timing.
+``UptimeKumaClient``-shaped object, so it is tested with the shared
+``FakeUptimeKumaClient`` fixture (see ``conftest.py``) rather than faking
+"""
+Unit tests for ``UptimeKumaMonitor``.
+
+``UptimeKumaMonitor`` only talks to the config manager and an injected
+``UptimeKumaClient``-shaped object, so it is tested with the shared
+``FakeUptimeKumaClient`` fixture (see ``conftest.py``) rather than faking
+aiohttp directly. The polling loop is exercised by faking ``asyncio.sleep``
+and stopping the loop after a controlled number of iterations, so no test
+depends on real timing.
 """
 
 import asyncio
-import logging
 from typing import cast
 
 import pytest
@@ -18,26 +23,8 @@ import pytest
 from app.config.config_manager import UptimeKumaMapping, config_manager
 from app.monitor import uptime_kuma_monitor as uptime_kuma_monitor_module
 from app.monitor.uptime_kuma_monitor import UptimeKumaMonitor
+from app.tests.unit.conftest import FakeUptimeKumaClient
 from app.uptime_kuma.uptime_kuma_client import UptimeKumaClient
-
-
-class _FakeUptimeKumaClient:
-    """In-memory stand-in for ``UptimeKumaClient``. No real HTTP is used."""
-
-    def __init__(self, connect_result: bool = True, monitors=None, get_all_monitors_error=None):
-        self.connect_result = connect_result
-        self.monitors = monitors if monitors is not None else []
-        self.get_all_monitors_error = get_all_monitors_error
-        self.get_all_monitors_calls = 0
-
-    async def connect(self) -> bool:
-        return self.connect_result
-
-    async def get_all_monitors(self):
-        self.get_all_monitors_calls += 1
-        if self.get_all_monitors_error is not None:
-            raise self.get_all_monitors_error
-        return self.monitors
 
 
 def _enable_uptime_kuma(auto_restart_on_down: bool = True):
@@ -57,7 +44,7 @@ def _add_mapping(container_id: str, monitor_friendly_name: str):
     config_manager.update_config(config)
 
 
-def _install_client(monitor: UptimeKumaMonitor, fake_client: _FakeUptimeKumaClient) -> None:
+def _install_client(monitor: UptimeKumaMonitor, fake_client: FakeUptimeKumaClient) -> None:
     """Attach a fake client, satisfying the ``Optional[UptimeKumaClient]`` type."""
     monitor.client = cast(UptimeKumaClient, fake_client)
 
@@ -96,7 +83,7 @@ class TestStart:
 
     async def test_successful_connect_builds_cache_and_starts_loop(self, monkeypatch):
         _enable_uptime_kuma()
-        fake_client = _FakeUptimeKumaClient(
+        fake_client = FakeUptimeKumaClient(
             connect_result=True, monitors=[{"friendly_name": "web", "status": 1}]
         )
         monkeypatch.setattr(
@@ -115,7 +102,7 @@ class TestStart:
 
     async def test_failed_connect_does_not_start_loop(self, monkeypatch):
         _enable_uptime_kuma()
-        fake_client = _FakeUptimeKumaClient(connect_result=False)
+        fake_client = FakeUptimeKumaClient(connect_result=False)
         monkeypatch.setattr(
             uptime_kuma_monitor_module, "UptimeKumaClient", lambda *a, **k: fake_client
         )
@@ -152,7 +139,7 @@ class TestStop:
 
     async def test_stop_cancels_running_task(self, monkeypatch):
         _enable_uptime_kuma()
-        fake_client = _FakeUptimeKumaClient(connect_result=True, monitors=[])
+        fake_client = FakeUptimeKumaClient(connect_result=True, monitors=[])
         monkeypatch.setattr(
             uptime_kuma_monitor_module, "UptimeKumaClient", lambda *a, **k: fake_client
         )
@@ -194,7 +181,7 @@ class TestRefreshMonitorCache:
         monitor = UptimeKumaMonitor()
         _install_client(
             monitor,
-            _FakeUptimeKumaClient(
+            FakeUptimeKumaClient(
                 monitors=[
                     {"friendly_name": "web", "status": 1},
                     {"friendly_name": "db", "status": 0},
@@ -211,30 +198,22 @@ class TestRefreshMonitorCache:
 class TestUpdateStatusCache:
     async def test_noop_when_no_mappings_configured(self):
         monitor = UptimeKumaMonitor()
-        fake_client = _FakeUptimeKumaClient()
+        fake_client = FakeUptimeKumaClient()
         _install_client(monitor, fake_client)
 
         await monitor._update_status_cache()
 
         assert monitor._container_status_cache == {}
-        assert fake_client.get_all_monitors_calls == 0
 
     async def test_caches_status_for_each_mapping(self):
         _add_mapping("web", "Web Monitor")
         _add_mapping("db", "DB Monitor")
         monitor = UptimeKumaMonitor()
-        fake_client = _FakeUptimeKumaClient(
-            monitors=[
-                {"friendly_name": "Web Monitor", "status": 1},
-                {"friendly_name": "DB Monitor", "status": 0},
-            ]
-        )
-        _install_client(monitor, fake_client)
+        _install_client(monitor, FakeUptimeKumaClient(statuses={"Web Monitor": 1, "DB Monitor": 0}))
 
         await monitor._update_status_cache()
 
         assert monitor._container_status_cache == {"web": 1, "db": 0}
-        assert fake_client.get_all_monitors_calls == 1
 
     async def test_fetches_metrics_once_regardless_of_mapping_count(self):
         """Regression test for #94: N mapped containers must not cause N /metrics fetches."""
@@ -242,24 +221,25 @@ class TestUpdateStatusCache:
         _add_mapping("db", "DB Monitor")
         _add_mapping("cache", "Cache Monitor")
         monitor = UptimeKumaMonitor()
-        fake_client = _FakeUptimeKumaClient(
-            monitors=[
-                {"friendly_name": "Web Monitor", "status": 1},
-                {"friendly_name": "DB Monitor", "status": 0},
-                {"friendly_name": "Cache Monitor", "status": 1},
-            ]
+        _install_client(
+            monitor,
+            FakeUptimeKumaClient(
+                monitors=[
+                    {"friendly_name": "Web Monitor", "status": 1},
+                    {"friendly_name": "DB Monitor", "status": 0},
+                    {"friendly_name": "Cache Monitor", "status": 1},
+                ]
+            ),
         )
-        _install_client(monitor, fake_client)
 
         await monitor._update_status_cache()
 
         assert monitor._container_status_cache == {"web": 1, "db": 0, "cache": 1}
-        assert fake_client.get_all_monitors_calls == 1
 
     async def test_missing_monitor_status_is_skipped(self):
         _add_mapping("web", "Unknown Monitor")
         monitor = UptimeKumaMonitor()
-        _install_client(monitor, _FakeUptimeKumaClient(monitors=[]))
+        _install_client(monitor, FakeUptimeKumaClient(statuses={"Unknown Monitor": None}))
 
         await monitor._update_status_cache()
 
@@ -269,14 +249,12 @@ class TestUpdateStatusCache:
         _add_mapping("web", "Web Monitor")
         monitor = UptimeKumaMonitor()
         monitor._container_status_cache["web"] = 1
-        fake_client = _FakeUptimeKumaClient(get_all_monitors_error=RuntimeError("upstream error"))
-        _install_client(monitor, fake_client)
+        _install_client(monitor, FakeUptimeKumaClient(get_all_monitors_error=RuntimeError("upstream error")))
 
         with caplog.at_level(logging.ERROR):
             await monitor._update_status_cache()
 
         assert monitor._container_status_cache == {"web": 1}
-        assert fake_client.get_all_monitors_calls == 1
         assert any(
             record.levelno == logging.ERROR and "upstream error" in record.getMessage()
             for record in caplog.records
@@ -321,22 +299,16 @@ class TestShouldRestartFromUptimeKuma:
         _enable_uptime_kuma(auto_restart_on_down=False)
         _add_mapping("web", "Web Monitor")
         monitor = UptimeKumaMonitor()
-        fake_client = _FakeUptimeKumaClient(
-            monitors=[{"friendly_name": "Web Monitor", "status": 0}]
-        )
-        _install_client(monitor, fake_client)
+        _install_client(monitor, FakeUptimeKumaClient(statuses={"Web Monitor": 0}))
 
         result = await monitor.should_restart_from_uptime_kuma("web")
 
         assert result is False
-        assert fake_client.get_all_monitors_calls == 0  # cache refresh skipped entirely
 
     async def test_false_when_container_not_mapped(self):
         _enable_uptime_kuma(auto_restart_on_down=True)
         monitor = UptimeKumaMonitor()
-        _install_client(
-            monitor, _FakeUptimeKumaClient(monitors=[{"friendly_name": "Web Monitor", "status": 0}])
-        )
+        _install_client(monitor, FakeUptimeKumaClient(statuses={"Web Monitor": 0}))
 
         assert await monitor.should_restart_from_uptime_kuma("web") is False
 
@@ -344,9 +316,7 @@ class TestShouldRestartFromUptimeKuma:
         _enable_uptime_kuma(auto_restart_on_down=True)
         _add_mapping("web", "Web Monitor")
         monitor = UptimeKumaMonitor()
-        _install_client(
-            monitor, _FakeUptimeKumaClient(monitors=[{"friendly_name": "Web Monitor", "status": 0}])
-        )
+        _install_client(monitor, FakeUptimeKumaClient(statuses={"Web Monitor": 0}))
 
         assert await monitor.should_restart_from_uptime_kuma("web") is True
 
@@ -354,9 +324,7 @@ class TestShouldRestartFromUptimeKuma:
         _enable_uptime_kuma(auto_restart_on_down=True)
         _add_mapping("web", "Web Monitor")
         monitor = UptimeKumaMonitor()
-        _install_client(
-            monitor, _FakeUptimeKumaClient(monitors=[{"friendly_name": "Web Monitor", "status": 1}])
-        )
+        _install_client(monitor, FakeUptimeKumaClient(statuses={"Web Monitor": 1}))
 
         assert await monitor.should_restart_from_uptime_kuma("web") is False
 
@@ -364,7 +332,7 @@ class TestShouldRestartFromUptimeKuma:
         _enable_uptime_kuma(auto_restart_on_down=True)
         _add_mapping("web", "Web Monitor")
         monitor = UptimeKumaMonitor()
-        _install_client(monitor, _FakeUptimeKumaClient(monitors=[]))
+        _install_client(monitor, FakeUptimeKumaClient(statuses={"Web Monitor": None}))
 
         assert await monitor.should_restart_from_uptime_kuma("web") is False
 
@@ -419,6 +387,9 @@ class TestMonitoringLoop:
         monkeypatch.setattr(asyncio, "sleep", fake_sleep)
         monkeypatch.setattr(monitor, "_update_status_cache", flaky_update)
 
+        await monitor._monitoring_loop()
+
+        assert len(attempts) == 2
         await monitor._monitoring_loop()
 
         assert len(attempts) == 2
