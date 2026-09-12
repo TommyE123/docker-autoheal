@@ -10,6 +10,7 @@ iterations, so no test depends on real timing.
 """
 
 import asyncio
+import logging
 from typing import cast
 
 import pytest
@@ -264,17 +265,22 @@ class TestUpdateStatusCache:
 
         assert monitor._container_status_cache == {}
 
-    async def test_error_fetching_metrics_is_logged_and_leaves_cache_unchanged(self):
+    async def test_error_fetching_metrics_is_logged_and_leaves_cache_unchanged(self, caplog):
         _add_mapping("web", "Web Monitor")
         monitor = UptimeKumaMonitor()
         monitor._container_status_cache["web"] = 1
         fake_client = _FakeUptimeKumaClient(get_all_monitors_error=RuntimeError("upstream error"))
         _install_client(monitor, fake_client)
 
-        await monitor._update_status_cache()
+        with caplog.at_level(logging.ERROR):
+            await monitor._update_status_cache()
 
         assert monitor._container_status_cache == {"web": 1}
         assert fake_client.get_all_monitors_calls == 1
+        assert any(
+            record.levelno == logging.ERROR and "upstream error" in record.getMessage()
+            for record in caplog.records
+        )
 
 
 class TestGetContainerStatus:
