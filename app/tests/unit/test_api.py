@@ -10,6 +10,8 @@ and the fake Docker client/monitoring engine mean no real Docker daemon is
 ever touched.
 """
 
+from unittest.mock import MagicMock
+
 import pytest
 from fastapi import HTTPException
 
@@ -37,7 +39,12 @@ from app.api.api import (
 )
 from app.api.api import test_uptime_kuma_connection as api_test_uptime_kuma_connection
 from app.api.api import update_config as api_update_config
-from app.config.config_manager import MonitorConfig, RestartConfig, config_manager
+from app.config.config_manager import (
+    MonitorConfig,
+    RestartConfig,
+    UptimeKumaMapping,
+    config_manager,
+)
 from app.tests.unit.conftest import make_container
 
 
@@ -119,6 +126,41 @@ class TestListContainers:
         assert result[0].quarantined is False
         # Uptime-Kuma integration is disabled by default.
         assert result[0].uptime_kuma_status == 5
+
+    async def test_reports_uptime_kuma_status_when_mapped(self, wired_api):
+        docker_client, engine = wired_api
+        container, info = make_container(name="web")
+        docker_client.add_container(container, info)
+        config = config_manager.get_config()
+        config.uptime_kuma.enabled = True
+        config.uptime_kuma_mappings = [
+            UptimeKumaMapping(container_id="web", monitor_friendly_name="Web Monitor")
+        ]
+        config_manager.update_config(config)
+        engine.uptime_kuma_monitor = MagicMock()
+        engine.uptime_kuma_monitor.is_container_mapped.return_value = True
+        engine.uptime_kuma_monitor.get_container_status.return_value = 1  # up
+
+        result = await list_containers()
+
+        assert result[0].uptime_kuma_status == 1
+        assert result[0].uptime_kuma_monitor_name == "Web Monitor"
+
+    async def test_reports_unknown_status_when_uptime_kuma_monitor_not_initialized(self, wired_api):
+        docker_client, engine = wired_api
+        container, info = make_container(name="web")
+        docker_client.add_container(container, info)
+        config = config_manager.get_config()
+        config.uptime_kuma.enabled = True
+        config_manager.update_config(config)
+        # engine has no `uptime_kuma_monitor` attribute, mirroring a service
+        # that hasn't finished initializing the integration yet.
+        assert not hasattr(engine, "uptime_kuma_monitor")
+
+        result = await list_containers()
+
+        assert result[0].uptime_kuma_status == 4
+        assert result[0].uptime_kuma_monitor_name is None
 
     async def test_skips_containers_docker_could_not_inspect(self, wired_api):
         docker_client, _engine = wired_api
