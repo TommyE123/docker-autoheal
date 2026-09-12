@@ -54,10 +54,10 @@ nothing there for it to track.
     writes `{{depName}}:{{newValue}}@{{newDigest}}` as one atomic edit (checked directly in the
     installed `renovate` package's source, not assumed); the `docker-compose` manager reuses that
     exact same extraction/replace code for Compose image references, so the two behave identically.
-  - `docker-compose.yml`'s `autoheal` service intentionally keeps `swaya1125/docker-autoheal:latest`
-    unpinned and un-managed by Renovate (see the comment next to it, and the `enabled: false`
-    package rule in `renovate.json`) - it's this project's own published image, not a dependency,
-    and it's meant to give users who copy the compose file our newest release, not a frozen one.
+  - `docker-compose.yml`'s `autoheal` service intentionally keeps `tommye123/docker-autoheal:latest`
+    unpinned (see the comment next to it) - it's this project's own published image, not a
+    dependency, and it's meant to give users who copy the compose file our newest release, not a
+    frozen one.
   - `docker-compose.test.yml` and `docker-compose.example.yml` are manual/demo compose files (not
     used by CI or by the published image) and were left exactly as they were. Renovate's
     `docker-compose` manager will still pick up every image reference in them, and
@@ -88,6 +88,11 @@ Renovate automerges the PR
   merging it itself. GitHub only completes that merge once every required status check on the PR
   is green - so automerge structurally cannot complete while CI is failing or still running,
   and `renovate.json` never sets `requiredStatusChecks` to bypass that.
+- `rebaseWhen: "behind-base-branch"` makes Renovate keep every dependency-update branch rebased
+  onto `main` whenever `main` moves, instead of only rebasing when the branch has a merge conflict
+  (Renovate's default `"auto"` setting only forces this for branches that are already set to
+  automerge). This keeps update PRs - including `major` ones, which never automerge - testable
+  against the latest `main` and prevents them from going stale while waiting on CI/review.
 - Automerge is enabled only for `minor`, `patch`, `digest`, `pin`, and `pinDigest` updates. `major`
   updates always get a normal PR that a maintainer merges by hand, so a major version bump never
   looks like (or merges like) a routine patch update.
