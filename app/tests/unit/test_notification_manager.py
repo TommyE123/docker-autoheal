@@ -479,8 +479,10 @@ async def test_start_stop_lifecycle_delivers_queued_notification(
 
     assert len(instance._session.calls) == 1
 
+    session = instance._session
     await instance.stop()
     assert instance._running is False
+    assert session.closed is True
     assert instance._session is None
 
 
