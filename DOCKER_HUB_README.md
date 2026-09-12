@@ -1,13 +1,19 @@
 # Docker Auto-Heal Service
 
-[![Docker Pulls](https://img.shields.io/docker/pulls/swaya1125/docker-autoheal)](https://hub.docker.com/r/swaya1125/docker-autoheal)
-[![Docker Image Size](https://img.shields.io/docker/image-size/swaya1125/docker-autoheal/latest)](https://hub.docker.com/r/swaya1125/docker-autoheal)
-[![Version](https://img.shields.io/badge/version-1.1-blue)](https://github.com/swaya1125/docker-autoheal)
+[![Docker Pulls](https://img.shields.io/docker/pulls/tommye123/docker-autoheal)](https://hub.docker.com/r/tommye123/docker-autoheal)
+[![Docker Image Size](https://img.shields.io/docker/image-size/tommye123/docker-autoheal/latest)](https://hub.docker.com/r/tommye123/docker-autoheal)
+[![Version](https://img.shields.io/badge/version-1.1-blue)](https://github.com/TommyE123/docker-autoheal)
+[![GitHub](https://img.shields.io/badge/GitHub-repository-181717?logo=github)](https://github.com/TommyE123/docker-autoheal)
 
 A production-ready Docker container monitoring and auto-healing service with a modern React web interface. Automatically monitors your Docker containers for failures and unhealthy states, restarting them intelligently based on configurable policies.
 
 ## 🚀 Quick Start
 
+Images are published to both Docker Hub and GitHub Container Registry (GHCR) - use whichever you prefer.
+
+> **Note:** GHCR packages are private by default when first published. If `docker pull ghcr.io/tommye123/docker-autoheal` fails with an access/authentication error, the package hasn't been switched to public yet in its GitHub package settings (Package settings → Change visibility) - use the Docker Hub image below in the meantime, or `docker login ghcr.io` with a token that has read access.
+
+**Docker Hub:**
 ```bash
 docker run -d \
   --name docker-autoheal \
@@ -16,7 +22,19 @@ docker run -d \
   -p 3131:3131 \
   -p 9090:9090 \
   --restart unless-stopped \
-  swaya1125/docker-autoheal:latest
+  tommye123/docker-autoheal:latest
+```
+
+**GHCR:**
+```bash
+docker run -d \
+  --name docker-autoheal \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  -v ./data:/data \
+  -p 3131:3131 \
+  -p 9090:9090 \
+  --restart unless-stopped \
+  ghcr.io/tommye123/docker-autoheal:latest
 ```
 
 **Access the Web UI:** http://localhost:3131
@@ -75,7 +93,16 @@ docker run -d \
   --name docker-autoheal \
   -v /var/run/docker.sock:/var/run/docker.sock:ro \
   -p 3131:3131 \
-  swaya1125/docker-autoheal:latest
+  tommye123/docker-autoheal:latest
+```
+
+Or from GHCR:
+```bash
+docker run -d \
+  --name docker-autoheal \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  -p 3131:3131 \
+  ghcr.io/tommye123/docker-autoheal:latest
 ```
 
 ### Docker Run (Full Options)
@@ -90,8 +117,10 @@ docker run -d \
   -p 9090:9090 \
   -e AUTOHEAL_INTERVAL=30 \
   -e AUTOHEAL_LOG_LEVEL=INFO \
-  swaya1125/docker-autoheal:latest
+  tommye123/docker-autoheal:latest
 ```
+
+Replace `tommye123/docker-autoheal:latest` with `ghcr.io/tommye123/docker-autoheal:latest` to pull from GHCR instead.
 
 ### Docker Compose
 
@@ -100,7 +129,7 @@ version: '3.8'
 
 services:
   autoheal:
-    image: swaya1125/docker-autoheal:latest
+    image: tommye123/docker-autoheal:latest  # or ghcr.io/tommye123/docker-autoheal:latest
     container_name: docker-autoheal
     restart: unless-stopped
     volumes:
@@ -304,4 +333,3 @@ Contributions welcome! Please see the GitHub repository for guidelines.
 ---
 
 **Built with ❤️ using Python, FastAPI, React, and Docker**
-
