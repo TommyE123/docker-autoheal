@@ -42,9 +42,9 @@ You should see the React dashboard with:
 
 ### Step 3: Verify It Works
 
-Run the test script:
+Run the integration smoke test (see `docs/TESTING.md`):
 ```bash
-python test_service.py
+pytest app/tests/integration/test_service_smoke.py
 ```
 
 Or manually check:
@@ -271,7 +271,7 @@ For production:
 ## Getting Help
 
 1. **Check logs**: `docker logs docker-autoheal`
-2. **Run test**: `python test_service.py`
+2. **Run test**: `pytest app/tests/integration/test_service_smoke.py`
 3. **Read docs**: See SETUP.md and REACT_ADDED.md
 4. **API docs**: http://localhost:8080/docs
 

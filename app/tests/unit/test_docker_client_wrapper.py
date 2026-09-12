@@ -33,6 +33,7 @@ def make_sdk_container(
     container_id: str = "a" * 64,
     labels: dict | None = None,
     state: dict | None = None,
+    restart_count: int = 0,
 ) -> MagicMock:
     """Build a mock Docker SDK container object."""
     container = MagicMock()
@@ -48,6 +49,7 @@ def make_sdk_container(
         "NetworkSettings": {"Networks": {"bridge": {"IPAddress": "172.17.0.2"}}},
         "Created": "2024-01-01T00:00:00Z",
         "HostConfig": {"RestartPolicy": {"Name": "no"}},
+        "RestartCount": restart_count,
     }
     return container
 
@@ -127,6 +129,20 @@ class TestContainerInfo:
         assert info["state"]["Status"] == "running"
         assert info["health"] is None
         container.reload.assert_called_once()
+
+    def test_restart_count_is_read_from_the_top_level_field(self, wrapper):
+        # RestartCount is a sibling of State in the Docker inspect payload, not
+        # nested inside it - a real regression, caught by an integration test
+        # against a real daemon rather than this fixture's own shape.
+        container = make_sdk_container(restart_count=3)
+
+        assert wrapper.get_container_info(container)["restart_count"] == 3
+
+    def test_restart_count_defaults_to_zero_when_absent(self, wrapper):
+        container = make_sdk_container()
+        del container.attrs["RestartCount"]
+
+        assert wrapper.get_container_info(container)["restart_count"] == 0
 
     def test_stable_id_prefers_the_monitoring_id_label(self, wrapper):
         container = make_sdk_container(
