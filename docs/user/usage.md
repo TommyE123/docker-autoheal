@@ -51,7 +51,7 @@ notification. See [Notifications](notifications.md).
 Everything the UI does is backed by a REST API under `/api`. Interactive, always-current
 documentation (Swagger UI) is available at:
 
-```
+```text
 http://localhost:3131/docs
 ```
 

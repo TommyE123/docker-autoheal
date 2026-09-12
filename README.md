@@ -70,7 +70,7 @@ services:
 docker compose up -d
 ```
 
-Open **http://localhost:3131** — that's the dashboard. Docker Auto-Heal is now running
+Open **<http://localhost:3131>** — that's the dashboard. Docker Auto-Heal is now running
 and ready to monitor containers.
 
 For a from-scratch walkthrough (requirements, verifying the socket mount, testing with a
