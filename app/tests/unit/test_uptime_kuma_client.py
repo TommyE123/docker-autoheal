@@ -242,6 +242,16 @@ class TestParseMonitorsFromMetrics:
         assert monitors[0]["friendly_name"] == "Tagged"
         assert monitors[0]["status"] == 1
 
+    def test_custom_tag_whose_name_ends_in_monitor_name_is_not_a_phantom_monitor(self):
+        """A custom tag like custom_monitor_name must not be matched as monitor_name
+        just because it contains that substring."""
+        client = UptimeKumaClient("http://kuma.example", "token")
+        text = 'monitor_status{custom_monitor_name="ghost"} 1\n'
+
+        monitors = client._parse_monitors_from_metrics(text)
+
+        assert monitors == []
+
 
 @pytest.mark.asyncio
 class TestGetMonitorStatus:
@@ -303,3 +313,12 @@ class TestGetMonitorStatusByName:
         client = UptimeKumaClient("http://kuma.example", "token")
 
         assert await client.get_monitor_status_by_name("My Website") == 1
+
+    async def test_custom_tag_whose_name_ends_in_monitor_name_is_not_matched(self, monkeypatch):
+        """A custom tag like custom_monitor_name must not be matched as monitor_name
+        just because it contains that substring."""
+        text = 'monitor_status{custom_monitor_name="ghost"} 1\n'
+        _patch_session(monkeypatch, response=_FakeResponse(200, text))
+        client = UptimeKumaClient("http://kuma.example", "token")
+
+        assert await client.get_monitor_status_by_name("ghost") is None
