@@ -1,6 +1,6 @@
 # Alternative docker-compose for local React build
 
-version: '3.8'
+version: "3.8"
 
 services:
   autoheal:
@@ -18,8 +18,8 @@ services:
 
     # Port mappings
     ports:
-      - "3131:3131"  # Web UI (React)
-      - "9090:9090"  # Prometheus metrics
+      - "3131:3131" # Web UI (React)
+      - "9090:9090" # Prometheus metrics
 
     # Environment variables
     environment:
@@ -37,4 +37,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
