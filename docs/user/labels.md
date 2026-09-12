@@ -49,11 +49,13 @@ quarantine state, and monitoring selection stable across recreation, Auto-Heal r
 each container to a **stable identifier**, in this priority order:
 
 1. A `monitoring.id` label, if you set one explicitly:
+
    ```yaml
    labels:
      autoheal: "true"
      monitoring.id: "my-stable-service-name"
    ```
+
 2. `com.docker.compose.project` + `com.docker.compose.service` (automatically present on
    containers started by Docker Compose)
 3. The container's name, as a fallback

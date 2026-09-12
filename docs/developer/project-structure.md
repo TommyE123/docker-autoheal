@@ -1,6 +1,6 @@
 # Project Structure
 
-```
+```text
 docker-autoheal/
 ├── app/                          # Python application package
 │   ├── main.py                   # Entry point: wires everything together, starts the API + monitoring loop

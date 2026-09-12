@@ -1,3 +1,5 @@
+# Project Restructuring (historical)
+
 > **Historical document.** This describes a code reorganization that was completed in the
 > past — flat root-level Python files (`main.py`, `api.py`, `config.py`,
 > `docker_client.py`, `monitor.py`) were moved into the `app/` package that exists today.
@@ -5,11 +7,9 @@
 > for historical context only. For the current layout, see
 > [Project Structure](../developer/project-structure.md).
 
-# Project Restructuring (historical)
-
 The project was originally a flat collection of Python scripts at the repository root:
 
-```
+```text
 docker-autoheal/
 ├── main.py
 ├── api.py
@@ -23,7 +23,7 @@ docker-autoheal/
 
 It was reorganized into a standard Python package layout:
 
-```
+```text
 docker-autoheal/
 ├── app/
 │   ├── main.py
