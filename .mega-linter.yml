@@ -1,0 +1,99 @@
+# MegaLinter configuration for Docker Auto-Heal
+# https://megalinter.io/
+
+# Global settings
+SHOW_ELAPSED_TIME: true
+LOG_LEVEL: info
+DEFAULT_WORKSPACE: /tmp/lint
+
+# File patterns
+IGNORED_DIRECTORIES:
+  - .git
+  - .github
+  - __pycache__
+  - .pytest_cache
+  - node_modules
+  - venv
+  - .venv
+  - dist
+  - build
+  - *.egg-info
+
+IGNORED_FILES:
+  - "**/node_modules/**"
+  - "**/.git/**"
+
+# Parallel processing
+PARALLEL: true
+
+# Enable all applicable linters
+ENABLE_LINTERS:
+  # Python linters
+  - PYTHON_PYLINT
+  - PYTHON_FLAKE8
+  - PYTHON_BLACK
+  - PYTHON_ISORT
+  - PYTHON_BANDIT
+  - PYTHON_MYPY
+  - PYTHON_RUFF
+
+  # JavaScript/Node linters
+  - JAVASCRIPT_ES
+  - JAVASCRIPT_PRETTIER
+
+  # JSON linters
+  - JSON_PRETTIER
+  - JSON_JSONLINT
+
+  # YAML linters
+  - YAML_YAMLLINT
+  - YAML_PRETTIER
+
+  # Docker linters
+  - DOCKERFILE_HADOLINT
+
+  # Markdown linters
+  - MARKDOWN_MARKDOWNLINT
+  - MARKDOWN_PRETTIER
+
+  # Shell script linters
+  - SHELL_SHELLCHECK
+
+  # General linters
+  - SPELL_CSPELL
+  - REPOSITORY_SECRETSCANNER
+  - REPOSITORY_TRIVY
+  - GITHUB_ACTIONS_ACTIONLINT
+
+# Disable errors for linters that have existing findings in the codebase
+# These linters remain enabled and visible in reports, but don't block CI
+DISABLE_ERRORS_LINTERS:
+  - PYTHON_PYLINT
+  - PYTHON_FLAKE8
+  - PYTHON_BLACK
+  - PYTHON_ISORT
+  - PYTHON_BANDIT
+  - PYTHON_MYPY
+  - PYTHON_RUFF
+
+# Linter-specific configurations
+# Python
+PYTHON_BLACK_ARGUMENTS: "--line-length=120"
+PYTHON_ISORT_ARGUMENTS: "--profile=black --line-length=120"
+PYTHON_FLAKE8_ARGUMENTS: "--max-line-length=120"
+PYTHON_MYPY_ARGUMENTS: "--ignore-missing-imports"
+
+# JavaScript
+JAVASCRIPT_PRETTIER_ARGUMENTS: "--print-width=120"
+
+# JSON
+JSON_PRETTIER_ARGUMENTS: "--print-width=120"
+
+# YAML
+YAML_PRETTIER_ARGUMENTS: "--print-width=120"
+
+# Markdown
+MARKDOWN_PRETTIER_ARGUMENTS: "--print-width=100"
+
+# General
+SPELL_CSPELL_ARGUMENTS: "--gitignore"
