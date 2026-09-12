@@ -2,8 +2,6 @@
 # See all available variables at https://megalinter.io/latest/configuration/ and in linters documentation
 SHOW_ELAPSED_TIME: true
 VALIDATE_ALL_CODEBASE: true
-GITHUB_COMMENT_REPORTER: false
-GITHUB_STATUS_REPORTER: false
 
 # Linters below have existing findings in this repository. They remain
 # enabled and their findings stay visible, but do not fail the build until
