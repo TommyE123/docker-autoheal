@@ -26,6 +26,35 @@ jobs:
       contents: read
 
     steps:
+      # Free up disk space before running MegaLinter
+      - name: Free Disk Space & Verify
+        run: |
+          echo "=== Initial Free Disk Space ==="
+          df -h /
+
+          # Ordered from lowest file count (fastest delete) to highest
+          TARGETS=(
+            "/usr/local/share/chromium"   # 480 files (~650 MB)
+            "/usr/local/share/powershell" # 551 files (~1.3 GB)
+            "/opt/microsoft"              # 952 files (~813 MB)
+            "/usr/share/swift"            # 2,025 files (~3.3 GB)
+          )
+
+          echo ""
+          echo "=== Validating & Removing Unused Directories ==="
+          for dir in "${TARGETS[@]}"; do
+            if [ ! -d "$dir" ]; then
+              echo "::error::Runner cleanup directory missing: $dir (runner layout may have changed)"
+              exit 1
+            fi
+            echo "Removing $dir..."
+            sudo rm -rf "$dir"
+          done
+
+          echo ""
+          echo "=== Post-Cleanup Free Disk Space ==="
+          df -h /
+
       # Git Checkout (Shallow clone to avoid tag bloat)
       - name: Checkout Code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
