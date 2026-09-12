@@ -4,6 +4,7 @@ SHOW_ELAPSED_TIME: true
 VALIDATE_ALL_CODEBASE: true
 GITHUB_STATUS_REPORTER: true
 FLAVOR_SUGGESTIONS: false
+FORMATTERS_DISABLE_ERRORS: false
 
 # Linters below have existing findings in this repository. They remain
 # enabled and their findings stay visible, but do not fail the build until
