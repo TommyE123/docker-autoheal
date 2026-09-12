@@ -52,9 +52,9 @@ COPY --from=frontend-builder /static ./static/
 RUN mkdir -p /data/logs
 
 # Expose ports
-# 8080 - Web UI (React)
+# 3131 - Web UI (React)
 # 9090 - Prometheus metrics
-EXPOSE 8080 9090
+EXPOSE 3131 9090
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
