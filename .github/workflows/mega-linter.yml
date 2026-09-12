@@ -24,6 +24,7 @@ jobs:
     # own report artifact, never to commit, push, or open a PR.
     permissions:
       contents: read
+      issues: write
       pull-requests: write
       statuses: write
 
