@@ -13,10 +13,19 @@ covers that ordering (issue #26) alongside ``METRICS_TEXT``'s simpler,
 name-first layout.
 """
 
+import base64
+
 import pytest
-from aiohttp import BasicAuth
 
 from app.uptime_kuma.uptime_kuma_client import UptimeKumaClient
+
+
+def _decode_basic_auth_header(header: str) -> tuple[str, str]:
+    scheme, _, encoded = header.partition(" ")
+    assert scheme == "Basic"
+    login, _, password = base64.b64decode(encoded).decode().partition(":")
+    return login, password
+
 
 METRICS_TEXT = (
     'monitor_status{monitor_name="Web",monitor_type="http"} 1\n'
@@ -86,15 +95,16 @@ class TestInit:
     def test_api_key_auth_uses_empty_username(self):
         client = UptimeKumaClient("http://kuma.example", "secret-token")
 
-        assert isinstance(client.auth, BasicAuth)
-        assert client.auth.login == ""
-        assert client.auth.password == "secret-token"
+        login, password = _decode_basic_auth_header(client.auth_header)
+        assert login == ""
+        assert password == "secret-token"
 
     def test_user_auth_uses_given_username(self):
         client = UptimeKumaClient("http://kuma.example", "hunter2", "admin")
 
-        assert client.auth.login == "admin"
-        assert client.auth.password == "hunter2"
+        login, password = _decode_basic_auth_header(client.auth_header)
+        assert login == "admin"
+        assert password == "hunter2"
 
     def test_server_url_trailing_slash_is_stripped(self):
         client = UptimeKumaClient("http://kuma.example/", "token")
@@ -104,6 +114,16 @@ class TestInit:
 
 @pytest.mark.asyncio
 class TestConnect:
+    async def test_sends_authorization_header_instead_of_auth_kwarg(self, monkeypatch):
+        session = _patch_session(monkeypatch, response=_FakeResponse(200, METRICS_TEXT))
+        client = UptimeKumaClient("http://kuma.example", "hunter2", "admin")
+
+        await client.connect()
+
+        call = session.get_calls[0]
+        assert call["headers"] == {"Authorization": client.auth_header}
+        assert "auth" not in call
+
     async def test_returns_true_when_monitor_status_present(self, monkeypatch):
         _patch_session(monkeypatch, response=_FakeResponse(200, METRICS_TEXT))
         client = UptimeKumaClient("http://kuma.example", "token")
@@ -137,6 +157,16 @@ class TestConnect:
 
 @pytest.mark.asyncio
 class TestGetAllMonitors:
+    async def test_sends_authorization_header_instead_of_auth_kwarg(self, monkeypatch):
+        session = _patch_session(monkeypatch, response=_FakeResponse(200, METRICS_TEXT))
+        client = UptimeKumaClient("http://kuma.example", "token")
+
+        await client.get_all_monitors()
+
+        call = session.get_calls[0]
+        assert call["headers"] == {"Authorization": client.auth_header}
+        assert "auth" not in call
+
     async def test_parses_monitors_from_metrics_response(self, monkeypatch):
         _patch_session(monkeypatch, response=_FakeResponse(200, METRICS_TEXT))
         client = UptimeKumaClient("http://kuma.example", "token")
@@ -272,6 +302,16 @@ class TestGetMonitorStatus:
 
 @pytest.mark.asyncio
 class TestGetMonitorStatusByName:
+    async def test_sends_authorization_header_instead_of_auth_kwarg(self, monkeypatch):
+        session = _patch_session(monkeypatch, response=_FakeResponse(200, METRICS_TEXT))
+        client = UptimeKumaClient("http://kuma.example", "token")
+
+        await client.get_monitor_status_by_name("API")
+
+        call = session.get_calls[0]
+        assert call["headers"] == {"Authorization": client.auth_header}
+        assert "auth" not in call
+
     async def test_returns_status_for_known_monitor(self, monkeypatch):
         _patch_session(monkeypatch, response=_FakeResponse(200, METRICS_TEXT))
         client = UptimeKumaClient("http://kuma.example", "token")

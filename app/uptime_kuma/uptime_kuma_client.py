@@ -6,7 +6,6 @@ import aiohttp
 import logging
 import re
 from typing import List, Dict, Optional
-from aiohttp import BasicAuth
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +20,7 @@ class UptimeKumaClient:
         # Use Basic Auth with username (empty for API key) and password/API key
         # For API key: username="", password=api_key
         # For user auth: username=username, password=password
-        self.auth = BasicAuth(username if username else '', password)
+        self.auth_header = aiohttp.encode_basic_auth(username if username else '', password)
         self.session: Optional[aiohttp.ClientSession] = None
 
     async def connect(self) -> bool:
@@ -31,7 +30,7 @@ class UptimeKumaClient:
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     f"{self.server_url}/metrics",
-                    auth=self.auth,
+                    headers={"Authorization": self.auth_header},
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as response:
                     logger.debug(f"Response status: {response.status}")
@@ -53,7 +52,7 @@ class UptimeKumaClient:
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     f"{self.server_url}/metrics",
-                    auth=self.auth,
+                    headers={"Authorization": self.auth_header},
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as response:
                     if response.status != 200:
@@ -110,7 +109,7 @@ class UptimeKumaClient:
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     f"{self.server_url}/metrics",
-                    auth=self.auth,
+                    headers={"Authorization": self.auth_header},
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as response:
                     if response.status != 200:
