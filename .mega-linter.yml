@@ -1,0 +1,49 @@
+# MegaLinter configuration for Docker Auto-Heal
+# https://megalinter.io/
+#
+# Baseline policy (Issue #9): every applicable linter runs. A linter with
+# existing findings in the current codebase is kept ENABLED, its findings
+# stay VISIBLE in the report, and only its ability to fail the build is
+# turned off via a per-linter "_DISABLE_ERRORS: true" setting. No linter is
+# turned off outright (DISABLE_LINTERS is intentionally empty/unset), and no
+# individual rules are suppressed. Follow-up issues will fix the underlying
+# findings for each linter below and re-enable it as a blocking gate.
+
+SHOW_ELAPSED_TIME: true
+PARALLEL: true
+
+# Lint the whole repository on every run, not just the files this PR
+# touches - this PR only adds 2 files, so without this the baseline job
+# would never actually scan the existing codebase it's meant to report on.
+VALIDATE_ALL_CODEBASE: true
+
+# This workflow runs with `contents: read` only (see mega-linter.yml) and
+# never comments on or sets a status check via the GitHub API - both
+# reporters need write permissions this workflow deliberately doesn't
+# request. The job's own pass/fail is already the required status check.
+GITHUB_COMMENT_REPORTER: false
+GITHUB_STATUS_REPORTER: false
+
+# Linters below are ENABLED and RUNNING, but their errors are non-blocking
+# because they currently have real findings against this repository's
+# existing files. See the PR description for the evidence behind each one.
+# Nothing here disables a linter or suppresses individual rules.
+DISABLE_ERRORS_LINTERS:
+  - PYTHON_PYLINT
+  - PYTHON_FLAKE8
+  - PYTHON_BLACK
+  - PYTHON_ISORT
+  - PYTHON_BANDIT
+  - PYTHON_MYPY
+  - PYTHON_RUFF
+  - PYTHON_PYRIGHT
+  - JAVASCRIPT_ESLINT
+  - JAVASCRIPT_PRETTIER
+  - JSON_PRETTIER
+  - YAML_YAMLLINT
+  - YAML_PRETTIER
+  - DOCKERFILE_HADOLINT
+  - MARKDOWN_MARKDOWNLINT
+  - SPELL_CSPELL
+  - REPOSITORY_TRIVY
+  - COPYPASTE_JSCPD
