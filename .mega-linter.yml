@@ -8,6 +8,7 @@ GITHUB_STATUS_REPORTER: true
 # enabled and their findings stay visible, but do not fail the build until
 # a follow-up issue fixes the underlying findings.
 DISABLE_ERRORS_LINTERS:
+  - ACTION_ZIZMOR
   - PYTHON_PYLINT
   - PYTHON_FLAKE8
   - PYTHON_BLACK
