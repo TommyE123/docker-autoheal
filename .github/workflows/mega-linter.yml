@@ -26,7 +26,9 @@ jobs:
       contents: read
 
     steps:
-      # Free up disk space before running MegaLinter
+      # Free runner disk space for MegaLinter. Security scanners such as Trivy
+      # and Grype download large vulnerability databases during the run.
+      # Fail if GitHub changes the runner layout so this does not silently regress.
       - name: Free Disk Space & Verify
         run: |
           echo "=== Initial Free Disk Space ==="
