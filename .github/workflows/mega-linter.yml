@@ -25,6 +25,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      statuses: write
 
     steps:
       # Free runner disk space for MegaLinter. Security scanners such as Trivy
