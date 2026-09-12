@@ -6,6 +6,8 @@ directory:
 
 * ``FakeDockerClient`` stands in for ``DockerClientWrapper`` and serves
   canned container information.
+* ``FakeUptimeKumaClient`` stands in for ``UptimeKumaClient`` and serves
+  canned monitor data.
 * ``isolated_config_manager`` points the global ``config_manager`` singleton at
   a per-test temporary directory and resets its in-memory state, so every test
   starts from the documented defaults.
@@ -218,6 +220,40 @@ class FakeDockerClient:
 
     def get_events(self, decode=True, filters=None):
         return self.events
+
+
+class FakeUptimeKumaClient:
+    """
+    In-memory fake of :class:`UptimeKumaClient`.
+
+    Covers the surface used by ``app/api/api.py`` and ``UptimeKumaMonitor``:
+    ``connect``, ``get_all_monitors``, and ``get_monitor_status_by_name``.
+    """
+
+    def __init__(
+        self,
+        connect_result: bool = True,
+        monitors: Optional[list] = None,
+        statuses: Optional[dict] = None,
+    ) -> None:
+        self.connect_result = connect_result
+        self.monitors = monitors if monitors is not None else []
+        # monitor_friendly_name -> status (or exception to raise)
+        self.statuses = statuses if statuses is not None else {}
+        self.status_calls: list[str] = []
+
+    async def connect(self) -> bool:
+        return self.connect_result
+
+    async def get_all_monitors(self):
+        return self.monitors
+
+    async def get_monitor_status_by_name(self, name: str):
+        self.status_calls.append(name)
+        result = self.statuses.get(name)
+        if isinstance(result, Exception):
+            raise result
+        return result
 
 
 # ---------------------------------------------------------------------------
