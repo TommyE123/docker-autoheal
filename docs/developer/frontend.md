@@ -70,7 +70,7 @@ python -m app.main
 
 ## Project structure
 
-```
+```text
 frontend/
 ├── public/                  # Static assets (icons, PWA manifest source, screenshots)
 ├── src/

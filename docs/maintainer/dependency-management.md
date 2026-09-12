@@ -66,7 +66,7 @@ nothing there for it to track.
 
 ## Automerge
 
-```
+```text
 Renovate detects an update
         |
         v

@@ -31,9 +31,11 @@ docker logs docker-autoheal
 
 1. Does it have the `autoheal=true` label? (Skip this if `monitor.include_all` is
    enabled.)
+
    ```bash
    docker inspect <container> --format '{{json .Config.Labels}}'
    ```
+
 2. Is it in the excluded list? Check **Configuration → Container Selection** in the UI, or
    `GET /api/config` and inspect `containers.excluded`.
 3. Does it fail a whitelist/blacklist filter? See [Configuration](configuration.md#filters).

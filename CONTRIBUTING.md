@@ -26,18 +26,22 @@ servers, and building a local Docker image — are in
 ## Before opening a pull request
 
 1. **Run the unit test suite:**
+
    ```bash
    pip install -r requirements-dev.txt
    pytest --cov=app --cov-report=term-missing
    ```
+
    See [docs/developer/testing.md](docs/developer/testing.md) for what's covered and how
    the test fixtures work.
 
 2. **If you changed the frontend**, confirm the production build succeeds:
+
    ```bash
    cd frontend
    npm run build
    ```
+
    (`npm run lint` exists in `package.json` but has no ESLint config file yet, so it
    currently fails regardless of code changes — see
    [docs/developer/frontend.md](docs/developer/frontend.md#linting).)

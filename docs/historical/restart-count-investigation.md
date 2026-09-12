@@ -1,11 +1,11 @@
+# Investigation: where does `container.restart_count` come from? (historical)
+
 > **Historical document.** A debugging investigation that traced where the "restarts"
 > number shown in the UI actually comes from. The conclusion is still accurate today and
 > is now stated directly (without the investigation narrative) in
 > [Architecture: stable container identity](../developer/architecture.md#stable-container-identity)
 > and [Troubleshooting: restart count looks wrong](../user/troubleshooting.md#restart-count-looks-wrong--doesnt-match-docker).
 > Kept here as the original, more detailed trace for anyone who wants the full code path.
-
-# Investigation: where does `container.restart_count` come from? (historical)
 
 **Question:** Is the "Restarts" number shown per-container in the UI Docker's own
 `RestartCount`, or something Auto-Heal tracks itself?

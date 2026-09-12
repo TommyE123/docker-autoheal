@@ -1,9 +1,9 @@
+# Changelog - Notification System (historical)
+
 > **Historical document.** A feature-by-feature changelog written while the notification
 > system was being built. For how notifications work *today*, see
 > [Notifications](../user/notifications.md). Kept here for historical context on how the
 > feature evolved.
-
-# Changelog - Notification System (historical)
 
 ## [v1.3.0]
 

@@ -21,7 +21,7 @@ docker run -d \
   swaya1125/docker-autoheal:latest
 ```
 
-**Web UI:** http://localhost:3131
+**Web UI:** <http://localhost:3131>
 
 ## What's included
 
@@ -105,6 +105,7 @@ docker logs -f docker-autoheal
 ## Troubleshooting
 
 **Container not being monitored?**
+
 1. Check it has the `autoheal=true` label (unless "monitor all containers" is enabled).
 2. Check it isn't in the excluded list (Configuration tab).
 3. Check logs: `docker logs docker-autoheal` (set log level to `DEBUG` from the
