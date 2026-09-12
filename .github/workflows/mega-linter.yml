@@ -72,9 +72,9 @@ jobs:
         # More info at https://megalinter.io/latest/flavors/
         uses: oxsecurity/megalinter@9949bad031045f366be2467e00e8371a7328a2e2 # v10.1.0
         env:
-          # All available variables are described in documentation
+          # Linting behavior (VALIDATE_ALL_CODEBASE, DISABLE_ERRORS_LINTERS, etc.)
+          # lives in .mega-linter.yml so it's a single place to toggle.
           # https://megalinter.io/latest/configuration/
-          VALIDATE_ALL_CODEBASE: true
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Upload MegaLinter artifacts
