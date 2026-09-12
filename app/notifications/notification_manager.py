@@ -605,11 +605,4 @@ class NotificationManager:
 
 # Global notification manager instance
 notification_manager = NotificationManager()
-"""
-Notification services for Docker Auto-Heal
-"""
-
-from app.notifications.notification_manager import NotificationManager
-
-__all__ = ['NotificationManager']
 
