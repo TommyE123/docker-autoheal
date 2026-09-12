@@ -1,0 +1,90 @@
+# MegaLinter GitHub Action configuration file
+# More info at https://megalinter.io
+name: MegaLinter
+
+# Trigger mega-linter on every PR to main.
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  megalinter:
+    name: MegaLinter
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # Read-only: MegaLinter only needs to check out the code and publish its
+    # own report artifact, never to commit, push, or open a PR.
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+      statuses: write
+
+    steps:
+      # Free runner disk space for MegaLinter. Security scanners such as Trivy
+      # and Grype download large vulnerability databases during the run.
+      # Fail if GitHub changes the runner layout so this does not silently regress.
+      - name: Free Disk Space & Verify
+        run: |
+          echo "=== Initial Free Disk Space ==="
+          df -h /
+
+          # Ordered from lowest file count (fastest delete) to highest
+          TARGETS=(
+            "/usr/local/share/chromium"   # 480 files (~650 MB)
+            "/usr/local/share/powershell" # 551 files (~1.3 GB)
+            "/opt/microsoft"              # 952 files (~813 MB)
+            "/usr/share/swift"            # 2,025 files (~3.3 GB)
+          )
+
+          echo ""
+          echo "=== Validating & Removing Unused Directories ==="
+          for dir in "${TARGETS[@]}"; do
+            if [ ! -d "$dir" ]; then
+              echo "::error::Runner cleanup directory missing: $dir (runner layout may have changed)"
+              exit 1
+            fi
+            echo "Removing $dir..."
+            sudo rm -rf "$dir"
+          done
+
+          echo ""
+          echo "=== Post-Cleanup Free Disk Space ==="
+          df -h /
+
+      # Git Checkout (Shallow clone to avoid tag bloat)
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      # MegaLinter
+      - name: MegaLinter
+        # More info at https://megalinter.io/latest/flavors/
+        uses: oxsecurity/megalinter@9949bad031045f366be2467e00e8371a7328a2e2 # v10.1.0
+        env:
+          # Linting behavior (VALIDATE_ALL_CODEBASE, DISABLE_ERRORS_LINTERS, etc.)
+          # lives in .mega-linter.yml so it's a single place to toggle.
+          # https://megalinter.io/latest/configuration/
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Upload MegaLinter artifacts
+      - name: Archive production artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: success() || failure()
+        with:
+          name: MegaLinter reports
+          include-hidden-files: "true"
+          path: |
+            megalinter-reports
+            mega-linter.log
+          if-no-files-found: ignore
