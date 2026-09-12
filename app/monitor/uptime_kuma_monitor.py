@@ -130,23 +130,28 @@ class UptimeKumaMonitor:
         if not config.uptime_kuma_mappings:
             return
 
+        try:
+            # Fetch /metrics once per refresh and reuse it for every mapped container,
+            # instead of re-fetching the full endpoint once per mapping (see #94)
+            monitors = await self.client.get_all_monitors()
+        except Exception as e:
+            logger.error(f"Error fetching Uptime-Kuma monitor statuses: {e}")
+            return
+
+        status_by_name = {m['friendly_name']: m['status'] for m in monitors}
+
         for mapping in config.uptime_kuma_mappings:
-            try:
-                # Use get_monitor_status_by_name directly since metrics endpoint doesn't provide stable IDs
-                status = await self.client.get_monitor_status_by_name(mapping.monitor_friendly_name)
+            status = status_by_name.get(mapping.monitor_friendly_name)
 
-                if status is None:
-                    logger.debug(f"Monitor '{mapping.monitor_friendly_name}' not found or could not fetch status")
-                    continue
+            if status is None:
+                logger.debug(f"Monitor '{mapping.monitor_friendly_name}' not found or could not fetch status")
+                continue
 
-                # Cache the status (0=down, 1=up, 2=pending, 3=maintenance)
-                # mapping.container_id now stores stable_id
-                self._container_status_cache[mapping.container_id] = status
+            # Cache the status (0=down, 1=up, 2=pending, 3=maintenance)
+            # mapping.container_id now stores stable_id
+            self._container_status_cache[mapping.container_id] = status
 
-                logger.debug(f"Cached status for {mapping.container_id}: {status} (monitor: {mapping.monitor_friendly_name})")
-
-            except Exception as e:
-                logger.error(f"Error fetching status for mapping {mapping.container_id}: {e}")
+            logger.debug(f"Cached status for {mapping.container_id}: {status} (monitor: {mapping.monitor_friendly_name})")
 
     def get_container_status(self, stable_id: str) -> Optional[int]:
         return self._container_status_cache.get(stable_id)
