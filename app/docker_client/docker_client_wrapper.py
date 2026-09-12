@@ -140,7 +140,8 @@ class DockerClientWrapper:
                 "started_at": attrs.get("State", {}).get("StartedAt"),
                 "finished_at": attrs.get("State", {}).get("FinishedAt"),
                 "exit_code": attrs.get("State", {}).get("ExitCode"),
-                "restart_count": attrs.get("State", {}).get("RestartCount", 0),
+                # RestartCount is a top-level inspect field, not nested under State.
+                "restart_count": attrs.get("RestartCount", 0),
                 "health": self._get_health_status(attrs),
                 "restart_policy": attrs.get("HostConfig", {}).get("RestartPolicy", {}),
                 "compose_project": labels.get("com.docker.compose.project"),  # NEW: Compose project

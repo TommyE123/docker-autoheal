@@ -114,7 +114,3 @@ class TestPrometheusStart:
             await service.start()
 
             self.mock_http_server.assert_called_once_with(8080)
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
