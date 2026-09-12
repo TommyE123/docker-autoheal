@@ -138,6 +138,12 @@ class TestContainerInfo:
 
         assert wrapper.get_container_info(container)["restart_count"] == 3
 
+    def test_restart_count_defaults_to_zero_when_absent(self, wrapper):
+        container = make_sdk_container()
+        del container.attrs["RestartCount"]
+
+        assert wrapper.get_container_info(container)["restart_count"] == 0
+
     def test_stable_id_prefers_the_monitoring_id_label(self, wrapper):
         container = make_sdk_container(
             labels={
