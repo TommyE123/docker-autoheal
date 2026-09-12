@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 # Docker Auto-Heal - Auto-Monitoring Example
 # This compose file demonstrates the auto-monitoring feature
@@ -14,8 +14,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./data:/data
     ports:
-      - "3131:3131"  # Web UI
-      - "9090:9090"  # Prometheus metrics
+      - "3131:3131" # Web UI
+      - "9090:9090" # Prometheus metrics
     environment:
       - LOG_LEVEL=INFO
     networks:
@@ -34,7 +34,8 @@ services:
     networks:
       - autoheal-demo
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      test:
+        ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -64,7 +65,15 @@ services:
     networks:
       - autoheal-demo
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8000/health"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8000/health",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
