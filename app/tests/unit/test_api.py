@@ -10,37 +10,53 @@ and the fake Docker client/monitoring engine mean no real Docker daemon is
 ever touched.
 """
 
-from unittest.mock import MagicMock
+import json
+from io import BytesIO
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
 
 from app.api.api import (
     ContainerSelectionRequest,
+    add_health_check,
+    add_notification_service,
     create_uptime_kuma_mapping,
+    delete_health_check,
+    delete_notification_service,
     delete_uptime_kuma_mapping,
     disable_maintenance_mode,
     disable_uptime_kuma_integration,
     enable_maintenance_mode,
     enable_uptime_kuma_integration,
+    export_config,
     get_config,
     get_container_details,
+    get_health_check,
     get_maintenance_status,
+    get_notifications_config,
     get_system_status,
     get_uptime_kuma_mappings,
     get_uptime_kuma_monitors,
     health_check,
     list_containers,
+    list_health_checks,
     restart_container_manual,
     unquarantine_container,
     update_container_selection,
     update_monitor_config,
+    update_notification_service,
+    update_notifications_config,
     update_restart_config,
 )
+from app.api.api import import_config as api_import_config
+from app.api.api import test_notification_service as api_test_notification_service
 from app.api.api import test_uptime_kuma_connection as api_test_uptime_kuma_connection
 from app.api.api import update_config as api_update_config
 from app.config.config_manager import (
+    HealthCheckConfig,
     MonitorConfig,
+    NotificationService,
     RestartConfig,
     UptimeKumaMapping,
     config_manager,
@@ -476,3 +492,296 @@ class TestUptimeKumaIntegration:
 
         assert result["success"] is True
         assert config_manager.get_config().uptime_kuma.enabled is False
+
+
+@pytest.mark.asyncio
+class TestHealthCheckManagement:
+    async def test_add_health_check_resolves_full_container_id(self, wired_api):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+
+        result = await add_health_check(
+            HealthCheckConfig(container_id="web", check_type="http", http_endpoint="http://localhost/health")
+        )
+
+        assert result["status"] == "success"
+        stored = config_manager.get_custom_health_check("a" * 64)
+        assert stored is not None
+        assert stored.container_id == "a" * 64
+        assert stored.check_type == "http"
+
+    async def test_add_health_check_unknown_container_returns_404(self, wired_api):
+        with pytest.raises(HTTPException) as exc_info:
+            await add_health_check(
+                HealthCheckConfig(container_id="does-not-exist", check_type="tcp", tcp_port=8080)
+            )
+
+        assert exc_info.value.status_code == 404
+
+    async def test_add_health_check_uninitialized_docker_client_returns_500(self, uninitialized_api):
+        with pytest.raises(HTTPException) as exc_info:
+            await add_health_check(HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080))
+
+        assert exc_info.value.status_code == 500
+
+    async def test_get_health_check_returns_stored_check(self, wired_api):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="a" * 64, check_type="tcp", tcp_port=8080)
+        )
+
+        result = await get_health_check("web")
+
+        assert result.container_id == "a" * 64
+        assert result.check_type == "tcp"
+
+    async def test_get_health_check_missing_check_returns_404(self, wired_api):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_health_check("web")
+
+        assert exc_info.value.status_code == 404
+
+    async def test_get_health_check_unknown_container_returns_404(self, wired_api):
+        with pytest.raises(HTTPException) as exc_info:
+            await get_health_check("does-not-exist")
+
+        assert exc_info.value.status_code == 404
+
+    async def test_get_health_check_uninitialized_docker_client_returns_500(self, uninitialized_api):
+        with pytest.raises(HTTPException) as exc_info:
+            await get_health_check("web")
+
+        assert exc_info.value.status_code == 500
+
+    async def test_delete_health_check_removes_stored_check(self, wired_api):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="a" * 64, check_type="tcp", tcp_port=8080)
+        )
+
+        result = await delete_health_check("web")
+
+        assert result["status"] == "success"
+        assert config_manager.get_custom_health_check("a" * 64) is None
+
+    async def test_delete_health_check_unknown_container_returns_404(self, wired_api):
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_health_check("does-not-exist")
+
+        assert exc_info.value.status_code == 404
+
+    async def test_delete_health_check_uninitialized_docker_client_returns_500(self, uninitialized_api):
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_health_check("web")
+
+        assert exc_info.value.status_code == 500
+
+    async def test_list_health_checks_returns_all_registered_checks(self):
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="a" * 64, check_type="tcp", tcp_port=8080)
+        )
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="b" * 64, check_type="http", http_endpoint="http://localhost/")
+        )
+
+        result = await list_health_checks()
+
+        assert set(result.keys()) == {"a" * 64, "b" * 64}
+
+    async def test_list_health_checks_empty_by_default(self):
+        assert await list_health_checks() == {}
+
+
+@pytest.mark.asyncio
+class TestNotificationsConfig:
+    async def test_get_notifications_config_returns_defaults(self):
+        result = await get_notifications_config()
+
+        assert result["enabled"] is False
+        assert result["services"] == []
+        assert "restart" in result["event_filters"]
+
+    async def test_get_notifications_config_reflects_current_state(self):
+        config = config_manager.get_config()
+        config.notifications.enabled = True
+        config.notifications.services = [
+            NotificationService(name="Slack", type="slack", url="https://example.invalid/slack")
+        ]
+        config_manager.update_config(config)
+
+        result = await get_notifications_config()
+
+        assert result["enabled"] is True
+        assert result["services"][0]["name"] == "Slack"
+
+    async def test_update_notifications_config_updates_enabled_and_filters(self):
+        result = await update_notifications_config({"enabled": True, "event_filters": ["restart"]})
+
+        assert result["status"] == "success"
+        updated = config_manager.get_config()
+        assert updated.notifications.enabled is True
+        assert updated.notifications.event_filters == ["restart"]
+
+    async def test_update_notifications_config_replaces_services(self):
+        result = await update_notifications_config(
+            {"services": [{"name": "Webhook", "type": "webhook", "url": "https://example.invalid/hook"}]}
+        )
+
+        assert result["config"]["services"][0]["name"] == "Webhook"
+        assert config_manager.get_config().notifications.services[0].name == "Webhook"
+
+    async def test_update_notifications_config_invalid_service_returns_500(self):
+        # Missing the required "type" field, so NotificationService(**data) raises.
+        with pytest.raises(HTTPException) as exc_info:
+            await update_notifications_config({"services": [{"name": "Missing Type"}]})
+
+        assert exc_info.value.status_code == 500
+
+
+@pytest.mark.asyncio
+class TestNotificationServiceCrud:
+    async def test_add_notification_service_success(self):
+        result = await add_notification_service(
+            {"name": "Webhook", "type": "webhook", "url": "https://example.invalid/hook"}
+        )
+
+        assert result["status"] == "success"
+        assert result["service"]["name"] == "Webhook"
+        assert config_manager.get_config().notifications.services[0].name == "Webhook"
+
+    async def test_add_notification_service_duplicate_name_returns_400(self):
+        await add_notification_service(
+            {"name": "Webhook", "type": "webhook", "url": "https://example.invalid/hook"}
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await add_notification_service(
+                {"name": "Webhook", "type": "slack", "url": "https://example.invalid/other"}
+            )
+
+        assert exc_info.value.status_code == 400
+        assert len(config_manager.get_config().notifications.services) == 1
+
+    async def test_add_notification_service_invalid_payload_returns_500(self):
+        with pytest.raises(HTTPException) as exc_info:
+            await add_notification_service({"name": "Missing Type"})
+
+        assert exc_info.value.status_code == 500
+
+    async def test_update_notification_service_preserves_name_when_omitted(self):
+        await add_notification_service(
+            {"name": "Webhook", "type": "webhook", "url": "https://example.invalid/hook"}
+        )
+
+        result = await update_notification_service(
+            "Webhook", {"type": "webhook", "url": "https://example.invalid/updated"}
+        )
+
+        assert result["status"] == "success"
+        assert result["service"]["name"] == "Webhook"
+        assert result["service"]["url"] == "https://example.invalid/updated"
+        stored = config_manager.get_config().notifications.services[0]
+        assert stored.url == "https://example.invalid/updated"
+
+    async def test_update_notification_service_unknown_name_returns_404(self):
+        with pytest.raises(HTTPException) as exc_info:
+            await update_notification_service("does-not-exist", {"type": "webhook"})
+
+        assert exc_info.value.status_code == 404
+
+    async def test_delete_notification_service_success(self):
+        await add_notification_service(
+            {"name": "Webhook", "type": "webhook", "url": "https://example.invalid/hook"}
+        )
+
+        result = await delete_notification_service("Webhook")
+
+        assert result["status"] == "success"
+        assert config_manager.get_config().notifications.services == []
+
+    async def test_delete_notification_service_unknown_name_returns_404(self):
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_notification_service("does-not-exist")
+
+        assert exc_info.value.status_code == 404
+
+
+@pytest.mark.asyncio
+class TestNotificationServiceTest:
+    """Delegation only; delivery itself is covered by NotificationManager's own tests."""
+
+    async def test_success_delegates_to_notification_manager(self, monkeypatch):
+        fake_test_notification = AsyncMock(
+            return_value={"success": True, "message": "Test notification sent successfully"}
+        )
+        monkeypatch.setattr("app.api.api.notification_manager.test_notification", fake_test_notification)
+
+        result = await api_test_notification_service("Webhook")
+
+        assert result == {"status": "success", "message": "Test notification sent successfully"}
+        fake_test_notification.assert_awaited_once_with("Webhook")
+
+    async def test_failure_result_raises_400_with_manager_message(self, monkeypatch):
+        fake_test_notification = AsyncMock(
+            return_value={"success": False, "message": "Service 'Webhook' not found"}
+        )
+        monkeypatch.setattr("app.api.api.notification_manager.test_notification", fake_test_notification)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await api_test_notification_service("Webhook")
+
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail == "Service 'Webhook' not found"
+
+
+@pytest.mark.asyncio
+class TestConfigExportImport:
+    async def test_export_config_returns_current_config_as_downloadable_json(self):
+        config = config_manager.get_config()
+        config.monitor.interval_seconds = 77
+        config_manager.update_config(config)
+
+        response = await export_config()
+
+        assert response.status_code == 200
+        assert "attachment; filename=autoheal-config-" in response.headers["content-disposition"]
+        body = json.loads(bytes(response.body))
+        assert body["monitor"]["interval_seconds"] == 77
+
+    async def test_export_config_failure_returns_500(self, monkeypatch):
+        monkeypatch.setattr(
+            config_manager, "export_config", MagicMock(side_effect=RuntimeError("disk error"))
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await export_config()
+
+        assert exc_info.value.status_code == 500
+
+    async def test_import_config_applies_uploaded_configuration(self):
+        new_config = config_manager.get_config()
+        new_config.monitor.interval_seconds = 123
+        payload = new_config.model_dump_json()
+        upload = UploadFile(file=BytesIO(payload.encode("utf-8")), filename="config.json")
+
+        result = await api_import_config(upload)
+
+        assert result["status"] == "success"
+        assert config_manager.get_config().monitor.interval_seconds == 123
+
+    async def test_import_config_invalid_json_returns_500(self):
+        upload = UploadFile(file=BytesIO(b"not valid json"), filename="config.json")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await api_import_config(upload)
+
+        assert exc_info.value.status_code == 500
