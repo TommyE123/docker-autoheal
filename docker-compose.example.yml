@@ -89,8 +89,8 @@ services:
       - "5432:5432"
     networks:
       - autoheal-demo
-    # NOTE: No autoheal=true label, so this won't be auto-monitored
-    # This is intentional - databases often need manual intervention
+  # NOTE: No autoheal=true label, so this won't be auto-monitored
+  # This is intentional - databases often need manual intervention
 
   # Example 4: Cache with auto-monitoring
   # Redis with automatic monitoring
@@ -159,4 +159,3 @@ networks:
 #
 # Clean up:
 # docker-compose -f docker-compose.example.yml down -v
-

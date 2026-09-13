@@ -6,6 +6,8 @@ directory:
 
 * ``FakeDockerClient`` stands in for ``DockerClientWrapper`` and serves
   canned container information.
+* ``FakeUptimeKumaClient`` stands in for ``UptimeKumaClient`` and serves
+  canned monitor data.
 * ``isolated_config_manager`` points the global ``config_manager`` singleton at
   a per-test temporary directory and resets its in-memory state, so every test
   starts from the documented defaults.
@@ -90,7 +92,9 @@ def make_container(
 
     if "monitoring.id" in labels:
         stable_id = labels["monitoring.id"]
-    elif labels.get("com.docker.compose.project") and labels.get("com.docker.compose.service"):
+    elif labels.get("com.docker.compose.project") and labels.get(
+        "com.docker.compose.service"
+    ):
         stable_id = f"{labels['com.docker.compose.project']}_{labels['com.docker.compose.service']}"
     else:
         stable_id = name
@@ -196,7 +200,9 @@ class FakeDockerClient:
         self.restart_calls.append(container.name)
         return self.restart_results.get(container.name, True)
 
-    def check_http_health(self, container, endpoint, expected_status=200, timeout=5) -> bool:
+    def check_http_health(
+        self, container, endpoint, expected_status=200, timeout=5
+    ) -> bool:
         if self.health_check_error is not None:
             raise self.health_check_error
         return self.health_results.get(container.name, True)
@@ -218,6 +224,47 @@ class FakeDockerClient:
 
     def get_events(self, decode=True, filters=None):
         return self.events
+
+
+class FakeUptimeKumaClient:
+    """
+    In-memory fake of :class:`UptimeKumaClient`.
+
+    Covers the surface used by ``app/api/api.py`` and ``UptimeKumaMonitor``:
+    ``connect``, ``get_all_monitors``, and ``get_monitor_status_by_name``.
+    """
+
+    def __init__(
+        self,
+        connect_result: bool = True,
+        monitors: Optional[list] = None,
+        statuses: Optional[dict] = None,
+        get_all_monitors_error: Optional[Exception] = None,
+    ) -> None:
+        self.connect_result = connect_result
+        self.monitors = monitors if monitors is not None else []
+        # monitor_friendly_name -> status (or exception to raise)
+        self.statuses = statuses if statuses is not None else {}
+        self.status_calls: list[str] = []
+        # Support tests that expect get_all_monitors to report errors or call counts
+        self.get_all_monitors_error = get_all_monitors_error
+        self.get_all_monitors_calls = 0
+
+    async def connect(self) -> bool:
+        return self.connect_result
+
+    async def get_all_monitors(self):
+        self.get_all_monitors_calls += 1
+        if self.get_all_monitors_error is not None:
+            raise self.get_all_monitors_error
+        return self.monitors
+
+    async def get_monitor_status_by_name(self, name: str):
+        self.status_calls.append(name)
+        result = self.statuses.get(name)
+        if isinstance(result, Exception):
+            raise result
+        return result
 
 
 # ---------------------------------------------------------------------------
