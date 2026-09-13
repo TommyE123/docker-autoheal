@@ -14,6 +14,7 @@
   "packageRules": [
     {
       "description": "Require manual review and merge for all dependency updates. No Renovate update is automatically merged.",
+      "matchPackageNames": ["*"],
       "automerge": false
     },
     {
