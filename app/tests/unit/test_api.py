@@ -12,6 +12,7 @@ ever touched.
 
 import json
 from io import BytesIO
+from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -323,7 +324,10 @@ class TestUnquarantineContainer:
         assert config_manager.is_quarantined("web") is False
         assert config_manager.get_total_restart_count("web") == 0
         events = config_manager.get_events()
-        assert events[-1].event_type == "unquarantine"
+        event = events[-1]
+        assert event.event_type == "unquarantine"
+        assert event.timestamp.tzinfo is not None
+        assert event.timestamp.utcoffset() == timedelta(0)
 
     async def test_unknown_container_returns_404(self, wired_api):
         with pytest.raises(HTTPException) as exc_info:
