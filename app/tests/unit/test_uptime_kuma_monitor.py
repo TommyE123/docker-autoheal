@@ -224,20 +224,19 @@ class TestUpdateStatusCache:
         _add_mapping("db", "DB Monitor")
         _add_mapping("cache", "Cache Monitor")
         monitor = UptimeKumaMonitor()
-        _install_client(
-            monitor,
-            FakeUptimeKumaClient(
-                monitors=[
-                    {"friendly_name": "Web Monitor", "status": 1},
-                    {"friendly_name": "DB Monitor", "status": 0},
-                    {"friendly_name": "Cache Monitor", "status": 1},
-                ]
-            ),
+        fake_client = FakeUptimeKumaClient(
+            monitors=[
+                {"friendly_name": "Web Monitor", "status": 1},
+                {"friendly_name": "DB Monitor", "status": 0},
+                {"friendly_name": "Cache Monitor", "status": 1},
+            ]
         )
+        _install_client(monitor, fake_client)
 
         await monitor._update_status_cache()
 
         assert monitor._container_status_cache == {"web": 1, "db": 0, "cache": 1}
+        assert fake_client.get_all_monitors_calls == 1
 
     async def test_missing_monitor_status_is_skipped(self):
         _add_mapping("web", "Unknown Monitor")
@@ -255,17 +254,15 @@ class TestUpdateStatusCache:
         _add_mapping("web", "Web Monitor")
         monitor = UptimeKumaMonitor()
         monitor._container_status_cache["web"] = 1
-        # Simulate an error fetching monitors by making the client's get_all_monitors raise
-        fake = FakeUptimeKumaClient()
+        # Arrange the shared fake to raise when get_all_monitors is called
+        fake = FakeUptimeKumaClient(get_all_monitors_error=RuntimeError("upstream error"))
         _install_client(monitor, fake)
-        async def _raise():
-            raise RuntimeError("upstream error")
-        fake.get_all_monitors = _raise
 
         with caplog.at_level(logging.ERROR):
             await monitor._update_status_cache()
 
         assert monitor._container_status_cache == {"web": 1}
+        assert fake.get_all_monitors_calls == 1
         assert any(
             record.levelno == logging.ERROR and "upstream error" in record.getMessage()
             for record in caplog.records
@@ -401,9 +398,6 @@ class TestMonitoringLoop:
         monkeypatch.setattr(asyncio, "sleep", fake_sleep)
         monkeypatch.setattr(monitor, "_update_status_cache", flaky_update)
 
-        await monitor._monitoring_loop()
-
-        assert len(attempts) == 2
         await monitor._monitoring_loop()
 
         assert len(attempts) == 2
