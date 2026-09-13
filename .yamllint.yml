@@ -15,3 +15,4 @@ rules:
       .github/workflows/greetings.yml
       .github/workflows/mega-linter.yml
       .github/workflows/semantic-pr-title.yml
+      .github/workflows/tests.yml
