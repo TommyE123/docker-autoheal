@@ -30,10 +30,12 @@ LABEL description="Automated container monitoring and healing service with React
 # Set working directory
 WORKDIR /app
 
+# renovate: datasource=deb depName=curl versioning=deb registryUrl=https://deb.debian.org/debian?suite=trixie&components=main&binaryArch=amd64
+ARG CURL_VERSION=8.14.1-2+deb13u5
+
 # Install system dependencies
-# renovate: suite=trixie depName=curl
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl=8.14.1-2+deb13u4 \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl="${CURL_VERSION}" \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
