@@ -117,6 +117,45 @@ def test_historical_naive_event_is_preserved_without_becoming_current_event(isol
     assert events[0].timestamp == naive_timestamp
 
 
+@pytest.mark.parametrize(
+    ("timestamp", "error"),
+    [
+        ("not-an-iso-timestamp", "legacy timestamp must be ISO 8601"),
+        ("2024-01-01T12:00:00+00:00", "UTC timestamps must use AutoHealEvent"),
+    ],
+)
+def test_legacy_event_rejects_invalid_or_current_utc_timestamps(timestamp, error):
+    """Legacy records must be ISO timestamps that cannot use the current model."""
+    with pytest.raises(ValidationError, match=error):
+        LegacyAutoHealEvent(**_event_payload(0, timestamp))
+
+
+def test_loading_events_skips_invalid_record_and_retains_valid_history(
+    isolated_config_manager, caplog
+):
+    """One corrupt record must not discard current or valid legacy history."""
+    isolated_config_manager.EVENTS_FILE.write_text(
+        json.dumps(
+            [
+                _event_payload(0, "2024-01-01T12:00:00+00:00"),
+                _event_payload(1, "2024-01-01T12:00:00"),
+                _event_payload(2, "not-an-iso-timestamp"),
+            ]
+        )
+    )
+
+    events = isolated_config_manager._load_events()
+
+    assert len(events) == 2
+    assert [event.container_id for event in events] == [
+        "test_container_0",
+        "test_container_1",
+    ]
+    assert isinstance(events[0], AutoHealEvent)
+    assert isinstance(events[1], LegacyAutoHealEvent)
+    assert "Skipping invalid event 2 from disk" in caplog.text
+
+
 def test_mixed_historical_and_utc_events_are_preserved_when_saved(isolated_config_manager):
     naive_timestamp = "2024-01-01T12:00:00"
     utc_timestamp = "2024-01-02T12:00:00+00:00"
@@ -142,3 +181,4 @@ def test_mixed_historical_and_utc_events_are_preserved_when_saved(isolated_confi
     assert isinstance(reloaded_events[0], LegacyAutoHealEvent)
     assert reloaded_events[0].timestamp == naive_timestamp
     assert isinstance(reloaded_events[1], AutoHealEvent)
+    assert isinstance(reloaded_events[2], AutoHealEvent)
