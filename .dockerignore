@@ -31,3 +31,4 @@ Thumbs.db
 # Config exports
 autoheal-config-*.json
 
+.git
