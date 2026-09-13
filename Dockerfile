@@ -30,9 +30,12 @@ LABEL description="Automated container monitoring and healing service with React
 # Set working directory
 WORKDIR /app
 
+# renovate: datasource=deb depName=curl versioning=deb registryUrl=https://deb.debian.org/debian?suite=trixie&components=main&binaryArch=amd64
+ARG CURL_VERSION=8.14.1-2+deb13u5
+
 # Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl="${CURL_VERSION}" \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -58,8 +61,7 @@ EXPOSE 8080 9090
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:3131/health || exit 1
+    CMD ["curl", "-f", "http://localhost:3131/health"]
 
 # Run the application
 CMD ["python", "-m", "app.main"]
-
