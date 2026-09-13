@@ -12,7 +12,7 @@ rules:
     # uses the key 'on' without quotes which fails the truthy check
     ignore: |
       .github/workflows/docker-build.yml
-      .github/workflows/docker-release.yml    
+      .github/workflows/docker-release.yml
       .github/workflows/greetings.yml
       .github/workflows/mega-linter.yml
       .github/workflows/semantic-pr-title.yml
