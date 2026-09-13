@@ -199,24 +199,24 @@ class TestUpdateStatusCache:
         await monitor._update_status_cache()
 
         assert monitor._container_status_cache == {}
+        assert fake_client.get_all_monitors_calls == 0
 
     async def test_caches_status_for_each_mapping(self):
         _add_mapping("web", "Web Monitor")
         _add_mapping("db", "DB Monitor")
         monitor = UptimeKumaMonitor()
-        _install_client(
-            monitor,
-            FakeUptimeKumaClient(
-                monitors=[
-                    {"friendly_name": "Web Monitor", "status": 1},
-                    {"friendly_name": "DB Monitor", "status": 0},
-                ]
-            ),
+        fake_client = FakeUptimeKumaClient(
+            monitors=[
+                {"friendly_name": "Web Monitor", "status": 1},
+                {"friendly_name": "DB Monitor", "status": 0},
+            ]
         )
+        _install_client(monitor, fake_client)
 
         await monitor._update_status_cache()
 
         assert monitor._container_status_cache == {"web": 1, "db": 0}
+        assert fake_client.get_all_monitors_calls == 1
 
     async def test_fetches_metrics_once_regardless_of_mapping_count(self):
         """Regression test for #94: N mapped containers must not cause N /metrics fetches."""
@@ -307,14 +307,13 @@ class TestShouldRestartFromUptimeKuma:
         _enable_uptime_kuma(auto_restart_on_down=False)
         _add_mapping("web", "Web Monitor")
         monitor = UptimeKumaMonitor()
-        _install_client(
-            monitor,
-            FakeUptimeKumaClient(monitors=[{"friendly_name": "Web Monitor", "status": 0}]),
-        )
+        fake_client = FakeUptimeKumaClient(monitors=[{"friendly_name": "Web Monitor", "status": 0}])
+        _install_client(monitor, fake_client)
 
         result = await monitor.should_restart_from_uptime_kuma("web")
 
         assert result is False
+        assert fake_client.get_all_monitors_calls == 0
 
     async def test_false_when_container_not_mapped(self):
         _enable_uptime_kuma(auto_restart_on_down=True)
