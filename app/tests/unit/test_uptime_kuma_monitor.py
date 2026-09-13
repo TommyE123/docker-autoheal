@@ -174,15 +174,7 @@ class TestRefreshMonitorCache:
 
     async def test_caches_monitors_by_friendly_name(self):
         monitor = UptimeKumaMonitor()
-        _install_client(
-            monitor,
-            FakeUptimeKumaClient(
-                monitors=[
-                    {"friendly_name": "web", "status": 1},
-                    {"friendly_name": "db", "status": 0},
-                ]
-            ),
-        )
+        _install_client(monitor, FakeUptimeKumaClient(monitors=[{"friendly_name": "web", "status": 1}, {"friendly_name": "db", "status": 0}]))
 
         await monitor._refresh_monitor_cache()
 
@@ -241,10 +233,7 @@ class TestUpdateStatusCache:
     async def test_missing_monitor_status_is_skipped(self):
         _add_mapping("web", "Unknown Monitor")
         monitor = UptimeKumaMonitor()
-        _install_client(
-            monitor,
-            FakeUptimeKumaClient(monitors=[]),
-        )
+        _install_client(monitor, FakeUptimeKumaClient(monitors=[]))
 
         await monitor._update_status_cache()
 
@@ -254,15 +243,14 @@ class TestUpdateStatusCache:
         _add_mapping("web", "Web Monitor")
         monitor = UptimeKumaMonitor()
         monitor._container_status_cache["web"] = 1
-        # Arrange the shared fake to raise when get_all_monitors is called
-        fake = FakeUptimeKumaClient(get_all_monitors_error=RuntimeError("upstream error"))
-        _install_client(monitor, fake)
+        fake_client = FakeUptimeKumaClient(get_all_monitors_error=RuntimeError("upstream error"))
+        _install_client(monitor, fake_client)
 
         with caplog.at_level(logging.ERROR):
             await monitor._update_status_cache()
 
         assert monitor._container_status_cache == {"web": 1}
-        assert fake.get_all_monitors_calls == 1
+        assert fake_client.get_all_monitors_calls == 1
         assert any(
             record.levelno == logging.ERROR and "upstream error" in record.getMessage()
             for record in caplog.records
@@ -313,7 +301,7 @@ class TestShouldRestartFromUptimeKuma:
         result = await monitor.should_restart_from_uptime_kuma("web")
 
         assert result is False
-        assert fake_client.get_all_monitors_calls == 0
+        assert fake_client.get_all_monitors_calls == 0  # cache refresh skipped entirely
 
     async def test_false_when_container_not_mapped(self):
         _enable_uptime_kuma(auto_restart_on_down=True)
