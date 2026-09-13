@@ -1,0 +1,208 @@
+name: Docker Release
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: docker-publish-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    name: Build and release Docker image
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the repository so subsequent steps can access the code
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      # The highest major marker reachable from main defines the active release series.
+      # For example, v2 selects the v2.x.x release series; v3 switches to v3.x.x.
+      - name: Determine release series
+        id: series
+        run: |
+          # Pick the highest major marker tag reachable from this commit
+          SERIES_TAG="$(
+            git tag --merged "$GITHUB_SHA" \
+              | grep -E '^v[0-9]+$' \
+              | sort -V \
+              | tail -n 1
+          )"
+
+          if [ -z "$SERIES_TAG" ]; then
+            echo "ERROR: No release-series marker tag was found on main."
+            echo "Create a marker such as v2 on the main branch before releasing."
+            exit 1
+          fi
+
+          MAJOR="${SERIES_TAG#v}"
+
+          echo "Active release series: v${MAJOR}"
+          echo "series_tag=${SERIES_TAG}" >> "$GITHUB_OUTPUT"
+          echo "major=${MAJOR}" >> "$GITHUB_OUTPUT"
+
+      # Find an existing release tag on the current commit first.
+      # This makes retries safe if the image was pushed and the tag already exists.
+      - name: Detect existing release for current commit
+        id: existing
+        env:
+          MAJOR: ${{ steps.series.outputs.major }}
+        run: |
+          # Look for an existing semantic version tag pointing at this commit
+          EXISTING_TAG="$(
+            git tag --points-at "$GITHUB_SHA" \
+              | grep -E "^v${MAJOR}\.[0-9]+\.[0-9]+$" \
+              | sort -V \
+              | tail -n 1
+          )"
+
+          if [ -n "$EXISTING_TAG" ]; then
+            echo "Existing release tag found on current commit: $EXISTING_TAG"
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "tag=$EXISTING_TAG" >> "$GITHUB_OUTPUT"
+          else
+            echo "No existing release tag found on current commit."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Calculate the first release or next patch release for the active series.
+      - name: Calculate release version
+        id: release_version
+        env:
+          MAJOR: ${{ steps.series.outputs.major }}
+          EXISTING_FOUND: ${{ steps.existing.outputs.found }}
+          EXISTING_TAG: ${{ steps.existing.outputs.tag }}
+        run: |
+          # A previous release attempt may already have created the tag.
+          if [ "$EXISTING_FOUND" = "true" ]; then
+            echo "Reusing existing release tag: $EXISTING_TAG"
+            echo "new_tag=$EXISTING_TAG" >> "$GITHUB_OUTPUT"
+            echo "create_tag=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          LATEST_TAG="$(
+            git tag --merged "$GITHUB_SHA" \
+              | grep -E "^v${MAJOR}\.[0-9]+\.[0-9]+$" \
+              | sort -V \
+              | tail -n 1
+          )"
+
+          if [ -z "$LATEST_TAG" ]; then
+            NEW_TAG="v${MAJOR}.0.0"
+            echo "No previous ${MAJOR}.x.x release found."
+            echo "First release: $NEW_TAG"
+          else
+            if [[ ! "$LATEST_TAG" =~ ^v${MAJOR}\.([0-9]+)\.([0-9]+)$ ]]; then
+              echo "ERROR: Could not parse latest release tag: $LATEST_TAG"
+              exit 1
+            fi
+
+            MINOR="${BASH_REMATCH[1]}"
+            PATCH="${BASH_REMATCH[2]}"
+            NEW_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+
+            echo "Latest release: $LATEST_TAG"
+            echo "Next release:   $NEW_TAG"
+          fi
+
+          echo "new_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+          echo "create_tag=true" >> "$GITHUB_OUTPUT"
+
+      # Configure QEMU to support building images for multiple CPU architectures
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
+
+      # Set up Docker Buildx builder for advanced multi-platform builds
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      # Authenticate to Docker Hub for pushing built images
+      - name: Login to Docker Hub
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Authenticate to GitHub Container Registry (GHCR) for pushing images
+      - name: Login to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Generate image metadata and tags for Docker registries
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: |
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal
+            ghcr.io/${{ github.repository_owner }}/docker-autoheal
+          tags: |
+            type=raw,value=${{ steps.release_version.outputs.new_tag }}
+            type=raw,value=latest
+
+      # Build the Docker image for multiple platforms and push to registries
+      - name: Build and push Docker image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=docker-autoheal
+          cache-to: type=gha,mode=max,scope=docker-autoheal
+
+      # Create and push a Git tag for the new release (if needed)
+      - name: Create Git tag
+        if: steps.release_version.outputs.create_tag == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.release_version.outputs.new_tag }}
+        run: |
+          # Configure git identity and push the new tag using the token
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${VERSION}"
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin "${VERSION}"
+
+      # Create a GitHub release entry for the new tag with generated notes
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ steps.release_version.outputs.new_tag }}
+        run: |
+          if gh release view "${TAG_NAME}" >/dev/null 2>&1; then
+            echo "GitHub Release ${TAG_NAME} already exists. Nothing to do."
+            exit 0
+          fi
+
+          gh release create "${TAG_NAME}" \
+            --verify-tag \
+            --title "${TAG_NAME}" \
+            --generate-notes
+
+      # Update the repository description on Docker Hub using the README
+      - name: Update Docker Hub description
+        uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal
+          readme-filepath: ./DOCKER_HUB_README.md
