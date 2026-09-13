@@ -9,8 +9,9 @@ LABEL description="Automated container monitoring and healing service with React
 WORKDIR /app
 
 # Install system dependencies
+# renovate: suite=trixie depName=curl
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
+    curl=8.14.1-2+deb13u4 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -36,8 +37,7 @@ EXPOSE 3131 9090
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:3131/health || exit 1
+    CMD ["curl", "-f", "http://localhost:3131/health"]
 
 # Run the application
 CMD ["python", "-m", "app.main"]
-
