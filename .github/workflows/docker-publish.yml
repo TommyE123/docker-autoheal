@@ -3,13 +3,13 @@ name: Publish to Docker Hub & GHCR
 on:
   push:
     tags:
-      - 'v*.*.*'  # Trigger on version tags like v1.0.0
-  workflow_dispatch:  # Allow manual trigger
+      - "v*.*.*" # Trigger on version tags like v1.0.0
+  workflow_dispatch: # Allow manual trigger
     inputs:
       tag:
-        description: 'Docker image tag'
+        description: "Docker image tag"
         required: false
-        default: 'latest'
+        default: "latest"
 
 jobs:
   build-and-push:
