@@ -50,3 +50,7 @@ DISABLE_ERRORS_LINTERS:
 
 ACTION_ZIZMOR_UNSECURED_ENV_VARIABLES:
   - GITHUB_TOKEN
+
+PRE_COMMANDS:
+
+- command: pip install --no-cache-dir -r /github/workspace/requirements.txt
