@@ -14,13 +14,17 @@ class UptimeKumaClient:
     """Client for interacting with Uptime-Kuma API using /metrics endpoint"""
 
     def __init__(self, server_url: str, password: str, username: str = ""):
+        """Configure the metrics endpoint and its Basic authentication header."""
         self.server_url = server_url.rstrip('/')
         self.password = password
         self.username = username
         # Use Basic Auth with username (empty for API key) and password/API key
         # For API key: username="", password=api_key
         # For user auth: username=username, password=password
-        self.auth_header = aiohttp.encode_basic_auth(username if username else '', password)
+        # Keep BasicAuth's Latin-1 default for compatibility with existing credentials.
+        self.auth_header = aiohttp.encode_basic_auth(
+            username if username else '', password, encoding="latin1"
+        )
         self.session: Optional[aiohttp.ClientSession] = None
 
     async def connect(self) -> bool:
@@ -129,4 +133,3 @@ class UptimeKumaClient:
         except Exception as e:
             logger.error(f"Failed to get monitor status for '{monitor_name}': {e}")
             return None
-

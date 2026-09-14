@@ -13,18 +13,9 @@ covers that ordering (issue #26) alongside ``METRICS_TEXT``'s simpler,
 name-first layout.
 """
 
-import base64
-
 import pytest
 
 from app.uptime_kuma.uptime_kuma_client import UptimeKumaClient
-
-
-def _decode_basic_auth_header(header: str) -> tuple[str, str]:
-    scheme, _, encoded = header.partition(" ")
-    assert scheme == "Basic"
-    login, _, password = base64.b64decode(encoded).decode().partition(":")
-    return login, password
 
 
 METRICS_TEXT = (
@@ -92,21 +83,22 @@ def _patch_session(monkeypatch, response=None, exc: Exception | None = None) -> 
 
 
 class TestInit:
-    def test_api_key_auth_uses_empty_username(self):
-        client = UptimeKumaClient("http://kuma.example", "secret-token")
+    """Tests for client configuration and authentication encoding."""
 
-        login, password = _decode_basic_auth_header(client.auth_header)
-        assert login == ""
-        assert password == "secret-token"
+    def test_api_key_auth_uses_empty_username_and_latin1(self):
+        """Encode API keys exactly as empty-user Latin-1 Basic credentials."""
+        client = UptimeKumaClient("http://kuma.example", " clé: secret ")
 
-    def test_user_auth_uses_given_username(self):
-        client = UptimeKumaClient("http://kuma.example", "hunter2", "admin")
+        assert client.auth_header == "Basic OiBjbOk6IHNlY3JldCA="
 
-        login, password = _decode_basic_auth_header(client.auth_header)
-        assert login == "admin"
-        assert password == "hunter2"
+    def test_user_auth_uses_given_username_and_latin1(self):
+        """Preserve spaces, colons, and Latin-1 bytes in user credentials."""
+        client = UptimeKumaClient("http://kuma.example", " pä:ss ", " Jörg ")
+
+        assert client.auth_header == "Basic IEr2cmcgOiBw5DpzcyA="
 
     def test_server_url_trailing_slash_is_stripped(self):
+        """Strip a trailing slash so metrics paths contain one separator."""
         client = UptimeKumaClient("http://kuma.example/", "token")
 
         assert client.server_url == "http://kuma.example"
@@ -114,7 +106,10 @@ class TestInit:
 
 @pytest.mark.asyncio
 class TestConnect:
+    """Tests for connection checks against the metrics endpoint."""
+
     async def test_sends_authorization_header_instead_of_auth_kwarg(self, monkeypatch):
+        """Send the precomputed Authorization header when checking connectivity."""
         session = _patch_session(monkeypatch, response=_FakeResponse(200, METRICS_TEXT))
         client = UptimeKumaClient("http://kuma.example", "hunter2", "admin")
 
@@ -125,6 +120,7 @@ class TestConnect:
         assert "auth" not in call
 
     async def test_returns_true_when_monitor_status_present(self, monkeypatch):
+        """Accept a successful response containing monitor status metrics."""
         _patch_session(monkeypatch, response=_FakeResponse(200, METRICS_TEXT))
         client = UptimeKumaClient("http://kuma.example", "token")
 
@@ -157,7 +153,10 @@ class TestConnect:
 
 @pytest.mark.asyncio
 class TestGetAllMonitors:
+    """Tests for fetching and parsing the full monitor list."""
+
     async def test_sends_authorization_header_instead_of_auth_kwarg(self, monkeypatch):
+        """Send the precomputed Authorization header when fetching monitors."""
         session = _patch_session(monkeypatch, response=_FakeResponse(200, METRICS_TEXT))
         client = UptimeKumaClient("http://kuma.example", "token")
 
@@ -168,6 +167,7 @@ class TestGetAllMonitors:
         assert "auth" not in call
 
     async def test_parses_monitors_from_metrics_response(self, monkeypatch):
+        """Return monitor names and statuses parsed from the metrics response."""
         _patch_session(monkeypatch, response=_FakeResponse(200, METRICS_TEXT))
         client = UptimeKumaClient("http://kuma.example", "token")
 
@@ -302,7 +302,10 @@ class TestGetMonitorStatus:
 
 @pytest.mark.asyncio
 class TestGetMonitorStatusByName:
+    """Tests for fetching a monitor status by its friendly name."""
+
     async def test_sends_authorization_header_instead_of_auth_kwarg(self, monkeypatch):
+        """Send the precomputed Authorization header when fetching one status."""
         session = _patch_session(monkeypatch, response=_FakeResponse(200, METRICS_TEXT))
         client = UptimeKumaClient("http://kuma.example", "token")
 
@@ -313,6 +316,7 @@ class TestGetMonitorStatusByName:
         assert "auth" not in call
 
     async def test_returns_status_for_known_monitor(self, monkeypatch):
+        """Return the status value for a named monitor in the response."""
         _patch_session(monkeypatch, response=_FakeResponse(200, METRICS_TEXT))
         client = UptimeKumaClient("http://kuma.example", "token")
 
