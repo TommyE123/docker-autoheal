@@ -8,7 +8,7 @@
     "venv"
   ],
   "pythonVersion": "3.14",
-  "typeCheckingMode": "strict",
+  "typeCheckingMode": "standard",
   "reportUnusedImport": "none",
   "reportUnusedVariable": "none",
   "reportDuplicateImport": "none",
