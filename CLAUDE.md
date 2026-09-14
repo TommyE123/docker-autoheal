@@ -67,7 +67,9 @@ When your task is driven by a specific GitHub issue, title your Claude Code sess
 
 ## Merging
 
-Do not merge PRs you open or work on. Tom (@TommyE123) is the final gatekeeper for merging — get the PR green and mergeable, then stop and let him review. This doesn't apply to Renovate's own routine minor/patch/digest updates, which are configured to automerge in `renovate.json` once CI passes; that's an explicit, separate policy decision, not something an agent should replicate for its own PRs.
+Do not merge PRs you open or work on. Tom (@TommyE123) is the final gatekeeper for merging — get the PR green and mergeable, then stop and let him review.
+
+Renovate dependency updates are also subject to manual review and merge; Renovate must not automatically merge dependency updates.
 
 ## Avoid duplicate issues
 
