@@ -4,6 +4,8 @@
 DISABLE:
   - COPYPASTE
   - SPELL
+
+DISABLE_LINTERS:
   - PYTHON_PYLINT
   - PYTHON_FLAKE8
   - PYTHON_BLACK
@@ -17,6 +19,7 @@ DOCKERFILE_HADOLINT_FILE_NAMES_REGEX: ["Dockerfile(\\..+)?"]
 SHOW_ELAPSED_TIME: true
 VALIDATE_ALL_CODEBASE: true
 YAML_YAMLLINT_ARGUMENTS: "--strict"
+PYTHON_DEFAULT_STYLE: ruff
 
 ENABLE_LINTERS:
   - PYTHON_RUFF
@@ -29,7 +32,7 @@ ENABLE_LINTERS:
 # enabled and their findings stay visible, but do not fail the build until
 # a follow-up issue fixes the underlying findings.
 DISABLE_ERRORS_LINTERS:
-  - ACTION_ZIZMOR 
+  - ACTION_ZIZMOR
   - PYTHON_BANDIT
   - PYTHON_MYPY
   - PYTHON_RUFF
