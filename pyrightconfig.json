@@ -1,0 +1,20 @@
+{
+  "include": [
+    "app"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    ".venv",
+    "venv"
+  ],
+  "pythonVersion": "3.14",
+  "typeCheckingMode": "strict",
+  "reportUnusedImport": "none",
+  "reportUnusedVariable": "none",
+  "reportDuplicateImport": "none",
+  "reportMissingTypeStubs": "none",
+  "reportPrivateUsage": "none",
+  "reportUnnecessaryIsInstance": "none",
+  "reportUnnecessaryCast": "none",
+  "reportUnnecessaryTypeIgnoreComment": "warning"
+}
