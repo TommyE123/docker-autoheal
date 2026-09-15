@@ -79,7 +79,9 @@ class TestVersionCalculation:
         assert latest_release(["v2.0.9", "v2.0.10"]) == Version(2, 0, 10)
 
     def test_missing_release_tag_fails_closed(self):
-        with pytest.raises(ReleaseError, match="could not determine the current release"):
+        with pytest.raises(
+            ReleaseError, match="could not determine the current release"
+        ):
             latest_release(["v2", "not-a-release"])
 
     def test_first_release_is_calculated_from_the_zero_base(self):
@@ -96,15 +98,11 @@ class TestVersionCalculation:
 
 class TestCandidateValidation:
     def test_candidate_matching_the_requested_type_passes(self):
-        validate_candidate(
-            Version(1, 8, 4), Version(1, 8, 5), "patch", ["v1.8.4"]
-        )
+        validate_candidate(Version(1, 8, 4), Version(1, 8, 5), "patch", ["v1.8.4"])
 
     def test_candidate_for_another_release_type_is_rejected(self):
         with pytest.raises(ReleaseError, match="is not the major release"):
-            validate_candidate(
-                Version(1, 8, 4), Version(1, 9, 0), "major", ["v1.8.4"]
-            )
+            validate_candidate(Version(1, 8, 4), Version(1, 9, 0), "major", ["v1.8.4"])
 
     def test_existing_candidate_tag_is_rejected(self):
         with pytest.raises(ReleaseError, match="already exists"):
@@ -123,9 +121,7 @@ class TestCandidateValidation:
 
     def test_candidate_must_be_greater_than_the_current_release(self):
         with pytest.raises(ReleaseError, match="is not the patch release"):
-            validate_candidate(
-                Version(2, 0, 4), Version(2, 0, 3), "patch", ["v2.0.4"]
-            )
+            validate_candidate(Version(2, 0, 4), Version(2, 0, 3), "patch", ["v2.0.4"])
 
 
 class TestPlanFromLabels:
@@ -188,7 +184,9 @@ class TestMaintenanceRelease:
         assert plan.version == Version(2, 0, 5)
         assert "#101, #102, #103" in plan.reason
 
-    def test_changes_already_included_in_an_earlier_release_are_not_released_again(self):
+    def test_changes_already_included_in_an_earlier_release_are_not_released_again(
+        self,
+    ):
         # The workflow only passes pull requests merged after the latest release
         # tag, so a release:none change swept up by an earlier release never
         # reaches the Friday sweep.
@@ -460,7 +458,9 @@ class TestReleaseWorkflows:
         assert triggers["schedule"] == [{"cron": "0 9 * * 5"}]
         # A push only releases when the plan job says so, from the merged pull
         # request's classification label.
-        assert workflow["jobs"]["release"]["if"] == "needs.plan.outputs.release == 'true'"
+        assert (
+            workflow["jobs"]["release"]["if"] == "needs.plan.outputs.release == 'true'"
+        )
 
     def test_release_operations_are_serialised(self):
         concurrency = self.load("docker-release.yml")["concurrency"]
@@ -486,8 +486,14 @@ class TestReleaseWorkflows:
         steps = self.load("docker-release.yml")["jobs"]["release"]["steps"]
         metadata = next(step for step in steps if step.get("id") == "meta")
 
-        assert "docker.io/${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal" in metadata["with"]["images"]
-        assert "ghcr.io/${{ github.repository_owner }}/docker-autoheal" in metadata["with"]["images"]
+        assert (
+            "docker.io/${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal"
+            in metadata["with"]["images"]
+        )
+        assert (
+            "ghcr.io/${{ github.repository_owner }}/docker-autoheal"
+            in metadata["with"]["images"]
+        )
         assert "type=raw,value=latest" in metadata["with"]["tags"]
 
     def test_pull_request_validation_uses_no_secrets(self):

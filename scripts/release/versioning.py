@@ -63,7 +63,9 @@ class Version:
             return Version(self.major, self.minor + 1, 0)
         if release_type == "major":
             return Version(self.major + 1, 0, 0)
-        raise ReleaseError(f"release type {release_type!r} does not produce a new version")
+        raise ReleaseError(
+            f"release type {release_type!r} does not produce a new version"
+        )
 
 
 # The base used when a repository has never published a release tag.
