@@ -32,3 +32,6 @@ Thumbs.db
 autoheal-config-*.json
 
 .git
+
+# Prevent host Node modules being copied into the Docker build context
+frontend/node_modules/

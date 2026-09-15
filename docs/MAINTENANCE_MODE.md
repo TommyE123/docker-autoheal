@@ -137,7 +137,7 @@ if config_manager.is_maintenance_mode():
 
 ## Testing
 1. Start the application: `docker-compose up --build`
-2. Access UI at http://localhost:8080
+2. Access UI at http://localhost:3131
 3. Click "Enter Maintenance Mode" button
 4. Verify modal appears with timer
 5. Verify background is grayed out
