@@ -336,12 +336,19 @@ class TestLabelsAtMergeTime:
     def _unlabeled(self, name, at):
         return {"event": "unlabeled", "created_at": at, "label": {"name": name}}
 
+    def _merged(self, at, event_id=None):
+        e: dict = {"event": "merged", "created_at": at}
+        if event_id is not None:
+            e["id"] = event_id
+        return e
+
     def test_label_changed_after_merge_does_not_affect_classification(self):
         # The specific failure mode: PR was validated with release:minor,
         # then the label was changed to release:patch after merge.  The
         # classification must still be minor.
         events = [
             self._labeled("release:minor", "2024-01-14T09:00:00Z"),
+            self._merged(self._MERGE_TIME),
             self._unlabeled("release:minor", "2024-01-16T11:00:00Z"),
             self._labeled("release:patch", "2024-01-16T11:01:00Z"),
         ]
@@ -352,7 +359,10 @@ class TestLabelsAtMergeTime:
         assert "release:patch" not in result
 
     def test_label_present_at_merge_is_included(self):
-        events = [self._labeled("release:patch", "2024-01-14T09:00:00Z")]
+        events = [
+            self._labeled("release:patch", "2024-01-14T09:00:00Z"),
+            self._merged(self._MERGE_TIME),
+        ]
 
         assert labels_at_merge_time(events, self._MERGE_TIME) == ["release:patch"]
 
@@ -361,6 +371,7 @@ class TestLabelsAtMergeTime:
             self._labeled("release:minor", "2024-01-14T09:00:00Z"),
             self._unlabeled("release:minor", "2024-01-14T10:00:00Z"),
             self._labeled("release:patch", "2024-01-14T11:00:00Z"),
+            self._merged(self._MERGE_TIME),
         ]
 
         result = labels_at_merge_time(events, self._MERGE_TIME)
@@ -369,7 +380,10 @@ class TestLabelsAtMergeTime:
         assert "release:minor" not in result
 
     def test_label_added_after_merge_is_excluded(self):
-        events = [self._labeled("release:major", "2024-01-16T12:00:00Z")]
+        events = [
+            self._merged(self._MERGE_TIME),
+            self._labeled("release:major", "2024-01-16T12:00:00Z"),
+        ]
 
         assert labels_at_merge_time(events, self._MERGE_TIME) == []
 
@@ -384,20 +398,56 @@ class TestLabelsAtMergeTime:
         assert labels_at_merge_time(events, self._MERGE_TIME) == ["release:patch"]
 
     def test_events_at_exactly_merge_time_are_included(self):
-        # A label event with created_at == merged_at is on the boundary;
-        # it should be included, not excluded.
-        events = [self._labeled("release:minor", self._MERGE_TIME)]
+        # A label event at the same second as the merge is pre-merge when its
+        # event id is lower than the merged event's id.
+        events = [
+            {**self._labeled("release:minor", self._MERGE_TIME), "id": 1},
+            self._merged(self._MERGE_TIME, event_id=2),
+        ]
 
         assert labels_at_merge_time(events, self._MERGE_TIME) == ["release:minor"]
 
-    def test_empty_event_log_returns_no_labels(self):
-        assert labels_at_merge_time([], self._MERGE_TIME) == []
+    def test_empty_event_log_raises_error(self):
+        # An empty event log has no merged event; the function must fail closed
+        # rather than silently returning an empty label set.
+        with pytest.raises(ReleaseError, match="no 'merged' event"):
+            labels_at_merge_time([], self._MERGE_TIME)
+
+    def test_no_merged_event_raises_error(self):
+        with pytest.raises(ReleaseError, match="no 'merged' event"):
+            labels_at_merge_time(
+                [self._labeled("release:minor", "2024-01-14T09:00:00Z")],
+                self._MERGE_TIME,
+            )
+
+    def test_post_merge_label_change_same_second_is_excluded(self):
+        # Regression: a label changed after merge but within the same second
+        # as merged_at must not be included.
+        # Sequence (all at _MERGE_TIME, ascending event-id order):
+        #   id=1  labeled   release:minor  (pre-merge)
+        #   id=2  merged
+        #   id=3  unlabeled release:minor  (post-merge, same second)
+        #   id=4  labeled   release:patch  (post-merge, same second)
+        # Correct result: only release:minor (present at merge time).
+        ts = self._MERGE_TIME
+        events = [
+            {"id": 1, "event": "labeled", "created_at": ts, "label": {"name": "release:minor"}},
+            {"id": 2, "event": "merged", "created_at": ts},
+            {"id": 3, "event": "unlabeled", "created_at": ts, "label": {"name": "release:minor"}},
+            {"id": 4, "event": "labeled", "created_at": ts, "label": {"name": "release:patch"}},
+        ]
+
+        result = labels_at_merge_time(events, self._MERGE_TIME)
+
+        assert result == ["release:minor"]
+        assert "release:patch" not in result
 
     def test_multiple_non_release_labels_are_preserved(self):
         events = [
             self._labeled("bug", "2024-01-14T08:00:00Z"),
             self._labeled("release:patch", "2024-01-14T09:00:00Z"),
             self._labeled("documentation", "2024-01-14T10:00:00Z"),
+            self._merged(self._MERGE_TIME),
         ]
 
         result = labels_at_merge_time(events, self._MERGE_TIME)
@@ -410,6 +460,7 @@ class TestLabelsAtMergeTime:
         events = [
             self._labeled("z-label", "2024-01-14T08:00:00Z"),
             self._labeled("a-label", "2024-01-14T09:00:00Z"),
+            self._merged(self._MERGE_TIME),
         ]
 
         result = labels_at_merge_time(events, self._MERGE_TIME)
@@ -619,6 +670,7 @@ class TestCommandLineInterface:
         events = [
             {"event": "labeled", "created_at": "2024-01-14T09:00:00Z",
              "label": {"name": "release:minor"}},
+            {"event": "merged", "created_at": "2024-01-15T10:00:00Z"},
             {"event": "unlabeled", "created_at": "2024-01-16T11:00:00Z",
              "label": {"name": "release:minor"}},
             {"event": "labeled", "created_at": "2024-01-16T11:01:00Z",
@@ -639,7 +691,8 @@ class TestCommandLineInterface:
         output = json.loads(capsys.readouterr().out)
         assert output == ["release:minor"]
 
-    def test_resolve_labels_empty_events_returns_empty_array(self, tmp_path, capsys):
+    def test_resolve_labels_empty_events_raises_error(self, tmp_path, capsys):
+        # An empty event log has no merged event; the function must fail closed.
         exit_code = main(
             [
                 "resolve-labels",
@@ -650,8 +703,8 @@ class TestCommandLineInterface:
             ]
         )
 
-        assert exit_code == 0
-        assert json.loads(capsys.readouterr().out) == []
+        assert exit_code == 1
+        assert "no 'merged' event" in capsys.readouterr().err
 
     def test_resolve_labels_handles_multi_page_paginated_response(
         self, tmp_path, capsys
@@ -673,6 +726,7 @@ class TestCommandLineInterface:
              "label": {"name": "release:patch"}},
             {"event": "labeled", "created_at": "2024-01-12T00:00:00Z",
              "label": {"name": "release:none"}},
+            {"event": "merged", "created_at": "2024-01-15T00:00:00Z"},
         ]
         events_file = tmp_path / "pr-events.json"
         # Write the two pages exactly as gh api --paginate would produce them.
@@ -719,6 +773,7 @@ class TestCommandLineInterface:
              "label": {"name": "release:patch"}},
             {"event": "labeled", "created_at": "2024-01-10T00:00:00Z",
              "label": {"name": "release:patch"}},
+            {"event": "merged", "created_at": "2024-01-15T00:00:00Z"},
         ]
         events_file = tmp_path / "pr-events.json"
         events_file.write_text(json.dumps(events_reversed), encoding="utf-8")
@@ -756,6 +811,7 @@ class TestCommandLineInterface:
              "label": {"name": "release:patch"}},
             {"id": 1, "event": "labeled", "created_at": same_ts,
              "label": {"name": "release:patch"}},
+            {"id": 3, "event": "merged", "created_at": "2024-01-15T00:00:00Z"},
         ]
         events_file = tmp_path / "pr-events.json"
         events_file.write_text(json.dumps(events_reversed), encoding="utf-8")

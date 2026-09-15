@@ -75,26 +75,37 @@ def labels_at_merge_time(
     """Reconstruct the label set on a PR at the moment it was merged.
 
     Replays the ``labeled`` and ``unlabeled`` entries from the GitHub Issues
-    Events API up to and including ``merged_at``; label changes recorded after
-    that timestamp are ignored.  The event log is append-only, so this makes
-    release classification effectively immutable: even if a label is changed on
-    the merged PR afterwards, the release workflow still uses the type that
-    ``validate-release`` checked before the merge.
+    Events API, stopping when the ``merged`` event is reached.  The ``merged``
+    event is the authoritative replay boundary: any label change recorded after
+    it—even one that shares the same ``created_at`` second as the merge—is
+    excluded.  GitHub Issue Event timestamps have second precision, so a
+    post-merge label change can carry an identical ``created_at`` as
+    ``merged_at``; only the ``merged`` event's position in the sorted log
+    (by ``created_at``, then ``id``) reliably separates pre- from post-merge.
+
+    Fails closed: raises ``ReleaseError`` when no ``merged`` event is present,
+    rather than silently accepting an ambiguous label state.  The event log is
+    append-only, so this makes release classification effectively immutable.
     """
+    found_merged = False
     labels: set[str] = set()
     for event in sorted(events, key=lambda e: (e.get("created_at") or "", e.get("id") or 0)):
-        event_time = event.get("created_at") or ""
-        if event_time > merged_at:
-            continue
+        event_type = event.get("event") or ""
+        if event_type == "merged":
+            found_merged = True
+            break
         label_obj = event.get("label") or {}
         label_name = (label_obj.get("name") or "") if isinstance(label_obj, dict) else ""
         if not label_name:
             continue
-        event_type = event.get("event") or ""
         if event_type == "labeled":
             labels.add(label_name)
         elif event_type == "unlabeled":
             labels.discard(label_name)
+    if not found_merged:
+        raise ReleaseError(
+            "cannot reconstruct labels at merge time: no 'merged' event in the issue event log"
+        )
     return sorted(labels)
 
 
