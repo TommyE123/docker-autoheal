@@ -232,7 +232,13 @@ jobs:
             # Precise boundary check: skip PRs merged at or before the boundary.
             # The search uses merged:>= to avoid missing PRs in the same second,
             # so this comparison is the authoritative filter.
-            AFTER_BOUNDARY="$(MERGED_AT="${MERGED_AT}" BOUNDARY="${BOUNDARY}" python3 -c 'import os; from datetime import datetime; m=datetime.fromisoformat(os.environ["MERGED_AT"].replace("Z","+00:00")); b=datetime.fromisoformat(os.environ["BOUNDARY"].replace("Z","+00:00")); print("true" if m>b else "false")')"
+            printf '%s\n' 'import os,datetime as D' \
+              'm=D.datetime.fromisoformat(os.environ["MERGED_AT"].replace("Z","+00:00"))' \
+              'b=D.datetime.fromisoformat(os.environ["BOUNDARY"].replace("Z","+00:00"))' \
+              'print("true"if m>b else"false")' \
+              > /tmp/_br.py
+            AFTER_BOUNDARY="$(MERGED_AT="${MERGED_AT}" BOUNDARY="${BOUNDARY}" python3 /tmp/_br.py)"
+            rm -f /tmp/_br.py
             if [ "$AFTER_BOUNDARY" != "true" ]; then
               echo "PR #${PR_NUMBER} merged at ${MERGED_AT} is not after boundary ${BOUNDARY}; skipping"
               continue
