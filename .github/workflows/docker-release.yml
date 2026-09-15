@@ -206,12 +206,40 @@ jobs:
           BOUNDARY="$(git log -1 --format=%cI "$LATEST_TAG")"
           echo "Latest release: ${LATEST_TAG} (${BOUNDARY})"
 
+          # Collect each merged PR's number and merge timestamp; labels are
+          # resolved below from the Issues Events API rather than from the
+          # current PR state, so classification is immutable after merge.
           gh api --method GET search/issues --paginate \
             -f "q=repo:${GITHUB_REPOSITORY} is:pr is:merged base:main merged:>${BOUNDARY}" \
-            --jq '.items[] | {number: .number, labels: [.labels[].name]}' \
+            --jq '.items[] | {number: .number, merged_at: .closed_at}' \
             > merged-pr-lines.json
 
-          jq -s '.' merged-pr-lines.json > maintenance-prs.json
+          jq -s '.' merged-pr-lines.json > merged-prs-meta.json
+          COUNT="$(jq 'length' merged-prs-meta.json)"
+          echo "Merged pull requests since ${LATEST_TAG}: ${COUNT}"
+
+          # Reconstruct labels from the GitHub Issues event log (append-only
+          # audit record) at the moment each PR was merged, rather than
+          # reading the current PR labels.  Any label change made after merge
+          # is ignored, so the classification used here cannot be altered
+          # after the PR passed the validate-release check.
+          echo '[]' > maintenance-prs.json
+          for i in $(seq 1 "${COUNT}"); do
+            IDX=$((i - 1))
+            PR_NUMBER="$(jq -r ".[$IDX].number" merged-prs-meta.json)"
+            MERGED_AT="$(jq -r ".[$IDX].merged_at" merged-prs-meta.json)"
+
+            gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/events" \
+              --paginate > "pr-${PR_NUMBER}-events.json"
+
+            PR_LABELS="$(python3 -m scripts.release.cli resolve-labels \
+              --events-file "pr-${PR_NUMBER}-events.json" \
+              --merged-at "${MERGED_AT}")"
+
+            jq --argjson pr_number "${PR_NUMBER}" --argjson pr_labels "${PR_LABELS}" \
+              '. + [{"number": $pr_number, "labels": $pr_labels}]' maintenance-prs.json \
+              > maintenance-prs-updated.json && mv maintenance-prs-updated.json maintenance-prs.json
+          done
           jq -r '.[] | "  #\(.number) \(.labels | join(", "))"' maintenance-prs.json
 
       - name: Plan release

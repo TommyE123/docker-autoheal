@@ -803,6 +803,31 @@ class TestReleaseWorkflows:
             "classification step must not read current PR labels from the API response"
         )
 
+    def test_maintenance_classification_uses_events_api_not_current_labels(self):
+        # Regression guard: the maintenance step must also reconstruct labels
+        # from the GitHub Issues Events API at merge time, not from the current
+        # mutable PR labels returned by the search/issues endpoint.
+        #
+        # Failure scenario: a PR is merged with release:none; someone removes
+        # the label afterwards; the Friday sweep reads current labels and
+        # omits the PR from the maintenance release entirely.
+        step = next(
+            s
+            for s in self.load("docker-release.yml")["jobs"]["plan"]["steps"]
+            if "Collect unreleased release:none pull requests" in s.get("name", "")
+        )
+        run = step["run"]
+
+        assert "issues" in run and "events" in run, (
+            "maintenance step must call the GitHub Issues Events API"
+        )
+        assert "resolve-labels" in run, (
+            "maintenance step must use resolve-labels for merge-time label reconstruction"
+        )
+        assert ".labels[" not in run, (
+            "maintenance step must not read current PR labels from the search response"
+        )
+
     def test_pull_request_validation_uses_no_secrets(self):
         workflow = self.load("release-validation.yml")
 
