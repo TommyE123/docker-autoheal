@@ -62,10 +62,20 @@ test isolation works.
 pull request targeting `main`, covering Python, JavaScript, YAML, Dockerfile, Markdown,
 and several security scanners in one pass — see `.mega-linter.yml` for the exact set.
 Several of those linters (`PYTHON_PYLINT`, `PYTHON_FLAKE8`, `PYTHON_RUFF`, `PYTHON_BANDIT`,
-`MARKDOWN_MARKDOWNLINT`, and others listed in `.mega-linter.yml`'s
+`MARKDOWN_MARKDOWN_TABLE_FORMATTER`, and others listed in `.mega-linter.yml`'s
 `DISABLE_ERRORS_LINTERS`) currently have pre-existing findings and are configured not to
 fail the build over them; they still run and report. There is no repository-wide Python
 formatter/import-sorter enforced beyond what MegaLinter reports.
+
+Markdown *is* fully enforced: `MARKDOWN_MARKDOWNLINT` is not in that disabled list, so
+every Markdown file must pass it. `.markdownlint.jsonc` at the repo root turns off only
+`MD013` (line length) and `MD060` (table pipe spacing), which conflict with this repo's
+established long-prose/padded-table style — everything else is at markdownlint's
+defaults. Run it locally before pushing docs changes:
+
+```bash
+npx markdownlint-cli2 "**/*.md" "#node_modules" "#frontend/node_modules"
+```
 
 The frontend has an `npm run lint` script (ESLint) but no ESLint configuration file yet —
 see [Frontend Development](frontend.md#linting).

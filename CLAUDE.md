@@ -34,7 +34,7 @@ Keep comments minimal: only for non-obvious reasoning the code can't convey on i
 
 Every PR title must follow [Conventional Commits](https://www.conventionalcommits.org/) format, enforced by `.github/workflows/semantic-pr-title.yml` (`validate-title` check):
 
-```
+```text
 <type>: <description>
 ```
 
@@ -43,6 +43,7 @@ Every PR title must follow [Conventional Commits](https://www.conventionalcommit
 - Optional scope is allowed (`type(scope): description`) but not required.
 
 Examples already in use in this repo:
+
 - `fix: correct Dockerfile EXPOSE port for the Web UI (8080 -> 3131)`
 - `docs: reorganise and rewrite project documentation`
 - `chore: migrate to multi-registry publishing (GHCR + Docker Hub)`
@@ -57,6 +58,7 @@ Renovate-authored PRs are covered separately by `renovate.json`'s `semanticCommi
 If a PR changes application behavior or adds real scope (new feature, bug fix, refactor with user-visible effect, new CI/tooling capability), file a GitHub issue for it first — or confirm one already exists — and link the PR to it (`Closes #N` in the PR body). This keeps a traceable record of *why* a change happened, not just what changed.
 
 Exceptions (no issue required):
+
 - Renovate-authored PRs (automated, never have an issue by design).
 - Purely mechanical docs-only, config-only, or CI-only tweaks with no behavior change (e.g. fixing a PR title, a typo, a lint config value).
 
