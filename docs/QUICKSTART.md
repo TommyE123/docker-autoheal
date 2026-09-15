@@ -230,8 +230,8 @@ docker logs autoheal
 ### UI not accessible
 
 ```bash
-# Check if port 8080 is available
-netstat -an | grep 8080
+# Check if port 3131 is available
+netstat -an | grep 3131
 
 # Check container is running
 docker ps | grep autoheal
