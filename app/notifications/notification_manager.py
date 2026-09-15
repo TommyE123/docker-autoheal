@@ -607,4 +607,3 @@ class NotificationManager:
 notification_manager = NotificationManager()
 
 __all__ = ['NotificationManager']
-
