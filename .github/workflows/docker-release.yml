@@ -4,19 +4,203 @@ on:
   push:
     branches:
       - main
+  schedule:
+    # Friday maintenance release check for accumulated release:none changes
+    - cron: "0 9 * * 5"
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: "What to release (auto re-runs the classification of the latest commit)"
+        type: choice
+        default: auto
+        options:
+          - auto
+          - maintenance
+          - patch
+          - minor
+          - major
 
+# Releases are serialised: two runs must never calculate or create the same
+# version concurrently, and a run that may already have tagged is never cancelled.
 concurrency:
-  group: docker-publish-main
+  group: release-publication
   cancel-in-progress: false
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 jobs:
+  plan:
+    name: Determine release
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: read
+
+    outputs:
+      release: ${{ steps.plan.outputs.release }}
+      release_type: ${{ steps.plan.outputs.release_type }}
+      version: ${{ steps.plan.outputs.version }}
+      create_tag: ${{ steps.plan.outputs.create_tag }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          fetch-tags: true
+
+      # The release type comes from the merged pull request's label, the Friday
+      # maintenance sweep, or an explicit manual request - never from the code,
+      # the commit message or the pull request title.
+      - name: Determine release mode
+        id: mode
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REQUESTED: ${{ github.event.inputs.release_type }}
+        run: |
+          MODE=classification
+
+          case "$EVENT_NAME" in
+            schedule)
+              MODE=maintenance
+              ;;
+            workflow_dispatch)
+              case "$REQUESTED" in
+                auto) MODE=classification ;;
+                maintenance) MODE=maintenance ;;
+                patch | minor | major) MODE=explicit ;;
+                *)
+                  echo "::error::Unknown requested release type: ${REQUESTED}"
+                  exit 1
+                  ;;
+              esac
+              ;;
+          esac
+
+          echo "Release mode: ${MODE}"
+          echo "mode=${MODE}" >> "$GITHUB_OUTPUT"
+
+      - name: Collect existing release tags
+        run: git tag --list > tags.txt
+
+      # A release tag on this commit without a published GitHub Release means an
+      # earlier attempt stopped part-way. That release is resumed with its
+      # existing tag instead of a new version being calculated.
+      - name: Detect an incomplete earlier release attempt
+        id: resume
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RESUME=""
+
+          for TAG in $(git tag --points-at "$GITHUB_SHA" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true); do
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              echo "Release ${TAG} on this commit is already published."
+            else
+              echo "Release ${TAG} on this commit has no GitHub Release; it will be resumed."
+              RESUME="$TAG"
+            fi
+          done
+
+          echo "tag=${RESUME}" >> "$GITHUB_OUTPUT"
+
+      - name: Collect the release classification of the merged pull request
+        id: classification
+        if: steps.mode.outputs.mode == 'classification'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" \
+            --jq '[.[] | select(.merged_at != null)]' > merged-prs.json
+          jq '[.[] | .labels[].name]' merged-prs.json > labels.json
+
+          COUNT="$(jq 'length' merged-prs.json)"
+          echo "Merged pull requests for this commit: ${COUNT}"
+          cat labels.json
+          echo "merged_pull_requests=${COUNT}" >> "$GITHUB_OUTPUT"
+
+      # Only pull requests merged after the commit of the latest successful
+      # release are considered, so changes already included in an earlier release
+      # are never released a second time.
+      - name: Collect unreleased release:none pull requests
+        if: steps.mode.outputs.mode == 'maintenance'
+        run: |
+          LATEST_TAG="$(git tag --list | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)"
+
+          if [ -z "$LATEST_TAG" ]; then
+            echo "::error::No release tag found; cannot determine the maintenance release boundary."
+            exit 1
+          fi
+
+          echo "Latest release: ${LATEST_TAG}"
+          : > merged-pr-lines.json
+
+          for SHA in $(git rev-list "${LATEST_TAG}..${GITHUB_SHA}"); do
+            gh api "repos/${GITHUB_REPOSITORY}/commits/${SHA}/pulls" \
+              --jq '.[] | select(.merged_at != null) | {number: .number, labels: [.labels[].name]}' \
+              >> merged-pr-lines.json
+          done
+
+          jq -s '.' merged-pr-lines.json > maintenance-prs.json
+          jq -r '.[] | "  #\(.number) \(.labels | join(", "))"' maintenance-prs.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Plan release
+        id: plan
+        env:
+          MODE: ${{ steps.mode.outputs.mode }}
+          REQUESTED: ${{ github.event.inputs.release_type }}
+          RESUME_TAG: ${{ steps.resume.outputs.tag }}
+          MERGED_PULL_REQUESTS: ${{ steps.classification.outputs.merged_pull_requests }}
+        run: |
+          RESUME_ARGS=()
+          if [ -n "$RESUME_TAG" ]; then
+            RESUME_ARGS=(--resume-tag "$RESUME_TAG")
+          fi
+
+          case "$MODE" in
+            classification)
+              if [ "${MERGED_PULL_REQUESTS:-0}" = "0" ]; then
+                echo "::warning::No merged pull request found for ${GITHUB_SHA}; nothing is released without a release classification."
+                {
+                  echo "release=false"
+                  echo "release_type=none"
+                  echo "create_tag=false"
+                  echo "version="
+                } >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              ;;
+            explicit)
+              printf '["release:%s"]' "$REQUESTED" > labels.json
+              ;;
+          esac
+
+          if [ "$MODE" = "maintenance" ]; then
+            python3 -m scripts.release.cli plan-maintenance \
+              --pull-requests-file maintenance-prs.json \
+              --tags-file tags.txt \
+              "${RESUME_ARGS[@]}"
+          else
+            python3 -m scripts.release.cli plan-release \
+              --labels-file labels.json \
+              --tags-file tags.txt \
+              "${RESUME_ARGS[@]}"
+          fi
+
   release:
     name: Build and release Docker image
+    needs: plan
+    if: needs.plan.outputs.release == 'true'
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      packages: write
 
     steps:
       # Checkout the repository so subsequent steps can access the code
@@ -25,99 +209,53 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+          fetch-tags: true
 
-      # The highest major marker reachable from main defines the active release series.
-      # For example, v2 selects the v2.x.x release series; v3 switches to v3.x.x.
-      - name: Determine release series
-        id: series
+      - name: Collect existing release tags
+        run: git tag --list > tags.txt
+
+      # The pull request validation is never trusted on its own: another release
+      # may have been published since, so the full version and tag validation is
+      # repeated here against the current state of main, immediately before the
+      # tag is created.
+      - name: Re-validate release before publishing
+        env:
+          VERSION: ${{ needs.plan.outputs.version }}
+          RELEASE_TYPE: ${{ needs.plan.outputs.release_type }}
+          CREATE_TAG: ${{ needs.plan.outputs.create_tag }}
         run: |
-          # Pick the highest major marker tag reachable from this commit
-          SERIES_TAG="$(
-            git tag --merged "$GITHUB_SHA" \
-              | grep -E '^v[0-9]+$' \
-              | sort -V \
-              | tail -n 1
-          )"
+          python3 -m scripts.release.cli verify-release \
+            --version "$VERSION" \
+            --release-type "$RELEASE_TYPE" \
+            --create-tag "$CREATE_TAG" \
+            --tags-file tags.txt
 
-          if [ -z "$SERIES_TAG" ]; then
-            echo "ERROR: No release-series marker tag was found on main."
-            echo "Create a marker such as v2 on the main branch before releasing."
+      # The Git references API refuses to create a reference that already exists.
+      # That conflict is a hard safety boundary: the release fails rather than
+      # moving, deleting or force-pushing an existing release tag.
+      - name: Create release tag
+        if: needs.plan.outputs.create_tag == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f "ref=refs/tags/${VERSION}" \
+            -f "sha=${GITHUB_SHA}"
+
+      - name: Verify the release tag points at this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          TAGGED_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${VERSION}" --jq '.object.sha')"
+
+          if [ "$TAGGED_SHA" != "$GITHUB_SHA" ]; then
+            echo "::error::Release tag ${VERSION} points at ${TAGGED_SHA}, not ${GITHUB_SHA}."
             exit 1
           fi
 
-          MAJOR="${SERIES_TAG#v}"
-
-          echo "Active release series: v${MAJOR}"
-          echo "series_tag=${SERIES_TAG}" >> "$GITHUB_OUTPUT"
-          echo "major=${MAJOR}" >> "$GITHUB_OUTPUT"
-
-      # Find an existing release tag on the current commit first.
-      # This makes retries safe if the image was pushed and the tag already exists.
-      - name: Detect existing release for current commit
-        id: existing
-        env:
-          MAJOR: ${{ steps.series.outputs.major }}
-        run: |
-          # Look for an existing semantic version tag pointing at this commit
-          EXISTING_TAG="$(
-            git tag --points-at "$GITHUB_SHA" \
-              | grep -E "^v${MAJOR}\.[0-9]+\.[0-9]+$" \
-              | sort -V \
-              | tail -n 1
-          )"
-
-          if [ -n "$EXISTING_TAG" ]; then
-            echo "Existing release tag found on current commit: $EXISTING_TAG"
-            echo "found=true" >> "$GITHUB_OUTPUT"
-            echo "tag=$EXISTING_TAG" >> "$GITHUB_OUTPUT"
-          else
-            echo "No existing release tag found on current commit."
-            echo "found=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      # Calculate the first release or next patch release for the active series.
-      - name: Calculate release version
-        id: release_version
-        env:
-          MAJOR: ${{ steps.series.outputs.major }}
-          EXISTING_FOUND: ${{ steps.existing.outputs.found }}
-          EXISTING_TAG: ${{ steps.existing.outputs.tag }}
-        run: |
-          # A previous release attempt may already have created the tag.
-          if [ "$EXISTING_FOUND" = "true" ]; then
-            echo "Reusing existing release tag: $EXISTING_TAG"
-            echo "new_tag=$EXISTING_TAG" >> "$GITHUB_OUTPUT"
-            echo "create_tag=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          LATEST_TAG="$(
-            git tag --merged "$GITHUB_SHA" \
-              | grep -E "^v${MAJOR}\.[0-9]+\.[0-9]+$" \
-              | sort -V \
-              | tail -n 1
-          )"
-
-          if [ -z "$LATEST_TAG" ]; then
-            NEW_TAG="v${MAJOR}.0.0"
-            echo "No previous ${MAJOR}.x.x release found."
-            echo "First release: $NEW_TAG"
-          else
-            if [[ ! "$LATEST_TAG" =~ ^v${MAJOR}\.([0-9]+)\.([0-9]+)$ ]]; then
-              echo "ERROR: Could not parse latest release tag: $LATEST_TAG"
-              exit 1
-            fi
-
-            MINOR="${BASH_REMATCH[1]}"
-            PATCH="${BASH_REMATCH[2]}"
-            NEW_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
-
-            echo "Latest release: $LATEST_TAG"
-            echo "Next release:   $NEW_TAG"
-          fi
-
-          echo "new_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
-          echo "create_tag=true" >> "$GITHUB_OUTPUT"
+          echo "Release tag ${VERSION} points at ${GITHUB_SHA}."
 
       # Configure QEMU to support building images for multiple CPU architectures
       - name: Set up QEMU
@@ -152,7 +290,7 @@ jobs:
             docker.io/${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal
             ghcr.io/${{ github.repository_owner }}/docker-autoheal
           tags: |
-            type=raw,value=${{ steps.release_version.outputs.new_tag }}
+            type=raw,value=${{ needs.plan.outputs.version }}
             type=raw,value=latest
 
       # Build the Docker image for multiple platforms and push to registries
@@ -168,25 +306,11 @@ jobs:
           cache-from: type=gha,scope=docker-autoheal
           cache-to: type=gha,mode=max,scope=docker-autoheal
 
-      # Create and push a Git tag for the new release (if needed)
-      - name: Create Git tag
-        if: steps.release_version.outputs.create_tag == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.release_version.outputs.new_tag }}
-        run: |
-          # Configure git identity and push the new tag using the token
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "${VERSION}"
-          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git push origin "${VERSION}"
-
       # Create a GitHub release entry for the new tag with generated notes
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG_NAME: ${{ steps.release_version.outputs.new_tag }}
+          TAG_NAME: ${{ needs.plan.outputs.version }}
         run: |
           if gh release view "${TAG_NAME}" >/dev/null 2>&1; then
             echo "GitHub Release ${TAG_NAME} already exists. Nothing to do."
