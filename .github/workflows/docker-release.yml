@@ -42,6 +42,18 @@ jobs:
       create_tag: ${{ steps.plan.outputs.create_tag }}
 
     steps:
+      # push is already restricted to main by its own trigger, and schedule
+      # always runs the default branch, but workflow_dispatch lets a caller pick
+      # *any* ref to run this workflow against - without this, dispatching
+      # "maintenance" against a feature branch would tag and publish that
+      # unmerged commit, moving "latest" to code that was never reviewed.
+      - name: Refuse releases from any ref other than main
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "::error::Releases run only from main; this run's ref is ${{ github.ref }}."
+            exit 1
+          fi
+
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -96,6 +108,22 @@ jobs:
         run: |
           RESUME=""
           ALREADY_RELEASED=""
+          HIGHEST_TAG=""
+          PUBLISHED_HIGHEST_TAG=""
+
+          # The highest semantic tag overall must have a published GitHub
+          # Release. If it doesn't, an earlier release stalled part-way on a
+          # *different* commit than this run's: every other release path
+          # (a normal classification release, or the Friday sweep's PR-search
+          # boundary) would otherwise silently calculate the next version
+          # after it, or the next PR boundary from it, leaving that release
+          # permanently unpublished and its changes never released.
+          for TAG in $(git tag --list | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V || true); do
+            HIGHEST_TAG="$TAG"
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              PUBLISHED_HIGHEST_TAG="$TAG"
+            fi
+          done
 
           for TAG in $(git tag --points-at "$GITHUB_SHA" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true); do
             if gh release view "$TAG" >/dev/null 2>&1; then
@@ -106,6 +134,15 @@ jobs:
               RESUME="$TAG"
             fi
           done
+
+          # This commit's own incomplete/complete tag (if any) is handled above
+          # by resuming or no-op'ing; only fail closed here for a stalled
+          # release that belongs to some *other* commit.
+          if [ -z "$RESUME" ] && [ -z "$ALREADY_RELEASED" ] \
+            && [ -n "$HIGHEST_TAG" ] && [ "$HIGHEST_TAG" != "$PUBLISHED_HIGHEST_TAG" ]; then
+            echo "::error::Release tag ${HIGHEST_TAG} has no published GitHub Release. Resume it (re-run its workflow run) before any new release can be calculated."
+            exit 1
+          fi
 
           echo "tag=${RESUME}" >> "$GITHUB_OUTPUT"
           echo "already_released_tag=${ALREADY_RELEASED}" >> "$GITHUB_OUTPUT"
@@ -209,6 +246,16 @@ jobs:
       packages: write
 
     steps:
+      # Defence in depth: the plan job already refuses to run outside main, so
+      # this job never starts unless plan succeeded - but a release this
+      # dangerous is worth asserting twice rather than trusting the chain.
+      - name: Refuse releases from any ref other than main
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "::error::Releases run only from main; this run's ref is ${{ github.ref }}."
+            exit 1
+          fi
+
       # Checkout the repository so subsequent steps can access the code
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

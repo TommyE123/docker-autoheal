@@ -574,6 +574,26 @@ class TestReleaseWorkflows:
 
         assert set(options) == {"auto", "maintenance"}
 
+    def test_workflow_dispatch_cannot_publish_an_unmerged_ref(self):
+        # workflow_dispatch lets a caller pick any branch or tag to run this
+        # workflow against; push is already restricted to main by its own
+        # trigger and schedule always runs the default branch, but nothing
+        # else stops a dispatched run from tagging and publishing a feature
+        # branch's tip commit. Both jobs must refuse to proceed unless the
+        # ref actually is main, before either one checks out any code.
+        for job_name in ("plan", "release"):
+            steps = self.load("docker-release.yml")["jobs"][job_name]["steps"]
+            names = [step.get("name", "") for step in steps]
+
+            guard_index = names.index("Refuse releases from any ref other than main")
+            checkout_index = names.index("Checkout code")
+            assert guard_index < checkout_index, job_name
+
+            guard_run = steps[guard_index]["run"]
+            assert "github.ref" in guard_run
+            assert "refs/heads/main" in guard_run
+            assert "exit 1" in guard_run
+
     def test_the_tag_is_created_before_the_image_is_published(self):
         steps = self.load("docker-release.yml")["jobs"]["release"]["steps"]
         names = [step.get("name", "") for step in steps]
@@ -583,6 +603,26 @@ class TestReleaseWorkflows:
         )
         assert names.index("Create release tag") < names.index("Build and push Docker image")
         assert names.index("Build and push Docker image") < names.index("Create GitHub release")
+
+    def test_an_unpublished_tag_elsewhere_blocks_every_other_release_path(self):
+        # If the highest semantic tag anywhere in history has no published
+        # GitHub Release, and it isn't this commit's own tag (which is
+        # already handled by resume/already-released), the run must fail
+        # closed rather than silently calculating past the stalled release -
+        # a normal classification release would skip its version, and the
+        # Friday sweep would use its commit as a boundary and lose the
+        # release:none PRs that were meant to ride the next release.
+        step = next(
+            step
+            for step in self.load("docker-release.yml")["jobs"]["plan"]["steps"]
+            if step.get("id") == "resume"
+        )
+        run = step["run"]
+
+        assert "HIGHEST_TAG" in run
+        assert "PUBLISHED_HIGHEST_TAG" in run
+        assert '"$HIGHEST_TAG" != "$PUBLISHED_HIGHEST_TAG"' in run
+        assert "exit 1" in run
 
     def test_image_naming_and_registries_are_unchanged(self):
         steps = self.load("docker-release.yml")["jobs"]["release"]["steps"]

@@ -118,6 +118,21 @@ There is deliberately no manual `patch`/`minor`/`major` option. Every release mu
 back to a merged pull request's `release:*` label — a manual dispatch that picked the
 release type directly would bypass the required `validate-release` PR check entirely.
 
+If an unpublished tag exists anywhere else in the repository's history — a release that
+stalled on a different, earlier commit — every other release path refuses to run until it
+is resumed. Otherwise a normal release would silently calculate the next version past it,
+or the Friday sweep would use its commit as the boundary and permanently lose the
+`release:none` pull requests that were meant to ride the next release.
+
+## Ref safety
+
+Both jobs refuse to run unless `github.ref` is `refs/heads/main`, checked before either one
+checks out any code. `push` is already restricted to `main` by its own trigger and
+`schedule` always runs the default branch, but `workflow_dispatch` lets a caller pick any
+branch or tag to run the workflow against — without this guard, dispatching `maintenance`
+against a feature branch would tag and publish that unmerged commit, including moving
+`latest` to code that was never reviewed or merged.
+
 ## The tooling
 
 `scripts/release/` holds the version calculation and safety rules used by both workflows:
