@@ -12,8 +12,9 @@ import argparse
 import json
 import os
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import Any
 
 from . import versioning
 from .versioning import MergedPullRequest, ReleaseError, ReleasePlan
@@ -132,9 +133,7 @@ def _verify_release(args: argparse.Namespace) -> ReleasePlan:
     if not args.create_tag:
         return versioning.plan_resume(candidate.tag, tags)
 
-    current = versioning.latest_release(
-        tags, allow_first_release=args.allow_first_release
-    )
+    current = versioning.latest_release(tags, allow_first_release=args.allow_first_release)
     versioning.validate_candidate(current, candidate, args.release_type, tags)
     return ReleasePlan(
         release=True,
@@ -211,7 +210,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     if hasattr(args, "create_tag"):

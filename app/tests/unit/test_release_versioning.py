@@ -80,9 +80,7 @@ class TestVersionCalculation:
         assert latest_release(["v2.0.9", "v2.0.10"]) == Version(2, 0, 10)
 
     def test_missing_release_tag_fails_closed(self):
-        with pytest.raises(
-            ReleaseError, match="could not determine the current release"
-        ):
+        with pytest.raises(ReleaseError, match="could not determine the current release"):
             latest_release(["v2", "not-a-release"])
 
     def test_first_release_is_calculated_from_the_zero_base(self):
@@ -107,9 +105,7 @@ class TestCandidateValidation:
 
     def test_existing_candidate_tag_is_rejected(self):
         with pytest.raises(ReleaseError, match="already exists"):
-            validate_candidate(
-                Version(1, 8, 5), Version(2, 0, 0), "major", ["v1.8.5", "v2.0.0"]
-            )
+            validate_candidate(Version(1, 8, 5), Version(2, 0, 0), "major", ["v1.8.5", "v2.0.0"])
 
     def test_planning_always_starts_from_the_latest_release_tag(self):
         # v2.0.0 exists, so it - not v1.8.5 - is the release a major bump
@@ -129,6 +125,7 @@ class TestPlanFromLabels:
     def test_patch_label_releases_immediately(self):
         plan = plan_from_labels(["release:patch"], EXISTING_TAGS)
 
+        assert plan.version is not None
         assert (plan.release, plan.version.tag, plan.create_tag) == (
             True,
             "v2.0.5",
@@ -136,14 +133,10 @@ class TestPlanFromLabels:
         )
 
     def test_minor_label_releases_immediately(self):
-        assert plan_from_labels(["release:minor"], EXISTING_TAGS).version == Version(
-            2, 1, 0
-        )
+        assert plan_from_labels(["release:minor"], EXISTING_TAGS).version == Version(2, 1, 0)
 
     def test_major_label_releases_immediately(self):
-        assert plan_from_labels(["release:major"], EXISTING_TAGS).version == Version(
-            3, 0, 0
-        )
+        assert plan_from_labels(["release:major"], EXISTING_TAGS).version == Version(3, 0, 0)
 
     def test_release_none_does_not_release(self):
         plan = plan_from_labels(["release:none"], EXISTING_TAGS)
@@ -162,10 +155,9 @@ class TestMaintenanceRelease:
         assert "no unreleased release:none" in plan.reason
 
     def test_a_single_unreleased_change_produces_one_patch_release(self):
-        plan = plan_maintenance(
-            [MergedPullRequest(101, ["release:none"])], EXISTING_TAGS
-        )
+        plan = plan_maintenance([MergedPullRequest(101, ["release:none"])], EXISTING_TAGS)
 
+        assert plan.version is not None
         assert (plan.release, plan.release_type, plan.version.tag) == (
             True,
             "patch",
@@ -194,19 +186,16 @@ class TestMaintenanceRelease:
         assert plan_maintenance([], ["v2.0.5", "v2.0.6"]).release is False
 
     def test_pull_requests_without_the_none_label_are_ignored(self):
-        plan = plan_maintenance(
-            [MergedPullRequest(104, ["documentation"])], EXISTING_TAGS
-        )
+        plan = plan_maintenance([MergedPullRequest(104, ["documentation"])], EXISTING_TAGS)
 
         assert plan.release is False
 
 
 class TestRetryAndConcurrency:
     def test_retry_reuses_the_tag_created_by_a_partial_attempt(self):
-        plan = plan_from_labels(
-            ["release:patch"], EXISTING_TAGS + ["v2.0.5"], resume_tag="v2.0.5"
-        )
+        plan = plan_from_labels(["release:patch"], EXISTING_TAGS + ["v2.0.5"], resume_tag="v2.0.5")
 
+        assert plan.version is not None
         assert (plan.release, plan.version.tag, plan.create_tag) == (
             True,
             "v2.0.5",
@@ -216,6 +205,7 @@ class TestRetryAndConcurrency:
     def test_maintenance_retry_reuses_the_tag_of_the_partial_attempt(self):
         plan = plan_maintenance([], EXISTING_TAGS + ["v2.0.5"], resume_tag="v2.0.5")
 
+        assert plan.version is not None
         assert (plan.release, plan.version.tag, plan.create_tag) == (
             True,
             "v2.0.5",
@@ -223,9 +213,7 @@ class TestRetryAndConcurrency:
         )
 
     def test_retry_never_increments_the_version(self):
-        plan = plan_from_labels(
-            ["release:major"], EXISTING_TAGS + ["v3.0.0"], resume_tag="v3.0.0"
-        )
+        plan = plan_from_labels(["release:major"], EXISTING_TAGS + ["v3.0.0"], resume_tag="v3.0.0")
 
         assert plan.version == Version(3, 0, 0)
 
@@ -238,9 +226,7 @@ class TestRetryAndConcurrency:
             plan_resume("v2.0.4", EXISTING_TAGS + ["v2.0.5"])
 
     def test_release_none_is_never_turned_into_a_resumed_release(self):
-        plan = plan_from_labels(
-            ["release:none"], EXISTING_TAGS + ["v2.0.5"], resume_tag="v2.0.5"
-        )
+        plan = plan_from_labels(["release:none"], EXISTING_TAGS + ["v2.0.5"], resume_tag="v2.0.5")
 
         assert plan.release is False
 
@@ -248,6 +234,7 @@ class TestRetryAndConcurrency:
         # Two releases race: the first publishes v2.0.5, so the second must be
         # blocked at the release-time re-validation rather than reusing the tag.
         planned = plan_version("patch", EXISTING_TAGS)
+        assert planned.version is not None
         published_by_the_other_release = EXISTING_TAGS + [planned.version.tag]
 
         with pytest.raises(ReleaseError, match="already exists"):
@@ -280,9 +267,7 @@ class TestAlreadyReleasedCommitIsANoOp:
         # Without the already_released_tag guard this would classify the
         # merged PR's label again and calculate v2.0.5 - a second release for
         # a commit that was already fully published as v2.0.4.
-        plan = plan_from_labels(
-            ["release:patch"], EXISTING_TAGS, already_released_tag="v2.0.4"
-        )
+        plan = plan_from_labels(["release:patch"], EXISTING_TAGS, already_released_tag="v2.0.4")
 
         assert plan.release is False
         assert plan.version is None
@@ -437,9 +422,7 @@ class TestCommandLineInterface:
             encoding="utf-8"
         )
 
-    def test_plan_release_with_already_released_tag_is_a_no_op(
-        self, tmp_path, monkeypatch
-    ):
+    def test_plan_release_with_already_released_tag_is_a_no_op(self, tmp_path, monkeypatch):
         output = tmp_path / "github_output"
         monkeypatch.setenv("GITHUB_OUTPUT", str(output))
 
@@ -460,9 +443,7 @@ class TestCommandLineInterface:
         assert "release=false" in result
         assert "version=\n" in result or result.rstrip().endswith("version=")
 
-    def test_plan_maintenance_with_already_released_tag_is_a_no_op(
-        self, tmp_path, monkeypatch
-    ):
+    def test_plan_maintenance_with_already_released_tag_is_a_no_op(self, tmp_path, monkeypatch):
         output = tmp_path / "github_output"
         monkeypatch.setenv("GITHUB_OUTPUT", str(output))
         pull_requests = [{"number": 101, "labels": [{"name": "release:none"}]}]
@@ -574,9 +555,7 @@ class TestReleaseWorkflows:
         assert triggers["schedule"] == [{"cron": "0 9 * * 5"}]
         # A push only releases when the plan job says so, from the merged pull
         # request's classification label.
-        assert (
-            workflow["jobs"]["release"]["if"] == "needs.plan.outputs.release == 'true'"
-        )
+        assert workflow["jobs"]["release"]["if"] == "needs.plan.outputs.release == 'true'"
 
     def test_release_operations_are_serialised(self):
         concurrency = self.load("docker-release.yml")["concurrency"]
@@ -602,12 +581,8 @@ class TestReleaseWorkflows:
         assert names.index("Re-validate release before publishing") < names.index(
             "Create release tag"
         )
-        assert names.index("Create release tag") < names.index(
-            "Build and push Docker image"
-        )
-        assert names.index("Build and push Docker image") < names.index(
-            "Create GitHub release"
-        )
+        assert names.index("Create release tag") < names.index("Build and push Docker image")
+        assert names.index("Build and push Docker image") < names.index("Create GitHub release")
 
     def test_image_naming_and_registries_are_unchanged(self):
         steps = self.load("docker-release.yml")["jobs"]["release"]["steps"]
@@ -618,8 +593,7 @@ class TestReleaseWorkflows:
             in metadata["with"]["images"]
         )
         assert (
-            "ghcr.io/${{ github.repository_owner }}/docker-autoheal"
-            in metadata["with"]["images"]
+            "ghcr.io/${{ github.repository_owner }}/docker-autoheal" in metadata["with"]["images"]
         )
         assert "type=raw,value=latest" in metadata["with"]["tags"]
 

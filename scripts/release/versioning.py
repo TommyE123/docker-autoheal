@@ -11,8 +11,8 @@ Every function fails closed: an ambiguous or unexpected release state raises
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Iterable, Optional, Sequence
 
 RELEASE_LABEL_PREFIX = "release:"
 RELEASE_TYPES = ("none", "patch", "minor", "major")
@@ -36,12 +36,10 @@ class Version:
     patch: int
 
     @classmethod
-    def parse(cls, tag: str) -> "Version":
+    def parse(cls, tag: str) -> Version:
         match = TAG_PATTERN.match(tag.strip())
         if match is None:
-            raise ReleaseError(
-                f"{tag!r} is not a valid release tag; expected vMAJOR.MINOR.PATCH"
-            )
+            raise ReleaseError(f"{tag!r} is not a valid release tag; expected vMAJOR.MINOR.PATCH")
         major, minor, patch = (int(part) for part in match.groups())
         return cls(major, minor, patch)
 
@@ -56,16 +54,14 @@ class Version:
     def __str__(self) -> str:
         return self.tag
 
-    def bump(self, release_type: str) -> "Version":
+    def bump(self, release_type: str) -> Version:
         if release_type == "patch":
             return Version(self.major, self.minor, self.patch + 1)
         if release_type == "minor":
             return Version(self.major, self.minor + 1, 0)
         if release_type == "major":
             return Version(self.major + 1, 0, 0)
-        raise ReleaseError(
-            f"release type {release_type!r} does not produce a new version"
-        )
+        raise ReleaseError(f"release type {release_type!r} does not produce a new version")
 
 
 # The base used when a repository has never published a release tag.
@@ -91,19 +87,15 @@ class ReleasePlan:
     release: bool
     release_type: str
     reason: str
-    current: Optional[Version] = None
-    version: Optional[Version] = None
+    current: Version | None = None
+    version: Version | None = None
     create_tag: bool = False
 
 
 def classify(labels: Iterable[str]) -> str:
     """Return the release type named by exactly one ``release:*`` label."""
     found = sorted(
-        {
-            label.strip()
-            for label in labels
-            if label.strip().startswith(RELEASE_LABEL_PREFIX)
-        }
+        {label.strip() for label in labels if label.strip().startswith(RELEASE_LABEL_PREFIX)}
     )
     invalid = [label for label in found if label not in RELEASE_LABELS]
     if invalid:
@@ -115,8 +107,7 @@ def classify(labels: Iterable[str]) -> str:
         )
     if not found:
         raise ReleaseError(
-            "no release classification label; add exactly one of "
-            + ", ".join(RELEASE_LABELS)
+            "no release classification label; add exactly one of " + ", ".join(RELEASE_LABELS)
         )
     if len(found) > 1:
         raise ReleaseError(
@@ -137,18 +128,14 @@ def release_versions(tags: Iterable[str]) -> list[Version]:
     return sorted(versions)
 
 
-def latest_release(
-    tags: Iterable[str], *, allow_first_release: bool = False
-) -> Version:
+def latest_release(tags: Iterable[str], *, allow_first_release: bool = False) -> Version:
     """The highest existing release tag, or the first-release base."""
     versions = release_versions(tags)
     if versions:
         return versions[-1]
     if allow_first_release:
         return FIRST_RELEASE_BASE
-    raise ReleaseError(
-        "could not determine the current release: no vMAJOR.MINOR.PATCH tag exists"
-    )
+    raise ReleaseError("could not determine the current release: no vMAJOR.MINOR.PATCH tag exists")
 
 
 def validate_candidate(
@@ -171,9 +158,7 @@ def validate_candidate(
             f"{current.tag}; expected {expected.tag}"
         )
     if candidate <= current:
-        raise ReleaseError(
-            f"{candidate.tag} is not greater than the current release {current.tag}"
-        )
+        raise ReleaseError(f"{candidate.tag} is not greater than the current release {current.tag}")
 
 
 def plan_version(
@@ -185,8 +170,7 @@ def plan_version(
     """Calculate and validate the release produced by ``release_type``."""
     if release_type not in RELEASE_TYPES:
         raise ReleaseError(
-            f"invalid release type {release_type!r}; expected one of "
-            + ", ".join(RELEASE_TYPES)
+            f"invalid release type {release_type!r}; expected one of " + ", ".join(RELEASE_TYPES)
         )
     if release_type == "none":
         return ReleasePlan(
@@ -224,9 +208,7 @@ def plan_already_released(released_tag: str, tags: Iterable[str]) -> ReleasePlan
     released = Version.parse(released_tag)
     existing = {tag.strip() for tag in tags}
     if released.tag not in existing:
-        raise ReleaseError(
-            f"cannot skip as already released: {released.tag} does not exist"
-        )
+        raise ReleaseError(f"cannot skip as already released: {released.tag} does not exist")
     return ReleasePlan(
         release=False,
         release_type="none",
@@ -242,14 +224,10 @@ def plan_resume(resume_tag: str, tags: Iterable[str]) -> ReleasePlan:
     resumed = Version.parse(resume_tag)
     existing = {tag.strip() for tag in tags}
     if resumed.tag not in existing:
-        raise ReleaseError(
-            f"cannot resume release {resumed.tag}: the tag does not exist"
-        )
+        raise ReleaseError(f"cannot resume release {resumed.tag}: the tag does not exist")
     newest = latest_release(tags)
     if resumed != newest:
-        raise ReleaseError(
-            f"cannot resume release {resumed.tag}: {newest.tag} is a newer release"
-        )
+        raise ReleaseError(f"cannot resume release {resumed.tag}: {newest.tag} is a newer release")
     return ReleasePlan(
         release=True,
         release_type="resume",
@@ -264,8 +242,8 @@ def plan_from_labels(
     labels: Iterable[str],
     tags: Iterable[str],
     *,
-    resume_tag: Optional[str] = None,
-    already_released_tag: Optional[str] = None,
+    resume_tag: str | None = None,
+    already_released_tag: str | None = None,
     allow_first_release: bool = False,
 ) -> ReleasePlan:
     """Plan the release for a merged pull request's classification labels."""
@@ -283,8 +261,8 @@ def plan_maintenance(
     pull_requests: Iterable[MergedPullRequest],
     tags: Iterable[str],
     *,
-    resume_tag: Optional[str] = None,
-    already_released_tag: Optional[str] = None,
+    resume_tag: str | None = None,
+    already_released_tag: str | None = None,
     allow_first_release: bool = False,
 ) -> ReleasePlan:
     """Plan the Friday maintenance release for unreleased ``release:none`` work.
