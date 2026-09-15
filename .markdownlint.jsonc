@@ -1,0 +1,18 @@
+{
+  // Configuration for markdownlint / MegaLinter's MARKDOWN_MARKDOWNLINT.
+  // https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+  "default": true,
+
+  // Every Markdown file in this repository - long before markdownlint was ever
+  // enabled, and independent of any single PR - wraps prose in long lines rather
+  // than hard-wrapping at 80 characters. Enforcing MD013 would mean rewrapping
+  // every paragraph in every doc for no readability gain (GitHub and every editor
+  // used here soft-wrap long lines anyway).
+  "MD013": false,
+
+  // Same story for table formatting: every table in this repo uses padded GFM
+  // pipes (`| Col |`) for readability as plain text, not the "compact" style
+  // (`|Col|`) this rule's default wants. Padded pipes are also the far more
+  // common GFM convention.
+  "MD060": false
+}
