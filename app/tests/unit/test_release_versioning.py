@@ -1029,6 +1029,47 @@ class TestReleaseWorkflows:
             "Promote latest tag must have GH_TOKEN to query published releases"
         )
 
+    def test_promote_latest_output_gates_hub_description_update(self):
+        # Regression guard: when the newest-release guard skips an older
+        # rerun, update-hub-description must not run — otherwise the Docker Hub
+        # description is overwritten with an older DOCKER_HUB_README.md.
+        # Failure scenario:
+        #   v2.0.5 completes; v2.0.6 publishes and updates the readme;
+        #   maintainer re-runs v2.0.5; promote_latest exits 0 (skip);
+        #   update-hub-description still runs because promote_latest.result is
+        #   'success'; Docker Hub shows the older description.
+        workflow = self.load("docker-release.yml")
+        promote_job = workflow["jobs"]["promote_latest"]
+        hub_job = workflow["jobs"]["update-hub-description"]
+
+        # promote_latest must expose a 'promoted' output
+        outputs = promote_job.get("outputs", {})
+        assert "promoted" in outputs, (
+            "promote_latest must declare a 'promoted' output so "
+            "update-hub-description can distinguish a real promotion from a skip"
+        )
+
+        # The Promote latest tag step must set promoted=true on success and
+        # promoted=false on the skip path
+        promote_step = next(
+            s for s in promote_job["steps"] if s.get("name") == "Promote latest tag"
+        )
+        run = promote_step["run"]
+        assert "promoted=true" in run, (
+            "Promote latest tag must set promoted=true after imagetools create succeeds"
+        )
+        assert "promoted=false" in run, (
+            "Promote latest tag must set promoted=false on the newest-release skip path"
+        )
+
+        # update-hub-description must gate on the promoted output, not just
+        # on promote_latest.result == 'success'
+        hub_condition = hub_job.get("if", "")
+        assert "needs.promote_latest.outputs.promoted" in hub_condition, (
+            "update-hub-description must check needs.promote_latest.outputs.promoted "
+            "so it does not run when the latest-tag promotion was skipped"
+        )
+
     def test_classification_uses_events_api_not_current_labels(self):
         # Guard the immutability fix: the classification step must reconstruct
         # labels from the GitHub Issues Events API (append-only) rather than

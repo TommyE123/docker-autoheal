@@ -440,6 +440,9 @@ jobs:
       contents: read
       packages: write
 
+    outputs:
+      promoted: ${{ steps.promote.outputs.promoted }}
+
     steps:
       - name: Refuse releases from any ref other than main
         env:
@@ -485,6 +488,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Promote latest tag
+        id: promote
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -507,6 +511,7 @@ jobs:
 
           if [ "$VERSION" != "$NEWEST" ]; then
             echo "Skipping: ${VERSION} is not the newest published release (${NEWEST} is); :latest already points at a newer release."
+            echo "promoted=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -518,16 +523,20 @@ jobs:
             --tag "ghcr.io/${{ github.repository_owner }}/docker-autoheal:latest" \
             "ghcr.io/${{ github.repository_owner }}/docker-autoheal:${VERSION}"
 
+          echo "promoted=true" >> "$GITHUB_OUTPUT"
+
   update-hub-description:
     name: Update Docker Hub description
     runs-on: ubuntu-latest
-    # Run when latest promotion succeeded (covers both a new release and a
-    # rerun after a previously failed description update).
+    # Run only when latest was actually promoted (not when the newest-release
+    # guard skipped an older rerun), so we never overwrite the description with
+    # an older revision of DOCKER_HUB_README.md.
     needs: [promote_latest]
     if: |
       always() &&
       github.ref == 'refs/heads/main' &&
-      needs.promote_latest.result == 'success'
+      needs.promote_latest.result == 'success' &&
+      needs.promote_latest.outputs.promoted == 'true'
 
     steps:
       - name: Checkout code
