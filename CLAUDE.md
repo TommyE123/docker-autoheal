@@ -51,6 +51,21 @@ Set the title correctly when you open the PR — don't rely on a later retitle. 
 
 Renovate-authored PRs are covered separately by `renovate.json`'s `semanticCommits` setting, not by this file — Renovate doesn't read `CLAUDE.md`.
 
+## Release classification label (required)
+
+Every PR into `main` must carry exactly one release label, enforced by
+`.github/workflows/release-validation.yml` (`validate-release` check):
+
+- `release:none` — docs, CI, tests, refactors with no behaviour change, normal Renovate updates, formatting/linting.
+- `release:patch` — bug fix, security fix needing a new image, performance improvement.
+- `release:minor` — new backwards-compatible feature, new configuration option, intentional backwards-compatible behaviour change.
+- `release:major` — breaking behaviour or configuration change.
+
+Choose the release *type* only — never a version number. The automation calculates the
+version from the latest release tag, publishes patch/minor/major releases on merge, and
+sweeps accumulated `release:none` changes into one patch release each Friday. See
+`docs/RELEASING.md`.
+
 ## Pull requests need a linked issue
 
 If a PR changes application behavior or adds real scope (new feature, bug fix, refactor with user-visible effect, new CI/tooling capability), file a GitHub issue for it first — or confirm one already exists — and link the PR to it (`Closes #N` in the PR body). This keeps a traceable record of *why* a change happened, not just what changed.

@@ -1,0 +1,53 @@
+name: Release Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - labeled
+      - unlabeled
+      - ready_for_review
+      - edited
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-validation-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Read-only, no secrets: this check never needs registry credentials, and
+      # its result is never trusted on its own - docker-release.yml repeats the
+      # full validation from main immediately before it publishes anything.
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Collect release classification labels
+        env:
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: printf '%s' "$LABELS" > labels.json
+
+      - name: Collect existing release tags
+        run: git tag --list > tags.txt
+
+      # Fails when the classification is missing, duplicated or invalid, when the
+      # current release cannot be determined, or when the calculated candidate is
+      # not a new, valid tag for the requested release type.
+      - name: Validate release classification and candidate version
+        run: |
+          python3 -m scripts.release.cli validate-pr \
+            --labels-file labels.json \
+            --tags-file tags.txt
