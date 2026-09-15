@@ -870,13 +870,10 @@ class TestReleaseWorkflows:
         assert names.index("Build and push Docker image") < names.index("Create GitHub release")
 
     def test_an_unpublished_tag_elsewhere_blocks_every_other_release_path(self):
-        # If the highest semantic tag anywhere in history has no published
-        # GitHub Release, and it isn't this commit's own tag (which is
-        # already handled by resume/already-released), the run must fail
-        # closed rather than silently calculating past the stalled release -
-        # a normal classification release would skip its version, and the
-        # Friday sweep would use its commit as a boundary and lose the
-        # release:none PRs that were meant to ride the next release.
+        # Every semantic tag except the one being resumed on this commit must
+        # have a published GitHub Release.  The guard must check all tags
+        # individually (not just the highest), so an intermediate unpublished
+        # tag is not silently skipped when a later tag is already published.
         step = next(
             step
             for step in self.load("docker-release.yml")["jobs"]["plan"]["steps"]
@@ -884,9 +881,9 @@ class TestReleaseWorkflows:
         )
         run = step["run"]
 
-        assert "HIGHEST_TAG" in run
-        assert "PUBLISHED_HIGHEST_TAG" in run
-        assert '"$HIGHEST_TAG" != "$PUBLISHED_HIGHEST_TAG"' in run
+        # Per-tag loop that collects unpublished tags (excluding the resume tag)
+        assert "STALLED_TAGS" in run
+        assert '"$TAG" != "$RESUME"' in run
         assert "exit 1" in run
 
     def test_image_naming_and_registries_are_unchanged(self):
@@ -900,7 +897,13 @@ class TestReleaseWorkflows:
         assert (
             "ghcr.io/${{ github.repository_owner }}/docker-autoheal" in metadata["with"]["images"]
         )
-        assert "type=raw,value=latest" in metadata["with"]["tags"]
+        # latest is promoted in a separate step after the GitHub Release is
+        # created, so it is not in the metadata-action tags.
+        assert "type=raw,value=latest" not in metadata["with"]["tags"]
+        promote = next(
+            step for step in steps if step.get("name") == "Promote latest tag"
+        )
+        assert "docker-autoheal:latest" in promote["run"]
 
     def test_classification_uses_events_api_not_current_labels(self):
         # Guard the immutability fix: the classification step must reconstruct

@@ -112,23 +112,9 @@ jobs:
         run: |
           RESUME=""
           ALREADY_RELEASED=""
-          HIGHEST_TAG=""
-          PUBLISHED_HIGHEST_TAG=""
 
-          # The highest semantic tag overall must have a published GitHub
-          # Release. If it doesn't, an earlier release stalled part-way on a
-          # *different* commit than this run's: every other release path
-          # (a normal classification release, or the Friday sweep's PR-search
-          # boundary) would otherwise silently calculate the next version
-          # after it, or the next PR boundary from it, leaving that release
-          # permanently unpublished and its changes never released.
-          for TAG in $(git tag --list | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V || true); do
-            HIGHEST_TAG="$TAG"
-            if gh release view "$TAG" >/dev/null 2>&1; then
-              PUBLISHED_HIGHEST_TAG="$TAG"
-            fi
-          done
-
+          # Detect if the current commit already has a release tag so the
+          # per-tag check below can exempt the tag being resumed.
           for TAG in $(git tag --points-at "$GITHUB_SHA" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true); do
             if gh release view "$TAG" >/dev/null 2>&1; then
               echo "Release ${TAG} on this commit is already published."
@@ -139,12 +125,19 @@ jobs:
             fi
           done
 
-          # This commit's own incomplete/complete tag (if any) is handled above
-          # by resuming or no-op'ing; only fail closed here for a stalled
-          # release that belongs to some *other* commit.
-          if [ -z "$RESUME" ] && [ -z "$ALREADY_RELEASED" ] \
-            && [ -n "$HIGHEST_TAG" ] && [ "$HIGHEST_TAG" != "$PUBLISHED_HIGHEST_TAG" ]; then
-            echo "::error::Release tag ${HIGHEST_TAG} has no published GitHub Release. Resume it (re-run its workflow run) before any new release can be calculated."
+          # Every semantic tag except the one being resumed on this commit must
+          # have a published GitHub Release.  An unpublished tag on any other
+          # commit is a stalled partial release: proceeding past it would
+          # permanently skip the changes it was meant to deliver.
+          STALLED_TAGS=""
+          for TAG in $(git tag --list | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V || true); do
+            if ! gh release view "$TAG" >/dev/null 2>&1 && [ "$TAG" != "$RESUME" ]; then
+              STALLED_TAGS="${STALLED_TAGS:+$STALLED_TAGS, }${TAG}"
+            fi
+          done
+
+          if [ -n "$STALLED_TAGS" ]; then
+            echo "::error::Release tag(s) ${STALLED_TAGS} have no published GitHub Release. Resume each (re-run their workflow run) before any new release can be calculated."
             exit 1
           fi
 
@@ -399,7 +392,6 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/docker-autoheal
           tags: |
             type=raw,value=${{ needs.plan.outputs.version }}
-            type=raw,value=latest
 
       # Build the Docker image for multiple platforms and push to registries
       - name: Build and push Docker image
@@ -429,6 +421,22 @@ jobs:
             --verify-tag \
             --title "${TAG_NAME}" \
             --generate-notes
+
+      # Promote the `latest` tag only after the GitHub Release exists.
+      # The build step above pushed only the immutable version tag, so `latest`
+      # never advances while a release is still incomplete.
+      - name: Promote latest tag
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          docker buildx imagetools create \
+            --tag "docker.io/${DOCKERHUB_USERNAME}/docker-autoheal:latest" \
+            "docker.io/${DOCKERHUB_USERNAME}/docker-autoheal:${VERSION}"
+
+          docker buildx imagetools create \
+            --tag "ghcr.io/${{ github.repository_owner }}/docker-autoheal:latest" \
+            "ghcr.io/${{ github.repository_owner }}/docker-autoheal:${VERSION}"
 
   update-hub-description:
     name: Update Docker Hub description
