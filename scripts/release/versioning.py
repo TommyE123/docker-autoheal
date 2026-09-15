@@ -68,6 +68,36 @@ class Version:
 FIRST_RELEASE_BASE = Version(0, 0, 0)
 
 
+def labels_at_merge_time(
+    events: Iterable[dict],
+    merged_at: str,
+) -> list[str]:
+    """Reconstruct the label set on a PR at the moment it was merged.
+
+    Replays the ``labeled`` and ``unlabeled`` entries from the GitHub Issues
+    Events API up to and including ``merged_at``; label changes recorded after
+    that timestamp are ignored.  The event log is append-only, so this makes
+    release classification effectively immutable: even if a label is changed on
+    the merged PR afterwards, the release workflow still uses the type that
+    ``validate-release`` checked before the merge.
+    """
+    labels: set[str] = set()
+    for event in events:
+        event_time = event.get("created_at") or ""
+        if event_time > merged_at:
+            continue
+        label_obj = event.get("label") or {}
+        label_name = (label_obj.get("name") or "") if isinstance(label_obj, dict) else ""
+        if not label_name:
+            continue
+        event_type = event.get("event") or ""
+        if event_type == "labeled":
+            labels.add(label_name)
+        elif event_type == "unlabeled":
+            labels.discard(label_name)
+    return sorted(labels)
+
+
 @dataclass(frozen=True)
 class MergedPullRequest:
     """A merged pull request considered by the Friday maintenance release."""

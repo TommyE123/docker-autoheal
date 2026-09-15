@@ -157,12 +157,33 @@ jobs:
         run: |
           gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" \
             --jq '[.[] | select(.merged_at != null)]' > merged-prs.json
-          jq '[.[] | .labels[].name]' merged-prs.json > labels.json
 
           COUNT="$(jq 'length' merged-prs.json)"
           echo "Merged pull requests for this commit: ${COUNT}"
-          cat labels.json
           echo "merged_pull_requests=${COUNT}" >> "$GITHUB_OUTPUT"
+
+          # Reconstruct labels from the GitHub Issues event log (append-only
+          # audit record) at the moment each PR was merged, rather than
+          # reading the current PR labels.  Any label change made after merge
+          # is ignored, so the classification used here is the same one that
+          # validate-release checked before the merge.
+          echo '[]' > labels.json
+          for i in $(seq 1 "${COUNT}"); do
+            IDX=$((i - 1))
+            PR_NUMBER="$(jq -r ".[$IDX].number" merged-prs.json)"
+            MERGED_AT="$(jq -r ".[$IDX].merged_at" merged-prs.json)"
+
+            gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/events" \
+              --paginate > "pr-${PR_NUMBER}-events.json"
+
+            PR_LABELS="$(python3 -m scripts.release.cli resolve-labels \
+              --events-file "pr-${PR_NUMBER}-events.json" \
+              --merged-at "${MERGED_AT}")"
+
+            jq --argjson new_labels "${PR_LABELS}" '. + $new_labels' labels.json \
+              > labels-updated.json && mv labels-updated.json labels.json
+          done
+          cat labels.json
 
       # Only pull requests merged after the latest successful release are
       # considered, so changes already included in an earlier release are

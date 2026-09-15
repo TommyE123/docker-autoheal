@@ -121,6 +121,14 @@ def _plan_maintenance(args: argparse.Namespace) -> ReleasePlan:
     )
 
 
+def _resolve_labels(args: argparse.Namespace) -> list[str]:
+    """Reconstruct PR labels at merge time from the GitHub Issues event log."""
+    events = _load(args.events_file)
+    if not isinstance(events, list):
+        raise ReleaseError(f"expected a JSON array in {args.events_file}")
+    return versioning.labels_at_merge_time(events, args.merged_at)
+
+
 def _verify_release(args: argparse.Namespace) -> ReleasePlan:
     """Re-run the full validation against the current state of the repository.
 
@@ -207,6 +215,22 @@ def build_parser() -> argparse.ArgumentParser:
     add_common(verify_release)
     verify_release.set_defaults(handler=_verify_release)
 
+    resolve_labels = subparsers.add_parser(
+        "resolve-labels",
+        help="reconstruct PR labels at merge time from the issue event log",
+    )
+    resolve_labels.add_argument(
+        "--events-file",
+        required=True,
+        help="path to the GitHub Issues Events API JSON for the pull request",
+    )
+    resolve_labels.add_argument(
+        "--merged-at",
+        required=True,
+        help="ISO 8601 timestamp of when the pull request was merged",
+    )
+    resolve_labels.set_defaults(handler=_resolve_labels)
+
     return parser
 
 
@@ -217,12 +241,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.create_tag = args.create_tag == "true"
 
     try:
-        plan = args.handler(args)
+        result = args.handler(args)
     except (ReleaseError, json.JSONDecodeError, OSError) as error:
         print(f"::error::{error}", file=sys.stderr)
         return 1
 
-    _emit(plan)
+    if isinstance(result, ReleasePlan):
+        _emit(result)
+    else:
+        # resolve-labels: output a JSON array of label names to stdout
+        print(json.dumps(result))
     return 0
 
 

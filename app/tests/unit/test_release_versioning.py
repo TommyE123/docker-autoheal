@@ -17,6 +17,7 @@ from scripts.release.versioning import (
     ReleaseError,
     Version,
     classify,
+    labels_at_merge_time,
     latest_release,
     plan_already_released,
     plan_from_labels,
@@ -314,6 +315,108 @@ class TestAlreadyReleasedCommitIsANoOp:
             plan_already_released("v2.0.9", EXISTING_TAGS)
 
 
+class TestLabelsAtMergeTime:
+    """Regression: label changes made after a PR merges must not silently alter
+    the release classification.
+
+    The release workflow reconstructs labels from the GitHub Issues Events API
+    at the ``merged_at`` timestamp rather than reading current PR labels.  The
+    event log is append-only, so replaying it up to that timestamp gives the
+    immutable label state at the moment of merge.
+    """
+
+    _MERGE_TIME = "2024-01-15T10:00:00Z"
+
+    def _events(self, *entries):
+        return list(entries)
+
+    def _labeled(self, name, at):
+        return {"event": "labeled", "created_at": at, "label": {"name": name}}
+
+    def _unlabeled(self, name, at):
+        return {"event": "unlabeled", "created_at": at, "label": {"name": name}}
+
+    def test_label_changed_after_merge_does_not_affect_classification(self):
+        # The specific failure mode: PR was validated with release:minor,
+        # then the label was changed to release:patch after merge.  The
+        # classification must still be minor.
+        events = [
+            self._labeled("release:minor", "2024-01-14T09:00:00Z"),
+            self._unlabeled("release:minor", "2024-01-16T11:00:00Z"),
+            self._labeled("release:patch", "2024-01-16T11:01:00Z"),
+        ]
+
+        result = labels_at_merge_time(events, self._MERGE_TIME)
+
+        assert result == ["release:minor"]
+        assert "release:patch" not in result
+
+    def test_label_present_at_merge_is_included(self):
+        events = [self._labeled("release:patch", "2024-01-14T09:00:00Z")]
+
+        assert labels_at_merge_time(events, self._MERGE_TIME) == ["release:patch"]
+
+    def test_label_removed_before_merge_is_not_included(self):
+        events = [
+            self._labeled("release:minor", "2024-01-14T09:00:00Z"),
+            self._unlabeled("release:minor", "2024-01-14T10:00:00Z"),
+            self._labeled("release:patch", "2024-01-14T11:00:00Z"),
+        ]
+
+        result = labels_at_merge_time(events, self._MERGE_TIME)
+
+        assert result == ["release:patch"]
+        assert "release:minor" not in result
+
+    def test_label_added_after_merge_is_excluded(self):
+        events = [self._labeled("release:major", "2024-01-16T12:00:00Z")]
+
+        assert labels_at_merge_time(events, self._MERGE_TIME) == []
+
+    def test_non_label_events_are_ignored(self):
+        events = [
+            {"event": "merged", "created_at": "2024-01-15T10:00:00Z"},
+            self._labeled("release:patch", "2024-01-14T09:00:00Z"),
+            {"event": "review_requested", "created_at": "2024-01-14T08:00:00Z"},
+            {"event": "commented", "created_at": "2024-01-14T07:00:00Z"},
+        ]
+
+        assert labels_at_merge_time(events, self._MERGE_TIME) == ["release:patch"]
+
+    def test_events_at_exactly_merge_time_are_included(self):
+        # A label event with created_at == merged_at is on the boundary;
+        # it should be included, not excluded.
+        events = [self._labeled("release:minor", self._MERGE_TIME)]
+
+        assert labels_at_merge_time(events, self._MERGE_TIME) == ["release:minor"]
+
+    def test_empty_event_log_returns_no_labels(self):
+        assert labels_at_merge_time([], self._MERGE_TIME) == []
+
+    def test_multiple_non_release_labels_are_preserved(self):
+        events = [
+            self._labeled("bug", "2024-01-14T08:00:00Z"),
+            self._labeled("release:patch", "2024-01-14T09:00:00Z"),
+            self._labeled("documentation", "2024-01-14T10:00:00Z"),
+        ]
+
+        result = labels_at_merge_time(events, self._MERGE_TIME)
+
+        assert "release:patch" in result
+        assert "bug" in result
+        assert "documentation" in result
+
+    def test_result_is_sorted(self):
+        events = [
+            self._labeled("z-label", "2024-01-14T08:00:00Z"),
+            self._labeled("a-label", "2024-01-14T09:00:00Z"),
+        ]
+
+        result = labels_at_merge_time(events, self._MERGE_TIME)
+
+        assert result == sorted(result)
+
+
 class TestCommandLineInterface:
     def test_validate_pr_accepts_a_valid_classification(self, tmp_path, monkeypatch):
         output = tmp_path / "github_output"
@@ -510,6 +613,46 @@ class TestCommandLineInterface:
         assert exit_code == 1
         assert "does not exist" in capsys.readouterr().err
 
+    def test_resolve_labels_outputs_labels_at_merge_time(self, tmp_path, capsys):
+        # Regression: label changed after merge must not silently alter the
+        # classification that the release workflow uses.
+        events = [
+            {"event": "labeled", "created_at": "2024-01-14T09:00:00Z",
+             "label": {"name": "release:minor"}},
+            {"event": "unlabeled", "created_at": "2024-01-16T11:00:00Z",
+             "label": {"name": "release:minor"}},
+            {"event": "labeled", "created_at": "2024-01-16T11:01:00Z",
+             "label": {"name": "release:patch"}},
+        ]
+
+        exit_code = main(
+            [
+                "resolve-labels",
+                "--events-file",
+                write(tmp_path / "events.json", events),
+                "--merged-at",
+                "2024-01-15T10:00:00Z",
+            ]
+        )
+
+        assert exit_code == 0
+        output = json.loads(capsys.readouterr().out)
+        assert output == ["release:minor"]
+
+    def test_resolve_labels_empty_events_returns_empty_array(self, tmp_path, capsys):
+        exit_code = main(
+            [
+                "resolve-labels",
+                "--events-file",
+                write(tmp_path / "events.json", []),
+                "--merged-at",
+                "2024-01-15T10:00:00Z",
+            ]
+        )
+
+        assert exit_code == 0
+        assert json.loads(capsys.readouterr().out) == []
+
     def test_unreadable_input_fails_closed(self, tmp_path, capsys):
         exit_code = main(
             [
@@ -638,6 +781,27 @@ class TestReleaseWorkflows:
             "ghcr.io/${{ github.repository_owner }}/docker-autoheal" in metadata["with"]["images"]
         )
         assert "type=raw,value=latest" in metadata["with"]["tags"]
+
+    def test_classification_uses_events_api_not_current_labels(self):
+        # Guard the immutability fix: the classification step must reconstruct
+        # labels from the GitHub Issues Events API (append-only) rather than
+        # reading the current mutable PR labels.
+        step = next(
+            s
+            for s in self.load("docker-release.yml")["jobs"]["plan"]["steps"]
+            if s.get("id") == "classification"
+        )
+        run = step["run"]
+
+        assert "issues" in run and "events" in run, (
+            "classification step must call the GitHub Issues Events API"
+        )
+        assert "resolve-labels" in run, (
+            "classification step must use resolve-labels for merge-time label reconstruction"
+        )
+        assert ".labels[" not in run, (
+            "classification step must not read current PR labels from the API response"
+        )
 
     def test_pull_request_validation_uses_no_secrets(self):
         workflow = self.load("release-validation.yml")
