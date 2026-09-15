@@ -12,7 +12,7 @@
 ```yaml
 services:
   autoheal:
-    image: swaya1125/docker-autoheal:latest
+    image: tommye123/docker-autoheal:latest  # or ghcr.io/tommye123/docker-autoheal:latest
     container_name: docker-autoheal
     restart: unless-stopped
     volumes:
@@ -45,8 +45,11 @@ docker run -d \
   -v ./data:/data \
   -p 3131:3131 \
   -p 9090:9090 \
-  swaya1125/docker-autoheal:latest
+  tommye123/docker-autoheal:latest
 ```
+
+Images are also published to GitHub Container Registry as
+`ghcr.io/tommye123/docker-autoheal:latest`.
 
 ## Verify it's running
 
@@ -98,9 +101,11 @@ You should see a `restart` event for `test-nginx`.
 
 ## Building the image yourself
 
-The published image (`swaya1125/docker-autoheal`) is a multi-stage build: it builds the
-React frontend with Node 18 in the first stage, then copies the build output into a
-Python 3.11 image. To build it locally:
+The published image (`tommye123/docker-autoheal`, also mirrored to
+`ghcr.io/tommye123/docker-autoheal`) is a multi-stage build: it builds the React frontend
+with Node 18 in the first stage, then copies the build output into a Python image (the
+version is whatever the `Dockerfile`'s `FROM python:X.Y-slim` line currently pins). To
+build it locally:
 
 ```bash
 git clone https://github.com/TommyE123/docker-autoheal.git

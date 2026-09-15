@@ -1,7 +1,7 @@
 # Docker Auto-Heal Service
 
 [![Unit Tests](https://github.com/TommyE123/docker-autoheal/actions/workflows/tests.yml/badge.svg)](https://github.com/TommyE123/docker-autoheal/actions/workflows/tests.yml)
-[![Docker Pulls](https://img.shields.io/docker/pulls/swaya1125/docker-autoheal)](https://hub.docker.com/r/swaya1125/docker-autoheal)
+[![Docker Pulls](https://img.shields.io/docker/pulls/tommye123/docker-autoheal)](https://hub.docker.com/r/tommye123/docker-autoheal)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Docker Auto-Heal watches your Docker containers and restarts the ones that fail or go
@@ -45,15 +45,18 @@ docker run -d \
   -p 3131:3131 \
   -p 9090:9090 \
   --restart unless-stopped \
-  swaya1125/docker-autoheal:latest
+  tommye123/docker-autoheal:latest
 ```
+
+Images are also published to GitHub Container Registry as
+`ghcr.io/tommye123/docker-autoheal:latest` if you prefer GHCR over Docker Hub.
 
 Or with Docker Compose:
 
 ```yaml
 services:
   autoheal:
-    image: swaya1125/docker-autoheal:latest
+    image: tommye123/docker-autoheal:latest
     container_name: docker-autoheal
     restart: unless-stopped
     volumes:

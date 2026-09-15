@@ -83,7 +83,7 @@ would also do, and undo the ones with lasting effect:
   directly against an isolated `config_manager`: same code path, no real
   service or Docker daemon required, and no risk to anyone's data.
 
-### CI
+### CI status
 
 This suite is **not** run in CI. It needs a live Docker daemon and, for most
 of its tests, a running Auto-Heal service - standing up Docker-in-Docker (or
