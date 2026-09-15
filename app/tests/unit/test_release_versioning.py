@@ -653,6 +653,46 @@ class TestCommandLineInterface:
         assert exit_code == 0
         assert json.loads(capsys.readouterr().out) == []
 
+    def test_resolve_labels_handles_multi_page_paginated_response(
+        self, tmp_path, capsys
+    ):
+        # gh api --paginate writes one JSON array per page with no outer
+        # wrapper, so a multi-page response is multiple arrays concatenated.
+        # Without this fix json.loads raises "Extra data" on the second page.
+        #
+        # Failure scenario: a PR has enough label events to span two API
+        # pages; the release workflow calls gh api ... --paginate, producing
+        # two concatenated arrays in the events file; resolve-labels fails
+        # with a JSONDecodeError and the release run aborts.
+        page1 = [
+            {"event": "labeled", "created_at": "2024-01-10T00:00:00Z",
+             "label": {"name": "release:patch"}},
+        ]
+        page2 = [
+            {"event": "unlabeled", "created_at": "2024-01-11T00:00:00Z",
+             "label": {"name": "release:patch"}},
+            {"event": "labeled", "created_at": "2024-01-12T00:00:00Z",
+             "label": {"name": "release:none"}},
+        ]
+        events_file = tmp_path / "pr-events.json"
+        # Write the two pages exactly as gh api --paginate would produce them.
+        events_file.write_text(
+            json.dumps(page1) + "\n" + json.dumps(page2), encoding="utf-8"
+        )
+
+        exit_code = main(
+            [
+                "resolve-labels",
+                "--events-file",
+                str(events_file),
+                "--merged-at",
+                "2024-01-15T00:00:00Z",
+            ]
+        )
+
+        assert exit_code == 0
+        assert json.loads(capsys.readouterr().out) == ["release:none"]
+
     def test_unreadable_input_fails_closed(self, tmp_path, capsys):
         exit_code = main(
             [

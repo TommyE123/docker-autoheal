@@ -21,12 +21,33 @@ from .versioning import MergedPullRequest, ReleaseError, ReleasePlan
 
 
 def _load(path: str) -> Any:
-    """Load a JSON document, or a plain newline-separated list, from ``path``."""
+    """Load a JSON document, or a plain newline-separated list, from ``path``.
+
+    ``gh api --paginate`` outputs one JSON document per page with no outer
+    wrapper, so a multi-page response is multiple JSON arrays concatenated.
+    When the file starts with ``[`` or ``{`` all top-level documents are
+    decoded and their contents merged into a single flat list, so callers
+    see a single list regardless of how many pages the API returned.
+    """
     text = Path(path).read_text(encoding="utf-8").strip()
     if not text:
         return []
     if text[0] in "[{":
-        return json.loads(text)
+        decoder = json.JSONDecoder()
+        items: list = []
+        offset = 0
+        while offset < len(text):
+            while offset < len(text) and text[offset].isspace():
+                offset += 1
+            if offset >= len(text):
+                break
+            value, end = decoder.raw_decode(text, offset)
+            if isinstance(value, list):
+                items.extend(value)
+            else:
+                items.append(value)
+            offset = end
+        return items
     return [line.strip() for line in text.splitlines() if line.strip()]
 
 
