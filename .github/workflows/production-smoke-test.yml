@@ -1,0 +1,138 @@
+name: Production Smoke Test
+
+# Runs after "Docker Build" (docker-build.yml) has already built and pushed
+# the PR image, and pulls that exact image by its immutable per-commit
+# sha-<short sha> tag rather than rebuilding it.
+on:
+  workflow_run:
+    workflows: ["Docker Build"]
+    types: [completed]
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: production-smoke-test-${{ github.event.workflow_run.id }}
+  cancel-in-progress: true
+
+jobs:
+  smoke-test:
+    name: Production container smoke test
+    runs-on: ubuntu-latest
+    # docker-build.yml only pushes an image for same-repo PRs (forked PRs
+    # build but don't push), so github.event.workflow_run.pull_requests is
+    # only populated in that same case - nothing to pull otherwise.
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.pull_requests[0] != null
+
+    steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve the exact image built for this commit
+        id: image
+        # pr-<N> is mutable and can be overwritten by a later commit on the
+        # same PR before this job runs; docker-build.yml's metadata-action
+        # also tags every build with sha-<short sha> (type=sha), which is
+        # unique per commit, so it names exactly the image this run built.
+        run: |
+          SHORT_SHA="${{ github.event.workflow_run.head_sha }}"
+          echo "ref=ghcr.io/${{ github.repository_owner }}/docker-autoheal:sha-${SHORT_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Pull the exact PR image
+        run: docker pull "${{ steps.image.outputs.ref }}"
+
+      - name: Start the container with a realistic production configuration
+        run: |
+          docker run -d --name autoheal-smoke \
+            -v /var/run/docker.sock:/var/run/docker.sock:ro \
+            -p 3131:3131 \
+            -e PYTHONUNBUFFERED=1 \
+            --label autoheal=false \
+            "${{ steps.image.outputs.ref }}"
+
+      - name: Wait for the service to become ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3131/health >/dev/null; then
+              echo "Service is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Auto-Heal service did not become ready within the timeout"
+          exit 1
+
+      - name: Verify the application can communicate with Docker
+        # /api/status returns HTTP 200 even when Docker is unreachable
+        # (docker_connected: false) rather than failing the request, so the
+        # field itself - not just the HTTP status - has to be checked.
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3131/api/status | jq -e '.docker_connected == true' >/dev/null 2>&1; then
+              echo "Application is connected to Docker"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Application never reported a successful Docker connection"
+          exit 1
+
+      # A short interval makes the deterministic scenario below observable
+      # quickly, without resorting to an arbitrary fixed sleep.
+      - name: Speed up the monitoring interval
+        run: |
+          curl -sf -X PUT http://localhost:3131/api/config/monitor \
+            -H "Content-Type: application/json" \
+            -d '{"interval_seconds": 2, "label_key": "autoheal", "label_value": "true", "include_all": false}' \
+            >/dev/null
+
+      - name: Start a container that will fail and require autoheal
+        run: |
+          docker run -d --name autoheal-victim \
+            --restart no \
+            --label autoheal=true \
+            alpine:latest sh -c "sleep 3 && exit 1"
+
+      - name: Wait for the expected autoheal restart
+        # container_name in the event log is "<name> (<stable_id>)", not an
+        # exact container name, hence contains() rather than ==.
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3131/api/events \
+              | jq -e '.[] | select(.container_name | contains("autoheal-victim")) | select(.event_type == "restart")' \
+              >/dev/null 2>&1; then
+              echo "Autoheal restarted the failed container"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Expected autoheal restart event for autoheal-victim was not observed"
+          exit 1
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          echo "--- docker ps -a ---"
+          docker ps -a
+          echo "--- autoheal-smoke logs ---"
+          docker logs autoheal-smoke || true
+          echo "--- autoheal-victim logs ---"
+          docker logs autoheal-victim || true
+          echo "--- autoheal-smoke inspect ---"
+          docker inspect autoheal-smoke || true
+          if docker logs autoheal-smoke 2>&1 | grep -qi "http+docker\|Not supported URL scheme"; then
+            echo "::error::Confirmed known Docker SDK/requests 'http+docker' transport failure (see PR #61)"
+          fi
+
+      - name: Clean up
+        if: always()
+        run: |
+          docker rm -f autoheal-smoke autoheal-victim 2>/dev/null || true
