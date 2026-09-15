@@ -82,7 +82,7 @@ def labels_at_merge_time(
     ``validate-release`` checked before the merge.
     """
     labels: set[str] = set()
-    for event in sorted(events, key=lambda e: e.get("created_at") or ""):
+    for event in sorted(events, key=lambda e: (e.get("created_at") or "", e.get("id") or 0)):
         event_time = event.get("created_at") or ""
         if event_time > merged_at:
             continue

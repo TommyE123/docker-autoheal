@@ -736,6 +736,43 @@ class TestCommandLineInterface:
         assert exit_code == 0
         assert json.loads(capsys.readouterr().out) == ["release:minor"]
 
+    def test_resolve_labels_same_timestamp_uses_event_id_order(
+        self, tmp_path, capsys
+    ):
+        # GitHub Issues Events use second-precision timestamps.  If two events
+        # share the same created_at (add and remove within the same second),
+        # the sort must fall back to the event id, which is monotonically
+        # increasing and therefore a reliable secondary chronological key.
+        #
+        # Sequence (same second, supplied in reverse id order):
+        #   id=2  unlabeled release:patch
+        #   id=1  labeled   release:patch
+        # Correct result: release:patch was added then immediately removed → [].
+        # Without the id tiebreak the stable sort preserves the reversed input
+        # order, replaying remove-then-add and leaving release:patch present.
+        same_ts = "2024-01-10T00:00:00Z"
+        events_reversed = [
+            {"id": 2, "event": "unlabeled", "created_at": same_ts,
+             "label": {"name": "release:patch"}},
+            {"id": 1, "event": "labeled", "created_at": same_ts,
+             "label": {"name": "release:patch"}},
+        ]
+        events_file = tmp_path / "pr-events.json"
+        events_file.write_text(json.dumps(events_reversed), encoding="utf-8")
+
+        exit_code = main(
+            [
+                "resolve-labels",
+                "--events-file",
+                str(events_file),
+                "--merged-at",
+                "2024-01-15T00:00:00Z",
+            ]
+        )
+
+        assert exit_code == 0
+        assert json.loads(capsys.readouterr().out) == []
+
     def test_unreadable_input_fails_closed(self, tmp_path, capsys):
         exit_code = main(
             [
