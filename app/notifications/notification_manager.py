@@ -605,5 +605,3 @@ class NotificationManager:
 
 # Global notification manager instance
 notification_manager = NotificationManager()
-
-__all__ = ['NotificationManager']
