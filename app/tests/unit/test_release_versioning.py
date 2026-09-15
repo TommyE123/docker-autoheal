@@ -589,10 +589,12 @@ class TestReleaseWorkflows:
             checkout_index = names.index("Checkout code")
             assert guard_index < checkout_index, job_name
 
-            guard_run = steps[guard_index]["run"]
-            assert "github.ref" in guard_run
-            assert "refs/heads/main" in guard_run
-            assert "exit 1" in guard_run
+            guard_step = steps[guard_index]
+            # github.ref is piped through env rather than interpolated
+            # straight into the shell, so a ref name can't inject into it.
+            assert "github.ref" in guard_step["env"]["REF"]
+            assert "refs/heads/main" in guard_step["run"]
+            assert "exit 1" in guard_step["run"]
 
     def test_the_tag_is_created_before_the_image_is_published(self):
         steps = self.load("docker-release.yml")["jobs"]["release"]["steps"]

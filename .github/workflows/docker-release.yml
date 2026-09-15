@@ -48,9 +48,11 @@ jobs:
       # "maintenance" against a feature branch would tag and publish that
       # unmerged commit, moving "latest" to code that was never reviewed.
       - name: Refuse releases from any ref other than main
+        env:
+          REF: ${{ github.ref }}
         run: |
-          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
-            echo "::error::Releases run only from main; this run's ref is ${{ github.ref }}."
+          if [ "$REF" != "refs/heads/main" ]; then
+            echo "::error::Releases run only from main; this run's ref is ${REF}."
             exit 1
           fi
 
@@ -250,9 +252,11 @@ jobs:
       # this job never starts unless plan succeeded - but a release this
       # dangerous is worth asserting twice rather than trusting the chain.
       - name: Refuse releases from any ref other than main
+        env:
+          REF: ${{ github.ref }}
         run: |
-          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
-            echo "::error::Releases run only from main; this run's ref is ${{ github.ref }}."
+          if [ "$REF" != "refs/heads/main" ]; then
+            echo "::error::Releases run only from main; this run's ref is ${REF}."
             exit 1
           fi
 
