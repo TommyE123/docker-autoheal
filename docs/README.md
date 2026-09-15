@@ -14,7 +14,7 @@ The application now supports **two UI options**:
 ### Prerequisites
 
 - Node.js 18+ and npm
-- Docker Auto-Heal backend running on port 8080
+- Docker Auto-Heal backend running on port 3131
 
 ### Setup
 

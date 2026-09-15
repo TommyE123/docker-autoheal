@@ -121,9 +121,7 @@ npm run dev
 ```
 
 Now access:
-- Dev UI with hot reload: http://localhost:3000
-- Backend API: http://localhost:8080
-
+ Backend API: http://localhost:3131
 Make changes in `frontend/src/` and see them instantly!
 
 ## Common Commands
