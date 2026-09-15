@@ -422,13 +422,71 @@ jobs:
             --title "${TAG_NAME}" \
             --generate-notes
 
-      # Promote the `latest` tag only after the GitHub Release exists.
-      # The build step above pushed only the immutable version tag, so `latest`
-      # never advances while a release is still incomplete.
+  promote_latest:
+    name: Promote latest tag
+    runs-on: ubuntu-latest
+    # Run when a new release just published successfully, or when the commit
+    # is already fully released (already_released) so a rerun after a failed
+    # latest-promotion can complete the step without re-publishing images or
+    # creating a second GitHub Release.
+    needs: [plan, release]
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      (needs.release.result == 'success' ||
+       needs.plan.outputs.already_released != '')
+
+    permissions:
+      packages: write
+
+    steps:
+      - name: Refuse releases from any ref other than main
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          if [ "$REF" != "refs/heads/main" ]; then
+            echo "::error::Releases run only from main; this run's ref is ${REF}."
+            exit 1
+          fi
+
+      # For a normal release, the version comes from the plan.  For an
+      # already-released re-run, plan.outputs.version is empty because no new
+      # version was calculated; use already_released instead.
+      - name: Resolve version to promote
+        id: version
+        env:
+          ALREADY_RELEASED: ${{ needs.plan.outputs.already_released }}
+          PLANNED_VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          VERSION="${ALREADY_RELEASED:-$PLANNED_VERSION}"
+          if [ -z "$VERSION" ]; then
+            echo "::error::No version to promote to latest."
+            exit 1
+          fi
+          echo "Promoting ${VERSION} to latest."
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Promote latest tag
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          VERSION: ${{ needs.plan.outputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           docker buildx imagetools create \
             --tag "docker.io/${DOCKERHUB_USERNAME}/docker-autoheal:latest" \
@@ -441,15 +499,13 @@ jobs:
   update-hub-description:
     name: Update Docker Hub description
     runs-on: ubuntu-latest
-    # Run when a new release just published successfully, or when the commit
-    # is already fully released (ALREADY_RELEASED) so a rerun after a failed
-    # description update can complete the step without re-publishing images.
-    needs: [plan, release]
+    # Run when latest promotion succeeded (covers both a new release and a
+    # rerun after a previously failed description update).
+    needs: [promote_latest]
     if: |
       always() &&
       github.ref == 'refs/heads/main' &&
-      (needs.release.result == 'success' ||
-       needs.plan.outputs.already_released != '')
+      needs.promote_latest.result == 'success'
 
     steps:
       - name: Checkout code

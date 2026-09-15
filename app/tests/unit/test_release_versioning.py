@@ -943,23 +943,55 @@ class TestReleaseWorkflows:
         assert "exit 1" in run
 
     def test_image_naming_and_registries_are_unchanged(self):
-        steps = self.load("docker-release.yml")["jobs"]["release"]["steps"]
-        metadata = next(step for step in steps if step.get("id") == "meta")
+        workflow = self.load("docker-release.yml")
+        release_steps = workflow["jobs"]["release"]["steps"]
+        metadata = next(step for step in release_steps if step.get("id") == "meta")
 
         assert (
             "docker.io/${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal"
             in metadata["with"]["images"]
         )
         assert (
-            "ghcr.io/${{ github.repository_owner }}/docker-autoheal" in metadata["with"]["images"]
+            "ghcr.io/${{ github.repository_owner }}/docker-autoheal"
+            in metadata["with"]["images"]
         )
-        # latest is promoted in a separate step after the GitHub Release is
-        # created, so it is not in the metadata-action tags.
+        # latest is promoted in the separate promote_latest job after the
+        # GitHub Release is created, so it is not in the metadata-action tags.
         assert "type=raw,value=latest" not in metadata["with"]["tags"]
+        assert all(
+            step.get("name") != "Promote latest tag" for step in release_steps
+        ), "Promote latest tag must not be in the release job (it lives in promote_latest)"
+
+        promote_steps = workflow["jobs"]["promote_latest"]["steps"]
         promote = next(
-            step for step in steps if step.get("name") == "Promote latest tag"
+            step for step in promote_steps if step.get("name") == "Promote latest tag"
         )
         assert "docker-autoheal:latest" in promote["run"]
+
+    def test_promote_latest_runs_on_already_released_rerun(self):
+        # Regression guard: a re-run after a partial release (GitHub Release
+        # created but latest-promotion failed) must still promote latest.
+        # Failure scenario: promote_latest condition omits the already_released
+        # path, so latest is permanently stuck on the previous version after a
+        # registry transient failure.
+        job = self.load("docker-release.yml")["jobs"]["promote_latest"]
+        condition = job.get("if", "")
+        assert "needs.plan.outputs.already_released" in condition, (
+            "promote_latest must run when already_released is set so a "
+            "re-run after a failed latest-promotion can complete"
+        )
+        assert "needs.release.result == 'success'" in condition, (
+            "promote_latest must also run when a new release job succeeds"
+        )
+
+        # The version resolution step must prefer already_released over version
+        # so the correct tag is used on the re-run path.
+        resolve = next(
+            step for step in job["steps"] if step.get("id") == "version"
+        )
+        run = resolve["run"]
+        assert "ALREADY_RELEASED" in run
+        assert "PLANNED_VERSION" in run
 
     def test_classification_uses_events_api_not_current_labels(self):
         # Guard the immutability fix: the classification step must reconstruct
