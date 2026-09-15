@@ -15,7 +15,7 @@ project layout, frontend tooling, testing internals — lives under
 
 You'll need:
 
-- Python 3.11 or 3.12
+- Python 3, matching the version pinned in the `Dockerfile`'s `FROM python:X.Y-slim` line
 - Node.js 18+ and npm (only if you're working on the web UI)
 - Docker (to run the service the way users do, and for integration testing)
 
@@ -50,8 +50,11 @@ servers, and building a local Docker image — are in
    (configuration fields, API endpoints, ports, labels), update the relevant page under
    [docs/user/](docs/user/) in the same PR.
 
-4. CI (`.github/workflows/tests.yml`) runs the unit test suite on Python 3.11 and 3.12 for
-   every pull request. It must pass before a PR can be merged.
+4. CI (`.github/workflows/tests.yml`) runs the unit test suite on every pull request,
+   against the Python version pinned in the `Dockerfile`. `.github/workflows/mega-linter.yml`
+   also runs MegaLinter (Python, JS, YAML, Dockerfile, Markdown, and security linters) on
+   every PR targeting `main` — see [docs/developer/development-setup.md](docs/developer/development-setup.md#linting).
+   Both must pass before a PR can be merged.
 
 ## Pull request guidelines
 
@@ -60,6 +63,12 @@ servers, and building a local Docker image — are in
 - Describe *why* a change is needed, not just what it does.
 - Don't change configuration formats or application behavior purely for documentation or
   stylistic reasons.
+- PR titles must follow [Conventional Commits](https://www.conventionalcommits.org/)
+  (`type: description`, e.g. `fix: ...`, `docs: ...`), and most PRs that change behavior
+  or add real scope should link an issue (`Closes #N`). See
+  [`CLAUDE.md`](CLAUDE.md) for the full set of repository conventions, including these.
+- A repository maintainer merges pull requests after review; contributors shouldn't merge
+  their own.
 
 ## Project structure and architecture
 

@@ -23,7 +23,8 @@ docker-autoheal/
 │   ├── models/, services/, utils/    # Currently near-empty; reserved for future growth
 │   └── tests/
 │       ├── unit/                 # Automated unit test suite (see docs/developer/testing.md)
-│       └── test_*.py             # Manual/integration scripts requiring a live Docker daemon
+│       └── integration/          # Marked integration suite; needs a real Docker daemon,
+│                                  # not run by a plain `pytest` and not run in CI
 │
 ├── frontend/                     # React UI (Vite)
 │   ├── src/
@@ -49,9 +50,12 @@ docker-autoheal/
 ├── docker-compose.yml            # Production compose file, pulls the published image
 ├── docker-compose.simple.yml     # Builds with Dockerfile.simple
 ├── docker-compose.example.yml    # Demonstrates auto-monitoring with several sample services
-├── docker-compose.test.yml       # Test environment with sample containers
-└── test_*.py                     # Root-level manual test/verification scripts (require a live service)
+└── docker-compose.test.yml       # Test environment with sample containers
 ```
+
+There are no root-level Python test/verification scripts — the manual scripts that used
+to live there were converted into the `app/tests/unit/` and `app/tests/integration/`
+suites (see [Testing](testing.md#legacy-script-triage) for what happened to each one).
 
 ## Module responsibilities
 

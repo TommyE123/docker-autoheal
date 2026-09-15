@@ -2,7 +2,9 @@
 
 ## Prerequisites
 
-- Python 3.11 or 3.12
+- Python 3 matching the version pinned in the `Dockerfile`'s `FROM python:X.Y-slim` line
+  (CI tests against exactly that version, read dynamically from the Dockerfile — see
+  [Testing](testing.md))
 - Node.js 18+ and npm (only needed if you're touching the frontend)
 - Docker and Docker Compose
 
@@ -48,13 +50,25 @@ pip install -r requirements-dev.txt
 pytest --cov=app --cov-report=term-missing
 ```
 
-See [Testing](testing.md) for what's covered and how test isolation works.
+That runs the unit suite only (per `pytest.ini`'s `testpaths`) — no Docker daemon needed.
+There's also an integration suite that exercises a real Docker daemon and, for some
+tests, a running Auto-Heal instance; it's not run by a plain `pytest` and not run in CI.
+See [Testing](testing.md) for what's covered, how to run the integration suite, and how
+test isolation works.
 
 ## Linting
 
-There is no configured Python linter/formatter in this repository at present. The
-frontend has an `npm run lint` script (ESLint) but no ESLint configuration file yet — see
-[Frontend Development](frontend.md#linting).
+`.github/workflows/mega-linter.yml` runs [MegaLinter](https://megalinter.io/) on every
+pull request targeting `main`, covering Python, JavaScript, YAML, Dockerfile, Markdown,
+and several security scanners in one pass — see `.mega-linter.yml` for the exact set.
+Several of those linters (`PYTHON_PYLINT`, `PYTHON_FLAKE8`, `PYTHON_RUFF`, `PYTHON_BANDIT`,
+`MARKDOWN_MARKDOWNLINT`, and others listed in `.mega-linter.yml`'s
+`DISABLE_ERRORS_LINTERS`) currently have pre-existing findings and are configured not to
+fail the build over them; they still run and report. There is no repository-wide Python
+formatter/import-sorter enforced beyond what MegaLinter reports.
+
+The frontend has an `npm run lint` script (ESLint) but no ESLint configuration file yet —
+see [Frontend Development](frontend.md#linting).
 
 ## Data directory when developing locally
 
