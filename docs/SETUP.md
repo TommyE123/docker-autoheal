@@ -82,7 +82,7 @@ docker-compose down
 ```bash
 # Start backend
 python main.py
-# Runs on http://localhost:8080
+# Runs on http://localhost:3131
 ```
 
 **Frontend (separate terminal):**
@@ -222,20 +222,20 @@ Then access: `http://localhost:8081`
 python main.py
 
 # Check it responds
-curl http://localhost:8080/health
+curl http://localhost:3131/health
 ```
 
 **React proxy not working:**
 ```bash
 # Check vite.config.js has correct proxy settings
-# Should proxy /api to http://localhost:8080
+# Should proxy /api to http://localhost:3131
 ```
 
 ## API Documentation
 
 Interactive API docs available at:
 ```
-http://localhost:8080/docs
+http://localhost:3131/docs
 ```
 
 ## Metrics
@@ -249,7 +249,7 @@ http://localhost:9090/metrics
 
 Service health endpoint:
 ```bash
-curl http://localhost:8080/health
+curl http://localhost:3131/health
 ```
 
 Response:
@@ -321,7 +321,7 @@ To update the UI:
 ## Next Steps
 
 1. **Start the service**: `docker-compose up --build`
-2. **Access UI**: http://localhost:8080
+2. **Access UI**: http://localhost:3131
 3. **Add containers**: Label them with `autoheal=true`
 4. **Configure**: Use the Configuration tab
 5. **Monitor**: Check Events tab for activity
@@ -329,7 +329,7 @@ To update the UI:
 ## Documentation
 
 - **Full docs**: See other markdown files in the repo
-- **API Reference**: http://localhost:8080/docs
+- **API Reference**: http://localhost:3131/docs
 - **Frontend docs**: `frontend/README.md`
 
 ## Support

@@ -149,7 +149,7 @@ services:
 ```bash
 # Via UI:
 # Containers → Find container → Click heart icon → Select HTTP
-# Enter: http://localhost:8080/health
+# Enter: http://localhost:3131/health
 # Set status code: 200
 # Click Save
 ```
@@ -161,7 +161,7 @@ services:
 # Containers → Find quarantined container → Click unlock icon
 
 # Via command line:
-curl -X POST http://localhost:8080/api/containers/{container_id}/unquarantine
+curl -X POST http://localhost:3131/api/containers/{container_id}/unquarantine
 ```
 
 ### Use Case 4: Export Configuration
@@ -171,7 +171,7 @@ curl -X POST http://localhost:8080/api/containers/{container_id}/unquarantine
 # Configuration → Click "Export Configuration" → Downloads JSON file
 
 # Via API:
-curl -O http://localhost:8080/api/config/export
+curl -O http://localhost:3131/api/config/export
 ```
 
 ## Monitoring
@@ -185,7 +185,7 @@ http://localhost:9090/metrics
 ### View API Documentation
 
 ```
-http://localhost:8080/docs
+http://localhost:3131/docs
 ```
 
 ### View Logs
@@ -237,7 +237,7 @@ netstat -an | grep 8080
 docker ps | grep autoheal
 
 # Check health
-curl http://localhost:8080/health
+curl http://localhost:3131/health
 ```
 
 ## Next Steps
@@ -282,16 +282,16 @@ docker-compose up -d --build
 docker ps --filter "label=autoheal=true"
 
 # Check service health
-curl http://localhost:8080/health
+curl http://localhost:3131/health
 
 # View events via API
-curl http://localhost:8080/api/events | jq
+curl http://localhost:3131/api/events | jq
 
 # Restart a container manually via API
-curl -X POST http://localhost:8080/api/containers/{id}/restart
+curl -X POST http://localhost:3131/api/containers/{id}/restart
 ```
 
 ---
 
-**Need help?** Check the full README.md or visit the API docs at http://localhost:8080/docs
+**Need help?** Check the full README.md or visit the API docs at http://localhost:3131/docs
 

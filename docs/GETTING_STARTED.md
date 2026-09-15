@@ -6,7 +6,7 @@ This guide will get you up and running in **2 minutes**.
 
 - ✅ Docker installed and running
 - ✅ Docker Compose installed
-- ✅ Port 8080 available
+- ✅ Port 3131 available
 
 That's it! No Node.js required for production.
 
@@ -50,10 +50,10 @@ pytest app/tests/integration/test_service_smoke.py
 Or manually check:
 ```bash
 # Health check
-curl http://localhost:8080/health
+curl http://localhost:3131/health
 
 # API status
-curl http://localhost:8080/api/status
+curl http://localhost:3131/api/status
 
 # Open UI
 start http://localhost:3131
@@ -166,19 +166,19 @@ docker-compose down
 docker-compose up --build
 ```
 
-### Port 8080 already in use
+### Port 3131 already in use
 
 **Solution 1 - Change port:**
 Edit `docker-compose.yml`:
 ```yaml
 ports:
-  - "8081:8080"  # Use 8081 instead
+  - "3132:3131"  # Use 3132 instead
 ```
 
 **Solution 2 - Kill process:**
 ```bash
-# Find process using port 8080
-netstat -ano | findstr :8080
+# Find process using port 3131
+netstat -ano | findstr :3131
 
 # Kill it (replace PID)
 taskkill /PID <pid> /F
@@ -233,7 +233,7 @@ Access these features at http://localhost:3131:
 
 Interactive docs available at:
 ```
-http://localhost:8080/docs
+http://localhost:3131/docs
 ```
 
 ## Testing
@@ -274,7 +274,7 @@ For production:
 1. **Check logs**: `docker logs docker-autoheal`
 2. **Run test**: `pytest app/tests/integration/test_service_smoke.py`
 3. **Read docs**: See SETUP.md and REACT_ADDED.md
-4. **API docs**: http://localhost:8080/docs
+4. **API docs**: http://localhost:3131/docs
 
 ## Summary
 
