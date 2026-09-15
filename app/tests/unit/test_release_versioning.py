@@ -693,6 +693,49 @@ class TestCommandLineInterface:
         assert exit_code == 0
         assert json.loads(capsys.readouterr().out) == ["release:none"]
 
+    def test_resolve_labels_events_out_of_order_uses_created_at(
+        self, tmp_path, capsys
+    ):
+        # GitHub Issues Events API has no documented ordering guarantee.
+        # If events arrive newest-first (reverse chronological), naive replay
+        # produces the wrong label: applying unlabeled before labeled leaves
+        # the wrong label in the set.
+        #
+        # Sequence of label changes:
+        #   1. release:patch added
+        #   2. release:patch removed
+        #   3. release:minor added
+        #   (PR merges — correct classification is release:minor)
+        #
+        # Failure scenario: API returns events in reverse order;
+        # without sorting by created_at the loop sees unlabeled(patch) first
+        # (which discards nothing), then labeled(minor), then labeled(patch),
+        # yielding ["release:minor", "release:patch"] instead of
+        # ["release:minor"].
+        events_reversed = [
+            {"event": "labeled", "created_at": "2024-01-12T00:00:00Z",
+             "label": {"name": "release:minor"}},
+            {"event": "unlabeled", "created_at": "2024-01-11T00:00:00Z",
+             "label": {"name": "release:patch"}},
+            {"event": "labeled", "created_at": "2024-01-10T00:00:00Z",
+             "label": {"name": "release:patch"}},
+        ]
+        events_file = tmp_path / "pr-events.json"
+        events_file.write_text(json.dumps(events_reversed), encoding="utf-8")
+
+        exit_code = main(
+            [
+                "resolve-labels",
+                "--events-file",
+                str(events_file),
+                "--merged-at",
+                "2024-01-15T00:00:00Z",
+            ]
+        )
+
+        assert exit_code == 0
+        assert json.loads(capsys.readouterr().out) == ["release:minor"]
+
     def test_unreadable_input_fails_closed(self, tmp_path, capsys):
         exit_code = main(
             [
