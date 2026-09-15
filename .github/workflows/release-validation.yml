@@ -24,14 +24,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Validation only needs the pull request's labels and the repository's
-      # existing tags, so it runs the base branch's copy of the release tooling
-      # rather than the untrusted code proposed by the pull request. No registry
-      # credentials or other secrets are used here.
-      - name: Checkout base branch
+      # Read-only, no secrets: this check never needs registry credentials, and
+      # its result is never trusted on its own - docker-release.yml repeats the
+      # full validation from main immediately before it publishes anything.
+      - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
           fetch-depth: 0
           fetch-tags: true

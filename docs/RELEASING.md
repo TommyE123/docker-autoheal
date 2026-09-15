@@ -41,8 +41,10 @@ fails when:
 - the calculated candidate version is invalid, or is not the requested release type;
 - the calculated release tag already exists.
 
-It uses no secrets and runs the base branch's copy of the release tooling, so an untrusted
-pull request cannot weaken its own validation.
+It uses no secrets and needs no registry credentials. Its result is never trusted on its
+own: `docker-release.yml` repeats the whole validation from `main` immediately before it
+publishes, so a pull request cannot talk the release automation into an unsafe release by
+altering the tooling.
 
 ## Version calculation
 
