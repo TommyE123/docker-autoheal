@@ -186,10 +186,49 @@ class TestMaintenanceRelease:
         # reaches the Friday sweep.
         assert plan_maintenance([], ["v2.0.5", "v2.0.6"]).release is False
 
-    def test_pull_requests_without_the_none_label_are_ignored(self):
-        plan = plan_maintenance([MergedPullRequest(104, ["documentation"])], EXISTING_TAGS)
+    def test_pull_requests_without_the_none_label_raise_an_error(self):
+        # Behaviour change (BLOCKER 4): plan_maintenance now fails closed
+        # for PRs without a valid release:none label instead of silently
+        # ignoring them, so a pending non-none release is never accidentally
+        # omitted from the maintenance sweep's accounting.
+        with pytest.raises(ReleaseError, match="no release classification label"):
+            plan_maintenance([MergedPullRequest(104, ["documentation"])], EXISTING_TAGS)
 
-        assert plan.release is False
+    def test_pull_requests_with_patch_label_raise_an_error(self):
+        # A release:patch PR must not be swept into a maintenance patch release;
+        # it should have triggered an immediate release when it was merged.
+        with pytest.raises(ReleaseError, match="patch"):
+            plan_maintenance([MergedPullRequest(105, ["release:patch"])], EXISTING_TAGS)
+
+    def test_pull_requests_with_minor_label_raise_an_error(self):
+        with pytest.raises(ReleaseError, match="minor"):
+            plan_maintenance([MergedPullRequest(106, ["release:minor"])], EXISTING_TAGS)
+
+    def test_pull_requests_with_major_label_raise_an_error(self):
+        with pytest.raises(ReleaseError, match="major"):
+            plan_maintenance([MergedPullRequest(107, ["release:major"])], EXISTING_TAGS)
+
+    def test_invalid_label_in_maintenance_sweep_raises_an_error(self):
+        with pytest.raises(ReleaseError, match="invalid release classification"):
+            plan_maintenance([MergedPullRequest(108, ["release:hotfix"])], EXISTING_TAGS)
+
+    def test_multiple_release_labels_in_maintenance_sweep_raises_an_error(self):
+        with pytest.raises(ReleaseError, match="more than one"):
+            plan_maintenance(
+                [MergedPullRequest(109, ["release:none", "release:patch"])], EXISTING_TAGS
+            )
+
+    def test_mixed_none_and_non_none_raises_on_non_none(self):
+        # Even when some PRs are correctly labelled release:none, a single
+        # non-none PR in the sweep should raise immediately.
+        with pytest.raises(ReleaseError, match="patch"):
+            plan_maintenance(
+                [
+                    MergedPullRequest(101, ["release:none"]),
+                    MergedPullRequest(102, ["release:patch"]),
+                ],
+                EXISTING_TAGS,
+            )
 
 
 class TestRetryAndConcurrency:
@@ -844,6 +883,43 @@ class TestCommandLineInterface:
         assert "::error::" in capsys.readouterr().err
 
 
+class TestMaintenanceChangeClassification:
+    """BLOCKER 3: is_maintenance_change must delegate to classify()."""
+
+    def test_release_none_label_is_a_maintenance_change(self):
+        assert MergedPullRequest(1, ["release:none"]).is_maintenance_change is True
+
+    def test_non_release_label_alone_raises_error(self):
+        # Without a release:* label classify() raises; is_maintenance_change
+        # must propagate that error instead of returning False silently.
+        with pytest.raises(ReleaseError, match="no release classification label"):
+            MergedPullRequest(1, ["documentation"]).is_maintenance_change
+
+    def test_patch_label_is_not_a_maintenance_change(self):
+        assert MergedPullRequest(1, ["release:patch"]).is_maintenance_change is False
+
+    def test_minor_label_is_not_a_maintenance_change(self):
+        assert MergedPullRequest(1, ["release:minor"]).is_maintenance_change is False
+
+    def test_major_label_is_not_a_maintenance_change(self):
+        assert MergedPullRequest(1, ["release:major"]).is_maintenance_change is False
+
+    def test_no_labels_raises_error(self):
+        with pytest.raises(ReleaseError, match="no release classification label"):
+            MergedPullRequest(1, []).is_maintenance_change
+
+    def test_multiple_release_labels_raises_error(self):
+        with pytest.raises(ReleaseError, match="more than one"):
+            MergedPullRequest(1, ["release:none", "release:patch"]).is_maintenance_change
+
+    def test_invalid_release_label_raises_error(self):
+        with pytest.raises(ReleaseError, match="invalid release classification"):
+            MergedPullRequest(1, ["release:hotfix"]).is_maintenance_change
+
+    def test_extra_non_release_labels_alongside_none_are_ok(self):
+        assert MergedPullRequest(1, ["documentation", "release:none"]).is_maintenance_change is True
+
+
 class TestModuleContract:
     def test_only_the_four_release_labels_are_recognised(self):
         assert versioning.RELEASE_LABELS == (
@@ -1122,3 +1198,160 @@ class TestReleaseWorkflows:
         assert workflow["permissions"] == {"contents": "read"}
         assert "secrets." not in json.dumps(workflow)
         assert "validate-release" in workflow["jobs"]
+
+    def test_release_validation_triggers_on_base_branch_edit(self):
+        # BLOCKER 6: changing a PR's base branch must retrigger validation so
+        # a PR retargeted to main after being created against another branch
+        # cannot bypass the release classification check.
+        # PyYAML parses the bare `on:` key as the boolean True.
+        triggers = self.load("release-validation.yml")[True]
+        types = triggers["pull_request"]["types"]
+        assert "edited" in types, (
+            "release-validation.yml must include 'edited' in pull_request types "
+            "so that changing a PR's base branch re-runs validation"
+        )
+
+    def test_commit_associated_prs_filtered_to_main_base(self):
+        # BLOCKER 5: the commits/pulls API returns all PRs associated with a
+        # commit, including those merged into non-main branches; only PRs whose
+        # base is main carry a release classification for this repo's workflow.
+        step = next(
+            s
+            for s in self.load("docker-release.yml")["jobs"]["plan"]["steps"]
+            if s.get("id") == "classification"
+        )
+        run = step["run"]
+        assert '.base.ref == "main"' in run, (
+            "classification step must filter commits/pulls results to "
+            "base.ref == 'main' to exclude PRs merged into non-main branches"
+        )
+
+    def test_release_tags_collected_from_main_history_only(self):
+        # IMPORTANT 7: git tag --list includes tags unreachable from HEAD (e.g.
+        # a v99.0.0 tag on a feature branch) which would inflate the calculated
+        # current version.  Both tag-collection steps must use git tag --merged HEAD.
+        workflow = self.load("docker-release.yml")
+        for job_name in ("plan", "release"):
+            steps = workflow["jobs"][job_name]["steps"]
+            collect = next(
+                s for s in steps if s.get("name") == "Collect existing release tags"
+            )
+            assert "git tag --merged HEAD" in collect["run"], (
+                f"{job_name} job must collect tags with 'git tag --merged HEAD' "
+                "to exclude tags unreachable from the main branch history"
+            )
+
+    def test_stalled_tags_loop_uses_merged_head(self):
+        # IMPORTANT 7: the stalled-tags loop must also use git tag --merged HEAD
+        # so unreachable branch tags are not flagged as stalled releases.
+        step = next(
+            s
+            for s in self.load("docker-release.yml")["jobs"]["plan"]["steps"]
+            if s.get("id") == "resume"
+        )
+        run = step["run"]
+        assert "git tag --merged HEAD" in run, (
+            "stalled-tags loop in resume step must use 'git tag --merged HEAD' "
+            "to exclude tags unreachable from the current HEAD"
+        )
+
+    def test_maintenance_boundary_uses_merged_head_for_latest_tag(self):
+        # IMPORTANT 7: the maintenance sweep's LATEST_TAG detection must use
+        # git tag --merged HEAD to exclude unreachable branch tags.
+        step = next(
+            s
+            for s in self.load("docker-release.yml")["jobs"]["plan"]["steps"]
+            if "Collect unreleased release:none pull requests" in s.get("name", "")
+        )
+        run = step["run"]
+        assert "git tag --merged HEAD" in run, (
+            "maintenance sweep must detect LATEST_TAG with 'git tag --merged HEAD' "
+            "to exclude unreachable branch tags"
+        )
+
+    def test_maintenance_boundary_uses_gte_search_qualifier(self):
+        # BLOCKER 1: the search qualifier must be merged:>= (not merged:>) so
+        # that PRs merged in the same second as the latest release are included
+        # in the candidate superset, and the precise Python filter decides.
+        step = next(
+            s
+            for s in self.load("docker-release.yml")["jobs"]["plan"]["steps"]
+            if "Collect unreleased release:none pull requests" in s.get("name", "")
+        )
+        run = step["run"]
+        assert "merged:>=" in run, (
+            "maintenance sweep must use merged:>= search qualifier to get a "
+            "candidate superset that includes PRs in the same second as the boundary"
+        )
+        assert "merged:> " not in run and not run.count("merged:>") > run.count("merged:>="), (
+            "maintenance sweep must not use merged:> (strict greater-than) search qualifier"
+        )
+
+    def test_maintenance_boundary_uses_pull_request_merged_at(self):
+        # BLOCKER 1: the search/issues API returns .pull_request.merged_at for
+        # the actual merge time; .closed_at can differ for issues.
+        step = next(
+            s
+            for s in self.load("docker-release.yml")["jobs"]["plan"]["steps"]
+            if "Collect unreleased release:none pull requests" in s.get("name", "")
+        )
+        run = step["run"]
+        assert ".pull_request.merged_at" in run, (
+            "maintenance sweep must read .pull_request.merged_at (not .closed_at) "
+            "from the search/issues API response for the precise merge timestamp"
+        )
+
+    def test_maintenance_boundary_uses_python_for_precise_comparison(self):
+        # BLOCKER 1: the precise boundary comparison must be done in Python to
+        # handle ISO8601 timezone variations correctly across platforms.
+        step = next(
+            s
+            for s in self.load("docker-release.yml")["jobs"]["plan"]["steps"]
+            if "Collect unreleased release:none pull requests" in s.get("name", "")
+        )
+        run = step["run"]
+        assert "python3" in run, (
+            "maintenance sweep must use Python for the precise boundary comparison"
+        )
+        assert "fromisoformat" in run, (
+            "maintenance sweep must use datetime.fromisoformat for timestamp parsing"
+        )
+
+    def test_draft_releases_are_resumable_not_already_released(self):
+        # BLOCKER 2: a draft GitHub Release (isDraft=true) is an incomplete
+        # release; it must be treated as resumable, not as already-published.
+        # The resume step must use --json isDraft --jq '.isDraft' to distinguish.
+        step = next(
+            s
+            for s in self.load("docker-release.yml")["jobs"]["plan"]["steps"]
+            if s.get("id") == "resume"
+        )
+        run = step["run"]
+        assert "--json isDraft" in run, (
+            "resume step must check isDraft to distinguish draft from published releases"
+        )
+        assert "--jq '.isDraft'" in run, (
+            "resume step must use --jq '.isDraft' to extract the draft flag"
+        )
+        # Must check for published (false), not just existence
+        assert '"false"' in run or "'false'" in run, (
+            "resume step must compare against 'false' to detect a published release"
+        )
+
+    def test_create_github_release_skips_only_published_releases(self):
+        # BLOCKER 2: the idempotency check in the release job must only skip
+        # when the release is published (isDraft=false), not when it is a draft.
+        step = next(
+            s
+            for s in self.load("docker-release.yml")["jobs"]["release"]["steps"]
+            if "Create GitHub release" in s.get("name", "")
+        )
+        run = step["run"]
+        assert "--json isDraft" in run, (
+            "Create GitHub release step must check isDraft to distinguish "
+            "draft from published releases for the idempotency check"
+        )
+        assert '"false"' in run or "'false'" in run, (
+            "Create GitHub release must only exit 0 (skip) when isDraft is 'false' "
+            "(published), not when it is 'true' (draft/incomplete)"
+        )

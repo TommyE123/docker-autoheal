@@ -96,7 +96,7 @@ jobs:
           echo "mode=${MODE}" >> "$GITHUB_OUTPUT"
 
       - name: Collect existing release tags
-        run: git tag --list > tags.txt
+        run: git tag --merged HEAD > tags.txt
 
       # A release tag on this commit without a published GitHub Release means an
       # earlier attempt stopped part-way; that release is resumed with its
@@ -116,11 +116,12 @@ jobs:
           # Detect if the current commit already has a release tag so the
           # per-tag check below can exempt the tag being resumed.
           for TAG in $(git tag --points-at "$GITHUB_SHA" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true); do
-            if gh release view "$TAG" >/dev/null 2>&1; then
+            RELEASE_IS_DRAFT="$(gh release view "$TAG" --json isDraft --jq '.isDraft' 2>/dev/null || echo 'null')"
+            if [ "$RELEASE_IS_DRAFT" = "false" ]; then
               echo "Release ${TAG} on this commit is already published."
               ALREADY_RELEASED="$TAG"
             else
-              echo "Release ${TAG} on this commit has no GitHub Release; it will be resumed."
+              echo "Release ${TAG} on this commit has no published GitHub Release; it will be resumed."
               RESUME="$TAG"
             fi
           done
@@ -130,8 +131,9 @@ jobs:
           # commit is a stalled partial release: proceeding past it would
           # permanently skip the changes it was meant to deliver.
           STALLED_TAGS=""
-          for TAG in $(git tag --list | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V || true); do
-            if ! gh release view "$TAG" >/dev/null 2>&1 && [ "$TAG" != "$RESUME" ]; then
+          for TAG in $(git tag --merged HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V || true); do
+            RELEASE_IS_DRAFT="$(gh release view "$TAG" --json isDraft --jq '.isDraft' 2>/dev/null || echo 'null')"
+            if [ "$RELEASE_IS_DRAFT" != "false" ] && [ "$TAG" != "$RESUME" ]; then
               STALLED_TAGS="${STALLED_TAGS:+$STALLED_TAGS, }${TAG}"
             fi
           done
@@ -151,7 +153,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" \
-            --jq '[.[] | select(.merged_at != null)]' > merged-prs.json
+            --jq '[.[] | select(.merged_at != null and .base.ref == "main")]' > merged-prs.json
 
           COUNT="$(jq 'length' merged-prs.json)"
           echo "Merged pull requests for this commit: ${COUNT}"
@@ -191,7 +193,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          LATEST_TAG="$(git tag --list | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)"
+          LATEST_TAG="$(git tag --merged HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)"
 
           if [ -z "$LATEST_TAG" ]; then
             echo "::error::No release tag found; cannot determine the maintenance release boundary."
@@ -204,14 +206,17 @@ jobs:
           # Collect each merged PR's number and merge timestamp; labels are
           # resolved below from the Issues Events API rather than from the
           # current PR state, so classification is immutable after merge.
+          # Use merged:>= to get a candidate superset that includes PRs merged
+          # at exactly the boundary second; each candidate is then compared
+          # precisely below to exclude PRs merged at or before the boundary.
           gh api --method GET search/issues --paginate \
-            -f "q=repo:${GITHUB_REPOSITORY} is:pr is:merged base:main merged:>${BOUNDARY}" \
-            --jq '.items[] | {number: .number, merged_at: .closed_at}' \
+            -f "q=repo:${GITHUB_REPOSITORY} is:pr is:merged base:main merged:>=${BOUNDARY}" \
+            --jq '.items[] | {number: .number, merged_at: .pull_request.merged_at}' \
             > merged-pr-lines.json
 
           jq -s '.' merged-pr-lines.json > merged-prs-meta.json
-          COUNT="$(jq 'length' merged-prs-meta.json)"
-          echo "Merged pull requests since ${LATEST_TAG}: ${COUNT}"
+          CANDIDATE_COUNT="$(jq 'length' merged-prs-meta.json)"
+          echo "Candidate pull requests since ${LATEST_TAG} (before precise filter): ${CANDIDATE_COUNT}"
 
           # Reconstruct labels from the GitHub Issues event log (append-only
           # audit record) at the moment each PR was merged, rather than
@@ -219,10 +224,19 @@ jobs:
           # is ignored, so the classification used here cannot be altered
           # after the PR passed the validate-release check.
           echo '[]' > maintenance-prs.json
-          for i in $(seq 1 "${COUNT}"); do
+          for i in $(seq 1 "${CANDIDATE_COUNT}"); do
             IDX=$((i - 1))
             PR_NUMBER="$(jq -r ".[$IDX].number" merged-prs-meta.json)"
             MERGED_AT="$(jq -r ".[$IDX].merged_at" merged-prs-meta.json)"
+
+            # Precise boundary check: skip PRs merged at or before the boundary.
+            # The search uses merged:>= to avoid missing PRs in the same second,
+            # so this comparison is the authoritative filter.
+            AFTER_BOUNDARY="$(MERGED_AT="${MERGED_AT}" BOUNDARY="${BOUNDARY}" python3 -c 'import os; from datetime import datetime; m=datetime.fromisoformat(os.environ["MERGED_AT"].replace("Z","+00:00")); b=datetime.fromisoformat(os.environ["BOUNDARY"].replace("Z","+00:00")); print("true" if m>b else "false")')"
+            if [ "$AFTER_BOUNDARY" != "true" ]; then
+              echo "PR #${PR_NUMBER} merged at ${MERGED_AT} is not after boundary ${BOUNDARY}; skipping"
+              continue
+            fi
 
             gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/events" \
               --paginate > "pr-${PR_NUMBER}-events.json"
@@ -235,6 +249,8 @@ jobs:
               '. + [{"number": $pr_number, "labels": $pr_labels}]' maintenance-prs.json \
               > maintenance-prs-updated.json && mv maintenance-prs-updated.json maintenance-prs.json
           done
+          COUNT="$(jq 'length' maintenance-prs.json)"
+          echo "Merged pull requests since ${LATEST_TAG}: ${COUNT}"
           jq -r '.[] | "  #\(.number) \(.labels | join(", "))"' maintenance-prs.json
 
       - name: Plan release
@@ -313,7 +329,7 @@ jobs:
           fetch-tags: true
 
       - name: Collect existing release tags
-        run: git tag --list > tags.txt
+        run: git tag --merged HEAD > tags.txt
 
       # The pull request validation is never trusted on its own: another release
       # may have been published since, so the full version and tag validation is
@@ -412,15 +428,19 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ needs.plan.outputs.version }}
         run: |
-          if gh release view "${TAG_NAME}" >/dev/null 2>&1; then
-            echo "GitHub Release ${TAG_NAME} already exists. Nothing to do."
+          RELEASE_IS_DRAFT="$(gh release view "${TAG_NAME}" --json isDraft --jq '.isDraft' 2>/dev/null || echo 'null')"
+          if [ "$RELEASE_IS_DRAFT" = "false" ]; then
+            echo "GitHub Release ${TAG_NAME} is already published. Nothing to do."
             exit 0
+          elif [ "$RELEASE_IS_DRAFT" = "true" ]; then
+            echo "GitHub Release ${TAG_NAME} is a draft; publishing it now."
+            gh release edit "${TAG_NAME}" --draft=false
+          else
+            gh release create "${TAG_NAME}" \
+              --verify-tag \
+              --title "${TAG_NAME}" \
+              --generate-notes
           fi
-
-          gh release create "${TAG_NAME}" \
-            --verify-tag \
-            --title "${TAG_NAME}" \
-            --generate-notes
 
   promote_latest:
     name: Promote latest tag

@@ -118,7 +118,7 @@ class MergedPullRequest:
 
     @property
     def is_maintenance_change(self) -> bool:
-        return RELEASE_NONE_LABEL in {label.strip() for label in self.labels}
+        return classify(self.labels) == "none"
 
 
 @dataclass(frozen=True)
@@ -317,7 +317,17 @@ def plan_maintenance(
     if resume_tag:
         return plan_resume(resume_tag, tags)
 
-    deferred = [request for request in pull_requests if request.is_maintenance_change]
+    deferred = []
+    for request in pull_requests:
+        release_type = classify(request.labels)
+        if release_type != "none":
+            raise ReleaseError(
+                f"pull request #{request.number} carries release classification "
+                f"{release_type!r}; the Friday maintenance sweep cannot release "
+                f"a pending {release_type}; re-run the release for that pull request instead"
+            )
+        deferred.append(request)
+
     if not deferred:
         return ReleasePlan(
             release=False,
