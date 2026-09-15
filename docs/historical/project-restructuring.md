@@ -36,12 +36,12 @@ docker-autoheal/
 
 Import changes made at the time:
 
-| Old import | New import |
-|---|---|
-| `from config import config_manager` | `from app.config.config_manager import config_manager` |
+| Old import                                      | New import                                                                |
+|-------------------------------------------------|---------------------------------------------------------------------------|
+| `from config import config_manager`             | `from app.config.config_manager import config_manager`                    |
 | `from docker_client import DockerClientWrapper` | `from app.docker_client.docker_client_wrapper import DockerClientWrapper` |
-| `from monitor import MonitoringEngine` | `from app.monitor.monitoring_engine import MonitoringEngine` |
-| `from api import app, init_api` | `from app.api.api import app, init_api` |
+| `from monitor import MonitoringEngine`          | `from app.monitor.monitoring_engine import MonitoringEngine`              |
+| `from api import app, init_api`                 | `from app.api.api import app, init_api`                                   |
 
 Running the application was, and still is, done with `python -m app.main` or `python
 run.py`. The Dockerfile was updated at the same time to copy `app/` instead of loose

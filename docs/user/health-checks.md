@@ -52,12 +52,12 @@ curl -X POST http://localhost:3131/api/healthchecks \
 
 Supported `check_type` values:
 
-| Type | Checks |
-|---|---|
-| `http` | Requests `http_endpoint` and compares the response status to `http_expected_status` (default `200`) |
-| `tcp` | Attempts a TCP connection to `tcp_port` on the container |
-| `exec` | Runs `exec_command` inside the container and checks its exit code |
-| `docker` | Defers to Docker's native health status (equivalent to not setting a custom check) |
+| Type     | Checks                                                                                              |
+|----------|-----------------------------------------------------------------------------------------------------|
+| `http`   | Requests `http_endpoint` and compares the response status to `http_expected_status` (default `200`) |
+| `tcp`    | Attempts a TCP connection to `tcp_port` on the container                                            |
+| `exec`   | Runs `exec_command` inside the container and checks its exit code                                   |
+| `docker` | Defers to Docker's native health status (equivalent to not setting a custom check)                  |
 
 If a custom health check is configured, it's evaluated in addition to Docker's native
 health status — either one reporting unhealthy is enough to trigger a restart.

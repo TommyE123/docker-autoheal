@@ -9,7 +9,7 @@ updates are reviewed and merged.
 ## What Renovate manages
 
 | Ecosystem                       | Files                                                 | Renovate manager                    |
-| ------------------------------- | ----------------------------------------------------- | ----------------------------------- |
+|---------------------------------|-------------------------------------------------------|-------------------------------------|
 | Python runtime dependencies     | `requirements.txt`                                    | `pip_requirements`                  |
 | Python dev/test dependencies    | `requirements-dev.txt`                                | `pip_requirements`                  |
 | npm dependencies + lockfile     | `frontend/package.json`, `frontend/package-lock.json` | `npm`                               |
