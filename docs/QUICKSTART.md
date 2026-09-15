@@ -4,9 +4,9 @@ This guide will help you get the Docker Auto-Heal Service up and running in 5 mi
 
 ## Prerequisites
 
-✅ Docker installed and running  
-✅ Docker Compose installed (optional but recommended)  
-✅ Internet connection to pull images  
+✅ Docker installed and running
+✅ Docker Compose installed (optional but recommended)
+✅ Internet connection to pull images
 
 ## Step 1: Start the Service
 
@@ -30,7 +30,7 @@ docker build -t docker-autoheal .
 docker run -d \
   --name autoheal \
   -v /var/run/docker.sock:/var/run/docker.sock:ro \
-  -p 8080:8080 \
+  -p 3131:3131 \
   -p 9090:9090 \
   --restart unless-stopped \
   docker-autoheal
@@ -41,7 +41,7 @@ docker run -d \
 Open your browser and navigate to:
 
 ```
-http://localhost:8080
+http://localhost:3131
 ```
 
 You should see the Docker Auto-Heal dashboard with:
@@ -77,7 +77,7 @@ watch docker ps
 docker logs -f autoheal
 
 # Check events in the UI
-# Navigate to Events tab in http://localhost:8080
+# Navigate to Events tab in http://localhost:3131
 ```
 
 ## Step 4: Enable Auto-Heal for a Container
@@ -149,7 +149,7 @@ services:
 ```bash
 # Via UI:
 # Containers → Find container → Click heart icon → Select HTTP
-# Enter: http://localhost:8080/health
+# Enter: http://localhost:3131/health
 # Set status code: 200
 # Click Save
 ```
@@ -161,7 +161,7 @@ services:
 # Containers → Find quarantined container → Click unlock icon
 
 # Via command line:
-curl -X POST http://localhost:8080/api/containers/{container_id}/unquarantine
+curl -X POST http://localhost:3131/api/containers/{container_id}/unquarantine
 ```
 
 ### Use Case 4: Export Configuration
@@ -171,7 +171,7 @@ curl -X POST http://localhost:8080/api/containers/{container_id}/unquarantine
 # Configuration → Click "Export Configuration" → Downloads JSON file
 
 # Via API:
-curl -O http://localhost:8080/api/config/export
+curl -O http://localhost:3131/api/config/export
 ```
 
 ## Monitoring
@@ -185,7 +185,7 @@ http://localhost:9090/metrics
 ### View API Documentation
 
 ```
-http://localhost:8080/docs
+http://localhost:3131/docs
 ```
 
 ### View Logs
@@ -230,23 +230,23 @@ docker logs autoheal
 ### UI not accessible
 
 ```bash
-# Check if port 8080 is available
-netstat -an | grep 8080
+# Check if port 3131 is available
+netstat -an | grep 3131
 
 # Check container is running
 docker ps | grep autoheal
 
 # Check health
-curl http://localhost:8080/health
+curl http://localhost:3131/health
 ```
 
 ## Next Steps
 
-✅ Add `autoheal=true` label to your production containers  
-✅ Configure custom health checks for your services  
-✅ Set up Prometheus monitoring  
-✅ Export and backup your configuration  
-✅ Review the full documentation in README.md  
+✅ Add `autoheal=true` label to your production containers
+✅ Configure custom health checks for your services
+✅ Set up Prometheus monitoring
+✅ Export and backup your configuration
+✅ Review the full documentation in README.md
 
 ## Clean Up (When Testing)
 
@@ -282,16 +282,16 @@ docker-compose up -d --build
 docker ps --filter "label=autoheal=true"
 
 # Check service health
-curl http://localhost:8080/health
+curl http://localhost:3131/health
 
 # View events via API
-curl http://localhost:8080/api/events | jq
+curl http://localhost:3131/api/events | jq
 
 # Restart a container manually via API
-curl -X POST http://localhost:8080/api/containers/{id}/restart
+curl -X POST http://localhost:3131/api/containers/{id}/restart
 ```
 
 ---
 
-**Need help?** Check the full README.md or visit the API docs at http://localhost:8080/docs
+**Need help?** Check the full README.md or visit the API docs at http://localhost:3131/docs
 

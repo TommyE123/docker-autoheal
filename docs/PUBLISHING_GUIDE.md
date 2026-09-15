@@ -212,11 +212,11 @@ REM Run it
 docker run -d ^
   --name test-autoheal ^
   -v /var/run/docker.sock:/var/run/docker.sock:ro ^
-  -p 8080:8080 ^
-  YOUR_USERNAME/docker-autoheal:latest
+   -p 3131:3131 ^
+   YOUR_USERNAME/docker-autoheal:latest
 
 REM Check it works
-REM Visit: http://localhost:8080
+REM Visit: http://localhost:3131
 
 REM Clean up
 docker stop test-autoheal
@@ -356,7 +356,7 @@ For automatic publishing on releases:
    ```bash
    # Add secrets to GitHub repository
    # Settings → Secrets and variables → Actions
-   
+
    DOCKERHUB_USERNAME: your_username
    DOCKERHUB_TOKEN: your_access_token
    ```
@@ -366,7 +366,7 @@ For automatic publishing on releases:
    # Create and push a tag
    git tag v1.1.0
    git push origin v1.1.0
-   
+
    # GitHub automatically builds and publishes! 🎉
    ```
 
@@ -417,7 +417,7 @@ After publishing, verify:
 - [ ] Description is updated with README
 - [ ] Image can be pulled successfully
 - [ ] Image runs without errors
-- [ ] Web UI loads at http://localhost:8080
+- [ ] Web UI loads at http://localhost:3131
 - [ ] All features work correctly
 
 ---

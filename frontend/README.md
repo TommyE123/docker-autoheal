@@ -14,7 +14,7 @@ The application now supports **two UI options**:
 ### Prerequisites
 
 - Node.js 18+ and npm
-- Docker Auto-Heal backend running on port 8080
+- Docker Auto-Heal backend running on port 3131
 
 ### Setup
 
@@ -50,7 +50,7 @@ npm run dev
 Now you can:
 - Edit React components in `frontend/src/`
 - Changes hot-reload automatically
-- Backend API proxied from `http://localhost:8080`
+- Backend API proxied from `http://localhost:3131`
 
 ## 🏗️ Building for Production
 
@@ -79,7 +79,7 @@ cd ..
 docker-compose up
 
 # Open browser
-http://localhost:8080
+http://localhost:3131
 ```
 
 ## 🐳 Docker Deployment
@@ -111,7 +111,7 @@ COPY *.py ./
 # Copy React build from stage 1
 COPY --from=frontend-builder /frontend/dist ./static-react/
 
-EXPOSE 8080 9090
+EXPOSE 3131 9090
 
 CMD ["python", "main.py"]
 ```
@@ -192,7 +192,7 @@ Create `frontend/.env` for custom settings:
 
 ```env
 # API URL (default: /api for proxy)
-VITE_API_URL=http://localhost:8080/api
+VITE_API_URL=http://localhost:3131/api
 
 # Development port (default: 3000)
 VITE_PORT=3000
@@ -207,8 +207,8 @@ API calls automatically proxy to backend during development:
 export default defineConfig({
   server: {
     proxy: {
-      '/api': 'http://localhost:8080',
-      '/health': 'http://localhost:8080',
+      '/api': 'http://localhost:3131',
+      '/health': 'http://localhost:3131',
     }
   }
 })
@@ -258,21 +258,21 @@ Access: `http://localhost:3000`
 cd frontend && npm run build
 docker-compose up
 ```
-Access: `http://localhost:8080`
+Access: `http://localhost:3131`
 
 ### Scenario 3: Simple Deploy (No Node.js)
 ```bash
 # Don't build React, use simple HTML
 docker-compose up
 ```
-Access: `http://localhost:8080` (serves `static/`)
+Access: `http://localhost:3131` (serves `static/`)
 
 ### Scenario 4: Docker with React Build
 ```dockerfile
 # Multi-stage Dockerfile
 # Builds React inside Docker
 docker build -t autoheal .
-docker run -p 8080:8080 autoheal
+docker run -p 3131:3131 autoheal
 ```
 
 ## 🐛 Troubleshooting
@@ -288,7 +288,7 @@ npm install
 ### Issue: API calls fail in development
 ```bash
 # Check backend is running
-curl http://localhost:8080/health
+curl http://localhost:3131/health
 
 # Check Vite proxy config in vite.config.js
 ```
@@ -320,7 +320,7 @@ docker logs docker-autoheal | grep "Serving UI"
 
 ### Project Resources
 - Main README: `../README.md`
-- API Documentation: `http://localhost:8080/docs`
+- API Documentation: `http://localhost:3131/docs`
 - Quick Start: `../QUICKSTART.md`
 
 ## 🎓 Next Steps

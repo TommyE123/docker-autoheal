@@ -4,14 +4,14 @@
 
 A **fully functional, production-ready** Docker container auto-healing service built in Python with:
 
-✅ **Core Monitoring Engine** - Monitors containers 24/7, auto-restarts on failures  
-✅ **Web UI Dashboard** - Modern, responsive interface to manage everything  
-✅ **REST API** - Full programmatic access with interactive documentation  
-✅ **Custom Health Checks** - HTTP, TCP, Exec, and Docker native support  
-✅ **Smart Restart Logic** - Cooldowns, backoffs, quarantine for flapping containers  
-✅ **Configuration Management** - In-memory state with JSON export/import  
-✅ **Event Logging** - Track all auto-heal actions and decisions  
-✅ **Prometheus Metrics** - Built-in observability  
+✅ **Core Monitoring Engine** - Monitors containers 24/7, auto-restarts on failures
+✅ **Web UI Dashboard** - Modern, responsive interface to manage everything
+✅ **REST API** - Full programmatic access with interactive documentation
+✅ **Custom Health Checks** - HTTP, TCP, Exec, and Docker native support
+✅ **Smart Restart Logic** - Cooldowns, backoffs, quarantine for flapping containers
+✅ **Configuration Management** - In-memory state with JSON export/import
+✅ **Event Logging** - Track all auto-heal actions and decisions
+✅ **Prometheus Metrics** - Built-in observability
 
 ## 📁 Complete File Structure
 
@@ -107,16 +107,16 @@ docker-compose down
 ### Access the Application
 ```bash
 # Web UI
-http://localhost:8080
+http://localhost:3131
 
 # API Documentation
-http://localhost:8080/docs
+http://localhost:3131/docs
 
 # Prometheus Metrics
 http://localhost:9090/metrics
 
 # Health Check
-curl http://localhost:8080/health
+curl http://localhost:3131/health
 ```
 
 ### Run Demo
@@ -168,13 +168,13 @@ docker logs -f docker-autoheal
   - Interval (how often to check)
   - Label filters
   - Include all mode
-  
+
 - **Restart Policy**
   - Mode (on-failure / health / both)
   - Cooldown seconds
   - Max restarts and window
   - Backoff settings
-  
+
 - **Export/Import**
   - Download config as JSON
   - Upload config from JSON
@@ -206,12 +206,12 @@ docker logs -f docker-autoheal
 ### Custom HTTP Health Check
 ```bash
 # Via API
-curl -X POST http://localhost:8080/api/healthchecks \
+curl -X POST http://localhost:3131/api/healthchecks \
   -H "Content-Type: application/json" \
   -d '{
     "container_id": "my-container",
     "check_type": "http",
-    "http_endpoint": "http://localhost:8080/health",
+    "http_endpoint": "http://localhost:3131/health",
     "http_expected_status": 200,
     "interval_seconds": 30,
     "timeout_seconds": 10,
@@ -300,7 +300,7 @@ services:
 ### Example 2: Selective Monitoring
 ```bash
 # Via UI:
-1. Open http://localhost:8080
+1. Open http://localhost:3131
 2. Go to Containers tab
 3. Check the containers you want to monitor
 4. Click "Enable Auto-Heal"
@@ -309,7 +309,7 @@ services:
 ### Example 3: Export Configuration Before Changes
 ```bash
 # Export current config
-curl -O http://localhost:8080/api/config/export
+curl -O http://localhost:3131/api/config/export
 
 # Make changes in UI
 # If something goes wrong, import the backup
@@ -429,7 +429,7 @@ All requirements from the Business Requirements Document have been implemented:
 
 2. **Open the UI:**
    ```
-   http://localhost:8080
+  http://localhost:3131
    ```
 
 3. **Add containers to monitor:**
@@ -459,17 +459,17 @@ All requirements from the Business Requirements Document have been implemented:
 ## 📞 Getting Help
 
 - **Documentation**: Start with QUICKSTART.md
-- **API Docs**: http://localhost:8080/docs
+- **API Docs**: http://localhost:3131/docs
 - **Demo**: Run `python demo.py --interactive`
 - **Logs**: `docker logs -f docker-autoheal`
 - **Issues**: Check IMPLEMENTATION.md for technical details
 
 ---
 
-**Version**: 1.1.0  
-**Date**: October 30, 2025  
-**Language**: Python 3.11+  
-**Framework**: FastAPI + Bootstrap 5  
+**Version**: 1.1.0
+**Date**: October 30, 2025
+**Language**: Python 3.11+
+**Framework**: FastAPI + Bootstrap 5
 **Status**: Production Ready ✅
 
 **Built with ❤️ following the complete BRD specification**
