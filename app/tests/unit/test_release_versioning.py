@@ -18,6 +18,7 @@ from scripts.release.versioning import (
     Version,
     classify,
     latest_release,
+    plan_already_released,
     plan_from_labels,
     plan_maintenance,
     plan_resume,
@@ -258,6 +259,76 @@ class TestRetryAndConcurrency:
             )
 
 
+class TestAlreadyReleasedCommitIsANoOp:
+    """Regression coverage: re-running the workflow on a commit that already
+    has a *published* GitHub Release must never calculate a new version.
+
+    This is distinct from resuming a partial failure (plan_resume): here the
+    release already fully succeeded, so the only correct plan is "nothing to
+    do" - not "the next patch/minor/major after this one".
+    """
+
+    def test_a_fully_released_commit_produces_no_new_release(self):
+        plan = plan_already_released("v2.0.4", EXISTING_TAGS)
+
+        assert plan.release is False
+        assert plan.version is None
+        assert plan.current == Version(2, 0, 4)
+        assert "already released" in plan.reason
+
+    def test_rerunning_classification_on_an_already_released_commit_is_a_no_op(self):
+        # Without the already_released_tag guard this would classify the
+        # merged PR's label again and calculate v2.0.5 - a second release for
+        # a commit that was already fully published as v2.0.4.
+        plan = plan_from_labels(
+            ["release:patch"], EXISTING_TAGS, already_released_tag="v2.0.4"
+        )
+
+        assert plan.release is False
+        assert plan.version is None
+
+    def test_already_released_takes_priority_over_an_invalid_label(self):
+        # Even a broken/duplicate classification on the merged PR must not
+        # block or reinterpret an already-published commit - there is
+        # nothing left to classify.
+        plan = plan_from_labels(
+            ["release:patch", "release:minor"],
+            EXISTING_TAGS,
+            already_released_tag="v2.0.4",
+        )
+
+        assert plan.release is False
+
+    def test_already_released_takes_priority_over_a_resume_tag(self):
+        plan = plan_from_labels(
+            ["release:patch"],
+            EXISTING_TAGS,
+            resume_tag="v2.0.4",
+            already_released_tag="v2.0.4",
+        )
+
+        assert plan.release is False
+
+    def test_rerunning_a_maintenance_release_on_an_already_released_commit_is_a_no_op(
+        self,
+    ):
+        # Without the guard this would find zero deferred PRs and legitimately
+        # report "no release" anyway in most cases - but the guard makes the
+        # no-op unconditional and independent of what release:none PRs exist,
+        # so it holds even if that accounting is ever wrong.
+        plan = plan_maintenance(
+            [MergedPullRequest(101, ["release:none"])],
+            EXISTING_TAGS,
+            already_released_tag="v2.0.4",
+        )
+
+        assert plan.release is False
+
+    def test_already_released_tag_must_exist(self):
+        with pytest.raises(ReleaseError, match="does not exist"):
+            plan_already_released("v2.0.9", EXISTING_TAGS)
+
+
 class TestCommandLineInterface:
     def test_validate_pr_accepts_a_valid_classification(self, tmp_path, monkeypatch):
         output = tmp_path / "github_output"
@@ -366,6 +437,51 @@ class TestCommandLineInterface:
             encoding="utf-8"
         )
 
+    def test_plan_release_with_already_released_tag_is_a_no_op(
+        self, tmp_path, monkeypatch
+    ):
+        output = tmp_path / "github_output"
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+
+        exit_code = main(
+            [
+                "plan-release",
+                "--labels-file",
+                write(tmp_path / "labels.json", ["release:patch"]),
+                "--tags-file",
+                write(tmp_path / "tags.json", EXISTING_TAGS),
+                "--already-released-tag",
+                "v2.0.4",
+            ]
+        )
+
+        assert exit_code == 0
+        result = output.read_text(encoding="utf-8")
+        assert "release=false" in result
+        assert "version=\n" in result or result.rstrip().endswith("version=")
+
+    def test_plan_maintenance_with_already_released_tag_is_a_no_op(
+        self, tmp_path, monkeypatch
+    ):
+        output = tmp_path / "github_output"
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        pull_requests = [{"number": 101, "labels": [{"name": "release:none"}]}]
+
+        exit_code = main(
+            [
+                "plan-maintenance",
+                "--pull-requests-file",
+                write(tmp_path / "prs.json", pull_requests),
+                "--tags-file",
+                write(tmp_path / "tags.json", EXISTING_TAGS),
+                "--already-released-tag",
+                "v2.0.4",
+            ]
+        )
+
+        assert exit_code == 0
+        assert "release=false" in output.read_text(encoding="utf-8")
+
     def test_verify_release_blocks_a_candidate_that_now_exists(self, tmp_path, capsys):
         exit_code = main(
             [
@@ -467,6 +583,17 @@ class TestReleaseWorkflows:
 
         assert concurrency["group"] == "release-publication"
         assert concurrency["cancel-in-progress"] is False
+
+    def test_manual_dispatch_cannot_bypass_the_pr_release_classification(self):
+        # workflow_dispatch must only be able to re-run classification of an
+        # already-merged pull request or trigger the Friday sweep - never
+        # request a patch/minor/major release directly, which would let
+        # someone publish a release the required PR check never validated.
+        options = self.load("docker-release.yml")[True]["workflow_dispatch"]["inputs"][
+            "release_type"
+        ]["options"]
+
+        assert set(options) == {"auto", "maintenance"}
 
     def test_the_tag_is_created_before_the_image_is_published(self):
         steps = self.load("docker-release.yml")["jobs"]["release"]["steps"]

@@ -10,15 +10,12 @@ on:
   workflow_dispatch:
     inputs:
       release_type:
-        description: "What to release (auto re-runs the classification of the latest commit)"
+        description: "auto re-runs classification for the latest commit; maintenance runs the Friday sweep now (no manual patch/minor/major - every release traces to a merged PR's label)"
         type: choice
         default: auto
         options:
           - auto
           - maintenance
-          - patch
-          - minor
-          - major
 
 # Releases are serialised: two runs must never calculate or create the same
 # version concurrently, and a run that may already have tagged is never cancelled.
@@ -71,7 +68,6 @@ jobs:
               case "$REQUESTED" in
                 auto) MODE=classification ;;
                 maintenance) MODE=maintenance ;;
-                patch | minor | major) MODE=explicit ;;
                 *)
                   echo "::error::Unknown requested release type: ${REQUESTED}"
                   exit 1
@@ -87,18 +83,24 @@ jobs:
         run: git tag --list > tags.txt
 
       # A release tag on this commit without a published GitHub Release means an
-      # earlier attempt stopped part-way. That release is resumed with its
-      # existing tag instead of a new version being calculated.
-      - name: Detect an incomplete earlier release attempt
+      # earlier attempt stopped part-way; that release is resumed with its
+      # existing tag instead of a new version being calculated. A release tag
+      # on this commit that *does* have a published GitHub Release means this
+      # commit was already fully released: re-running the workflow (a manual
+      # "re-run all jobs", or workflow_dispatch pointed at the same commit)
+      # must recognise that and do nothing, never calculate the next version.
+      - name: Detect an earlier release attempt on this commit
         id: resume
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           RESUME=""
+          ALREADY_RELEASED=""
 
           for TAG in $(git tag --points-at "$GITHUB_SHA" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true); do
             if gh release view "$TAG" >/dev/null 2>&1; then
               echo "Release ${TAG} on this commit is already published."
+              ALREADY_RELEASED="$TAG"
             else
               echo "Release ${TAG} on this commit has no GitHub Release; it will be resumed."
               RESUME="$TAG"
@@ -106,6 +108,7 @@ jobs:
           done
 
           echo "tag=${RESUME}" >> "$GITHUB_OUTPUT"
+          echo "already_released_tag=${ALREADY_RELEASED}" >> "$GITHUB_OUTPUT"
 
       - name: Collect the release classification of the merged pull request
         id: classification
@@ -122,11 +125,16 @@ jobs:
           cat labels.json
           echo "merged_pull_requests=${COUNT}" >> "$GITHUB_OUTPUT"
 
-      # Only pull requests merged after the commit of the latest successful
-      # release are considered, so changes already included in an earlier release
-      # are never released a second time.
+      # Only pull requests merged after the latest successful release are
+      # considered, so changes already included in an earlier release are
+      # never released a second time. This is one search query bounded by
+      # that release's commit timestamp rather than a GitHub API call per
+      # commit since, so it stays cheap no matter how many commits sit
+      # between releases.
       - name: Collect unreleased release:none pull requests
         if: steps.mode.outputs.mode == 'maintenance'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           LATEST_TAG="$(git tag --list | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)"
 
@@ -135,50 +143,48 @@ jobs:
             exit 1
           fi
 
-          echo "Latest release: ${LATEST_TAG}"
-          : > merged-pr-lines.json
+          BOUNDARY="$(git log -1 --format=%cI "$LATEST_TAG")"
+          echo "Latest release: ${LATEST_TAG} (${BOUNDARY})"
 
-          for SHA in $(git rev-list "${LATEST_TAG}..${GITHUB_SHA}"); do
-            gh api "repos/${GITHUB_REPOSITORY}/commits/${SHA}/pulls" \
-              --jq '.[] | select(.merged_at != null) | {number: .number, labels: [.labels[].name]}' \
-              >> merged-pr-lines.json
-          done
+          gh api --method GET search/issues --paginate \
+            -f "q=repo:${GITHUB_REPOSITORY} is:pr is:merged base:main merged:>${BOUNDARY}" \
+            --jq '.items[] | {number: .number, labels: [.labels[].name]}' \
+            > merged-pr-lines.json
 
           jq -s '.' merged-pr-lines.json > maintenance-prs.json
           jq -r '.[] | "  #\(.number) \(.labels | join(", "))"' maintenance-prs.json
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Plan release
         id: plan
         env:
           MODE: ${{ steps.mode.outputs.mode }}
-          REQUESTED: ${{ github.event.inputs.release_type }}
           RESUME_TAG: ${{ steps.resume.outputs.tag }}
+          ALREADY_RELEASED_TAG: ${{ steps.resume.outputs.already_released_tag }}
           MERGED_PULL_REQUESTS: ${{ steps.classification.outputs.merged_pull_requests }}
         run: |
           RESUME_ARGS=()
           if [ -n "$RESUME_TAG" ]; then
             RESUME_ARGS=(--resume-tag "$RESUME_TAG")
           fi
+          if [ -n "$ALREADY_RELEASED_TAG" ]; then
+            RESUME_ARGS+=(--already-released-tag "$ALREADY_RELEASED_TAG")
+          fi
 
-          case "$MODE" in
-            classification)
-              if [ "${MERGED_PULL_REQUESTS:-0}" = "0" ]; then
-                echo "::warning::No merged pull request found for ${GITHUB_SHA}; nothing is released without a release classification."
-                {
-                  echo "release=false"
-                  echo "release_type=none"
-                  echo "create_tag=false"
-                  echo "version="
-                } >> "$GITHUB_OUTPUT"
-                exit 0
-              fi
-              ;;
-            explicit)
-              printf '["release:%s"]' "$REQUESTED" > labels.json
-              ;;
-          esac
+          # No merged pull request to classify, and this isn't a resumed or
+          # already-released commit: there is nothing safe to release.
+          if [ "$MODE" = "classification" ] \
+            && [ "${MERGED_PULL_REQUESTS:-0}" = "0" ] \
+            && [ -z "$RESUME_TAG" ] \
+            && [ -z "$ALREADY_RELEASED_TAG" ]; then
+            echo "::warning::No merged pull request found for ${GITHUB_SHA}; nothing is released without a release classification."
+            {
+              echo "release=false"
+              echo "release_type=none"
+              echo "create_tag=false"
+              echo "version="
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           if [ "$MODE" = "maintenance" ]; then
             python3 -m scripts.release.cli plan-maintenance \

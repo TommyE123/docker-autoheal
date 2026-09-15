@@ -105,6 +105,7 @@ def _plan_release(args: argparse.Namespace) -> ReleasePlan:
         load_labels(args.labels_file),
         load_tags(args.tags_file),
         resume_tag=args.resume_tag or None,
+        already_released_tag=args.already_released_tag or None,
         allow_first_release=args.allow_first_release,
     )
 
@@ -114,6 +115,7 @@ def _plan_maintenance(args: argparse.Namespace) -> ReleasePlan:
         load_pull_requests(args.pull_requests_file),
         load_tags(args.tags_file),
         resume_tag=args.resume_tag or None,
+        already_released_tag=args.already_released_tag or None,
         allow_first_release=args.allow_first_release,
     )
 
@@ -173,6 +175,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     plan_release.add_argument("--labels-file", required=True)
     plan_release.add_argument("--resume-tag", default="")
+    plan_release.add_argument(
+        "--already-released-tag",
+        default="",
+        help="the tag already published on this commit, if any - short-circuits "
+        "to no-release so re-running the workflow never publishes a second "
+        "release for the same commit",
+    )
     add_common(plan_release)
     plan_release.set_defaults(handler=_plan_release)
 
@@ -181,6 +190,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     plan_maintenance.add_argument("--pull-requests-file", required=True)
     plan_maintenance.add_argument("--resume-tag", default="")
+    plan_maintenance.add_argument("--already-released-tag", default="")
     add_common(plan_maintenance)
     plan_maintenance.set_defaults(handler=_plan_maintenance)
 

@@ -210,6 +210,32 @@ def plan_version(
     )
 
 
+def plan_already_released(released_tag: str, tags: Iterable[str]) -> ReleasePlan:
+    """Nothing to do: this exact commit already has a published release.
+
+    Re-running the release workflow on a commit that was already fully
+    released (tag created, image published, GitHub Release created) must
+    never calculate the next version - that would publish an extra release
+    for no new change. This takes priority over everything else: whatever
+    the merged pull request's label says, or however many release:none
+    pull requests have accumulated, there is nothing left to release here.
+    """
+    tags = list(tags)
+    released = Version.parse(released_tag)
+    existing = {tag.strip() for tag in tags}
+    if released.tag not in existing:
+        raise ReleaseError(
+            f"cannot skip as already released: {released.tag} does not exist"
+        )
+    return ReleasePlan(
+        release=False,
+        release_type="none",
+        reason=f"{released.tag} is already released on this commit; nothing to do",
+        current=released,
+        create_tag=False,
+    )
+
+
 def plan_resume(resume_tag: str, tags: Iterable[str]) -> ReleasePlan:
     """Continue an earlier release attempt that already created its tag."""
     tags = list(tags)
@@ -239,9 +265,12 @@ def plan_from_labels(
     tags: Iterable[str],
     *,
     resume_tag: Optional[str] = None,
+    already_released_tag: Optional[str] = None,
     allow_first_release: bool = False,
 ) -> ReleasePlan:
     """Plan the release for a merged pull request's classification labels."""
+    if already_released_tag:
+        return plan_already_released(already_released_tag, tags)
     release_type = classify(labels)
     if release_type == "none":
         return plan_version("none", tags)
@@ -255,6 +284,7 @@ def plan_maintenance(
     tags: Iterable[str],
     *,
     resume_tag: Optional[str] = None,
+    already_released_tag: Optional[str] = None,
     allow_first_release: bool = False,
 ) -> ReleasePlan:
     """Plan the Friday maintenance release for unreleased ``release:none`` work.
@@ -263,6 +293,8 @@ def plan_maintenance(
     commit of the latest successful release, so changes swept up by an earlier
     release are never released twice.
     """
+    if already_released_tag:
+        return plan_already_released(already_released_tag, tags)
     if resume_tag:
         return plan_resume(resume_tag, tags)
 

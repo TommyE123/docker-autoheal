@@ -94,12 +94,18 @@ Every Friday at 09:00 UTC the workflow looks for merged `release:none` pull requ
 Because the boundary is the latest release tag, a `release:none` change that was already
 swept up by a normal patch/minor/major release is never released a second time.
 
-## Retrying a failed release
+## Retrying a failed release, and re-running a successful one
 
 Re-run the failed workflow run. A release tag on the release commit that has no published
 GitHub Release marks an incomplete attempt: the run resumes that exact version and
 completes the remaining steps. The version is never incremented because an earlier attempt
 failed, and a duplicate tag is never created.
+
+If the commit's release already fully succeeded (its tag *and* its GitHub Release both
+exist), re-running the workflow — a manual "re-run all jobs", or `workflow_dispatch` with
+`auto` pointed at that same commit — is a no-op: the plan step recognises the commit is
+already released and reports nothing to do, rather than calculating the next version on
+top of it.
 
 `workflow_dispatch` offers the same behaviour manually:
 
@@ -107,7 +113,10 @@ failed, and a duplicate tag is never created.
 | --- | --- |
 | `auto` | Re-run the classification of the latest commit on `main` (the retry path) |
 | `maintenance` | Run the Friday maintenance sweep now |
-| `patch` / `minor` / `major` | Publish that release from the latest commit on `main` |
+
+There is deliberately no manual `patch`/`minor`/`major` option. Every release must trace
+back to a merged pull request's `release:*` label — a manual dispatch that picked the
+release type directly would bypass the required `validate-release` PR check entirely.
 
 ## The tooling
 
