@@ -216,3 +216,101 @@ class TestHealthCheckMigration:
 
         checks = config_manager.get_all_custom_health_checks()
         assert len(checks) == 2, "Should have exactly 2 health checks after migration"
+
+    async def test_stable_id_collision_preserves_first_entry(self, wired_api):
+        """
+        When two Docker container IDs resolve to the same stable ID,
+        the collision is detected and the first entry is preserved.
+        This prevents silent data loss from overwriting.
+        """
+        docker_client, engine = wired_api
+
+        container1, info1 = make_container(name="web", container_id="a" * 64)
+        container2, info2 = make_container(name="web", container_id="b" * 64)
+
+        docker_client.add_container(container1, info1)
+        docker_client.add_container(container2, info2)
+
+        legacy_docker_id_1 = container1.id
+        legacy_docker_id_2 = container2.id
+        stable_id = "web"
+
+        check1 = HealthCheckConfig(
+            container_id=legacy_docker_id_1,
+            check_type="tcp",
+            tcp_port=8080,
+        )
+        check2 = HealthCheckConfig(
+            container_id=legacy_docker_id_2,
+            check_type="http",
+            http_endpoint="http://localhost/health",
+        )
+
+        config_manager.add_custom_health_check(check1)
+        config_manager.add_custom_health_check(check2)
+
+        config_manager.migrate_legacy_health_checks(docker_client, engine)
+
+        stored = config_manager.get_custom_health_check(stable_id)
+        assert (
+            stored is not None
+        ), "One of the colliding health checks should exist under stable ID"
+        assert stored.check_type in [
+            "tcp",
+            "http",
+        ], "The stored check should be from one of the original entries"
+
+        assert (
+            config_manager.get_custom_health_check(legacy_docker_id_1) is None
+        ), "Old Docker ID 1 key should be removed"
+        assert (
+            config_manager.get_custom_health_check(legacy_docker_id_2) is None
+        ), "Old Docker ID 2 key should be removed"
+
+        checks = config_manager.get_all_custom_health_checks()
+        assert (
+            len(checks) == 1
+        ), "Should have exactly 1 health check (collision prevents duplication)"
+
+    async def test_invalid_stable_id_preserves_original_docker_id_key(self, wired_api):
+        """
+        If get_stable_identifier returns None or empty string,
+        the health check is preserved under its original Docker ID key
+        to prevent configuration loss.
+        """
+        docker_client, engine = wired_api
+
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+
+        legacy_docker_id = container.id
+
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(
+                container_id=legacy_docker_id,
+                check_type="tcp",
+                tcp_port=8080,
+            )
+        )
+
+        original_engine_method = engine.get_stable_identifier
+
+        def mock_get_stable_identifier_returns_none(info):
+            if info.get("full_id") == container.id:
+                return None
+            return original_engine_method(info)
+
+        engine.get_stable_identifier = mock_get_stable_identifier_returns_none
+
+        config_manager.migrate_legacy_health_checks(docker_client, engine)
+
+        engine.get_stable_identifier = original_engine_method
+
+        assert (
+            config_manager.get_custom_health_check(legacy_docker_id) is not None
+        ), "Health check should be preserved under original Docker ID when stable_id is None"
+
+        checks = config_manager.get_all_custom_health_checks()
+        assert (
+            len(checks) == 1
+        ), "Should still have the health check preserved"

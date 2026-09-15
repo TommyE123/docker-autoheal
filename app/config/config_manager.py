@@ -446,38 +446,53 @@ class ConfigManager:
             docker_client: DockerClientWrapper instance to identify containers
             monitoring_engine: MonitoringEngine instance with get_stable_identifier method
         """
+        if not self._custom_health_checks:
+            return
+
+        migrated = {}
+        unmigrated_count = 0
+        collision_count = 0
+
+        for key, health_check in list(self._custom_health_checks.items()):
+            container = docker_client.get_container(key)
+            if not container:
+                migrated[key] = health_check
+                unmigrated_count += 1
+                continue
+
+            info = docker_client.get_container_info(container)
+            if not info:
+                migrated[key] = health_check
+                unmigrated_count += 1
+                continue
+
+            stable_id = monitoring_engine.get_stable_identifier(info)
+
+            if not stable_id:
+                migrated[key] = health_check
+                unmigrated_count += 1
+                logger.warning(
+                    f"Could not determine stable ID for container {key[:12]}..., preserving original Docker ID key"
+                )
+                continue
+
+            if stable_id == key:
+                migrated[key] = health_check
+            elif stable_id in migrated:
+                collision_count += 1
+                logger.warning(
+                    f"Health check collision: Docker ID {key[:12]}... and {list(self._custom_health_checks.keys())[0][:12]}... "
+                    f"both map to stable ID {stable_id}. Keeping existing entry."
+                )
+            else:
+                health_check.container_id = stable_id
+                migrated[stable_id] = health_check
+                logger.info(
+                    f"Migrated custom health check from Docker ID {key[:12]}... "
+                    f"to stable ID {stable_id}"
+                )
+
         with self._lock:
-            if not self._custom_health_checks:
-                return
-
-            migrated = {}
-            unmigrated_count = 0
-
-            for key, health_check in self._custom_health_checks.items():
-                container = docker_client.get_container(key)
-                if not container:
-                    migrated[key] = health_check
-                    unmigrated_count += 1
-                    continue
-
-                info = docker_client.get_container_info(container)
-                if not info:
-                    migrated[key] = health_check
-                    unmigrated_count += 1
-                    continue
-
-                stable_id = monitoring_engine.get_stable_identifier(info)
-
-                if stable_id == key:
-                    migrated[key] = health_check
-                else:
-                    health_check.container_id = stable_id
-                    migrated[stable_id] = health_check
-                    logger.info(
-                        f"Migrated custom health check from Docker ID {key[:12]}... "
-                        f"to stable ID {stable_id}"
-                    )
-
             if migrated != self._custom_health_checks:
                 self._custom_health_checks = migrated
                 self._save_config()
@@ -485,6 +500,11 @@ class ConfigManager:
                     logger.info(
                         f"Health check migration complete: {unmigrated_count} entries "
                         f"could not be resolved to containers and were preserved"
+                    )
+                if collision_count > 0:
+                    logger.warning(
+                        f"Health check migration: {collision_count} collisions detected "
+                        f"(multiple Docker IDs mapping to same stable ID)"
                     )
 
     def record_restart(self, container_id: str) -> None:
