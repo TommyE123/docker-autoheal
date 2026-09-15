@@ -152,8 +152,7 @@ docker ps | grep autoheal
 
 | Port | Service |
 |------|---------|
-| **3131** | **React UI** ← Main Web UI access point |
-| **8080** | **Backend API** |
+| **3131** | **React UI + API** ← Main Web UI + API access point |
 | 9090 | Prometheus metrics |
 
 ## Troubleshooting
@@ -193,7 +192,7 @@ docker logs docker-autoheal
 
 **Common issues:**
 - Docker socket not accessible
-- Port 8080 in use
+- Port 3131 in use
 - Build failed
 
 **Solution:**
