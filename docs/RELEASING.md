@@ -74,8 +74,11 @@ with `cancel-in-progress: false`, so releases are processed one at a time, in th
    that already exists;
 6. verify the tag points at the release commit;
 7. build and publish the multi-architecture image to Docker Hub and GHCR as
-   `<image>:vMAJOR.MINOR.PATCH` and `<image>:latest`;
-8. create the GitHub Release.
+   `<image>:vMAJOR.MINOR.PATCH` (the immutable version image only);
+8. create the GitHub Release;
+9. promote `<image>:latest` to the new version image (in a separate retryable job,
+   so a failed promotion can be retried without rebuilding the version image or
+   creating another GitHub Release).
 
 No image is published before its release tag is safely established, and a tag is never
 moved, deleted, recreated or force-pushed: a conflict fails the release instead.
