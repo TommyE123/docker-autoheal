@@ -14,7 +14,6 @@ from docker.models.containers import Container
 from app.config.config_manager import config_manager, AutoHealEvent, HealthCheckConfig
 from app.docker_client.docker_client_wrapper import DockerClientWrapper
 from app.notifications.notification_manager import notification_manager
-from app.notifications.notification_manager import notification_manager
 
 logger = logging.getLogger(__name__)
 
@@ -148,20 +147,6 @@ class MonitoringEngine:
 
             # Get ALL containers (including stopped) to detect failures
             containers = await asyncio.to_thread(self.docker_client.list_containers, all_containers=True)
-
-            # Get stable IDs for active containers to clean up restart counts
-            active_stable_ids = []
-            for container in containers:
-                try:
-                    info = self.docker_client.get_container_info(container)
-                    if info:
-                        stable_id = self.get_stable_identifier(info)
-                        active_stable_ids.append(stable_id)
-                except Exception as e:
-                    logger.debug(f"Error getting container info for cleanup: {e}")
-
-            # Clean up restart counts for removed containers
-            config_manager.cleanup_restart_counts(active_stable_ids)
 
             for container in containers:
                 try:
