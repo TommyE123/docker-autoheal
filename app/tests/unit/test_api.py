@@ -510,9 +510,9 @@ class TestHealthCheckManagement:
         )
 
         assert result["status"] == "success"
-        stored = config_manager.get_custom_health_check("a" * 64)
+        stored = config_manager.get_custom_health_check("web")
         assert stored is not None
-        assert stored.container_id == "a" * 64
+        assert stored.container_id == "web"
         assert stored.check_type == "http"
 
     async def test_add_health_check_unknown_container_returns_404(self, wired_api):
@@ -540,12 +540,12 @@ class TestHealthCheckManagement:
         container, info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, info)
         config_manager.add_custom_health_check(
-            HealthCheckConfig(container_id="a" * 64, check_type="tcp", tcp_port=8080)
+            HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080)
         )
 
         result = await get_health_check("web")
 
-        assert result.container_id == "a" * 64
+        assert result.container_id == "web"
         assert result.check_type == "tcp"
 
     async def test_get_health_check_missing_check_returns_404(self, wired_api):
@@ -577,13 +577,13 @@ class TestHealthCheckManagement:
         container, info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, info)
         config_manager.add_custom_health_check(
-            HealthCheckConfig(container_id="a" * 64, check_type="tcp", tcp_port=8080)
+            HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080)
         )
 
         result = await delete_health_check("web")
 
         assert result["status"] == "success"
-        assert config_manager.get_custom_health_check("a" * 64) is None
+        assert config_manager.get_custom_health_check("web") is None
 
     async def test_delete_health_check_unknown_container_returns_404(self, wired_api):
         with pytest.raises(HTTPException) as exc_info:
