@@ -13,6 +13,14 @@ SHOW_ELAPSED_TIME: true
 VALIDATE_ALL_CODEBASE: true
 YAML_YAMLLINT_ARGUMENTS: "--strict"
 
+# MegaLinter's markdownlint descriptor only auto-detects a file literally named
+# .markdownlint.json by default; a .jsonc file (needed for the comments explaining
+# the two disabled rules) is otherwise silently ignored in favor of MegaLinter's own
+# bundled default config. Point it explicitly at ours, at the repo root (LINTER_RULES_PATH
+# defaults to .github/linters, which doesn't exist here).
+MARKDOWN_MARKDOWNLINT_CONFIG_FILE: ".markdownlint.jsonc"
+MARKDOWN_MARKDOWNLINT_RULES_PATH: "."
+
 # Linters below have existing findings in this repository. They remain
 # enabled and their findings stay visible, but do not fail the build until
 # a follow-up issue fixes the underlying findings.
