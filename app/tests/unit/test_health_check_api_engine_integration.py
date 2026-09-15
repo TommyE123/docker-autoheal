@@ -88,9 +88,14 @@ class TestCustomHealthCheckDiscoveryAcrossRecreation:
         stable_id = engine.get_stable_identifier(original_info)
 
         # Recreate: the old container is gone, a new one takes its place with
-        # a new Docker ID but the same compose project/service labels.
+        # a new Docker ID and name, but the same compose project/service
+        # labels. The new name deliberately differs from the original so the
+        # engine's container-name fallback lookup can't mask a broken
+        # stable-ID lookup.
         docker_client.remove_container(original_container)
-        recreated_container, recreated_info = self._compose_container(container_id="b" * 64)
+        recreated_container, recreated_info = self._compose_container(
+            container_id="b" * 64, name="stack-web-1-recreated"
+        )
         docker_client.add_container(recreated_container, recreated_info)
         docker_client.health_results[recreated_container.name] = False
 
