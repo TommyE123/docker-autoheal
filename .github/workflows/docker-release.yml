@@ -41,6 +41,7 @@ jobs:
       release_type: ${{ steps.plan.outputs.release_type }}
       version: ${{ steps.plan.outputs.version }}
       create_tag: ${{ steps.plan.outputs.create_tag }}
+      already_released: ${{ steps.resume.outputs.already_released_tag }}
 
     steps:
       # push is already restricted to main by its own trigger, and schedule
@@ -429,7 +430,25 @@ jobs:
             --title "${TAG_NAME}" \
             --generate-notes
 
-      # Update the repository description on Docker Hub using the README
+  update-hub-description:
+    name: Update Docker Hub description
+    runs-on: ubuntu-latest
+    # Run when a new release just published successfully, or when the commit
+    # is already fully released (ALREADY_RELEASED) so a rerun after a failed
+    # description update can complete the step without re-publishing images.
+    needs: [plan, release]
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      (needs.release.result == 'success' ||
+       needs.plan.outputs.already_released != '')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Update Docker Hub description
         uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
         with:
