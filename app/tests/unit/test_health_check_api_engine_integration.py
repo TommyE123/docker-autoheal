@@ -66,6 +66,7 @@ class TestCustomHealthCheckDiscoveryAcrossRecreation:
         assert reason == "Custom health check failed (tcp)"
 
     @pytest.mark.xfail(
+        raises=AssertionError,
         reason="Known regression tracked by #30; expected to pass when the fix lands.",
         strict=True,
     )
@@ -99,6 +100,7 @@ class TestCustomHealthCheckDiscoveryAcrossRecreation:
         docker_client.add_container(recreated_container, recreated_info)
         docker_client.health_results[recreated_container.name] = False
 
+        assert recreated_info["name"] != original_info["name"]
         assert recreated_info["full_id"] != original_info["full_id"]
         assert engine.get_stable_identifier(recreated_info) == stable_id
 
