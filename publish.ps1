@@ -2,16 +2,16 @@
 # Usage: .\publish.ps1 -Username <your-dockerhub-username> [-Tag <version>]
 
 param(
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string]$Username = "",
 
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string]$Tag = "latest",
 
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [switch]$SkipBuild = $false,
 
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [switch]$PushLatest = $true
 )
 
@@ -131,7 +131,7 @@ if ($PushLatest -and $Tag -ne "latest") {
 Write-Host ""
 Write-Host "To use this image:" -ForegroundColor White
 Write-Host "  docker pull $FullImageName`:$Tag" -ForegroundColor Gray
-Write-Host "  docker run -d -v /var/run/docker.sock:/var/run/docker.sock -p 8080:8080 $FullImageName`:$Tag" -ForegroundColor Gray
+Write-Host "  docker run -d -v /var/run/docker.sock:/var/run/docker.sock -p 3131:3131 $FullImageName`:$Tag" -ForegroundColor Gray
 Write-Host ""
 Write-Host "View on Docker Hub:" -ForegroundColor White
 Write-Host "  https://hub.docker.com/r/$FullImageName" -ForegroundColor Cyan

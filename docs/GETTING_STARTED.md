@@ -1,4 +1,4 @@
-# 🚀 Getting Started - React UI on Port 8080
+# 🚀 Getting Started - React UI on Port 3131
 
 This guide will get you up and running in **2 minutes**.
 
@@ -25,13 +25,13 @@ docker-compose up --build
 **What happens:**
 1. Docker builds the React UI (takes ~30 seconds first time)
 2. Python backend starts
-3. UI is served on port 8080
+3. UI is served on port 3131
 
 ### Step 2: Access the UI
 
 Open your browser:
 ```
-http://localhost:8080
+http://localhost:3131
 ```
 
 You should see the React dashboard with:
@@ -56,12 +56,12 @@ curl http://localhost:8080/health
 curl http://localhost:8080/api/status
 
 # Open UI
-start http://localhost:8080
+start http://localhost:3131
 ```
 
 ## That's It! 🎉
 
-You're now running the Docker Auto-Heal Service with React UI on port 8080.
+You're now running the Docker Auto-Heal Service with React UI on port 3131.
 
 ## What to Do Next
 
@@ -152,7 +152,8 @@ docker ps | grep autoheal
 
 | Port | Service |
 |------|---------|
-| **8080** | **React UI + API** ← Main access point |
+| **3131** | **React UI** ← Main Web UI access point |
+| **8080** | **Backend API** |
 | 9090 | Prometheus metrics |
 
 ## Troubleshooting
@@ -220,7 +221,7 @@ docker-autoheal/
 
 ## Key Features
 
-Access these features at http://localhost:8080:
+Access these features at http://localhost:3131:
 
 - ✅ **Dashboard** - Real-time metrics
 - ✅ **Container Management** - Enable/disable auto-heal
@@ -248,7 +249,7 @@ docker run -d \
   nginx:alpine
 
 # View in UI
-# Go to http://localhost:8080
+# Go to http://localhost:3131
 # See test-nginx in Containers tab
 ```
 
@@ -277,10 +278,10 @@ For production:
 
 ## Summary
 
-✅ **One command**: `docker-compose up --build`  
-✅ **One port**: http://localhost:8080  
-✅ **React UI**: Built automatically  
-✅ **No Node.js**: Required only for development  
+✅ **One command**: `docker-compose up --build`
+✅ **One port**: http://localhost:3131
+✅ **React UI**: Built automatically
+✅ **No Node.js**: Required only for development
 
 **Start monitoring your containers now! 🚀**
 

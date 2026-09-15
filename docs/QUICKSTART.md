@@ -4,9 +4,9 @@ This guide will help you get the Docker Auto-Heal Service up and running in 5 mi
 
 ## Prerequisites
 
-✅ Docker installed and running  
-✅ Docker Compose installed (optional but recommended)  
-✅ Internet connection to pull images  
+✅ Docker installed and running
+✅ Docker Compose installed (optional but recommended)
+✅ Internet connection to pull images
 
 ## Step 1: Start the Service
 
@@ -30,7 +30,7 @@ docker build -t docker-autoheal .
 docker run -d \
   --name autoheal \
   -v /var/run/docker.sock:/var/run/docker.sock:ro \
-  -p 8080:8080 \
+  -p 3131:3131 \
   -p 9090:9090 \
   --restart unless-stopped \
   docker-autoheal
@@ -41,7 +41,7 @@ docker run -d \
 Open your browser and navigate to:
 
 ```
-http://localhost:8080
+http://localhost:3131
 ```
 
 You should see the Docker Auto-Heal dashboard with:
@@ -77,7 +77,7 @@ watch docker ps
 docker logs -f autoheal
 
 # Check events in the UI
-# Navigate to Events tab in http://localhost:8080
+# Navigate to Events tab in http://localhost:3131
 ```
 
 ## Step 4: Enable Auto-Heal for a Container
@@ -242,11 +242,11 @@ curl http://localhost:8080/health
 
 ## Next Steps
 
-✅ Add `autoheal=true` label to your production containers  
-✅ Configure custom health checks for your services  
-✅ Set up Prometheus monitoring  
-✅ Export and backup your configuration  
-✅ Review the full documentation in README.md  
+✅ Add `autoheal=true` label to your production containers
+✅ Configure custom health checks for your services
+✅ Set up Prometheus monitoring
+✅ Export and backup your configuration
+✅ Review the full documentation in README.md
 
 ## Clean Up (When Testing)
 

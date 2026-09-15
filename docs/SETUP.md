@@ -9,17 +9,17 @@ The easiest way to run the application with React UI:
 docker-compose up --build
 
 # Access the UI
-http://localhost:8080
+http://localhost:3131
 ```
 
-That's it! The React UI is built automatically inside Docker and served on port 8080.
+That's it! The React UI is built automatically inside Docker and served on port 3131.
 
 ## What Changed
 
-✅ **Removed** Simple HTML/JavaScript UI  
-✅ **React is now the only UI**  
-✅ **Single `docker-compose up` command** builds everything  
-✅ **UI accessible on port 8080**  
+✅ **Removed** Simple HTML/JavaScript UI
+✅ **React is now the only UI**
+✅ **Single `docker-compose up` command** builds everything
+✅ **UI accessible on port 3131**
 
 ## Architecture
 
@@ -28,7 +28,7 @@ That's it! The React UI is built automatically inside Docker and served on port 
 │         Docker Container                 │
 │                                          │
 │  ┌────────────────────────────────┐    │
-│  │   React UI (port 8080)         │    │
+│  │   React UI (port 3131)         │    │
 │  │   - Built with Vite            │    │
 │  │   - Served by FastAPI          │    │
 │  └────────────────────────────────┘    │
@@ -59,7 +59,7 @@ The Dockerfile uses multi-stage build:
    - Uses Python 3.11 slim
    - Installs Python dependencies
    - Copies React build to `static/`
-   - Exposes ports 8080 and 9090
+  - Exposes ports 3131 and 9090
 
 ## Usage
 
@@ -115,14 +115,15 @@ This creates the `static/` directory with optimized React build.
 Then start the backend:
 ```bash
 python main.py
-# Serves React at http://localhost:8080
+# Serves React at http://localhost:3131
 ```
 
 ## Ports
 
 | Port | Service |
 |------|---------|
-| 8080 | React UI + API |
+| 3131 | React UI |
+| 8080 | Backend API |
 | 9090 | Prometheus metrics |
 
 ## File Structure
@@ -153,7 +154,7 @@ docker-autoheal/
 
 ## Features
 
-All features available through React UI on port 8080:
+All features available through React UI on port 3131:
 
 - ✅ **Dashboard** - Real-time metrics and status
 - ✅ **Containers** - List, select, manage containers
@@ -191,7 +192,7 @@ docker logs docker-autoheal
 **Should see:**
 ```
 Serving React UI from static directory
-Web UI available at http://0.0.0.0:8080
+Web UI available at http://0.0.0.0:3131
 ```
 
 ### Build fails
@@ -342,5 +343,5 @@ If you encounter issues:
 
 ---
 
-**The UI is now React-only and accessible at http://localhost:8080 when you run `docker-compose up`! 🚀**
+**The UI is now React-only and accessible at http://localhost:3131 when you run `docker-compose up`! 🚀**
 

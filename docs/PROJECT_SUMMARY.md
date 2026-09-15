@@ -4,14 +4,14 @@
 
 A **fully functional, production-ready** Docker container auto-healing service built in Python with:
 
-✅ **Core Monitoring Engine** - Monitors containers 24/7, auto-restarts on failures  
-✅ **Web UI Dashboard** - Modern, responsive interface to manage everything  
-✅ **REST API** - Full programmatic access with interactive documentation  
-✅ **Custom Health Checks** - HTTP, TCP, Exec, and Docker native support  
-✅ **Smart Restart Logic** - Cooldowns, backoffs, quarantine for flapping containers  
-✅ **Configuration Management** - In-memory state with JSON export/import  
-✅ **Event Logging** - Track all auto-heal actions and decisions  
-✅ **Prometheus Metrics** - Built-in observability  
+✅ **Core Monitoring Engine** - Monitors containers 24/7, auto-restarts on failures
+✅ **Web UI Dashboard** - Modern, responsive interface to manage everything
+✅ **REST API** - Full programmatic access with interactive documentation
+✅ **Custom Health Checks** - HTTP, TCP, Exec, and Docker native support
+✅ **Smart Restart Logic** - Cooldowns, backoffs, quarantine for flapping containers
+✅ **Configuration Management** - In-memory state with JSON export/import
+✅ **Event Logging** - Track all auto-heal actions and decisions
+✅ **Prometheus Metrics** - Built-in observability
 
 ## 📁 Complete File Structure
 
@@ -107,7 +107,7 @@ docker-compose down
 ### Access the Application
 ```bash
 # Web UI
-http://localhost:8080
+http://localhost:3131
 
 # API Documentation
 http://localhost:8080/docs
@@ -168,13 +168,13 @@ docker logs -f docker-autoheal
   - Interval (how often to check)
   - Label filters
   - Include all mode
-  
+
 - **Restart Policy**
   - Mode (on-failure / health / both)
   - Cooldown seconds
   - Max restarts and window
   - Backoff settings
-  
+
 - **Export/Import**
   - Download config as JSON
   - Upload config from JSON
@@ -466,10 +466,10 @@ All requirements from the Business Requirements Document have been implemented:
 
 ---
 
-**Version**: 1.1.0  
-**Date**: October 30, 2025  
-**Language**: Python 3.11+  
-**Framework**: FastAPI + Bootstrap 5  
+**Version**: 1.1.0
+**Date**: October 30, 2025
+**Language**: Python 3.11+
+**Framework**: FastAPI + Bootstrap 5
 **Status**: Production Ready ✅
 
 **Built with ❤️ following the complete BRD specification**

@@ -54,8 +54,8 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "========================================" -ForegroundColor Green
     Write-Host ""
     Write-Host "  Service is running!" -ForegroundColor White
-    Write-Host "  UI: http://localhost:8080" -ForegroundColor Cyan
-    Write-Host "  API Docs: http://localhost:8080/docs" -ForegroundColor Cyan
+    Write-Host "  UI: http://localhost:3131" -ForegroundColor Cyan
+    Write-Host "  API Docs: http://localhost:3131/docs" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "  View logs:" -ForegroundColor White
     Write-Host "  docker logs -f docker-autoheal" -ForegroundColor Gray
