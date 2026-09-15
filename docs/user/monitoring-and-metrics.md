@@ -12,13 +12,13 @@ curl http://localhost:9090/metrics
 
 Metrics defined by the service:
 
-| Metric | Type | Labels | Description |
-|---|---|---|---|
-| `autoheal_container_restarts_total` | Counter | `container_name` | Total restarts performed |
-| `autoheal_containers_monitored` | Gauge | — | Number of containers currently monitored |
-| `autoheal_containers_quarantined` | Gauge | — | Number of containers currently quarantined |
-| `autoheal_health_checks_total` | Counter | — | Total health checks performed |
-| `autoheal_health_checks_failed` | Counter | `container_name` | Failed health checks |
+| Metric                              | Type    | Labels           | Description                                |
+|-------------------------------------|---------|------------------|--------------------------------------------|
+| `autoheal_container_restarts_total` | Counter | `container_name` | Total restarts performed                   |
+| `autoheal_containers_monitored`     | Gauge   | —                | Number of containers currently monitored   |
+| `autoheal_containers_quarantined`   | Gauge   | —                | Number of containers currently quarantined |
+| `autoheal_health_checks_total`      | Counter | —                | Total health checks performed              |
+| `autoheal_health_checks_failed`     | Counter | `container_name` | Failed health checks                       |
 
 The metrics server runs on its own port, separate from the web UI/API port (`3131`), so
 you can restrict access to it independently (for example, only exposing it to your

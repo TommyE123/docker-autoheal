@@ -7,15 +7,15 @@ notification endpoint never blocks monitoring.
 
 ## Supported services
 
-| Service | Notes |
-|---|---|
-| Generic webhook | JSON POST to any URL, with optional custom headers |
-| Discord | Rich embeds |
-| Slack | Formatted blocks |
-| Telegram | Via a bot token + chat ID |
-| ntfy | Push notifications, self-hosted or [ntfy.sh](https://ntfy.sh) |
-| Gotify | Self-hosted push server |
-| Pushover | Cross-platform push |
+| Service         | Notes                                                         |
+|-----------------|---------------------------------------------------------------|
+| Generic webhook | JSON POST to any URL, with optional custom headers            |
+| Discord         | Rich embeds                                                   |
+| Slack           | Formatted blocks                                              |
+| Telegram        | Via a bot token + chat ID                                     |
+| ntfy            | Push notifications, self-hosted or [ntfy.sh](https://ntfy.sh) |
+| Gotify          | Self-hosted push server                                       |
+| Pushover        | Cross-platform push                                           |
 
 ## Setting up a notification service
 
@@ -40,14 +40,14 @@ curl -X POST http://localhost:3131/api/notifications/services \
   }'
 ```
 
-| Endpoint | Purpose |
-|---|---|
-| `GET /api/notifications/config` | Current notification configuration |
-| `PUT /api/notifications/config` | Update enabled state / event filters / services in bulk |
-| `POST /api/notifications/services` | Add a service |
-| `PUT /api/notifications/services/{name}` | Update a service |
-| `DELETE /api/notifications/services/{name}` | Remove a service |
-| `POST /api/notifications/test/{name}` | Send a test notification |
+| Endpoint                                    | Purpose                                                 |
+|---------------------------------------------|---------------------------------------------------------|
+| `GET /api/notifications/config`             | Current notification configuration                      |
+| `PUT /api/notifications/config`             | Update enabled state / event filters / services in bulk |
+| `POST /api/notifications/services`          | Add a service                                           |
+| `PUT /api/notifications/services/{name}`    | Update a service                                        |
+| `DELETE /api/notifications/services/{name}` | Remove a service                                        |
+| `POST /api/notifications/test/{name}`       | Send a test notification                                |
 
 ## Event filtering
 

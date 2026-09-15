@@ -136,17 +136,17 @@ For more, see the full [Troubleshooting guide](docs/user/troubleshooting.md).
 
 ## Documentation
 
-| For users | For developers | For maintainers |
-|---|---|---|
-| [Installation](docs/user/installation.md) | [Development setup](docs/developer/development-setup.md) | [Dependency management](docs/maintainer/dependency-management.md) |
-| [Configuration](docs/user/configuration.md) | [Architecture](docs/developer/architecture.md) | [Publishing](docs/maintainer/publishing.md) |
-| [Usage](docs/user/usage.md) | [Project structure](docs/developer/project-structure.md) | [Release process](docs/maintainer/release-process.md) |
-| [Labels](docs/user/labels.md) | [Frontend development](docs/developer/frontend.md) | |
-| [Health checks](docs/user/health-checks.md) | [Testing](docs/developer/testing.md) | |
-| [Monitoring & metrics](docs/user/monitoring-and-metrics.md) | | |
-| [Notifications](docs/user/notifications.md) | | |
-| [Maintenance mode](docs/user/maintenance-mode.md) | | |
-| [Troubleshooting](docs/user/troubleshooting.md) | | |
+| For users                                                   | For developers                                           | For maintainers                                                   |
+|-------------------------------------------------------------|----------------------------------------------------------|-------------------------------------------------------------------|
+| [Installation](docs/user/installation.md)                   | [Development setup](docs/developer/development-setup.md) | [Dependency management](docs/maintainer/dependency-management.md) |
+| [Configuration](docs/user/configuration.md)                 | [Architecture](docs/developer/architecture.md)           | [Publishing](docs/maintainer/publishing.md)                       |
+| [Usage](docs/user/usage.md)                                 | [Project structure](docs/developer/project-structure.md) | [Release process](docs/maintainer/release-process.md)             |
+| [Labels](docs/user/labels.md)                               | [Frontend development](docs/developer/frontend.md)       |                                                                   |
+| [Health checks](docs/user/health-checks.md)                 | [Testing](docs/developer/testing.md)                     |                                                                   |
+| [Monitoring & metrics](docs/user/monitoring-and-metrics.md) |                                                          |                                                                   |
+| [Notifications](docs/user/notifications.md)                 |                                                          |                                                                   |
+| [Maintenance mode](docs/user/maintenance-mode.md)           |                                                          |                                                                   |
+| [Troubleshooting](docs/user/troubleshooting.md)             |                                                          |                                                                   |
 
 The full documentation index, including historical/superseded documents, is in
 [docs/README.md](docs/README.md).

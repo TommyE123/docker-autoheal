@@ -34,17 +34,17 @@ The next push to `main` after that will release `v3.0.0`.
 
 ## What's automated vs. manual
 
-| Step | Automated? |
-|---|---|
-| Unit tests on every push/PR | Yes (`tests.yml`) |
-| MegaLinter on every PR to `main` | Yes (`mega-linter.yml`) |
-| Docker image build (verification only, no release) on every PR | Yes (`docker-build.yml`) |
-| Docker image build + push (Docker Hub + GHCR) + Git tag + GitHub release, on every push to `main` | Yes (`docker-release.yml`) |
-| Docker Hub description update | Yes (part of `docker-release.yml`) |
-| Dependency updates | Yes, via Renovate (see [Dependency Management](dependency-management.md)) |
-| Starting a new major/minor release series | No — push the `vN` marker tag manually |
-| GitHub release notes | Yes — auto-generated from merged PRs (`gh release create --generate-notes`) |
-| Changelog file | No — this project does not maintain a running `CHANGELOG.md`; GitHub Releases serve that purpose |
+| Step                                                                                              | Automated?                                                                                       |
+|---------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
+| Unit tests on every push/PR                                                                       | Yes (`tests.yml`)                                                                                |
+| MegaLinter on every PR to `main`                                                                  | Yes (`mega-linter.yml`)                                                                          |
+| Docker image build (verification only, no release) on every PR                                    | Yes (`docker-build.yml`)                                                                         |
+| Docker image build + push (Docker Hub + GHCR) + Git tag + GitHub release, on every push to `main` | Yes (`docker-release.yml`)                                                                       |
+| Docker Hub description update                                                                     | Yes (part of `docker-release.yml`)                                                               |
+| Dependency updates                                                                                | Yes, via Renovate (see [Dependency Management](dependency-management.md))                        |
+| Starting a new major/minor release series                                                         | No — push the `vN` marker tag manually                                                           |
+| GitHub release notes                                                                              | Yes — auto-generated from merged PRs (`gh release create --generate-notes`)                      |
+| Changelog file                                                                                    | No — this project does not maintain a running `CHANGELOG.md`; GitHub Releases serve that purpose |
 
 ## See also
 

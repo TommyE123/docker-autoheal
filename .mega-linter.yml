@@ -25,14 +25,13 @@ MARKDOWN_MARKDOWNLINT_RULES_PATH: "."
 # enabled and their findings stay visible, but do not fail the build until
 # a follow-up issue fixes the underlying findings.
 #
-# MARKDOWN_MARKDOWNLINT was in this list but is now enabled for real (see
-# .markdownlint.jsonc, which turns off only the two rules - MD013 line-length
-# and MD060 table-pipe-style - that conflict with this repo's established
-# prose/table formatting, rather than suppressing the linter's findings
-# wholesale). MARKDOWN_MARKDOWN_TABLE_FORMATTER is a separate table-alignment
-# formatter and is left disabled here: enabling it would mean reformatting
-# every table in the repo to its specific alignment style, which hasn't been
-# done or verified.
+# MARKDOWN_MARKDOWNLINT and MARKDOWN_MARKDOWN_TABLE_FORMATTER were both in this
+# list but are now enabled for real: .markdownlint.jsonc turns off only MD013
+# (line-length) and MD060 (table-pipe-style), the two rules that conflict with
+# this repo's established prose/table formatting; every table in the repo has
+# been run through `markdown-table-formatter` (its column-aligned style is a
+# strict superset of - not a conflict with - the padded-pipe convention MD060
+# was kept off for), so its --check mode is clean repo-wide.
 DISABLE_ERRORS_LINTERS:
   - ACTION_ZIZMOR
   - PYTHON_PYLINT
@@ -45,7 +44,6 @@ DISABLE_ERRORS_LINTERS:
   - PYTHON_PYRIGHT
   - JAVASCRIPT_STANDARD
   - CSS_STYLELINT
-  - MARKDOWN_MARKDOWN_TABLE_FORMATTER
   - REPOSITORY_TRIVY
   - REPOSITORY_GRYPE
   - REPOSITORY_OSV_SCANNER

@@ -57,15 +57,15 @@ http://localhost:3131/docs
 
 A few endpoints you're likely to use directly:
 
-| Endpoint | Purpose |
-|---|---|
-| `GET /health` | Service health check (used by the container's own `HEALTHCHECK`) |
-| `GET /api/status` | Overall system status and current config |
-| `GET /api/containers` | List containers with monitoring/health/quarantine state |
-| `POST /api/containers/{id}/restart` | Manually restart a container |
-| `POST /api/containers/{id}/unquarantine` | Remove a container from quarantine |
-| `GET /api/events` | Recent auto-heal events |
-| `GET /api/config` / `PUT /api/config` | Read/replace full configuration |
+| Endpoint                                 | Purpose                                                          |
+|------------------------------------------|------------------------------------------------------------------|
+| `GET /health`                            | Service health check (used by the container's own `HEALTHCHECK`) |
+| `GET /api/status`                        | Overall system status and current config                         |
+| `GET /api/containers`                    | List containers with monitoring/health/quarantine state          |
+| `POST /api/containers/{id}/restart`      | Manually restart a container                                     |
+| `POST /api/containers/{id}/unquarantine` | Remove a container from quarantine                               |
+| `GET /api/events`                        | Recent auto-heal events                                          |
+| `GET /api/config` / `PUT /api/config`    | Read/replace full configuration                                  |
 
 ## See also
 
