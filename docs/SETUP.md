@@ -95,9 +95,9 @@ npm run dev
 ```
 
 In development mode:
-- Backend runs on port 8080
+- Backend runs on port 3131
 - React dev server on port 3000
-- API calls proxy from 3000 → 8080
+- API calls proxy from 3000 → 3131
 - Hot reload enabled
 
 ## Building React Locally (Optional)
@@ -122,8 +122,8 @@ python main.py
 
 | Port | Service |
 |------|---------|
-| 3131 | React UI |
-| 8080 | Backend API |
+| 3131 | React UI + API |
+| 9090 | Prometheus metrics |
 | 9090 | Prometheus metrics |
 
 ## File Structure
@@ -204,15 +204,15 @@ docker-compose build --no-cache
 docker-compose up
 ```
 
-### Port 8080 already in use
+### Port 3131 already in use
 
 **Change port in docker-compose.yml:**
 ```yaml
 ports:
-  - "8081:8080"  # Changed from 8080:8080
+  - "3132:3131"  # Changed from 3131:3131
 ```
 
-Then access: `http://localhost:8081`
+Then access: `http://localhost:3132`
 
 ### Development mode issues
 
@@ -338,7 +338,7 @@ If you encounter issues:
 
 1. Check `docker logs docker-autoheal`
 2. Verify React build exists in container
-3. Check port 8080 is not in use
+3. Check port 3131 is not in use
 4. Try rebuilding: `docker-compose up --build --force-recreate`
 
 ---
