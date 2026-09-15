@@ -3,9 +3,9 @@ Configuration management for Docker Auto-Heal Service
 Handles in-memory configuration state with JSON export/import support
 """
 
-from typing import List, Dict, Optional
-from pydantic import BaseModel, Field
-from datetime import datetime, timezone
+from typing import List, Dict, Optional, Union
+from pydantic import BaseModel, Field, ValidationError, field_validator
+from datetime import datetime, timedelta, timezone
 import json
 import threading
 from pathlib import Path
@@ -165,7 +165,7 @@ class HealthCheckConfig(BaseModel):
 
 
 class AutoHealEvent(BaseModel):
-    """Auto-heal event log entry"""
+    """Current auto-heal event log entry with a UTC-aware timestamp."""
     timestamp: datetime
     container_id: str
     container_name: str
@@ -173,6 +173,48 @@ class AutoHealEvent(BaseModel):
     restart_count: int
     status: str  # success, failure, quarantined
     message: str
+
+    @field_validator("timestamp")
+    @classmethod
+    def timestamp_must_be_utc(cls, value: datetime) -> datetime:
+        """Reject timestamps that are not timezone-aware UTC datetimes."""
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("timestamp must be timezone-aware UTC")
+        if value.utcoffset() != timedelta(0):
+            raise ValueError("timestamp must be UTC")
+        return value
+
+
+class LegacyAutoHealEvent(BaseModel):
+    """Persisted event that predates the UTC-aware event model contract.
+
+    The timestamp remains its original JSON text because a naive timestamp
+    cannot be safely assigned a timezone after the fact.
+    """
+
+    timestamp: str
+    container_id: str
+    container_name: str
+    event_type: str
+    restart_count: int
+    status: str
+    message: str
+
+    @field_validator("timestamp")
+    @classmethod
+    def timestamp_must_be_non_utc_legacy_value(cls, value: str) -> str:
+        """Only retain values that cannot satisfy the current UTC contract."""
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as error:
+            raise ValueError("legacy timestamp must be ISO 8601") from error
+
+        if parsed.tzinfo is not None and parsed.utcoffset() == timedelta(0):
+            raise ValueError("UTC timestamps must use AutoHealEvent")
+        return value
+
+
+StoredAutoHealEvent = Union[AutoHealEvent, LegacyAutoHealEvent]
 
 
 class ConfigManager:
@@ -200,7 +242,7 @@ class ConfigManager:
 
         # Load persisted data or initialize with defaults
         self._config = self._load_config()
-        self._event_log: List[AutoHealEvent] = self._load_events()
+        self._event_log: List[StoredAutoHealEvent] = self._load_events()
         self._custom_health_checks: Dict[str, HealthCheckConfig] = self._load_custom_health_checks()
         # _container_restart_counts removed - now stored in self._config.containers.restart_counts
         self._quarantined_containers: set = self._load_quarantine()
@@ -262,13 +304,29 @@ class ConfigManager:
         except Exception as e:
             logger.error(f"Failed to save config to disk: {e}")
 
-    def _load_events(self) -> List[AutoHealEvent]:
-        """Load events from file or return empty list"""
+    def _load_events(self) -> List[StoredAutoHealEvent]:
+        """Load current and legacy events without losing valid history."""
         try:
             if self.EVENTS_FILE.exists():
                 with open(self.EVENTS_FILE, 'r') as f:
                     data = json.load(f)
-                    events = [AutoHealEvent(**event) for event in data]
+                    events: List[StoredAutoHealEvent] = []
+                    for index, event in enumerate(data):
+                        try:
+                            events.append(AutoHealEvent(**event))
+                        except ValidationError:
+                            try:
+                                events.append(LegacyAutoHealEvent(**event))
+                                logger.warning(
+                                    "Loaded legacy event %d with a timestamp outside "
+                                    "the current contract; "
+                                    "preserving its original timestamp text",
+                                    index,
+                                )
+                            except ValidationError as error:
+                                logger.warning(
+                                    "Skipping invalid event %d from disk: %s", index, error
+                                )
                     logger.info(f"Loaded {len(events)} events from disk")
                     return events
         except Exception as e:
@@ -397,7 +455,7 @@ class ConfigManager:
                 self._event_log = self._event_log[-max_entries:]
             self._save_events()
 
-    def get_events(self, limit: Optional[int] = None) -> List[AutoHealEvent]:
+    def get_events(self, limit: Optional[int] = None) -> List[StoredAutoHealEvent]:
         """Get event log (thread-safe)"""
         with self._lock:
             if limit:
