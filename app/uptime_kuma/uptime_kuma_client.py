@@ -6,7 +6,6 @@ import aiohttp
 import logging
 import re
 from typing import List, Dict, Optional
-from aiohttp import BasicAuth
 
 logger = logging.getLogger(__name__)
 
@@ -15,13 +14,17 @@ class UptimeKumaClient:
     """Client for interacting with Uptime-Kuma API using /metrics endpoint"""
 
     def __init__(self, server_url: str, password: str, username: str = ""):
+        """Configure the metrics endpoint and its Basic authentication header."""
         self.server_url = server_url.rstrip('/')
         self.password = password
         self.username = username
         # Use Basic Auth with username (empty for API key) and password/API key
         # For API key: username="", password=api_key
         # For user auth: username=username, password=password
-        self.auth = BasicAuth(username if username else '', password)
+        # Keep BasicAuth's Latin-1 default for compatibility with existing credentials.
+        self.auth_header = aiohttp.encode_basic_auth(
+            username if username else '', password, encoding="latin1"
+        )
         self.session: Optional[aiohttp.ClientSession] = None
 
     async def connect(self) -> bool:
@@ -31,7 +34,7 @@ class UptimeKumaClient:
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     f"{self.server_url}/metrics",
-                    auth=self.auth,
+                    headers={"Authorization": self.auth_header},
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as response:
                     logger.debug(f"Response status: {response.status}")
@@ -53,7 +56,7 @@ class UptimeKumaClient:
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     f"{self.server_url}/metrics",
-                    auth=self.auth,
+                    headers={"Authorization": self.auth_header},
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as response:
                     if response.status != 200:
@@ -110,7 +113,7 @@ class UptimeKumaClient:
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     f"{self.server_url}/metrics",
-                    auth=self.auth,
+                    headers={"Authorization": self.auth_header},
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as response:
                     if response.status != 200:
@@ -130,4 +133,3 @@ class UptimeKumaClient:
         except Exception as e:
             logger.error(f"Failed to get monitor status for '{monitor_name}': {e}")
             return None
-
