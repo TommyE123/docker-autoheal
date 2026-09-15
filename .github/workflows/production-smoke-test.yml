@@ -1,8 +1,8 @@
 name: Production Smoke Test
 
 # Runs after "Docker Build" (docker-build.yml) has already built and pushed
-# the PR image, and pulls that exact image (ghcr.io/.../docker-autoheal:pr-N)
-# rather than rebuilding it.
+# the PR image, and pulls that exact image by its immutable per-commit
+# sha-<short sha> tag rather than rebuilding it.
 on:
   workflow_run:
     workflows: ["Docker Build"]
@@ -36,11 +36,15 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Resolve PR image
+      - name: Resolve the exact image built for this commit
         id: image
+        # pr-<N> is mutable and can be overwritten by a later commit on the
+        # same PR before this job runs; docker-build.yml's metadata-action
+        # also tags every build with sha-<short sha> (type=sha), which is
+        # unique per commit, so it names exactly the image this run built.
         run: |
-          PR_NUMBER="${{ github.event.workflow_run.pull_requests[0].number }}"
-          echo "ref=ghcr.io/${{ github.repository_owner }}/docker-autoheal:pr-${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+          SHORT_SHA="${{ github.event.workflow_run.head_sha }}"
+          echo "ref=ghcr.io/${{ github.repository_owner }}/docker-autoheal:sha-${SHORT_SHA:0:7}" >> "$GITHUB_OUTPUT"
 
       - name: Pull the exact PR image
         run: docker pull "${{ steps.image.outputs.ref }}"
