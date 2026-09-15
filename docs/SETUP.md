@@ -124,7 +124,6 @@ python main.py
 |------|---------|
 | 3131 | React UI + API |
 | 9090 | Prometheus metrics |
-| 9090 | Prometheus metrics |
 
 ## File Structure
 
