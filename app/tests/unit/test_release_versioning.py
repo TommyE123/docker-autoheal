@@ -993,6 +993,42 @@ class TestReleaseWorkflows:
         assert "ALREADY_RELEASED" in run
         assert "PLANNED_VERSION" in run
 
+    def test_promote_latest_skips_if_newer_release_exists(self):
+        # Regression guard: a re-run of an older completed workflow (e.g.
+        # v2.0.5) must not move :latest backwards when a newer release (e.g.
+        # v2.0.6) has since been published.
+        # Failure scenario:
+        #   v2.0.5 completes; v2.0.6 completes and becomes :latest;
+        #   maintainer re-runs the v2.0.5 workflow; plan detects
+        #   already_released=v2.0.5; promote_latest overwrites :latest with
+        #   v2.0.5, downgrading users from v2.0.6.
+        promote = next(
+            step
+            for step in self.load("docker-release.yml")["jobs"]["promote_latest"]["steps"]
+            if step.get("name") == "Promote latest tag"
+        )
+        run = promote["run"]
+        # Must query the newest published release before promoting
+        assert "release list" in run or "releases" in run, (
+            "Promote latest tag must check for a newer published release "
+            "before calling imagetools create"
+        )
+        # Must skip gracefully (exit 0, not exit 1) when a newer release owns
+        # :latest — an older re-run is not an error, it just has nothing to do
+        assert "exit 0" in run, (
+            "Promote latest tag must exit 0 when skipping due to a newer "
+            "published release; the re-run workflow must not fail"
+        )
+        # Must compare VERSION against the newest release
+        assert "NEWEST" in run, (
+            "Promote latest tag must compare VERSION against the newest "
+            "published release before calling imagetools create"
+        )
+        # Must have GH_TOKEN to query published releases
+        assert "GH_TOKEN" in promote.get("env", {}), (
+            "Promote latest tag must have GH_TOKEN to query published releases"
+        )
+
     def test_classification_uses_events_api_not_current_labels(self):
         # Guard the immutability fix: the classification step must reconstruct
         # labels from the GitHub Issues Events API (append-only) rather than

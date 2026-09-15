@@ -437,6 +437,7 @@ jobs:
        needs.plan.outputs.already_released != '')
 
     permissions:
+      contents: read
       packages: write
 
     steps:
@@ -485,9 +486,30 @@ jobs:
 
       - name: Promote latest tag
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
+          # Guard: only promote when this version is still the newest published
+          # release.  A re-run of an older completed workflow must not downgrade
+          # :latest when a newer release has since been published.
+          NEWEST="$(gh release list \
+            --exclude-drafts --exclude-pre-releases \
+            --limit 100 \
+            --json tagName \
+            --jq '.[].tagName' \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || echo '')"
+
+          if [ -z "$NEWEST" ]; then
+            echo "::error::No published GitHub Release found; cannot determine the newest release."
+            exit 1
+          fi
+
+          if [ "$VERSION" != "$NEWEST" ]; then
+            echo "Skipping: ${VERSION} is not the newest published release (${NEWEST} is); :latest already points at a newer release."
+            exit 0
+          fi
+
           docker buildx imagetools create \
             --tag "docker.io/${DOCKERHUB_USERNAME}/docker-autoheal:latest" \
             "docker.io/${DOCKERHUB_USERNAME}/docker-autoheal:${VERSION}"
