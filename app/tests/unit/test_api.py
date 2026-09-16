@@ -558,6 +558,39 @@ class TestHealthCheckManagement:
 
         assert exc_info.value.status_code == 404
 
+    async def test_get_health_check_falls_back_to_legacy_full_docker_id(self, wired_api):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+        # A check persisted before stable-ID storage, still keyed by the
+        # container's current full Docker ID.
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="a" * 64, check_type="tcp", tcp_port=8080)
+        )
+
+        result = await get_health_check("web")
+
+        assert result.container_id == "a" * 64
+        assert result.check_type == "tcp"
+
+    async def test_get_health_check_prefers_stable_id_over_legacy_full_docker_id(
+        self, wired_api
+    ):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="web", check_type="http", http_endpoint="http://localhost/health")
+        )
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="a" * 64, check_type="tcp", tcp_port=8080)
+        )
+
+        result = await get_health_check("web")
+
+        assert result.container_id == "web"
+        assert result.check_type == "http"
+
     async def test_get_health_check_unknown_container_returns_404(self, wired_api):
         with pytest.raises(HTTPException) as exc_info:
             await get_health_check("does-not-exist")
@@ -584,6 +617,38 @@ class TestHealthCheckManagement:
 
         assert result["status"] == "success"
         assert config_manager.get_custom_health_check("web") is None
+
+    async def test_delete_health_check_removes_legacy_full_docker_id(self, wired_api):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="a" * 64, check_type="tcp", tcp_port=8080)
+        )
+
+        result = await delete_health_check("web")
+
+        assert result["status"] == "success"
+        assert config_manager.get_custom_health_check("a" * 64) is None
+
+    async def test_delete_health_check_prefers_stable_id_over_legacy_full_docker_id(
+        self, wired_api
+    ):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="web", check_type="http", http_endpoint="http://localhost/health")
+        )
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="a" * 64, check_type="tcp", tcp_port=8080)
+        )
+
+        result = await delete_health_check("web")
+
+        assert result["status"] == "success"
+        assert config_manager.get_custom_health_check("web") is None
+        assert config_manager.get_custom_health_check("a" * 64) is not None
 
     async def test_delete_health_check_unknown_container_returns_404(self, wired_api):
         with pytest.raises(HTTPException) as exc_info:

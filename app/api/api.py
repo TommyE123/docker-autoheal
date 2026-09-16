@@ -637,6 +637,10 @@ async def get_health_check(container_id: str):
 
         health_check = config_manager.get_custom_health_check(stable_id)
         if not health_check:
+            # Fall back to the container's current full Docker ID for checks
+            # persisted before stable-ID storage that haven't been re-added.
+            health_check = config_manager.get_custom_health_check(container.id)
+        if not health_check:
             raise HTTPException(status_code=404, detail="No custom health check found for this container")
         return health_check
     except HTTPException:
@@ -666,7 +670,13 @@ async def delete_health_check(container_id: str):
         if not stable_id:
             raise HTTPException(status_code=500, detail="Unable to resolve container stable identifier")
 
-        config_manager.remove_custom_health_check(stable_id)
+        # Remove whichever key the check is actually stored under: the
+        # stable ID, or (for checks persisted before stable-ID storage)
+        # the container's current full Docker ID.
+        remove_key = stable_id
+        if not config_manager.get_custom_health_check(remove_key):
+            remove_key = container.id
+        config_manager.remove_custom_health_check(remove_key)
         return {"status": "success", "message": f"Health check removed for container {container_id}"}
     except HTTPException:
         raise
