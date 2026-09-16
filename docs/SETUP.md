@@ -9,17 +9,17 @@ The easiest way to run the application with React UI:
 docker-compose up --build
 
 # Access the UI
-http://localhost:8080
+http://localhost:3131
 ```
 
-That's it! The React UI is built automatically inside Docker and served on port 8080.
+That's it! The React UI is built automatically inside Docker and served on port 3131.
 
 ## What Changed
 
-✅ **Removed** Simple HTML/JavaScript UI  
-✅ **React is now the only UI**  
-✅ **Single `docker-compose up` command** builds everything  
-✅ **UI accessible on port 8080**  
+✅ **Removed** Simple HTML/JavaScript UI
+✅ **React is now the only UI**
+✅ **Single `docker-compose up` command** builds everything
+✅ **UI accessible on port 3131**
 
 ## Architecture
 
@@ -28,7 +28,7 @@ That's it! The React UI is built automatically inside Docker and served on port 
 │         Docker Container                 │
 │                                          │
 │  ┌────────────────────────────────┐    │
-│  │   React UI (port 8080)         │    │
+│  │   React UI (port 3131)         │    │
 │  │   - Built with Vite            │    │
 │  │   - Served by FastAPI          │    │
 │  └────────────────────────────────┘    │
@@ -59,7 +59,7 @@ The Dockerfile uses multi-stage build:
    - Uses Python 3.11 slim
    - Installs Python dependencies
    - Copies React build to `static/`
-   - Exposes ports 8080 and 9090
+  - Exposes ports 3131 and 9090
 
 ## Usage
 
@@ -82,7 +82,7 @@ docker-compose down
 ```bash
 # Start backend
 python main.py
-# Runs on http://localhost:8080
+# Runs on http://localhost:3131
 ```
 
 **Frontend (separate terminal):**
@@ -95,9 +95,9 @@ npm run dev
 ```
 
 In development mode:
-- Backend runs on port 8080
+- Backend runs on port 3131
 - React dev server on port 3000
-- API calls proxy from 3000 → 8080
+- API calls proxy from 3000 → 3131
 - Hot reload enabled
 
 ## Building React Locally (Optional)
@@ -115,14 +115,14 @@ This creates the `static/` directory with optimized React build.
 Then start the backend:
 ```bash
 python main.py
-# Serves React at http://localhost:8080
+# Serves React at http://localhost:3131
 ```
 
 ## Ports
 
 | Port | Service |
 |------|---------|
-| 8080 | React UI + API |
+| 3131 | React UI + API |
 | 9090 | Prometheus metrics |
 
 ## File Structure
@@ -153,7 +153,7 @@ docker-autoheal/
 
 ## Features
 
-All features available through React UI on port 8080:
+All features available through React UI on port 3131:
 
 - ✅ **Dashboard** - Real-time metrics and status
 - ✅ **Containers** - List, select, manage containers
@@ -191,7 +191,7 @@ docker logs docker-autoheal
 **Should see:**
 ```
 Serving React UI from static directory
-Web UI available at http://0.0.0.0:8080
+Web UI available at http://0.0.0.0:3131
 ```
 
 ### Build fails
@@ -203,15 +203,15 @@ docker-compose build --no-cache
 docker-compose up
 ```
 
-### Port 8080 already in use
+### Port 3131 already in use
 
 **Change port in docker-compose.yml:**
 ```yaml
 ports:
-  - "8081:8080"  # Changed from 8080:8080
+  - "3132:3131"  # Changed from 3131:3131
 ```
 
-Then access: `http://localhost:8081`
+Then access: `http://localhost:3132`
 
 ### Development mode issues
 
@@ -221,20 +221,20 @@ Then access: `http://localhost:8081`
 python main.py
 
 # Check it responds
-curl http://localhost:8080/health
+curl http://localhost:3131/health
 ```
 
 **React proxy not working:**
 ```bash
 # Check vite.config.js has correct proxy settings
-# Should proxy /api to http://localhost:8080
+# Should proxy /api to http://localhost:3131
 ```
 
 ## API Documentation
 
 Interactive API docs available at:
 ```
-http://localhost:8080/docs
+http://localhost:3131/docs
 ```
 
 ## Metrics
@@ -248,7 +248,7 @@ http://localhost:9090/metrics
 
 Service health endpoint:
 ```bash
-curl http://localhost:8080/health
+curl http://localhost:3131/health
 ```
 
 Response:
@@ -320,7 +320,7 @@ To update the UI:
 ## Next Steps
 
 1. **Start the service**: `docker-compose up --build`
-2. **Access UI**: http://localhost:8080
+2. **Access UI**: http://localhost:3131
 3. **Add containers**: Label them with `autoheal=true`
 4. **Configure**: Use the Configuration tab
 5. **Monitor**: Check Events tab for activity
@@ -328,7 +328,7 @@ To update the UI:
 ## Documentation
 
 - **Full docs**: See other markdown files in the repo
-- **API Reference**: http://localhost:8080/docs
+- **API Reference**: http://localhost:3131/docs
 - **Frontend docs**: `frontend/README.md`
 
 ## Support
@@ -337,10 +337,10 @@ If you encounter issues:
 
 1. Check `docker logs docker-autoheal`
 2. Verify React build exists in container
-3. Check port 8080 is not in use
+3. Check port 3131 is not in use
 4. Try rebuilding: `docker-compose up --build --force-recreate`
 
 ---
 
-**The UI is now React-only and accessible at http://localhost:8080 when you run `docker-compose up`! 🚀**
+**The UI is now React-only and accessible at http://localhost:3131 when you run `docker-compose up`! 🚀**
 
