@@ -730,6 +730,65 @@ class TestHealthCheckManagement:
         assert exc_info.value.status_code == 500
         assert "Unable to resolve container stable identifier" in exc_info.value.detail
 
+    async def test_add_health_check_handles_unexpected_error_in_config_manager(
+        self, wired_api, monkeypatch
+    ):
+        docker_client, engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+
+        # Mock config_manager.add_custom_health_check to raise an exception
+        original_add = config_manager.add_custom_health_check
+        def mock_add_raises(check):
+            raise ValueError("Unexpected config error")
+        config_manager.add_custom_health_check = mock_add_raises
+
+        with pytest.raises(HTTPException) as exc_info:
+            await add_health_check(
+                HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080)
+            )
+
+        config_manager.add_custom_health_check = original_add
+        assert exc_info.value.status_code == 500
+
+    async def test_get_health_check_handles_unexpected_error(
+        self, wired_api, monkeypatch
+    ):
+        docker_client, engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+
+        # Mock config_manager.get_custom_health_check to raise an exception
+        original_get = config_manager.get_custom_health_check
+        def mock_get_raises(container_id):
+            raise ValueError("Unexpected config error")
+        config_manager.get_custom_health_check = mock_get_raises
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_health_check("web")
+
+        config_manager.get_custom_health_check = original_get
+        assert exc_info.value.status_code == 500
+
+    async def test_delete_health_check_handles_unexpected_error(
+        self, wired_api, monkeypatch
+    ):
+        docker_client, engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+
+        # Mock config_manager.remove_custom_health_check to raise an exception
+        original_remove = config_manager.remove_custom_health_check
+        def mock_remove_raises(container_id):
+            raise ValueError("Unexpected config error")
+        config_manager.remove_custom_health_check = mock_remove_raises
+
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_health_check("web")
+
+        config_manager.remove_custom_health_check = original_remove
+        assert exc_info.value.status_code == 500
+
 
 @pytest.mark.asyncio
 class TestNotificationsConfig:
