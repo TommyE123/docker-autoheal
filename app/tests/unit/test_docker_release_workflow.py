@@ -41,12 +41,15 @@ def test_an_existing_tag_on_this_commit_is_reused_not_recalculated():
 
 
 def test_the_git_tag_is_only_created_after_the_image_is_published():
-    build_index = WORKFLOW.index("Build and push Docker image")
-    tag_index = WORKFLOW.index("Create Git tag")
+    # Match the actual step declarations, not just the words anywhere in the
+    # file (e.g. in a comment), so a future edit that moves the real step
+    # can't slip past this check while a stray comment keeps it passing.
+    build_index = WORKFLOW.index("- name: Build and push Docker image")
+    tag_index = WORKFLOW.index("- name: Create Git tag")
 
     assert build_index < tag_index, (
         "a release tag must never exist for an image that hasn't successfully built and pushed yet"
     )
     # and never re-created when this run is just resuming an existing release
-    tag_step = WORKFLOW[tag_index : WORKFLOW.index("Create GitHub release")]
+    tag_step = WORKFLOW[tag_index : WORKFLOW.index("- name: Create GitHub release")]
     assert "steps.existing.outputs.found != 'true'" in tag_step
