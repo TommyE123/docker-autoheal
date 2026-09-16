@@ -65,7 +65,11 @@ jobs:
       # later commit on the same PR can overwrite before it's consumed.
       - name: Record the exact image reference for the smoke test
         id: image
-        run: echo "ref=ghcr.io/${{ github.repository_owner }}/docker-autoheal:sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+        # Image references must be lowercase; github.repository_owner isn't
+        # (metadata-action above lowercases it internally when tagging).
+        run: |
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "ref=ghcr.io/${OWNER_LC}/docker-autoheal:sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
     outputs:
       image_ref: ${{ steps.image.outputs.ref }}
 
