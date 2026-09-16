@@ -129,3 +129,9 @@ Renovate dependency updates are also subject to manual review and merge; Renovat
 ## Avoid duplicate issues
 
 Before filing a new issue, search existing open and closed issues for one that already covers the same problem or overlaps significantly with it. If you find a close match, extend or comment on it instead of creating a near-duplicate — this has already happened once (issue #26 and a planned issue #6 both touching Uptime Kuma test coverage).
+
+## Issue labels are not yours to set
+
+GitHub issue classification (`kind/*` and `area/*`) is owned by the automated Gemini triage workflow (`.github/workflows/issue-triage.yml`), and workflow state (`status/*`) is owned by that same workflow. Do not add, remove, or modify GitHub issue labels yourself, including when creating an issue, editing an issue, triaging an issue, fixing an issue, or otherwise interacting with issue labels. You may still create issues when the repository workflow requires one (see "Pull requests need a linked issue" above) — just leave label selection to the triage workflow.
+
+This rule is specific to issue labels. It does not change or restrict how PR labels are handled, including the `release:*` labels used by the release process — those continue to work as before.

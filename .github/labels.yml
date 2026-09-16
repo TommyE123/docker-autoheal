@@ -1,0 +1,94 @@
+# Source of truth for the issue-classification label taxonomy used by
+# Gemini-powered issue triage (see .github/workflows/issue-triage.yml).
+#
+# Ownership model:
+#   kind/*   - owned by Gemini triage (what kind of issue this is)
+#   area/*   - owned by Gemini triage (which part of the codebase it touches)
+#   status/* - owned by the triage workflow (where the issue is in the triage
+#              lifecycle)
+#   everything else (priority, assignment, milestones, release:* PR labels,
+#   etc.) - owned by humans / other existing processes, and is out of scope
+#   for this file.
+#
+# Synced to GitHub with EndBug/label-sync (see
+# .github/workflows/labels-sync.yml). `aliases` lets label-sync rename an
+# existing label (preserving which issues carry it) instead of creating a
+# duplicate - used here to fold the old flat/colon-namespaced classification
+# labels into the new slash-namespaced ones.
+
+# --- kind/* --------------------------------------------------------------
+
+- name: kind/bug
+  color: d73a4a
+  description: Unexpected behaviour, failures or incorrect results.
+  aliases:
+    - bug
+    - "type:bug"
+
+- name: kind/enhancement
+  color: a2eeef
+  description: New functionality, improvements or behaviour changes.
+  aliases:
+    - enhancement
+    - "type:story"
+
+- name: kind/documentation
+  color: 0075ca
+  description: Documentation, README, examples or guides.
+  aliases:
+    - documentation
+
+- name: kind/chore
+  color: bfd4f2
+  description: Maintenance, refactoring, dependency updates, test coverage.
+  aliases:
+    - "type:chore"
+    - "type:task"
+
+# --- area/* ----------------------------------------------------------------
+
+- name: area/docker
+  color: 1d76db
+  description: Docker API, container/image lifecycle handling.
+
+- name: area/restart
+  color: d4c5f9
+  description: Restart detection, decision-making and triggering.
+
+- name: area/health-check
+  color: 0e8a16
+  description: Health monitoring, Uptime Kuma integration, monitor state.
+  aliases:
+    - "area:monitoring"
+
+- name: area/config
+  color: fbca04
+  description: Configuration, environment variables, config parsing.
+  aliases:
+    - "area:config"
+
+- name: area/logging
+  color: c2e0c6
+  description: Logging, diagnostics, verbosity, log output.
+
+- name: area/github-actions
+  color: 5319e7
+  description: CI/CD, GitHub Actions, releases, repository automation.
+  aliases:
+    - "area:ci"
+
+- name: area/tests
+  color: 006b75
+  description: Unit tests, integration tests, test coverage.
+  aliases:
+    - "area:testing"
+
+# --- status/* --------------------------------------------------------------
+
+- name: status/needs-triage
+  color: e99695
+  description: Awaiting kind/area classification.
+
+- name: status/needs-information
+  color: f9d0c4
+  description: Awaiting more information from the reporter.

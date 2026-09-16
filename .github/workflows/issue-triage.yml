@@ -1,0 +1,60 @@
+name: Issue Triage
+
+# Re-running classification on every edit is fine - issue volume is low and
+# Gemini API headroom is plentiful. The per-issue concurrency group (below)
+# ensures a later edit's classification always wins over an in-flight
+# earlier one, rather than racing.
+on:
+  issues:
+    types:
+      - opened
+      - edited
+      - reopened
+
+permissions:
+  issues: write
+
+concurrency:
+  group: issue-triage-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  triage:
+    name: Classify issue with Gemini
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout is required here: the classification/validation logic and
+      # the system prompt live in the repo (app/services/issue_triage.py,
+      # .github/triage/system-prompt.txt) so they stay unit-testable and
+      # under normal code review, rather than being duplicated inline in
+      # YAML.
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "$(grep '^requests==' requirements.txt)"
+
+      - name: Run triage
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_LABELS_JSON: ${{ toJSON(github.event.issue.labels.*.name) }}
+          # Set the repository variable ISSUE_TRIAGE_DRY_RUN to 'true'
+          # (Settings -> Secrets and variables -> Actions -> Variables) to
+          # validate classification against real issues without mutating
+          # any labels/comments, before trusting it to run live.
+          DRY_RUN: ${{ vars.ISSUE_TRIAGE_DRY_RUN || 'false' }}
+        run: python app/scripts/triage_issue.py

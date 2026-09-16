@@ -14,6 +14,8 @@ rules:
       .github/workflows/docker-build.yml
       .github/workflows/docker-release.yml
       .github/workflows/greetings.yml
+      .github/workflows/issue-triage.yml
+      .github/workflows/labels-sync.yml
       .github/workflows/mega-linter.yml
       .github/workflows/production-smoke-test.yml
       .github/workflows/semantic-pr-title.yml

@@ -1,0 +1,115 @@
+name: Sync issue labels
+
+# One-off/manual synchronisation of the issue-classification label taxonomy
+# defined in .github/labels.yml. Not run on every issue event - see
+# .github/workflows/issue-triage.yml for the per-issue classification
+# workflow that this label set supports.
+on:
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  sync-labels:
+    name: Sync labels.yml to GitHub
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout labels config
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            .github/labels.yml
+          sparse-checkout-cone-mode: false
+
+      # Creates kind/*, area/*, status/* labels and, via `aliases` in
+      # labels.yml, renames the old flat/colon-namespaced labels that have a
+      # direct new-taxonomy equivalent (e.g. "bug" -> "kind/bug",
+      # "area:ci" -> "area/github-actions") so issues keep their
+      # classification instead of losing it.
+      - name: Sync labels
+        uses: EndBug/label-sync@52074158190acb45f3077f9099fea818aa43f97a # v2.3.3
+        with:
+          config-file: .github/labels.yml
+          delete-other-labels: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  reset-legacy-labels:
+    name: Remove retired taxonomy labels and flag open issues for triage
+    needs: sync-labels
+    runs-on: ubuntu-latest
+    steps:
+      # Old classification labels that have no direct equivalent in the new
+      # kind/*, area/*, status/* taxonomy (unlike the ones handled via
+      # `aliases` above) are deleted outright here. This list is deliberately
+      # explicit and narrow so nothing outside the retired classification
+      # scheme - including "release:*" and other PR labels - is touched.
+      - name: Delete retired classification labels
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const retiredLabels = [
+              'area:security',
+              'area:dependencies',
+              'area:documentation',
+              'area:build',
+              'area:frontend',
+              'area:application',
+              'priority:high',
+              'priority:medium',
+              'priority:low',
+              'phase:foundation',
+              'phase:polish',
+              'ai:ready',
+            ];
+
+            for (const name of retiredLabels) {
+              try {
+                await github.rest.issues.deleteLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name,
+                });
+                core.info(`Deleted label: ${name}`);
+              } catch (error) {
+                if (error.status === 404) {
+                  core.info(`Label already absent, skipping: ${name}`);
+                } else {
+                  throw error;
+                }
+              }
+            }
+
+      # Any open issue that no longer carries a kind/* classification and
+      # isn't already in a status/* state (freshly created, or just lost its
+      # only classification above) needs to go through triage again.
+      - name: Flag unclassified open issues for triage
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+
+            for (const issue of issues) {
+              if (issue.pull_request) continue;
+
+              const labelNames = issue.labels.map((label) =>
+                typeof label === 'string' ? label : label.name
+              );
+              const hasKind = labelNames.some((name) => name.startsWith('kind/'));
+              const hasStatus = labelNames.some((name) => name.startsWith('status/'));
+
+              if (hasKind || hasStatus) continue;
+
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: ['status/needs-triage'],
+              });
+              core.info(`Issue #${issue.number}: added status/needs-triage`);
+            }
