@@ -66,7 +66,8 @@ services:
       - "3131:3131"  # Web UI
       - "9090:9090"  # Prometheus metrics
     labels:
-      - "autoheal=false"  # don't monitor the monitor itself
+      - "autoheal=false"  # keeps the monitor unselected under the default label-based
+                          # selection; see docs/user/labels.md if you enable include_all
 ```
 
 ```bash
