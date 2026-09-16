@@ -142,6 +142,16 @@ def _plan_maintenance(args: argparse.Namespace) -> ReleasePlan:
     )
 
 
+def _plan_push(args: argparse.Namespace) -> ReleasePlan:
+    return versioning.plan_from_merged_prs(
+        load_pull_requests(args.pull_requests_file),
+        load_tags(args.tags_file),
+        resume_tag=args.resume_tag or None,
+        already_released_tag=args.already_released_tag or None,
+        allow_first_release=args.allow_first_release,
+    )
+
+
 def _resolve_labels(args: argparse.Namespace) -> list[str]:
     """Reconstruct PR labels at merge time from the GitHub Issues event log."""
     events = _load(args.events_file)
@@ -221,6 +231,16 @@ def build_parser() -> argparse.ArgumentParser:
     plan_maintenance.add_argument("--already-released-tag", default="")
     add_common(plan_maintenance)
     plan_maintenance.set_defaults(handler=_plan_maintenance)
+
+    plan_push = subparsers.add_parser(
+        "plan-push",
+        help="plan release from all merged PRs since latest release (push reconciliation)",
+    )
+    plan_push.add_argument("--pull-requests-file", required=True)
+    plan_push.add_argument("--resume-tag", default="")
+    plan_push.add_argument("--already-released-tag", default="")
+    add_common(plan_push)
+    plan_push.set_defaults(handler=_plan_push)
 
     verify_release = subparsers.add_parser(
         "verify-release", help="re-validate a planned release before publishing"

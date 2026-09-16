@@ -21,6 +21,7 @@ from scripts.release.versioning import (
     latest_release,
     plan_already_released,
     plan_from_labels,
+    plan_from_merged_prs,
     plan_maintenance,
     plan_resume,
     plan_version,
@@ -229,6 +230,125 @@ class TestMaintenanceRelease:
                 ],
                 EXISTING_TAGS,
             )
+
+
+class TestPlanFromMergedPRs:
+    """Reconciliation planning: highest classification across all PRs since last release."""
+
+    def test_single_patch_pr_releases_patch(self):
+        plan = plan_from_merged_prs([MergedPullRequest(1, ["release:patch"])], EXISTING_TAGS)
+
+        assert plan.release is True
+        assert plan.release_type == "patch"
+        assert plan.version == Version(2, 0, 5)
+        assert plan.create_tag is True
+
+    def test_single_minor_pr_releases_minor(self):
+        plan = plan_from_merged_prs([MergedPullRequest(1, ["release:minor"])], EXISTING_TAGS)
+
+        assert plan.release is True
+        assert plan.release_type == "minor"
+        assert plan.version == Version(2, 1, 0)
+
+    def test_single_major_pr_releases_major(self):
+        plan = plan_from_merged_prs([MergedPullRequest(1, ["release:major"])], EXISTING_TAGS)
+
+        assert plan.release is True
+        assert plan.release_type == "major"
+        assert plan.version == Version(3, 0, 0)
+
+    def test_all_none_prs_produces_no_release(self):
+        plan = plan_from_merged_prs(
+            [MergedPullRequest(1, ["release:none"]), MergedPullRequest(2, ["release:none"])],
+            EXISTING_TAGS,
+        )
+
+        assert plan.release is False
+        assert plan.version is None
+        assert "deferred" in plan.reason
+
+    def test_empty_pr_list_produces_no_release(self):
+        plan = plan_from_merged_prs([], EXISTING_TAGS)
+
+        assert plan.release is False
+        assert plan.version is None
+        assert "no merged pull requests" in plan.reason
+
+    def test_highest_classification_wins_patch_over_none(self):
+        plan = plan_from_merged_prs(
+            [MergedPullRequest(1, ["release:none"]), MergedPullRequest(2, ["release:patch"])],
+            EXISTING_TAGS,
+        )
+
+        assert plan.release is True
+        assert plan.release_type == "patch"
+        assert plan.version == Version(2, 0, 5)
+
+    def test_highest_classification_wins_minor_over_patch(self):
+        plan = plan_from_merged_prs(
+            [
+                MergedPullRequest(1, ["release:patch"]),
+                MergedPullRequest(2, ["release:minor"]),
+                MergedPullRequest(3, ["release:none"]),
+            ],
+            EXISTING_TAGS,
+        )
+
+        assert plan.release_type == "minor"
+        assert plan.version == Version(2, 1, 0)
+
+    def test_highest_classification_wins_major_over_minor(self):
+        plan = plan_from_merged_prs(
+            [
+                MergedPullRequest(1, ["release:minor"]),
+                MergedPullRequest(2, ["release:major"]),
+            ],
+            EXISTING_TAGS,
+        )
+
+        assert plan.release_type == "major"
+        assert plan.version == Version(3, 0, 0)
+
+    def test_all_pr_numbers_included_in_reason(self):
+        plan = plan_from_merged_prs(
+            [
+                MergedPullRequest(101, ["release:none"]),
+                MergedPullRequest(102, ["release:patch"]),
+            ],
+            EXISTING_TAGS,
+        )
+
+        assert "#101" in plan.reason
+        assert "#102" in plan.reason
+
+    def test_already_released_tag_is_a_no_op(self):
+        plan = plan_from_merged_prs(
+            [MergedPullRequest(1, ["release:patch"])],
+            EXISTING_TAGS,
+            already_released_tag="v2.0.4",
+        )
+
+        assert plan.release is False
+        assert plan.version is None
+
+    def test_resume_tag_resumes_existing_release(self):
+        plan = plan_from_merged_prs(
+            [MergedPullRequest(1, ["release:patch"])],
+            EXISTING_TAGS + ["v2.0.5"],
+            resume_tag="v2.0.5",
+        )
+
+        assert plan.release is True
+        assert plan.version == Version(2, 0, 5)
+        assert plan.create_tag is False
+
+    def test_invalid_label_raises_error(self):
+        with pytest.raises(ReleaseError, match="invalid release classification"):
+            plan_from_merged_prs([MergedPullRequest(1, ["release:hotfix"])], EXISTING_TAGS)
+
+    def test_missing_label_raises_error(self):
+        with pytest.raises(ReleaseError, match="no release classification label"):
+            plan_from_merged_prs([MergedPullRequest(1, ["documentation"])], EXISTING_TAGS)
 
 
 class TestRetryAndConcurrency:
@@ -650,6 +770,47 @@ class TestCommandLineInterface:
                 write(tmp_path / "tags.json", EXISTING_TAGS),
                 "--already-released-tag",
                 "v2.0.4",
+            ]
+        )
+
+        assert exit_code == 0
+        assert "release=false" in output.read_text(encoding="utf-8")
+
+    def test_plan_push_returns_highest_classification(self, tmp_path, monkeypatch):
+        output = tmp_path / "github_output"
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+        pull_requests = [
+            {"number": 101, "labels": [{"name": "release:none"}]},
+            {"number": 102, "labels": [{"name": "release:patch"}]},
+        ]
+
+        exit_code = main(
+            [
+                "plan-push",
+                "--pull-requests-file",
+                write(tmp_path / "prs.json", pull_requests),
+                "--tags-file",
+                write(tmp_path / "tags.json", EXISTING_TAGS),
+            ]
+        )
+
+        assert exit_code == 0
+        result = output.read_text(encoding="utf-8")
+        assert "release=true" in result
+        assert "version=v2.0.5" in result
+        assert "release_type=patch" in result
+
+    def test_plan_push_with_no_prs_produces_no_release(self, tmp_path, monkeypatch):
+        output = tmp_path / "github_output"
+        monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+
+        exit_code = main(
+            [
+                "plan-push",
+                "--pull-requests-file",
+                write(tmp_path / "prs.json", []),
+                "--tags-file",
+                write(tmp_path / "tags.json", EXISTING_TAGS),
             ]
         )
 
@@ -1212,18 +1373,65 @@ class TestReleaseWorkflows:
         )
 
     def test_commit_associated_prs_filtered_to_main_base(self):
-        # BLOCKER 5: the commits/pulls API returns all PRs associated with a
-        # commit, including those merged into non-main branches; only PRs whose
-        # base is main carry a release classification for this repo's workflow.
+        # The classification step must restrict to PRs merged into main so that
+        # PRs targeting non-main branches are excluded from release planning.
+        # With the reconciliation approach this is enforced via the search query
+        # (base:main) rather than a jq filter on the commits/pulls API.
         step = next(
             s
             for s in self.load("docker-release.yml")["jobs"]["plan"]["steps"]
             if s.get("id") == "classification"
         )
         run = step["run"]
-        assert '.base.ref == "main"' in run, (
-            "classification step must filter commits/pulls results to "
-            "base.ref == 'main' to exclude PRs merged into non-main branches"
+        assert "base:main" in run, (
+            "classification step must restrict to base:main in the search query "
+            "to exclude PRs merged into non-main branches"
+        )
+
+    def test_classification_uses_reconciliation_not_sha_bound(self):
+        # Regression guard: the classification step must collect all PRs merged
+        # since the latest release tag, not just PRs associated with GITHUB_SHA.
+        # Without reconciliation a third push can displace a pending run, and
+        # that run's release classification is permanently lost.
+        step = next(
+            s
+            for s in self.load("docker-release.yml")["jobs"]["plan"]["steps"]
+            if s.get("id") == "classification"
+        )
+        run = step["run"]
+        assert "search/issues" in run, (
+            "classification step must use search/issues to collect all PRs "
+            "since the latest release boundary, not only PRs for GITHUB_SHA"
+        )
+        assert "commits/${GITHUB_SHA}/pulls" not in run and \
+            "commits/$GITHUB_SHA/pulls" not in run, (
+            "classification step must not use commits/SHA/pulls which only "
+            "returns PRs for the current commit and misses displaced runs"
+        )
+
+    def test_release_job_uses_parent_commit_for_privileged_revalidation(self):
+        # Security guard: the release job (contents:write, packages:write)
+        # must use the parent commit's scripts/ for verify-release so a PR
+        # that modifies scripts/release/ cannot weaken its own validator.
+        steps = self.load("docker-release.yml")["jobs"]["release"]["steps"]
+        names = [s.get("name", "") for s in steps]
+
+        trusted_step = next(
+            (s for s in steps if "Fetch trusted release tooling" in s.get("name", "")),
+            None,
+        )
+        assert trusted_step is not None, (
+            "release job must have a 'Fetch trusted release tooling' step that "
+            "replaces scripts/ with the parent commit's version before re-validating"
+        )
+        assert "HEAD^" in trusted_step["run"], (
+            "trusted tooling step must use HEAD^ to restore scripts/ from "
+            "before this PR's code was merged"
+        )
+        trusted_idx = names.index(trusted_step["name"])
+        verify_idx = names.index("Re-validate release before publishing")
+        assert trusted_idx < verify_idx, (
+            "Fetch trusted release tooling must precede Re-validate release before publishing"
         )
 
     def test_release_tags_collected_from_main_history_only(self):

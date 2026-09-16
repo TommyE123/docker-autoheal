@@ -67,6 +67,8 @@ class Version:
 # The base used when a repository has never published a release tag.
 FIRST_RELEASE_BASE = Version(0, 0, 0)
 
+RELEASE_TYPE_PRIORITY: dict[str, int] = {"none": 0, "patch": 1, "minor": 2, "major": 3}
+
 
 def labels_at_merge_time(
     events: Iterable[dict],
@@ -346,5 +348,61 @@ def plan_maintenance(
         ),
         current=plan.current,
         version=plan.version,
+        create_tag=True,
+    )
+
+
+def plan_from_merged_prs(
+    pull_requests: Iterable[MergedPullRequest],
+    tags: Iterable[str],
+    *,
+    resume_tag: str | None = None,
+    already_released_tag: str | None = None,
+    allow_first_release: bool = False,
+) -> ReleasePlan:
+    """Plan release from all PRs since the latest release (push reconciliation).
+
+    Selects the highest-priority release type across all merged PRs so no
+    release is silently lost when GitHub Actions concurrency displaces a
+    pending run.
+    """
+    if already_released_tag:
+        return plan_already_released(already_released_tag, tags)
+    if resume_tag:
+        return plan_resume(resume_tag, tags)
+    prs = list(pull_requests)
+    if not prs:
+        return ReleasePlan(
+            release=False,
+            release_type="none",
+            reason="no merged pull requests found since the latest release",
+        )
+    classified = [(pr, classify(pr.labels)) for pr in prs]
+    best_type = max(
+        (rt for _, rt in classified),
+        key=lambda t: RELEASE_TYPE_PRIORITY.get(t, 0),
+    )
+    if best_type == "none":
+        return ReleasePlan(
+            release=False,
+            release_type="none",
+            reason="all merged pull requests since the latest release carry "
+            "release:none; deferred to the next Friday maintenance release",
+        )
+    tags_list = list(tags)
+    current = latest_release(tags_list, allow_first_release=allow_first_release)
+    candidate = current.bump(best_type)
+    validate_candidate(current, candidate, best_type, tags_list)
+    pr_numbers = ", ".join(f"#{pr.number}" for pr, _ in classified)
+    return ReleasePlan(
+        release=True,
+        release_type=best_type,
+        reason=(
+            f"{best_type} release {candidate.tag} calculated from {current.tag}; "
+            f"highest classification across {len(classified)} PR(s) since {current.tag}: "
+            f"{pr_numbers}"
+        ),
+        current=current,
+        version=candidate,
         create_tag=True,
     )

@@ -64,7 +64,9 @@ The calculation never depends on how many pull requests are being released.
 never wait for Friday. The workflow runs in the `release-publication` concurrency group
 with `cancel-in-progress: false`, so releases are processed one at a time, in this order:
 
-1. determine the release type from the merged pull request's label;
+1. determine the release type from the labels of all pull requests merged since the latest
+   release tag, selecting the highest-priority classification; this reconciliation approach
+   ensures no release is lost when GitHub Actions concurrency displaces a pending run;
 2. determine the current release;
 3. calculate and validate the candidate version;
 4. **re-validate everything against the current state of `main`** — another release may
@@ -143,8 +145,10 @@ against a feature branch would tag and publish that unmerged commit, including m
 - `versioning.py` — classification, version calculation and the safety checks. Every
   function fails closed: an ambiguous or unexpected release state raises rather than
   guessing a version.
-- `cli.py` — the `validate-pr`, `plan-release`, `plan-maintenance` and `verify-release`
-  subcommands the workflows call.
+- `cli.py` — the `validate-pr`, `plan-push`, `plan-maintenance` and `verify-release`
+  subcommands the workflows call. `plan-push` is the reconciliation planner used on
+  every push: it scans all PRs merged since the latest release and selects the
+  highest-priority classification.
 
 Both are covered by `app/tests/unit/test_release_versioning.py`, which runs in the normal
 unit-test suite.

@@ -146,29 +146,62 @@ jobs:
           echo "tag=${RESUME}" >> "$GITHUB_OUTPUT"
           echo "already_released_tag=${ALREADY_RELEASED}" >> "$GITHUB_OUTPUT"
 
-      - name: Collect the release classification of the merged pull request
+      - name: Collect the release classification of all PRs since the latest release
         id: classification
         if: steps.mode.outputs.mode == 'classification'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh api "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" \
-            --jq '[.[] | select(.merged_at != null and .base.ref == "main")]' > merged-prs.json
+          # Use the latest release tag as the boundary so every PR merged after
+          # it is considered, not only PRs associated with GITHUB_SHA.  This
+          # prevents a silent release loss when GitHub Actions concurrency
+          # displaces a pending run: if PR B's run is replaced by PR C's run,
+          # C's run finds both B and C here and uses the highest classification.
+          LATEST_TAG="$(git tag --merged HEAD \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)"
 
-          COUNT="$(jq 'length' merged-prs.json)"
-          echo "Merged pull requests for this commit: ${COUNT}"
-          echo "merged_pull_requests=${COUNT}" >> "$GITHUB_OUTPUT"
+          if [ -z "$LATEST_TAG" ]; then
+            BOUNDARY="1970-01-01T00:00:00Z"
+          else
+            BOUNDARY="$(git log -1 --format=%cI "$LATEST_TAG")"
+          fi
+          echo "Classification boundary: ${LATEST_TAG:-none} (${BOUNDARY})"
+
+          # Collect all PRs merged into main since the latest release.
+          # Use merged:>= to include PRs merged in the same second as the
+          # boundary; the precise Python filter below is the authoritative check.
+          gh api --method GET search/issues --paginate \
+            -f "q=repo:${GITHUB_REPOSITORY} is:pr is:merged base:main merged:>=${BOUNDARY}" \
+            --jq '.items[] | {number: .number, merged_at: .pull_request.merged_at}' \
+            > classification-prs-meta.json
+
+          jq -s '.' classification-prs-meta.json > classification-prs-meta-arr.json
+          CANDIDATE_COUNT="$(jq 'length' classification-prs-meta-arr.json)"
+          echo "Candidate PRs since ${LATEST_TAG:-none}: ${CANDIDATE_COUNT}"
 
           # Reconstruct labels from the GitHub Issues event log (append-only
           # audit record) at the moment each PR was merged, rather than
           # reading the current PR labels.  Any label change made after merge
-          # is ignored, so the classification used here is the same one that
-          # validate-release checked before the merge.
-          echo '[]' > labels.json
-          for i in $(seq 1 "${COUNT}"); do
+          # is ignored, so the classification used here cannot be altered
+          # after the PR passed the validate-release check.
+          echo '[]' > classification-prs.json
+          for i in $(seq 1 "${CANDIDATE_COUNT}"); do
             IDX=$((i - 1))
-            PR_NUMBER="$(jq -r ".[$IDX].number" merged-prs.json)"
-            MERGED_AT="$(jq -r ".[$IDX].merged_at" merged-prs.json)"
+            PR_NUMBER="$(jq -r ".[$IDX].number" classification-prs-meta-arr.json)"
+            MERGED_AT="$(jq -r ".[$IDX].merged_at" classification-prs-meta-arr.json)"
+
+            # Precise boundary check: skip PRs merged at or before the boundary.
+            printf '%s\n' 'import os,datetime as D' \
+              'm=D.datetime.fromisoformat(os.environ["MERGED_AT"].replace("Z","+00:00"))' \
+              'b=D.datetime.fromisoformat(os.environ["BOUNDARY"].replace("Z","+00:00"))' \
+              'print("true"if m>b else"false")' \
+              > /tmp/_br.py
+            AFTER_BOUNDARY="$(MERGED_AT="${MERGED_AT}" BOUNDARY="${BOUNDARY}" python3 /tmp/_br.py)"
+            rm -f /tmp/_br.py
+            if [ "$AFTER_BOUNDARY" != "true" ]; then
+              echo "PR #${PR_NUMBER} merged at ${MERGED_AT} is not after boundary; skipping"
+              continue
+            fi
 
             gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/events" \
               --paginate > "pr-${PR_NUMBER}-events.json"
@@ -177,10 +210,14 @@ jobs:
               --events-file "pr-${PR_NUMBER}-events.json" \
               --merged-at "${MERGED_AT}")"
 
-            jq --argjson new_labels "${PR_LABELS}" '. + $new_labels' labels.json \
-              > labels-updated.json && mv labels-updated.json labels.json
+            jq --argjson pr_number "${PR_NUMBER}" --argjson pr_labels "${PR_LABELS}" \
+              '. + [{"number": $pr_number, "labels": $pr_labels}]' classification-prs.json \
+              > classification-prs-upd.json && mv classification-prs-upd.json classification-prs.json
           done
-          cat labels.json
+
+          COUNT="$(jq 'length' classification-prs.json)"
+          echo "Pull requests after precise filter: ${COUNT}"
+          jq -r '.[] | "  #\(.number) \(.labels | join(", "))"' classification-prs.json
 
       # Only pull requests merged after the latest successful release are
       # considered, so changes already included in an earlier release are
@@ -265,7 +302,6 @@ jobs:
           MODE: ${{ steps.mode.outputs.mode }}
           RESUME_TAG: ${{ steps.resume.outputs.tag }}
           ALREADY_RELEASED_TAG: ${{ steps.resume.outputs.already_released_tag }}
-          MERGED_PULL_REQUESTS: ${{ steps.classification.outputs.merged_pull_requests }}
         run: |
           RESUME_ARGS=()
           if [ -n "$RESUME_TAG" ]; then
@@ -275,30 +311,14 @@ jobs:
             RESUME_ARGS+=(--already-released-tag "$ALREADY_RELEASED_TAG")
           fi
 
-          # No merged pull request to classify, and this isn't a resumed or
-          # already-released commit: there is nothing safe to release.
-          if [ "$MODE" = "classification" ] \
-            && [ "${MERGED_PULL_REQUESTS:-0}" = "0" ] \
-            && [ -z "$RESUME_TAG" ] \
-            && [ -z "$ALREADY_RELEASED_TAG" ]; then
-            echo "::warning::No merged pull request found for ${GITHUB_SHA}; nothing is released without a release classification."
-            {
-              echo "release=false"
-              echo "release_type=none"
-              echo "create_tag=false"
-              echo "version="
-            } >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
           if [ "$MODE" = "maintenance" ]; then
             python3 -m scripts.release.cli plan-maintenance \
               --pull-requests-file maintenance-prs.json \
               --tags-file tags.txt \
               "${RESUME_ARGS[@]}"
           else
-            python3 -m scripts.release.cli plan-release \
-              --labels-file labels.json \
+            python3 -m scripts.release.cli plan-push \
+              --pull-requests-file classification-prs.json \
               --tags-file tags.txt \
               "${RESUME_ARGS[@]}"
           fi
@@ -336,6 +356,19 @@ jobs:
 
       - name: Collect existing release tags
         run: git tag --merged HEAD > tags.txt
+
+      # Replace scripts/ with the parent commit's copy so a PR that modifies
+      # scripts/release/ cannot weaken its own release-time validator.  HEAD^
+      # is the commit before this PR merged — a trusted state this PR could not
+      # have altered.  The Docker build context does not include scripts/, so
+      # this has no effect on the published image.
+      - name: Fetch trusted release tooling from parent commit
+        run: |
+          if git cat-file -e HEAD^:scripts 2>/dev/null; then
+            git checkout HEAD^ -- scripts/
+          else
+            echo "scripts/ not present in parent commit; using checked-out version."
+          fi
 
       # The pull request validation is never trusted on its own: another release
       # may have been published since, so the full version and tag validation is
