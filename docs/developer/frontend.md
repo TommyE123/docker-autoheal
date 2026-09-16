@@ -16,27 +16,15 @@ npm run dev
 This starts the Vite dev server on **`http://localhost:3000`**, with hot module
 replacement.
 
-## ⚠️ Dev server / backend port mismatch
-
-The Vite dev server proxies `/api` and `/health` requests to `http://localhost:8080`
-(`frontend/vite.config.js`), but the backend's default listen port is **3131** (see
-[Configuration](../user/configuration.md)). If you run the backend with its defaults and
-the frontend dev server as-is, API calls from the dev server will fail with connection
-errors.
-
-To develop against a live backend, either:
-
-- **Change the proxy target** in `frontend/vite.config.js` from `8080` to `3131`, or
-- **Change the backend's port** by editing `ui.listen_port` to `8080` in your local
-  `data/config.json` before starting it (there's no dedicated endpoint for the `ui`
-  section alone — changing it via the API means `PUT /api/config` with the full config).
-
-The first option is simpler and doesn't touch persisted configuration.
+The Vite dev server proxies `/api` and `/health` requests to `http://localhost:3131`
+(`frontend/vite.config.js`), matching the backend's default listen port (see
+[Configuration](../user/configuration.md)), so it works against a locally running backend
+with its defaults.
 
 ## Development workflow
 
 ```bash
-# Terminal 1: backend (after fixing the port, per above)
+# Terminal 1: backend
 python -m app.main
 
 # Terminal 2: frontend dev server
@@ -65,7 +53,7 @@ To see the production build served by the actual backend:
 cd frontend && npm run build
 cd ..
 python -m app.main
-# open http://localhost:3131 (or 8080 if you changed ui.listen_port)
+# open http://localhost:3131
 ```
 
 ## Project structure
