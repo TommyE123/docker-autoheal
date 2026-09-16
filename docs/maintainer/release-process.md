@@ -6,7 +6,7 @@ Semantic version tags (`vMAJOR.MINOR.PATCH`, e.g. `v2.0.3`), grouped into releas
 **series** by an additional bare `vMAJOR` marker tag (e.g. `v2`) that marks which series
 is currently active on `main`.
 
-## Releases happen automatically on every merge to `main`
+## Releases happen automatically on every push to `main`
 
 There is no manual "cut a release" step. `.github/workflows/docker-release.yml` runs on
 every push to `main` and automatically:

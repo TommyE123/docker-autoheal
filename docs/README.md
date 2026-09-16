@@ -16,6 +16,7 @@ How to install, configure, and use Docker Auto-Heal.
 - [Notifications](user/notifications.md)
 - [Maintenance mode](user/maintenance-mode.md)
 - [Troubleshooting](user/troubleshooting.md)
+- [Migration](user/migration.md)
 
 ## Developers
 

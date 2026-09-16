@@ -30,9 +30,11 @@ without adding a label — this stores an explicit selection that persists in
 
 ### `include_all` mode
 
-If `monitor.include_all` is set, every container is monitored regardless of labels
-(subject to the whitelist/blacklist filters in [Configuration](configuration.md)). The
-`autoheal` label and UI-based selection/exclusion still take priority when set.
+If `monitor.include_all` is set, every container is monitored regardless of the `autoheal`
+label (subject to the whitelist/blacklist filters in [Configuration](configuration.md)) —
+the label itself has no effect in this mode. An explicit UI/API selection or exclusion
+(`containers.selected` / `containers.excluded`) is checked before the label or `include_all`
+are even considered, and always wins either way.
 
 ## There is no per-container timeout label
 
