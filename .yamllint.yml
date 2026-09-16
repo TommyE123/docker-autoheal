@@ -15,5 +15,6 @@ rules:
       .github/workflows/docker-release.yml
       .github/workflows/greetings.yml
       .github/workflows/mega-linter.yml
+      .github/workflows/production-smoke-test.yml
       .github/workflows/semantic-pr-title.yml
       .github/workflows/tests.yml
