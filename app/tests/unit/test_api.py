@@ -789,6 +789,59 @@ class TestHealthCheckManagement:
         config_manager.remove_custom_health_check = original_remove
         assert exc_info.value.status_code == 500
 
+    async def test_add_health_check_rejects_when_monitoring_engine_not_initialized(
+        self, monkeypatch, docker_client
+    ):
+        docker_client_val = docker_client
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client_val.add_container(container, info)
+
+        # Set docker_client but not monitoring_engine
+        monkeypatch.setattr("app.api.api.docker_client", docker_client_val)
+        monkeypatch.setattr("app.api.api.monitoring_engine", None)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await add_health_check(
+                HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080)
+            )
+
+        assert exc_info.value.status_code == 500
+        assert "Unable to resolve container stable identifier" in exc_info.value.detail
+
+    async def test_get_health_check_rejects_when_monitoring_engine_not_initialized(
+        self, monkeypatch, docker_client
+    ):
+        docker_client_val = docker_client
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client_val.add_container(container, info)
+
+        # Set docker_client but not monitoring_engine
+        monkeypatch.setattr("app.api.api.docker_client", docker_client_val)
+        monkeypatch.setattr("app.api.api.monitoring_engine", None)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_health_check("web")
+
+        assert exc_info.value.status_code == 500
+        assert "Unable to resolve container stable identifier" in exc_info.value.detail
+
+    async def test_delete_health_check_rejects_when_monitoring_engine_not_initialized(
+        self, monkeypatch, docker_client
+    ):
+        docker_client_val = docker_client
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client_val.add_container(container, info)
+
+        # Set docker_client but not monitoring_engine
+        monkeypatch.setattr("app.api.api.docker_client", docker_client_val)
+        monkeypatch.setattr("app.api.api.monitoring_engine", None)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_health_check("web")
+
+        assert exc_info.value.status_code == 500
+        assert "Unable to resolve container stable identifier" in exc_info.value.detail
+
 
 @pytest.mark.asyncio
 class TestNotificationsConfig:
