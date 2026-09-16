@@ -7,7 +7,7 @@ description: Request a CodeRabbit review on a substantive PR in this repository,
 
 Automatic reviews are off in `.coderabbit.yaml` (`reviews.auto_review.enabled: false`), so CodeRabbit reviews a PR only when it is explicitly asked. Every substantive PR gets a CodeRabbit review before Tom merges it.
 
-**Ask only once the PR is green.** Wait until every check on the PR head has passed (`unit-tests`, `MegaLinter`, `Build Docker image`, `validate-title`, `codecov/patch`, `codecov/project`, plus any other check the PR triggers) and the branch has no merge conflict. Asking while CI is red spends the review on findings CI has already reported.
+**Ask only once the PR is green.** Wait until every check the PR triggers has passed and the branch has no merge conflict. Asking while CI is red spends the review on findings CI has already reported.
 
 **Always use `@coderabbitai full review`, never `@coderabbitai review`.** `review` is incremental: with automatic reviews disabled it can reply "CodeRabbit is an incremental review system and does not re-review already reviewed commits" and do nothing, which has already happened on PR #105. `full review` reviews the whole PR from scratch.
 
@@ -28,7 +28,7 @@ Free-form instructions in the same comment as the command are honoured (`chat.au
 - <any related PR/issue CodeRabbit must inspect before concluding, and why>
 
 **Out of scope**
-- Pre-existing MegaLinter findings (bandit `assert_used` in tests, mypy/pyright optional-access warnings) unless this PR introduced or worsened them.
+- Pre-existing MegaLinter findings unrelated to this PR, unless this PR introduced or worsened them.
 - Codecov percentages as evidence of correctness.
 - Style-only preferences and unrelated cleanup.
 
