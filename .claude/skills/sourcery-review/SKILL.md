@@ -1,27 +1,27 @@
 ---
 name: sourcery-review
-description: Optional second-opinion review of a PR in this repository using Sourcery, on top of the mandatory CodeRabbit review. Use only when explicitly requested or clearly valuable, and check first whether this PR already has a Sourcery review — it is a scarce resource and is normally spent at most once per PR.
+description: How to treat Sourcery's automatic PR reviews in this repository, on top of the mandatory CodeRabbit review. Sourcery reviews PRs automatically via its installed GitHub App — this skill is about not disturbing that automation and not requesting unnecessary re-reviews, not about manually triggering a first review.
 ---
 
-# Sourcery review (optional)
+# Sourcery review
 
-Sourcery is an optional second opinion and a scarce resource. It is independent of CodeRabbit, which remains the normal mandatory PR review process — do not make Sourcery a mandatory gate unless Tom explicitly requests it, and do not chain the two together.
+Sourcery is installed as a GitHub App and reviews PRs automatically — Claude does not need to (and should not try to) trigger a first review. It is independent of CodeRabbit, which remains the normal mandatory PR review process; do not make Sourcery a mandatory gate unless Tom explicitly requests it, and do not chain the two together.
 
-- Default to at most one Sourcery review per PR.
-- Before invoking Sourcery, inspect the PR's existing reviews/comments for a prior Sourcery review.
-- The verified GitHub review author is `sourcery-ai`. Do not use `sourcery-ai[bot]`.
-- If a prior review by `sourcery-ai` exists, treat that PR's Sourcery review as already spent unless Tom explicitly asks for another.
-- Do not create Sourcery → fix → Sourcery → fix loops.
-- Large/complex PRs should normally receive one review only.
-- Do not calculate or try to determine the account-wide Sourcery budget.
-- Do not add labels, status checks, workflows, or other repository state solely to enforce this policy.
+- Do not disable, suppress, or otherwise manipulate Sourcery's automatic reviews.
+- The verified GitHub review author is `sourcery-ai`. Do not use `sourcery-ai[bot]`. Check the PR's existing reviews/comments for a review by `sourcery-ai` before assuming none exists.
+- An existing Sourcery review on a PR counts as *the* Sourcery review for that PR.
+- After making fixes based on that review, do not automatically request a Sourcery re-review — a re-review is only requested when Tom explicitly asks for one.
+- Do not create Sourcery → fix → Sourcery re-review loops.
+- Do not attempt to determine, manage, or work around the account-wide Sourcery review budget.
+- If Sourcery reports that its review budget is exhausted, do not attempt another review.
+- Do not add labels, workflows, hooks, status checks, or other automation to control Sourcery.
 - Do not reproduce Sourcery locally.
 
 ## Boundary with CodeRabbit
 
 ```
 CodeRabbit → normal mandatory PR review process
-Sourcery   → optional second opinion
+Sourcery   → automatic reviewer; re-review only on Tom's explicit request
 ```
 
 Do not create a dependency such as CodeRabbit → Sourcery → CodeRabbit, and do not create automated review loops or add labels/status checks/workflows to coordinate the two.
