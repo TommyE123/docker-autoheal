@@ -65,8 +65,9 @@ When CodeRabbit reports findings:
 1. **Investigate each finding** — determine whether it is valid and related to the PR. Invalid, pre-existing, or genuinely out-of-scope findings can be explained rather than fixed.
 2. **Fix valid PR-related findings** — do not simply acknowledge and leave them unresolved. Do not suppress, disable, or work around a valid finding merely to obtain approval.
 3. **Run appropriate targeted validation** — use the smallest relevant check for the changed behaviour. For guidance on validation scope, see `.claude/rules/testing.md`.
-4. **Push the fixes** — commit and push the changes.
-5. **Post a concise PR comment** explaining what CodeRabbit identified and what was fixed:
+4. **Check if the PR branch is behind main** — before committing and pushing the fixes, verify that the PR branch is current with main. If it is behind, update the branch using the repository's established branch-update or rebase workflow, resolve any conflicts carefully, and re-run appropriate targeted validation. See `.claude/rules/branch-currency.md` for detailed guidance.
+5. **Commit and push the fixes** — commit and push the completed, validated changes.
+6. **Post a concise PR comment** explaining what CodeRabbit identified and what was fixed:
    ```
    Addressed the actionable CodeRabbit findings from the latest review:
    
@@ -74,11 +75,16 @@ When CodeRabbit reports findings:
    - Fixed "<finding>" in "<file>".
    
    Targeted validation completed: "<checks>".
+   
+   The branch was updated from "main" before the fixes were committed/pushed.
+   
+   CI is now being allowed to return to green before requesting another full CodeRabbit review.
    ```
-6. **Wait for checks to return to green** — do not request another review while CI is red.
-7. **Request another full review** — post a fresh `@coderabbitai full review` comment.
-8. **Repeat if necessary** — if the new review identifies further valid, PR-related actionable findings, go back to step 1.
-9. **Stop when done** — when there are no further actionable findings, or when all remaining findings have been appropriately explained as invalid or out-of-scope, the cycle is complete.
+   Only mention the branch update when one actually occurred.
+7. **Wait for checks to return to green** — do not request another review while CI is red.
+8. **Request another full review** — post a fresh `@coderabbitai full review` comment.
+9. **Repeat if necessary** — if the new review identifies further valid, PR-related actionable findings, go back to step 1.
+10. **Stop when done** — when there are no further actionable findings, or when all remaining findings have been appropriately explained as invalid or out-of-scope, the cycle is complete.
 
 Do not create an infinite review/fix loop. The purpose is to resolve genuine actionable findings, not repeatedly chase reviewer noise.
 
