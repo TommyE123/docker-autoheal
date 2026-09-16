@@ -21,9 +21,25 @@ VALIDATE_ALL_CODEBASE: true
 YAML_YAMLLINT_ARGUMENTS: "--strict"
 PYTHON_DEFAULT_STYLE: ruff
 
+# MegaLinter's markdownlint descriptor only auto-detects a file literally named
+# .markdownlint.json by default; a .jsonc file (needed for the comments explaining
+# the two disabled rules) is otherwise silently ignored in favor of MegaLinter's own
+# bundled default config. Point it explicitly at ours, at the repo root (LINTER_RULES_PATH
+# defaults to .github/linters, which doesn't exist here).
+MARKDOWN_MARKDOWNLINT_CONFIG_FILE: ".markdownlint.jsonc"
+MARKDOWN_MARKDOWNLINT_RULES_PATH: "."
+
 # Linters below have existing findings in this repository. They remain
 # enabled and their findings stay visible, but do not fail the build until
 # a follow-up issue fixes the underlying findings.
+#
+# MARKDOWN_MARKDOWNLINT and MARKDOWN_MARKDOWN_TABLE_FORMATTER were both in this
+# list but are now enabled for real: .markdownlint.jsonc turns off only MD013
+# (line-length) and MD060 (table-pipe-style), the two rules that conflict with
+# this repo's established prose/table formatting; every table in the repo has
+# been run through `markdown-table-formatter` (its column-aligned style is a
+# strict superset of - not a conflict with - the padded-pipe convention MD060
+# was kept off for), so its --check mode is clean repo-wide.
 DISABLE_ERRORS_LINTERS:
   - ACTION_ZIZMOR
   - PYTHON_BANDIT
@@ -33,8 +49,6 @@ DISABLE_ERRORS_LINTERS:
   - PYTHON_PYRIGHT
   - JAVASCRIPT_STANDARD
   - CSS_STYLELINT
-  - MARKDOWN_MARKDOWNLINT
-  - MARKDOWN_MARKDOWN_TABLE_FORMATTER
   - REPOSITORY_TRIVY
   - REPOSITORY_GRYPE
   - REPOSITORY_OSV_SCANNER

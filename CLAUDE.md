@@ -34,7 +34,7 @@ Keep comments minimal: only for non-obvious reasoning the code can't convey on i
 
 Every PR title must follow [Conventional Commits](https://www.conventionalcommits.org/) format, enforced by `.github/workflows/semantic-pr-title.yml` (`validate-title` check):
 
-```
+```text
 <type>: <description>
 ```
 
@@ -43,6 +43,7 @@ Every PR title must follow [Conventional Commits](https://www.conventionalcommit
 - Optional scope is allowed (`type(scope): description`) but not required.
 
 Examples already in use in this repo:
+
 - `fix: correct Dockerfile EXPOSE port for the Web UI (8080 -> 3131)`
 - `docs: reorganise and rewrite project documentation`
 - `chore: migrate to multi-registry publishing (GHCR + Docker Hub)`
@@ -57,6 +58,7 @@ Renovate-authored PRs are covered separately by `renovate.json`'s `semanticCommi
 If a PR changes application behavior or adds real scope (new feature, bug fix, refactor with user-visible effect, new CI/tooling capability), file a GitHub issue for it first — or confirm one already exists — and link the PR to it (`Closes #N` in the PR body). This keeps a traceable record of *why* a change happened, not just what changed.
 
 Exceptions (no issue required):
+
 - Renovate-authored PRs (automated, never have an issue by design).
 - Purely mechanical docs-only, config-only, or CI-only tweaks with no behavior change (e.g. fixing a PR title, a typo, a lint config value).
 
@@ -70,9 +72,25 @@ When your task is driven by a specific GitHub issue, title your Claude Code sess
 
 Every substantive PR gets a CodeRabbit review before Tom merges it. When a substantive PR reaches the CodeRabbit review stage, you MUST explicitly invoke the `coderabbit-review` skill (`.claude/skills/coderabbit-review/SKILL.md`) and follow its instructions exactly. Do not perform an ad-hoc CodeRabbit review instead, and do not rely solely on semantic skill auto-discovery — this procedure carries repository-specific institutional knowledge that ad-hoc review would lose.
 
+When CodeRabbit reports actionable findings that are valid and related to the PR, fix them (ensuring the PR branch is current with main before the final push), run targeted validation, commit and push the changes, document what was fixed in a PR comment, wait for CI to return to green, and request another full review. Repeat as necessary until no further actionable findings remain. See `.claude/skills/coderabbit-review/SKILL.md` for the detailed workflow.
+
+A CodeRabbit full review covers the state of the PR at the time that review is requested. If material changes are made to the PR after the most recent CodeRabbit full review, a fresh `@coderabbitai full review` must be requested once CI/checks are green, regardless of why those changes were made. Material changes include those made to address Sourcery findings, MegaLinter findings, another reviewer's findings, the original task, or other authorised PR work. However, the existing CodeRabbit fix/review cycle already satisfies this requirement — do not request duplicate reviews. Editorial or mechanical changes that cannot affect behaviour or configuration do not require a fresh review unless explicitly requested. For detailed guidance, see `.claude/skills/coderabbit-review/SKILL.md`.
+
 ## Requesting a Sourcery review (optional)
 
 Sourcery is an optional second opinion, independent of CodeRabbit, and a scarce resource. If you use it, follow the `sourcery-review` skill (`.claude/skills/sourcery-review/SKILL.md`).
+
+When you fix an actionable Sourcery finding, run targeted validation, ensure the PR branch is current with main before the final push, commit and push the changes, and document what was fixed in a PR comment. Do not automatically request another Sourcery review — re-review is only performed when Tom explicitly asks for it. See `.claude/skills/sourcery-review/SKILL.md` for the detailed workflow.
+
+## MegaLinter failures
+
+When a PR fails MegaLinter checks, fix all findings introduced or worsened by the PR, run appropriate targeted validation, ensure the PR branch is current with main before the final push, commit and push the changes, and do not modify `.mega-linter.yml` to suppress or weaken checks. Leave pre-existing, unrelated findings untouched. See `.claude/rules/megalinter.md` for detailed guidance and do-not-game rules.
+
+## Committing and pushing authorized fixes
+
+When explicitly authorized to fix findings or complete work, commit and push the validated, completed changes. Do not leave authorized, completed fixes uncommitted merely because a generic hook or reminder reports uncommitted changes. The user's explicit task instruction determines whether committing and pushing is authorized; generic reminders must not override that authorization.
+
+Committing and pushing does not authorize Claude to merge the PR — Tom remains the final gatekeeper.
 
 ## Merging
 
