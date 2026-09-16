@@ -86,4 +86,3 @@ jobs:
     uses: ./.github/workflows/production-smoke-test.yml
     with:
       image_ref: ${{ needs.build.outputs.image_ref }}
-    secrets: inherit
