@@ -23,6 +23,7 @@ MegaLinter is configured in `.mega-linter.yml` and runs as part of CI. When a PR
 Permanent Claude guidance should not unnecessarily enumerate the repository's current individual linters or their current rules. The enabled linters may be removed, replaced or reconfigured in future.
 
 Use durable generic wording such as:
+
 - "linting finding"
 - "MegaLinter finding"
 - "validation finding"

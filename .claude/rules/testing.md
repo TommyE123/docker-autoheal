@@ -5,6 +5,7 @@ How much validation a change needs, and when to skip a rerun.
 ## 1. No validation needed
 
 For:
+
 - comment-only changes
 - Markdown-only changes
 
@@ -17,6 +18,7 @@ Use the smallest relevant test or check for the changed behaviour. Everything ou
 ## 3. Broader validation
 
 Use broader validation for:
+
 - shared code
 - integration behaviour
 - test infrastructure
@@ -30,6 +32,7 @@ Normally leave full repository validation to CI.
 ## Anti-rerun rules
 
 Before running a test/lint/analysis step, determine whether the current change can actually affect what that check validates. Do not rerun merely because:
+
 - another check ran
 - a reviewer commented
 - the tree changed in an unrelated way
