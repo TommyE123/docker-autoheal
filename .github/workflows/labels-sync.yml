@@ -80,9 +80,10 @@ jobs:
               }
             }
 
-      # Any open issue that no longer carries a kind/* classification and
-      # isn't already in a status/* state (freshly created, or just lost its
-      # only classification above) needs to go through triage again.
+      # Any open issue that isn't fully classified (both a kind/* AND an
+      # area/* label - losing just one to the deletions above still leaves
+      # it incomplete) and isn't already in a status/* state needs to go
+      # through triage again.
       - name: Flag unclassified open issues for triage
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
@@ -101,9 +102,10 @@ jobs:
                 typeof label === 'string' ? label : label.name
               );
               const hasKind = labelNames.some((name) => name.startsWith('kind/'));
+              const hasArea = labelNames.some((name) => name.startsWith('area/'));
               const hasStatus = labelNames.some((name) => name.startsWith('status/'));
 
-              if (hasKind || hasStatus) continue;
+              if ((hasKind && hasArea) || hasStatus) continue;
 
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,

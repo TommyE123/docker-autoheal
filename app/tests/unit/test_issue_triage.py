@@ -419,7 +419,9 @@ class _RecordingGithubSession:
         return _FakeResponse(200, [])
 
 
-def _run_main_with_fake_session(monkeypatch, tmp_path, gemini_text, current_labels, title):
+def _run_main_with_fake_session(
+    monkeypatch, tmp_path, gemini_text, current_labels, title, dry_run=False
+):
     prompt_path = tmp_path / "system-prompt.txt"
     prompt_path.write_text("system prompt")
 
@@ -434,7 +436,10 @@ def _run_main_with_fake_session(monkeypatch, tmp_path, gemini_text, current_labe
     monkeypatch.setenv("GITHUB_TOKEN", "gh-token")
     monkeypatch.setenv("GEMINI_API_KEY", "gemini-key")
     monkeypatch.setenv("SYSTEM_PROMPT_PATH", str(prompt_path))
-    monkeypatch.delenv("DRY_RUN", raising=False)
+    if dry_run:
+        monkeypatch.setenv("DRY_RUN", "true")
+    else:
+        monkeypatch.delenv("DRY_RUN", raising=False)
 
     exit_code = triage_script.main()
     return exit_code, session
@@ -501,3 +506,22 @@ def test_main_insufficient_info_posts_comment_not_label_mutation_twice(monkeypat
     ]
     assert len(comment_posts) == 1
     assert triage.NEEDS_INFO_MARKER in comment_posts[0][2]["body"]
+
+
+def test_main_dry_run_performs_no_github_mutations(monkeypatch, tmp_path):
+    gemini_text = json.dumps({"kind": "enhancement", "area": "docker", "confidence": 0.9})
+
+    exit_code, session = _run_main_with_fake_session(
+        monkeypatch,
+        tmp_path,
+        gemini_text,
+        current_labels=["kind/bug", "area/restart"],
+        title="Add support for restart backoff / cooldown period",
+        dry_run=True,
+    )
+
+    assert exit_code == 0
+    # The only network call allowed in dry-run is classification itself;
+    # nothing may touch the GitHub labels/comments endpoints.
+    github_calls = [call for call in session.calls if "api.github.com" in call[1]]
+    assert github_calls == []
