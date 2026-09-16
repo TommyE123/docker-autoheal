@@ -68,18 +68,20 @@ When CodeRabbit reports findings:
 4. **Check if the PR branch is behind main** — before committing and pushing the fixes, verify that the PR branch is current with main. If it is behind, update the branch using the repository's established branch-update or rebase workflow, resolve any conflicts carefully, and re-run appropriate targeted validation. See `.claude/rules/branch-currency.md` for detailed guidance.
 5. **Commit and push the fixes** — commit and push the completed, validated changes.
 6. **Post a concise PR comment** explaining what CodeRabbit identified and what was fixed:
-   ```
+
+   ```text
    Addressed the actionable CodeRabbit findings from the latest review:
-   
+
    - Fixed "<finding>" in "<file>".
    - Fixed "<finding>" in "<file>".
-   
+
    Targeted validation completed: "<checks>".
-   
+
    The branch was updated from "main" before the fixes were committed/pushed.
-   
+
    CI is now being allowed to return to green before requesting another full CodeRabbit review.
    ```
+
    Only mention the branch update when one actually occurred.
 7. **Wait for checks to return to green** — do not request another review while CI is red.
 8. **Request another full review** — post a fresh `@coderabbitai full review` comment.
@@ -93,6 +95,7 @@ Do not create an infinite review/fix loop. The purpose is to resolve genuine act
 A CodeRabbit full review applies to the state of the PR at the time the review is requested. If Claude subsequently makes material changes to the PR, those changes must also be covered by a fresh `@coderabbitai full review` once CI/checks are green.
 
 This applies regardless of why the changes were made, including changes made to:
+
 - fix CodeRabbit findings
 - fix Sourcery findings
 - fix MegaLinter findings

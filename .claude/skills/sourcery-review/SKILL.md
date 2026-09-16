@@ -26,14 +26,16 @@ When Sourcery reports findings and you fix them:
 3. **Check if the PR branch is behind main** — before committing and pushing the fixes, verify that the PR branch is current with main. If it is behind, update the branch using the repository's established branch-update or rebase workflow, resolve any conflicts carefully, and re-run appropriate targeted validation. See `.claude/rules/branch-currency.md` for detailed guidance.
 4. **Commit and push the fixes** — commit and push the completed, validated changes.
 5. **Post a concise PR comment** explaining what Sourcery identified and what was fixed:
-   ```
+
+   ```text
    Addressed the actionable Sourcery findings:
-   
+
    - Fixed "<finding>" in "<file>".
    - Fixed "<finding>" in "<file>".
-   
+
    Targeted validation completed: "<checks>".
    ```
+
 6. **Do not automatically request another review** — the cycle stops here. Sourcery re-review is only performed when Tom explicitly asks for it.
 
 If Tom subsequently asks for a Sourcery re-review, follow the existing Sourcery workflow and update the PR discussion with the result. Do not create an automatic Sourcery fix/re-review loop.
