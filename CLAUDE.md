@@ -70,9 +70,17 @@ When your task is driven by a specific GitHub issue, title your Claude Code sess
 
 Every substantive PR gets a CodeRabbit review before Tom merges it. When a substantive PR reaches the CodeRabbit review stage, you MUST explicitly invoke the `coderabbit-review` skill (`.claude/skills/coderabbit-review/SKILL.md`) and follow its instructions exactly. Do not perform an ad-hoc CodeRabbit review instead, and do not rely solely on semantic skill auto-discovery — this procedure carries repository-specific institutional knowledge that ad-hoc review would lose.
 
+When CodeRabbit reports actionable findings that are valid and related to the PR, fix them, document what was fixed in a PR comment, ensure CI returns to green, and request another full review. Repeat as necessary until no further actionable findings remain. See `.claude/skills/coderabbit-review/SKILL.md` for the detailed workflow.
+
 ## Requesting a Sourcery review (optional)
 
 Sourcery is an optional second opinion, independent of CodeRabbit, and a scarce resource. If you use it, follow the `sourcery-review` skill (`.claude/skills/sourcery-review/SKILL.md`).
+
+When you fix an actionable Sourcery finding, document what was fixed in a PR comment. Do not automatically request another Sourcery review — re-review is only performed when Tom explicitly asks for it. See `.claude/skills/sourcery-review/SKILL.md` for the detailed workflow.
+
+## MegaLinter failures
+
+When a PR fails MegaLinter checks, fix all findings introduced or worsened by the PR, run appropriate targeted validation, and do not modify `.mega-linter.yml` to suppress or weaken checks. Leave pre-existing, unrelated findings untouched. See `.claude/rules/megalinter.md` for detailed guidance and do-not-game rules.
 
 ## Merging
 

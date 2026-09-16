@@ -58,4 +58,28 @@ Review only — do not push commits to this PR.
 
 Keep **In scope** to the handful of things that actually need judgement; it is the only part that should grow, and a scope list longer than about ten bullets means the PR is too broad. After pushing review fixes, wait for green again and post a fresh `full review` comment whose Context says what changed since the last round.
 
+## Handling actionable findings
+
+When CodeRabbit reports findings:
+
+1. **Investigate each finding** — determine whether it is valid and related to the PR. Invalid, pre-existing, or genuinely out-of-scope findings can be explained rather than fixed.
+2. **Fix valid PR-related findings** — do not simply acknowledge and leave them unresolved. Do not suppress, disable, or work around a valid finding merely to obtain approval.
+3. **Run appropriate targeted validation** — use the smallest relevant check for the changed behaviour. For guidance on validation scope, see `.claude/rules/testing.md`.
+4. **Push the fixes** — commit and push the changes.
+5. **Post a concise PR comment** explaining what CodeRabbit identified and what was fixed:
+   ```
+   Addressed the actionable CodeRabbit findings from the latest review:
+   
+   - Fixed "<finding>" in "<file>".
+   - Fixed "<finding>" in "<file>".
+   
+   Targeted validation completed: "<checks>".
+   ```
+6. **Wait for checks to return to green** — do not request another review while CI is red.
+7. **Request another full review** — post a fresh `@coderabbitai full review` comment.
+8. **Repeat if necessary** — if the new review identifies further valid, PR-related actionable findings, go back to step 1.
+9. **Stop when done** — when there are no further actionable findings, or when all remaining findings have been appropriately explained as invalid or out-of-scope, the cycle is complete.
+
+Do not create an infinite review/fix loop. The purpose is to resolve genuine actionable findings, not repeatedly chase reviewer noise.
+
 Do not merge the PR yourself — see `CLAUDE.md`'s Merging section. Tom (@TommyE123) is the final gatekeeper.

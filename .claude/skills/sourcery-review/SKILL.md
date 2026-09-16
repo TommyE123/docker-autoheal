@@ -17,11 +17,31 @@ Sourcery is installed as a GitHub App and reviews PRs automatically — Claude d
 - Do not add labels, workflows, hooks, status checks, or other automation to control Sourcery.
 - Do not reproduce Sourcery locally.
 
+## Handling actionable findings
+
+When Sourcery reports findings and you fix them:
+
+1. **Fix valid, actionable findings** — integrate the changes into the PR.
+2. **Run appropriate targeted validation** — use the smallest relevant check for the changed behaviour. For guidance on validation scope, see `.claude/rules/testing.md`.
+3. **Push the fixes** — commit and push the changes.
+4. **Post a concise PR comment** explaining what Sourcery identified and what was fixed:
+   ```
+   Addressed the actionable Sourcery findings:
+   
+   - Fixed "<finding>" in "<file>".
+   - Fixed "<finding>" in "<file>".
+   
+   Targeted validation completed: "<checks>".
+   ```
+5. **Do not automatically request another review** — the cycle stops here. Sourcery re-review is only performed when Tom explicitly asks for it.
+
+If Tom subsequently asks for a Sourcery re-review, follow the existing Sourcery workflow and update the PR discussion with the result. Do not create an automatic Sourcery fix/re-review loop.
+
 ## Boundary with CodeRabbit
 
 ```
-CodeRabbit → normal mandatory PR review process
-Sourcery   → automatic reviewer; re-review only on Tom's explicit request
+CodeRabbit → fix actionable findings → comment → green → request full re-review → repeat if needed
+Sourcery   → fix actionable findings → comment → stop; Tom decides whether re-review is needed
 ```
 
 Do not create a dependency such as CodeRabbit → Sourcery → CodeRabbit, and do not create automated review loops or add labels/status checks/workflows to coordinate the two.
