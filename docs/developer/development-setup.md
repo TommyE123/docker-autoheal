@@ -30,8 +30,7 @@ Prometheus metrics, when enabled, are served separately on port `9090`.
 ## Frontend
 
 The web UI is a Vite + React app in `frontend/`. See
-[Frontend Development](frontend.md) for the full setup, including a port mismatch you
-need to know about between the Vite dev server and the backend.
+[Frontend Development](frontend.md) for the full setup.
 
 ## Running the full stack with Docker
 
