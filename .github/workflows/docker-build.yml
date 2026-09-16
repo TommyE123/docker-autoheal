@@ -59,3 +59,30 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=docker-autoheal
           cache-to: type=gha,mode=max,scope=docker-autoheal
+
+      # sha-<short sha> is unambiguous: it's pushed above via metadata-action's
+      # type=sha (keyed on this job's own github.sha), unlike pr-<N> which a
+      # later commit on the same PR can overwrite before it's consumed.
+      - name: Record the exact image reference for the smoke test
+        id: image
+        # Image references must be lowercase; github.repository_owner isn't
+        # (metadata-action above lowercases it internally when tagging).
+        run: |
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "ref=ghcr.io/${OWNER_LC}/docker-autoheal:sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+    outputs:
+      image_ref: ${{ steps.image.outputs.ref }}
+
+  smoke-test:
+    name: Production container smoke test
+    needs: build
+    # docker-build.yml only pushes an image for same-repo PRs; running this
+    # job (which mounts the runner's Docker socket into the built image) for
+    # anything else would be pulling nothing, or worse, an unrelated image.
+    if: needs.build.result == 'success' && github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/production-smoke-test.yml
+    with:
+      image_ref: ${{ needs.build.outputs.image_ref }}
