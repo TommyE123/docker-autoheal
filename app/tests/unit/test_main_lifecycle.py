@@ -197,34 +197,6 @@ class TestAutoHealServiceStartFailure:
             assert service.running is True
             mock_notif.stop.assert_not_called()
 
-    @pytest.mark.asyncio
-    async def test_migrate_legacy_health_checks_called_during_startup(self):
-        with patch('app.main.config_manager') as mock_cm, \
-             patch('app.main.DockerClientWrapper') as mock_docker_cls, \
-             patch('app.main.MonitoringEngine') as mock_engine_cls, \
-             patch('app.main.UptimeKumaMonitor') as mock_kuma_cls, \
-             patch('app.main.init_api'), \
-             patch('app.main.notification_manager') as mock_notif, \
-             patch('app.main.start_http_server'):
-            mock_cm.get_config.return_value = self._make_config()
-            mock_cm.migrate_legacy_health_checks = MagicMock()
-            mock_docker = MagicMock()
-            mock_docker_cls.return_value = mock_docker
-            mock_engine = MagicMock()
-            mock_engine_cls.return_value = mock_engine
-            mock_engine.start = AsyncMock()
-            mock_kuma_cls.return_value.start = AsyncMock()
-            mock_notif.start = AsyncMock()
-
-            service = AutoHealService()
-            await service.start()
-
-            # Verify migrate_legacy_health_checks was called with docker_client and monitoring_engine
-            mock_cm.migrate_legacy_health_checks.assert_called_once()
-            call_args = mock_cm.migrate_legacy_health_checks.call_args
-            assert call_args[0][0] is mock_docker, "First arg should be docker_client"
-            assert call_args[0][1] is mock_engine, "Second arg should be monitoring_engine"
-
 
 class TestSignalHandler:
     def teardown_method(self):

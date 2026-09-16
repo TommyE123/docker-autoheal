@@ -117,11 +117,6 @@ class AutoHealService:
             logger.info("Initializing monitoring engine...")
             self.monitoring_engine = MonitoringEngine(self.docker_client)
 
-            # Migrate legacy health checks (from Docker IDs to stable IDs)
-            config_manager.migrate_legacy_health_checks(
-                self.docker_client, self.monitoring_engine
-            )
-
             # Initialize Uptime-Kuma monitor (independent service that provides status)
             logger.info("Initializing Uptime-Kuma monitor...")
             self.uptime_kuma_monitor = UptimeKumaMonitor()
