@@ -263,8 +263,10 @@ async def get_container_details(container_id: str):
         # Check if quarantined (use stable_id, matching how quarantine is stored)
         quarantined = config_manager.is_quarantined(stable_id)
 
-        # Get custom health check (by name first, then ID)
-        custom_hc = config_manager.get_custom_health_check(container_name)
+        # Get custom health check (by stable_id first for correctness, then fallback to name/ID for legacy compat)
+        custom_hc = config_manager.get_custom_health_check(stable_id)
+        if not custom_hc:
+            custom_hc = config_manager.get_custom_health_check(container_name)
         if not custom_hc:
             custom_hc = config_manager.get_custom_health_check(full_container_id)
 
@@ -592,7 +594,12 @@ async def add_health_check(health_check: HealthCheckConfig):
             raise HTTPException(status_code=404, detail="Container not found")
 
         info = docker_client.get_container_info(container)
-        stable_id = info.get("stable_id")
+        if not info:
+            raise HTTPException(status_code=500, detail="Unable to inspect container")
+
+        stable_id = monitoring_engine.get_stable_identifier(info) if monitoring_engine else None
+        if not stable_id:
+            raise HTTPException(status_code=500, detail="Unable to resolve container stable identifier")
 
         # Store by stable_id so the check survives container recreation
         # (image updates, `docker compose up --force-recreate`, etc.),
@@ -621,7 +628,13 @@ async def get_health_check(container_id: str):
             raise HTTPException(status_code=404, detail="Container not found")
 
         info = docker_client.get_container_info(container)
-        stable_id = info.get("stable_id")
+        if not info:
+            raise HTTPException(status_code=500, detail="Unable to inspect container")
+
+        stable_id = monitoring_engine.get_stable_identifier(info) if monitoring_engine else None
+        if not stable_id:
+            raise HTTPException(status_code=500, detail="Unable to resolve container stable identifier")
+
         health_check = config_manager.get_custom_health_check(stable_id)
         if not health_check:
             raise HTTPException(status_code=404, detail="No custom health check found for this container")
@@ -646,7 +659,13 @@ async def delete_health_check(container_id: str):
             raise HTTPException(status_code=404, detail="Container not found")
 
         info = docker_client.get_container_info(container)
-        stable_id = info.get("stable_id")
+        if not info:
+            raise HTTPException(status_code=500, detail="Unable to inspect container")
+
+        stable_id = monitoring_engine.get_stable_identifier(info) if monitoring_engine else None
+        if not stable_id:
+            raise HTTPException(status_code=500, detail="Unable to resolve container stable identifier")
+
         config_manager.remove_custom_health_check(stable_id)
         return {"status": "success", "message": f"Health check removed for container {container_id}"}
     except HTTPException:

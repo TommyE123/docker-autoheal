@@ -254,23 +254,19 @@ class TestHealthCheckMigration:
         stored = config_manager.get_custom_health_check(stable_id)
         assert (
             stored is not None
-        ), "One of the colliding health checks should exist under stable ID"
-        assert stored.check_type in [
-            "tcp",
-            "http",
-        ], "The stored check should be from one of the original entries"
+        ), "First colliding health check should exist under stable ID"
+        assert stored.check_type == "tcp", "First check (tcp) should be stored under stable ID"
 
+        colliding_check = config_manager.get_custom_health_check(legacy_docker_id_2)
         assert (
-            config_manager.get_custom_health_check(legacy_docker_id_1) is None
-        ), "Old Docker ID 1 key should be removed"
-        assert (
-            config_manager.get_custom_health_check(legacy_docker_id_2) is None
-        ), "Old Docker ID 2 key should be removed"
+            colliding_check is not None
+        ), "Second colliding check should be preserved under its original Docker ID key"
+        assert colliding_check.check_type == "http", "Second check (http) should be under original Docker ID key"
 
         checks = config_manager.get_all_custom_health_checks()
         assert (
-            len(checks) == 1
-        ), "Should have exactly 1 health check (collision prevents duplication)"
+            len(checks) == 2
+        ), "Should have exactly 2 health checks (both preserved, one under stable_id, one under original Docker ID)"
 
     async def test_invalid_stable_id_preserves_original_docker_id_key(self, wired_api):
         """
@@ -314,3 +310,48 @@ class TestHealthCheckMigration:
         assert (
             len(checks) == 1
         ), "Should still have the health check preserved"
+
+    async def test_stable_id_key_not_migrated_when_matches_container_name(
+        self, wired_api
+    ):
+        """
+        A key that is already a stable ID (not a legacy Docker ID) should not
+        be migrated even if another container matches that name/stable ID.
+        This prevents a valid stable-ID key from being incorrectly resolved
+        to a different container.
+        """
+        docker_client, engine = wired_api
+
+        container1, info1 = make_container(
+            name="payments", container_id="a" * 64
+        )
+        container2, info2 = make_container(
+            name="other", container_id="b" * 64
+        )
+        docker_client.add_container(container1, info1)
+        docker_client.add_container(container2, info2)
+
+        stable_id_key = "payments"
+
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(
+                container_id=stable_id_key,
+                check_type="tcp",
+                tcp_port=8080,
+            )
+        )
+
+        config_manager.migrate_legacy_health_checks(docker_client, engine)
+
+        stored = config_manager.get_custom_health_check(stable_id_key)
+        assert (
+            stored is not None
+        ), "Stable ID key should be preserved"
+        assert (
+            stored.check_type == "tcp"
+        ), "Health check content should be unchanged"
+
+        checks = config_manager.get_all_custom_health_checks()
+        assert (
+            len(checks) == 1
+        ), "Should have exactly 1 health check (key unchanged)"

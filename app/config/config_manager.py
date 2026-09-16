@@ -478,11 +478,19 @@ class ConfigManager:
 
             if stable_id == key:
                 migrated[key] = health_check
+            elif info.get("full_id") != key:
+                migrated[key] = health_check
+                logger.warning(
+                    f"Preserved health check under key {key[:12]}...: key does not match container full_id {info.get('full_id', '')[:12]}... "
+                    f"(may be a stable-ID key, not a legacy Docker ID)"
+                )
+                continue
             elif stable_id in migrated:
+                migrated[key] = health_check
                 collision_count += 1
                 logger.warning(
-                    f"Health check collision: Docker ID {key[:12]}... and {list(self._custom_health_checks.keys())[0][:12]}... "
-                    f"both map to stable ID {stable_id}. Keeping existing entry."
+                    f"Health check collision: Docker ID {key[:12]}... resolves to stable ID {stable_id} "
+                    f"which is already used. Preserving under original Docker ID key for manual resolution."
                 )
             else:
                 health_check.container_id = stable_id
