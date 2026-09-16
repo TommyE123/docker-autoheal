@@ -1,32 +1,27 @@
 name: Production Smoke Test
 
-# Runs after "Docker Build" (docker-build.yml) has already built and pushed
-# the PR image, and pulls that exact image by its immutable per-commit
-# sha-<short sha> tag rather than rebuilding it.
+# A reusable workflow invoked as a job from docker-build.yml (see the
+# smoke-test job there), not a standalone trigger: workflow_run only fires
+# using the workflow file already on the default branch, so it could never
+# run for the PR that introduces this file. Running as a job in the same
+# pull_request-triggered run avoids that, and gives direct access to the
+# same-repo guard docker-build.yml's own push step already uses.
 on:
-  workflow_run:
-    workflows: ["Docker Build"]
-    types: [completed]
+  workflow_call:
+    inputs:
+      image_ref:
+        description: "Exact image reference to test, e.g. ghcr.io/owner/docker-autoheal:sha-abc1234"
+        required: true
+        type: string
 
 permissions:
   contents: read
   packages: read
 
-concurrency:
-  group: production-smoke-test-${{ github.event.workflow_run.id }}
-  cancel-in-progress: true
-
 jobs:
   smoke-test:
     name: Production container smoke test
     runs-on: ubuntu-latest
-    # docker-build.yml only pushes an image for same-repo PRs (forked PRs
-    # build but don't push), so github.event.workflow_run.pull_requests is
-    # only populated in that same case - nothing to pull otherwise.
-    if: >
-      github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.pull_requests[0] != null
 
     steps:
       - name: Login to GitHub Container Registry
@@ -36,26 +31,14 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Resolve the exact image built for this commit
-        id: image
-        # pr-<N> is mutable and can be overwritten by a later commit on the
-        # same PR before this job runs; docker-build.yml's metadata-action
-        # also tags every build with sha-<short sha> (type=sha), which is
-        # unique per commit, so it names exactly the image this run built.
-        env:
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-          OWNER: ${{ github.repository_owner }}
-        run: |
-          echo "ref=ghcr.io/${OWNER}/docker-autoheal:sha-${HEAD_SHA:0:7}" >> "$GITHUB_OUTPUT"
-
       - name: Pull the exact PR image
         env:
-          IMAGE_REF: ${{ steps.image.outputs.ref }}
+          IMAGE_REF: ${{ inputs.image_ref }}
         run: docker pull "$IMAGE_REF"
 
       - name: Start the container with a realistic production configuration
         env:
-          IMAGE_REF: ${{ steps.image.outputs.ref }}
+          IMAGE_REF: ${{ inputs.image_ref }}
         run: |
           docker run -d --name autoheal-smoke \
             -v /var/run/docker.sock:/var/run/docker.sock:ro \
