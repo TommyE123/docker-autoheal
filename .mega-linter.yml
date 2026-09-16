@@ -5,6 +5,13 @@ DISABLE:
   - COPYPASTE
   - SPELL
 
+DISABLE_LINTERS:
+  - PYTHON_PYLINT
+  - PYTHON_FLAKE8
+  - PYTHON_BLACK
+  - PYTHON_ISORT
+  - PYTHON_NBQA_MYPY
+
 FLAVOR_SUGGESTIONS: false
 FORMATTERS_DISABLE_ERRORS: false
 GITHUB_STATUS_REPORTER: true
@@ -12,6 +19,7 @@ DOCKERFILE_HADOLINT_FILE_NAMES_REGEX: ["Dockerfile(\\..+)?"]
 SHOW_ELAPSED_TIME: true
 VALIDATE_ALL_CODEBASE: true
 YAML_YAMLLINT_ARGUMENTS: "--strict"
+PYTHON_DEFAULT_STYLE: ruff
 
 # MegaLinter's markdownlint descriptor only auto-detects a file literally named
 # .markdownlint.json by default; a .jsonc file (needed for the comments explaining
@@ -34,13 +42,10 @@ MARKDOWN_MARKDOWNLINT_RULES_PATH: "."
 # was kept off for), so its --check mode is clean repo-wide.
 DISABLE_ERRORS_LINTERS:
   - ACTION_ZIZMOR
-  - PYTHON_PYLINT
-  - PYTHON_FLAKE8
-  - PYTHON_BLACK
-  - PYTHON_ISORT
   - PYTHON_BANDIT
   - PYTHON_MYPY
   - PYTHON_RUFF
+  - PYTHON_RUFF_FORMAT
   - PYTHON_PYRIGHT
   - JAVASCRIPT_STANDARD
   - CSS_STYLELINT
@@ -53,3 +58,9 @@ DISABLE_ERRORS_LINTERS:
 
 ACTION_ZIZMOR_UNSECURED_ENV_VARIABLES:
   - GITHUB_TOKEN
+
+PYTHON_PYRIGHT_PRE_COMMANDS:
+  - command: pip install --no-cache-dir -r requirements-dev.txt
+
+PYTHON_MYPY_PRE_COMMANDS:
+  - command: pip install --no-cache-dir -r requirements-dev.txt
