@@ -81,11 +81,11 @@ services:
       - "autoheal=false"   # exclude Auto-Heal itself from monitoring
 
   webapp:
-    image: nginx:latest
+    image: nginx:alpine
     labels:
       autoheal: "true"     # monitor this container
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost"]
       interval: 30s
       timeout: 10s
       retries: 3

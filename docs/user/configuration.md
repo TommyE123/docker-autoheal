@@ -68,8 +68,19 @@ key/value pairs, independent of the `autoheal` label:
 | `whitelist_labels` | Only monitor containers matching at least one of these label filters |
 | `blacklist_labels` | Never monitor containers matching one of these label filters         |
 
-Blacklists are checked before whitelists; explicit selection/exclusion (via the UI or
-`autoheal` label) takes priority over both.
+These filters are applied after container selection is otherwise determined, in this order:
+
+1. An explicit UI/API exclusion (`containers.excluded`) always wins — the container is never
+   monitored.
+2. An explicit UI/API selection (`containers.selected`) always wins next — the container is
+   monitored regardless of `include_all`, the `autoheal` label, or these filters.
+3. Otherwise, if `monitor.include_all` is `false`, the container must carry the configured
+   monitoring label/value to be considered at all.
+4. Only containers that reach this point are checked against the filters: blacklists (names,
+   then labels) before whitelists (names, then labels).
+
+The `autoheal` label is not an explicit selection/exclusion mechanism and does not override
+these filters — see [Labels](labels.md#include_all-mode) for the full precedence.
 
 ### `ui`
 

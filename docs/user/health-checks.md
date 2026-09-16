@@ -21,15 +21,20 @@ configuration needed:
 ```yaml
 services:
   webapp:
-    image: myapp:latest
+    image: nginx:alpine
     labels:
       autoheal: "true"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
       interval: 30s
       timeout: 10s
       retries: 3
 ```
+
+The `test` command runs inside `webapp`'s own container, not inside Auto-Heal's — make sure
+whatever tool you use is actually installed in that image (`wget` here, because it ships
+with `nginx:alpine`'s BusyBox base; the common `nginx:latest`/Debian image has neither
+`curl` nor `wget` installed by default).
 
 ## Custom health checks
 

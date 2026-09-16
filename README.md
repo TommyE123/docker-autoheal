@@ -86,11 +86,11 @@ Add the `autoheal` label to any container you want monitored:
 ```yaml
 services:
   webapp:
-    image: nginx:latest
+    image: nginx:alpine
     labels:
       autoheal: "true"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost"]
       interval: 30s
       timeout: 10s
       retries: 3
