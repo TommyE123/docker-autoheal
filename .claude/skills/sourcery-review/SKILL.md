@@ -5,7 +5,7 @@ description: How to treat Sourcery's automatic PR reviews in this repository, on
 
 # Sourcery review
 
-Sourcery is installed as a GitHub App and reviews PRs automatically — Claude does not need to (and should not try to) trigger a first review. It is independent of CodeRabbit, which remains the normal mandatory PR review process; do not make Sourcery a mandatory gate unless Tom explicitly requests it, and do not chain the two together.
+Sourcery is installed as a GitHub App and reviews PRs automatically — Claude does not need to (and should not try to) trigger a first review. It is independent of CodeRabbit, which remains the normal mandatory PR review process; do not make Sourcery a mandatory gate unless Tom explicitly requests it. Do not create automatic coordination or feedback loops between Sourcery and CodeRabbit.
 
 - Do not disable, suppress, or otherwise manipulate Sourcery's automatic reviews.
 - The verified GitHub review author is `sourcery-ai`. Do not use `sourcery-ai[bot]`. Check the PR's existing reviews/comments for a review by `sourcery-ai` before assuming none exists.
@@ -45,6 +45,6 @@ CodeRabbit → fix actionable findings → comment → green → request full re
 Sourcery   → fix actionable findings → comment → stop; Tom decides whether re-review is needed
 ```
 
-Do not create a dependency such as CodeRabbit → Sourcery → CodeRabbit, and do not create automated review loops or add labels/status checks/workflows to coordinate the two.
+Do not create automatic coordination loops or feedback dependencies between Sourcery and CodeRabbit (such as automated labels, workflows, or status checks that tie one to the other). However, when a Sourcery-driven material change is made to a PR that has previously received a CodeRabbit review, a fresh `@coderabbitai full review` remains required once CI returns to green (per the CodeRabbit workflow in `CLAUDE.md`). The requirement for fresh CodeRabbit reviews after material changes — including Sourcery-driven changes — overrides any notion of avoiding coordination.
 
 Do not merge the PR yourself — see `CLAUDE.md`'s Merging section. Tom (@TommyE123) is the final gatekeeper.
