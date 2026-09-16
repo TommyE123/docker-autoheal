@@ -39,5 +39,3 @@ warn_return_any = true
 warn_unreachable = true
 show_error_codes = true
 pretty = true
-
-[tool.bandit]
