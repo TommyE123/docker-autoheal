@@ -367,24 +367,135 @@ jobs:
           if git cat-file -e HEAD^:scripts 2>/dev/null; then
             git checkout HEAD^ -- scripts/
           else
-            echo "scripts/ not present in parent commit; using checked-out version."
+            echo "::error::scripts/ not present in parent commit; cannot perform trusted re-validation."
+            exit 1
           fi
 
-      # The pull request validation is never trusted on its own: another release
-      # may have been published since, so the full version and tag validation is
-      # repeated here against the current state of main, immediately before the
-      # tag is created.
-      - name: Re-validate release before publishing
+      # Re-derive the release plan from scratch using trusted (parent-commit)
+      # scripts and raw GitHub API data.  verify-release only validates version
+      # arithmetic; it accepts any release_type the plan job passes in.  A PR
+      # that modifies scripts/release/ could therefore make plan-push emit
+      # release_type=major and have verify-release accept it.  This step re-runs
+      # the full PR collection and plan-push/plan-maintenance with trusted scripts
+      # and cross-checks the result against the plan job outputs, refusing to
+      # proceed if they differ.
+      - name: Re-derive release plan with trusted tooling and cross-check
         env:
-          VERSION: ${{ needs.plan.outputs.version }}
-          RELEASE_TYPE: ${{ needs.plan.outputs.release_type }}
-          CREATE_TAG: ${{ needs.plan.outputs.create_tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          REQUESTED: ${{ github.event.inputs.release_type }}
+          PLAN_RELEASE_TYPE: ${{ needs.plan.outputs.release_type }}
+          PLAN_VERSION: ${{ needs.plan.outputs.version }}
+          PLAN_CREATE_TAG: ${{ needs.plan.outputs.create_tag }}
         run: |
-          python3 -m scripts.release.cli verify-release \
-            --version "$VERSION" \
-            --release-type "$RELEASE_TYPE" \
-            --create-tag "$CREATE_TAG" \
-            --tags-file tags.txt
+          # Derive mode from GitHub trigger inputs — these are GitHub-controlled
+          # and cannot be influenced by candidate code.
+          MODE=classification
+          case "$EVENT_NAME" in
+            schedule) MODE=maintenance ;;
+            workflow_dispatch)
+              [ "$REQUESTED" = "maintenance" ] && MODE=maintenance ;;
+          esac
+
+          # Re-check resume/already-released by inspecting this commit's tags
+          # directly, independent of the plan job outputs.
+          RESUME_TAG=""
+          ALREADY_RELEASED_TAG=""
+          for TAG in $(git tag --points-at "$GITHUB_SHA" \
+              | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true); do
+            IS_DRAFT="$(gh release view "$TAG" \
+              --json isDraft --jq '.isDraft' 2>/dev/null || echo 'null')"
+            if [ "$IS_DRAFT" = "false" ]; then
+              ALREADY_RELEASED_TAG="$TAG"
+            else
+              RESUME_TAG="$TAG"
+            fi
+          done
+          RESUME_ARGS=()
+          [ -n "$RESUME_TAG" ] && RESUME_ARGS+=(--resume-tag "$RESUME_TAG")
+          [ -n "$ALREADY_RELEASED_TAG" ] \
+            && RESUME_ARGS+=(--already-released-tag "$ALREADY_RELEASED_TAG")
+
+          # Boundary: latest semantic release tag reachable from HEAD
+          LATEST_TAG="$(git tag --merged HEAD \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)"
+          if [ "$MODE" = "maintenance" ] \
+              && [ -z "$LATEST_TAG" ] \
+              && [ -z "$RESUME_TAG" ] \
+              && [ -z "$ALREADY_RELEASED_TAG" ]; then
+            echo "::error::No release tag found; cannot determine maintenance boundary."
+            exit 1
+          fi
+          if [ -z "$LATEST_TAG" ]; then
+            BOUNDARY="1970-01-01T00:00:00Z"
+          else
+            BOUNDARY="$(git log -1 --format=%cI "$LATEST_TAG")"
+          fi
+
+          # Re-collect all PRs since boundary using the same API approach as the
+          # plan job, but processing with trusted parent-commit scripts.
+          echo '[]' > /tmp/_tr_prs.json
+          gh api --method GET search/issues --paginate \
+            -f "q=repo:${GITHUB_REPOSITORY} is:pr is:merged base:main merged:>=${BOUNDARY}" \
+            --jq '.items[] | {number:.number, merged_at:.pull_request.merged_at}' \
+            | jq -s '.' > /tmp/_tr_meta.json
+          COUNT="$(jq 'length' /tmp/_tr_meta.json)"
+          for i in $(seq 1 "$COUNT"); do
+            IDX=$((i - 1))
+            PR_N="$(jq -r ".[$IDX].number" /tmp/_tr_meta.json)"
+            MERGED_AT="$(jq -r ".[$IDX].merged_at" /tmp/_tr_meta.json)"
+            printf '%s\n' 'import os,datetime as D' \
+              'm=D.datetime.fromisoformat(os.environ["MERGED_AT"].replace("Z","+00:00"))' \
+              'b=D.datetime.fromisoformat(os.environ["BOUNDARY"].replace("Z","+00:00"))' \
+              'print("true"if m>b else"false")' > /tmp/_tr_br.py
+            AFTER="$(MERGED_AT="$MERGED_AT" BOUNDARY="$BOUNDARY" python3 /tmp/_tr_br.py)"
+            rm -f /tmp/_tr_br.py
+            [ "$AFTER" = "true" ] || continue
+            gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_N}/events" \
+              --paginate > "/tmp/_tr_ev_${PR_N}.json"
+            LABELS="$(python3 -m scripts.release.cli resolve-labels \
+              --events-file "/tmp/_tr_ev_${PR_N}.json" --merged-at "$MERGED_AT")"
+            jq --argjson n "$PR_N" --argjson l "$LABELS" \
+              '. + [{"number":$n,"labels":$l}]' /tmp/_tr_prs.json \
+              > /tmp/_tr_upd.json && mv /tmp/_tr_upd.json /tmp/_tr_prs.json
+          done
+
+          # Run trusted plan-push or plan-maintenance with parent-commit scripts
+          if [ "$MODE" = "maintenance" ]; then
+            TRUSTED_OUT="$(python3 -m scripts.release.cli plan-maintenance \
+              --pull-requests-file /tmp/_tr_prs.json \
+              --tags-file tags.txt "${RESUME_ARGS[@]}")"
+          else
+            TRUSTED_OUT="$(python3 -m scripts.release.cli plan-push \
+              --pull-requests-file /tmp/_tr_prs.json \
+              --tags-file tags.txt "${RESUME_ARGS[@]}")"
+          fi
+
+          TRUSTED_RT="$(echo "$TRUSTED_OUT" | grep '^release_type=' | cut -d= -f2)"
+          TRUSTED_VER="$(echo "$TRUSTED_OUT" | grep '^version=' | cut -d= -f2)"
+          TRUSTED_CT="$(echo "$TRUSTED_OUT" | grep '^create_tag=' | cut -d= -f2)"
+
+          # Cross-check: trusted re-plan must agree with plan job outputs.
+          # A mismatch means the plan job used modified scripts/ to inflate the
+          # release classification beyond what PR labels authorise.
+          MISMATCH=false
+          if [ "$TRUSTED_RT" != "$PLAN_RELEASE_TYPE" ]; then
+            echo "::error::release_type mismatch: trusted=${TRUSTED_RT}, plan=${PLAN_RELEASE_TYPE}"
+            MISMATCH=true
+          fi
+          if [ "$TRUSTED_VER" != "$PLAN_VERSION" ]; then
+            echo "::error::version mismatch: trusted=${TRUSTED_VER}, plan=${PLAN_VERSION}"
+            MISMATCH=true
+          fi
+          if [ "$TRUSTED_CT" != "$PLAN_CREATE_TAG" ]; then
+            echo "::error::create_tag mismatch: trusted=${TRUSTED_CT}, plan=${PLAN_CREATE_TAG}"
+            MISMATCH=true
+          fi
+          if [ "$MISMATCH" = "true" ]; then
+            echo "::error::Refusing to proceed: plan job outputs do not match trusted re-plan."
+            exit 1
+          fi
+          echo "Trusted re-plan agrees: release_type=${TRUSTED_RT}, version=${TRUSTED_VER}, create_tag=${TRUSTED_CT}"
 
       # The Git references API refuses to create a reference that already exists.
       # That conflict is a hard safety boundary: the release fails rather than

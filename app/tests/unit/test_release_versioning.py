@@ -1156,9 +1156,9 @@ class TestReleaseWorkflows:
         steps = self.load("docker-release.yml")["jobs"]["release"]["steps"]
         names = [step.get("name", "") for step in steps]
 
-        assert names.index("Re-validate release before publishing") < names.index(
-            "Create release tag"
-        )
+        assert names.index(
+            "Re-derive release plan with trusted tooling and cross-check"
+        ) < names.index("Create release tag")
         assert names.index("Create release tag") < names.index("Build and push Docker image")
         assert names.index("Build and push Docker image") < names.index("Create GitHub release")
 
@@ -1411,7 +1411,7 @@ class TestReleaseWorkflows:
 
     def test_release_job_uses_parent_commit_for_privileged_revalidation(self):
         # Security guard: the release job (contents:write, packages:write)
-        # must use the parent commit's scripts/ for verify-release so a PR
+        # must use the parent commit's scripts/ for the re-derive step so a PR
         # that modifies scripts/release/ cannot weaken its own validator.
         steps = self.load("docker-release.yml")["jobs"]["release"]["steps"]
         names = [s.get("name", "") for s in steps]
@@ -1429,9 +1429,93 @@ class TestReleaseWorkflows:
             "before this PR's code was merged"
         )
         trusted_idx = names.index(trusted_step["name"])
-        verify_idx = names.index("Re-validate release before publishing")
-        assert trusted_idx < verify_idx, (
-            "Fetch trusted release tooling must precede Re-validate release before publishing"
+        rederive_idx = names.index("Re-derive release plan with trusted tooling and cross-check")
+        assert trusted_idx < rederive_idx, (
+            "Fetch trusted release tooling must precede "
+            "Re-derive release plan with trusted tooling and cross-check"
+        )
+
+    def test_trusted_tooling_bootstrap_fallback_fails(self):
+        # Security guard: if scripts/ is not present in the parent commit,
+        # the release job must fail hard rather than fall back to the candidate
+        # (merged PR's) scripts.  After this release system is introduced,
+        # HEAD^ always has scripts/, so the fallback is unreachable in normal
+        # operation - using candidate scripts would be insecure.
+        trusted_step = next(
+            s
+            for s in self.load("docker-release.yml")["jobs"]["release"]["steps"]
+            if "Fetch trusted release tooling" in s.get("name", "")
+        )
+        run = trusted_step["run"]
+        assert "exit 1" in run, (
+            "Fetch trusted release tooling must exit 1 when scripts/ is not "
+            "present in the parent commit - falling back to candidate scripts "
+            "would let a PR weaken its own validator"
+        )
+        assert "::error::" in run, (
+            "Fetch trusted release tooling must emit a GitHub Actions error "
+            "annotation (::error::) when the parent commit lacks scripts/"
+        )
+
+    def test_release_job_re_derives_plan_independently(self):
+        # Security guard: the release job must independently re-derive the
+        # release plan using trusted (parent-commit) scripts and raw GitHub
+        # API data - not merely re-validate version arithmetic.  A PR that
+        # modifies scripts/release/ could make plan-push emit release_type=major
+        # for a release:patch PR; verify-release would accept that if the
+        # arithmetic is valid.  This step re-runs the full PR collection and
+        # plan-push/plan-maintenance with trusted scripts, then cross-checks the
+        # result against the plan job outputs.
+        step = next(
+            (
+                s
+                for s in self.load("docker-release.yml")["jobs"]["release"]["steps"]
+                if "Re-derive release plan with trusted tooling" in s.get("name", "")
+            ),
+            None,
+        )
+        assert step is not None, (
+            "release job must have a 'Re-derive release plan with trusted "
+            "tooling and cross-check' step"
+        )
+        run = step["run"]
+
+        # Must re-collect PRs from the GitHub API, not trust plan job outputs.
+        assert "search/issues" in run, (
+            "trusted re-derive step must re-collect PRs via search/issues API, "
+            "not rely on the plan job's already-collected data"
+        )
+
+        # Must use plan-push or plan-maintenance (full re-plan), not verify-release.
+        assert "plan-push" in run or "plan-maintenance" in run, (
+            "trusted re-derive step must run plan-push or plan-maintenance "
+            "with trusted scripts - verify-release only checks arithmetic and "
+            "cannot detect an inflated release classification"
+        )
+        assert "verify-release" not in run, (
+            "trusted re-derive step must not use verify-release, which accepts "
+            "any release_type the plan job passes in without re-classifying PRs"
+        )
+
+        # Must cross-check against plan job outputs and fail on mismatch.
+        assert "PLAN_RELEASE_TYPE" in run or "PLAN_VERSION" in run, (
+            "trusted re-derive step must cross-check its result against the "
+            "plan job's release_type and version outputs"
+        )
+        assert "exit 1" in run, (
+            "trusted re-derive step must exit 1 when the trusted re-plan "
+            "disagrees with the plan job outputs"
+        )
+        assert "mismatch" in run.lower(), (
+            "trusted re-derive step must report a mismatch error when the "
+            "trusted re-plan disagrees with the plan job"
+        )
+
+        # Must derive mode from GitHub trigger inputs, not plan job outputs.
+        assert "EVENT_NAME" in run, (
+            "trusted re-derive step must derive the release mode (classification "
+            "vs maintenance) from the GitHub trigger inputs, which are "
+            "GitHub-controlled and cannot be influenced by candidate code"
         )
 
     def test_release_tags_collected_from_main_history_only(self):
