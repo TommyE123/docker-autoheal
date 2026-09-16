@@ -8,25 +8,29 @@ step. `.github/workflows/docker-release.yml` ("Docker Release") runs on every pu
 
 1. Calculates the next [SemVer](https://semver.org/) version from the Conventional Commit
    messages merged since the last release tag, using
-   [`mathieudutour/github-tag-action`](https://github.com/mathieudutour/github-tag-action):
-   a `fix:` commit bumps the patch version, `feat:` bumps minor, and a `!` after the type
-   or a `BREAKING CHANGE:` footer bumps major. Since PRs are squash-merged, this is driven
-   by the PR title, which `semantic-pr-title.yml` already requires to be a Conventional
+   [`mathieudutour/github-tag-action`](https://github.com/mathieudutour/github-tag-action)
+   in dry-run mode (it computes the version but does not create the tag yet): a `fix:`
+   commit bumps the patch version, `feat:` bumps minor, and a `!` after the type or a
+   `BREAKING CHANGE:` footer bumps major. Since PRs are squash-merged, this is driven by
+   the PR title, which `semantic-pr-title.yml` already requires to be a Conventional
    Commit. A push with no `fix`/`feat`/breaking-change commit (`docs`, `chore`, `ci`,
-   `test`, `style`, `refactor`, ...) produces **no release at all**.
-2. Creates and pushes the new Git tag as part of that calculation.
-3. Builds the image for `linux/amd64` and `linux/arm64` and pushes it to **both** Docker
+   `test`, `style`, `refactor`, ...) produces **no release at all** — nothing further below
+   runs.
+2. Builds the image for `linux/amd64` and `linux/arm64` and pushes it to **both** Docker
    Hub (`docker.io/tommye123/docker-autoheal`) and GitHub Container Registry
    (`ghcr.io/tommye123/docker-autoheal`), tagged with the computed version and `latest`.
-4. Creates a GitHub release for the new tag with auto-generated notes (skipped if a
-   release for that tag already exists — this makes re-runs after a partial failure safe:
-   if this exact commit is already tagged, that tag is reused rather than recalculated).
+3. Only once that build/push has succeeded, creates and pushes the Git tag for the
+   computed version — a release tag is never created for an image that failed to build.
+   Skipped if this exact commit is already tagged (a retry after a later step failed);
+   that existing tag is reused rather than a new version being calculated.
+4. Creates a GitHub release for the tag with auto-generated notes (skipped if a release
+   for that tag already exists, which makes re-runs after a partial failure safe).
 5. Updates the Docker Hub repository description from
    [`DOCKER_HUB_README.md`](../../DOCKER_HUB_README.md).
 
 In other words: **a merge to `main` ships a release only when it contains a `fix`,
 `feat`, or breaking-change commit**; anything else is a no-op push. There is no manual
-tagging step and no dry-run mode.
+tagging step.
 
 **Required repository secrets:** `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`. GHCR push uses
 the workflow's own `GITHUB_TOKEN` — no extra secret needed. Newly published GHCR packages

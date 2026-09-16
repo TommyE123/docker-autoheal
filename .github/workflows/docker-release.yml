@@ -48,12 +48,14 @@ jobs:
             echo "found=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # Calculate the next SemVer version from Conventional Commit messages
-      # since the last release tag (fix -> patch, feat -> minor, a
-      # "BREAKING CHANGE:" footer or "!" -> major), and push the new tag.
+      # Calculate (but do not create) the next SemVer version from
+      # Conventional Commit messages since the last release tag: fix -> patch,
+      # feat -> minor, a "BREAKING CHANGE:" footer or "!" -> major.
       # default_bump: false means a push with no fix/feat/breaking commit
       # (docs, chore, ci, test, style, refactor, ...) produces no release.
-      - name: Determine next SemVer version
+      # dry_run: true so the tag is only ever created below, once the Docker
+      # image has actually been built and pushed for it.
+      - name: Calculate next SemVer version
         id: tag_version
         if: steps.existing.outputs.found != 'true'
         uses: mathieudutour/github-tag-action@a22cf08638b34d5badda920f9daf6e72c477b07b # v6.2
@@ -61,6 +63,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           release_branches: main
           default_bump: false
+          dry_run: true
 
       # A single output used by every step below: the existing tag on a
       # retry, or the newly calculated one. Empty means no release this run.
@@ -119,7 +122,9 @@ jobs:
             type=raw,value=${{ steps.resolve.outputs.version }}
             type=raw,value=latest
 
-      # Build the Docker image for multiple platforms and push to registries
+      # Build the Docker image for multiple platforms and push to registries.
+      # This runs before the Git tag is created below: a release tag must
+      # never exist for an image that failed to build or push.
       - name: Build and push Docker image
         if: steps.resolve.outputs.version != ''
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -132,6 +137,21 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=docker-autoheal
           cache-to: type=gha,mode=max,scope=docker-autoheal
+
+      # Create and push the Git tag now that the image has been published.
+      # Skipped when reusing an existing tag (steps.existing.outputs.found),
+      # so a retry after a later failure never re-tags or double-tags.
+      - name: Create Git tag
+        if: steps.resolve.outputs.version != '' && steps.existing.outputs.found != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.resolve.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${VERSION}"
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin "${VERSION}"
 
       # Create a GitHub release entry for the new tag with generated notes
       - name: Create GitHub release
