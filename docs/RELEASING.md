@@ -10,21 +10,21 @@ Every pull request into `main` carries **exactly one** release label. The author
 or AI agent) chooses the release *type* only — the version number is always calculated by
 the automation, never by hand.
 
-| Change | Label |
-| --- | --- |
-| Documentation only | `release:none` |
-| CI-only change | `release:none` |
-| Tests only | `release:none` |
-| Refactor with no behaviour change | `release:none` |
-| Normal Renovate dependency update | `release:none` |
-| Formatting/linting with no runtime change | `release:none` |
-| Bug fix | `release:patch` |
-| Security fix requiring a new image | `release:patch` |
-| Performance improvement | `release:patch` |
-| New backwards-compatible feature | `release:minor` |
-| New configuration option | `release:minor` |
+| Change                                            | Label           |
+|---------------------------------------------------|-----------------|
+| Documentation only                                | `release:none`  |
+| CI-only change                                    | `release:none`  |
+| Tests only                                        | `release:none`  |
+| Refactor with no behaviour change                 | `release:none`  |
+| Normal Renovate dependency update                 | `release:none`  |
+| Formatting/linting with no runtime change         | `release:none`  |
+| Bug fix                                           | `release:patch` |
+| Security fix requiring a new image                | `release:patch` |
+| Performance improvement                           | `release:patch` |
+| New backwards-compatible feature                  | `release:minor` |
+| New configuration option                          | `release:minor` |
 | Intentional backwards-compatible behaviour change | `release:minor` |
-| Breaking behaviour/configuration change | `release:major` |
+| Breaking behaviour/configuration change           | `release:major` |
 
 The automation never infers the release type from the code, the commit message or the
 pull request title — the label is authoritative. Renovate applies `release:none` to its
@@ -63,11 +63,11 @@ merge.
 
 The latest `vMAJOR.MINOR.PATCH` tag is the source of truth. From `v1.8.4`:
 
-| Label | Next release |
-| --- | --- |
-| `release:patch` | `v1.8.5` |
-| `release:minor` | `v1.9.0` |
-| `release:major` | `v2.0.0` |
+| Label           | Next release |
+|-----------------|--------------|
+| `release:patch` | `v1.8.5`     |
+| `release:minor` | `v1.9.0`     |
+| `release:major` | `v2.0.0`     |
 
 The calculation never depends on how many pull requests are being released.
 
@@ -134,10 +134,10 @@ top of it.
 
 `workflow_dispatch` offers the same behaviour manually:
 
-| Input | Effect |
-| --- | --- |
-| `auto` | Re-run the classification of the latest commit on `main` (the retry path) |
-| `maintenance` | Run the Friday maintenance sweep now |
+| Input         | Effect                                                                    |
+|---------------|---------------------------------------------------------------------------|
+| `auto`        | Re-run the classification of the latest commit on `main` (the retry path) |
+| `maintenance` | Run the Friday maintenance sweep now                                      |
 
 There is deliberately no manual `patch`/`minor`/`major` option. Every release must trace
 back to a merged pull request's `release:*` label — a manual dispatch that picked the
