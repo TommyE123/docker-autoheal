@@ -13,7 +13,7 @@ MegaLinter is configured in `.mega-linter.yml` and runs as part of CI. When a PR
    - Pre-existing and unrelated (the repo already had this finding before this PR)
 3. **Fix findings introduced or worsened by the PR** — these must be addressed as part of the PR.
 4. **Leave pre-existing, unrelated findings untouched** — do not use a PR to clean up the repository's baseline unless the PR explicitly includes work to address them.
-5. **Run appropriate targeted validation** — after making fixes, run the relevant MegaLinter checks or the full CI suite as needed. For guidance on validation scope, see `testing.md`.
+5. **Run appropriate targeted validation** — after making fixes, run relevant targeted checks for the changed code. For guidance on validation scope, see `.claude/rules/testing.md`. The normal CI/MegaLinter checks remain the authoritative full validation.
 6. **Do not modify `.mega-linter.yml`** — do not weaken checks, add exclusions, or disable linters to suppress PR findings.
 
 ## Do not game MegaLinter
@@ -32,10 +32,10 @@ The existing `.mega-linter.yml` baseline and its handling of pre-existing findin
 
 ## Example workflow
 
-A PR adds code that triggers a new bandit security warning and also worsens an existing mypy type hint:
+A PR introduces a new linting finding and also worsens an existing linting finding:
 
-1. The bandit finding is **introduced by the PR** — fix the security issue or add a proper type hint.
-2. The mypy finding is **worsened by the PR** — fix the type hint in the new code.
-3. If the repository has pre-existing mypy warnings elsewhere, leave them alone — they are not this PR's responsibility.
-4. Run targeted validation: `mypy` on the changed files, or the full MegaLinter check.
+1. The new finding is **introduced by the PR** — fix the underlying issue in the new code.
+2. The existing finding is **worsened by the PR** — fix the issue in the code changed by this PR.
+3. If the repository has pre-existing linting findings elsewhere (unrelated to the PR), leave them alone — they are not this PR's responsibility.
+4. Run appropriate targeted validation for the changed files.
 5. Push the fixes.
