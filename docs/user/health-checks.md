@@ -25,7 +25,7 @@ services:
     labels:
       autoheal: "true"
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
       interval: 30s
       timeout: 10s
       retries: 3
