@@ -83,7 +83,3 @@ Renovate dependency updates are also subject to manual review and merge; Renovat
 ## Avoid duplicate issues
 
 Before filing a new issue, search existing open and closed issues for one that already covers the same problem or overlaps significantly with it. If you find a close match, extend or comment on it instead of creating a near-duplicate — this has already happened once (issue #26 and a planned issue #6 both touching Uptime Kuma test coverage).
-
-## Superpowers
-
-Superpowers is not a dependency of this repository — do not add it to `.claude/settings.json`, require it, reference its skill names as repository dependencies, or build a local copy or fallback for it. If Superpowers happens to be available in a given environment, it may be used for suitable heavyweight work (complex feature development, design/brainstorming, substantial planning, TDD-heavy work, systematic debugging), but this repository's own guidance must remain sufficient without it. Don't invoke a heavyweight workflow for small maintenance/configuration/documentation changes merely because it's available.
