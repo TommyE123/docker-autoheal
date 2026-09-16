@@ -19,7 +19,7 @@ Sourcery is installed as a GitHub App and reviews PRs automatically — Claude d
 
 ## Boundary with CodeRabbit
 
-```
+```text
 CodeRabbit → normal mandatory PR review process
 Sourcery   → automatic reviewer; re-review only on Tom's explicit request
 ```
