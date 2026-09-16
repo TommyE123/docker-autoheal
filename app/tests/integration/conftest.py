@@ -4,7 +4,7 @@ Shared fixtures for the Docker Auto-Heal integration suite.
 Unlike ``app/tests/unit``, these tests exercise the real Docker SDK and/or a
 running Auto-Heal service (``http://localhost:3131``). They are never
 collected by a plain ``pytest`` run (see ``pytest.ini``'s ``testpaths`` and
-``docs/TESTING.md``) and every test here is skipped, rather than failed, when
+``docs/developer/testing.md``) and every test here is skipped, rather than failed, when
 the resource it needs isn't available.
 """
 

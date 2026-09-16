@@ -200,7 +200,7 @@ echo.
 echo To run it:
 echo   docker run -d --name autoheal \
 echo     -v /var/run/docker.sock:/var/run/docker.sock:ro \
-echo     -p 8080:8080 \
+echo     -p 3131:3131 \
 echo     %USERNAME%/docker-autoheal:%TAG%
 echo.
 echo Next steps:

@@ -1,7 +1,7 @@
 # Dependency management
 
 Dependencies are kept up to date by [Renovate](https://docs.renovatebot.com/), configured in
-[`renovate.json`](../renovate.json) at the repository root.
+[`renovate.json`](../../renovate.json) at the repository root.
 
 This document explains what Renovate manages, how versions are pinned, and how dependency
 updates are reviewed and merged.
@@ -9,7 +9,7 @@ updates are reviewed and merged.
 ## What Renovate manages
 
 | Ecosystem                       | Files                                                 | Renovate manager                    |
-| ------------------------------- | ----------------------------------------------------- | ----------------------------------- |
+|---------------------------------|-------------------------------------------------------|-------------------------------------|
 | Python runtime dependencies     | `requirements.txt`                                    | `pip_requirements`                  |
 | Python dev/test dependencies    | `requirements-dev.txt`                                | `pip_requirements`                  |
 | npm dependencies + lockfile     | `frontend/package.json`, `frontend/package-lock.json` | `npm`                               |
