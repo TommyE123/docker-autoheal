@@ -141,6 +141,9 @@ def decide(
         return Decision(outcome=Outcome.INVALID, reason=validation.error)
 
     classification = validation.classification
+    if classification is None:
+        raise ValueError("classification is required when validation is valid")
+
     if classification.confidence < threshold:
         return Decision(
             outcome=Outcome.LOW_CONFIDENCE,

@@ -59,6 +59,7 @@ def test_valid_classification_for_each_kind(kind):
     raw = json.dumps({"kind": kind, "area": "docker", "confidence": 0.75})
     result = triage.parse_classification(raw)
     assert result.valid is True
+    assert result.classification is not None
     assert result.classification.kind == kind
 
 
@@ -67,6 +68,7 @@ def test_valid_classification_for_each_area(area):
     raw = json.dumps({"kind": "bug", "area": area, "confidence": 0.75})
     result = triage.parse_classification(raw)
     assert result.valid is True
+    assert result.classification is not None
     assert result.classification.area == area
 
 
@@ -74,6 +76,7 @@ def test_invalid_kind_is_rejected():
     raw = json.dumps({"kind": "not-a-kind", "area": "docker", "confidence": 0.9})
     result = triage.parse_classification(raw)
     assert result.valid is False
+    assert result.error is not None
     assert "kind" in result.error
 
 
@@ -81,6 +84,7 @@ def test_invalid_area_is_rejected():
     raw = json.dumps({"kind": "bug", "area": "not-an-area", "confidence": 0.9})
     result = triage.parse_classification(raw)
     assert result.valid is False
+    assert result.error is not None
     assert "area" in result.error
 
 
@@ -361,6 +365,7 @@ def test_call_gemini_rate_limited_exhausts_retries_and_fails():
     )
     assert result.ok is False
     assert session.calls == 3
+    assert result.error is not None
     assert "429" in result.error
 
 
