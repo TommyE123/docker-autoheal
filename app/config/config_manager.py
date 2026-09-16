@@ -314,7 +314,7 @@ class ConfigManager:
                     for index, event in enumerate(data):
                         try:
                             events.append(AutoHealEvent(**event))
-                        except ValidationError:
+                        except (ValidationError, TypeError):
                             try:
                                 events.append(LegacyAutoHealEvent(**event))
                                 logger.warning(
@@ -323,7 +323,7 @@ class ConfigManager:
                                     "preserving its original timestamp text",
                                     index,
                                 )
-                            except ValidationError as error:
+                            except (ValidationError, TypeError) as error:
                                 logger.warning(
                                     "Skipping invalid event %d from disk: %s", index, error
                                 )

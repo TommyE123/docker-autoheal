@@ -182,3 +182,41 @@ def test_mixed_historical_and_utc_events_are_preserved_when_saved(isolated_confi
     assert reloaded_events[0].timestamp == naive_timestamp
     assert isinstance(reloaded_events[1], AutoHealEvent)
     assert isinstance(reloaded_events[2], AutoHealEvent)
+
+
+def test_loading_events_skips_non_object_record_and_retains_valid_history(
+    isolated_config_manager, caplog
+):
+    """A non-object record (e.g. null) must not discard the rest of the history."""
+    isolated_config_manager.EVENTS_FILE.write_text(
+        json.dumps(
+            [
+                _event_payload(0, "2024-01-01T12:00:00+00:00"),
+                _event_payload(1, "2024-01-01T12:00:00"),
+                None,
+                "not-an-event",
+                ["also", "not", "an", "event"],
+            ]
+        )
+    )
+
+    events = isolated_config_manager._load_events()
+
+    assert len(events) == 2
+    assert isinstance(events[0], AutoHealEvent)
+    assert isinstance(events[1], LegacyAutoHealEvent)
+    assert "Skipping invalid event 2 from disk" in caplog.text
+    assert "Skipping invalid event 3 from disk" in caplog.text
+    assert "Skipping invalid event 4 from disk" in caplog.text
+
+    isolated_config_manager._event_log = events
+    isolated_config_manager.add_event(_make_event(2))
+
+    persisted_events = json.loads(isolated_config_manager.EVENTS_FILE.read_text())
+    reloaded_events = isolated_config_manager._load_events()
+
+    assert len(persisted_events) == 3
+    assert len(reloaded_events) == 3
+    assert isinstance(reloaded_events[0], AutoHealEvent)
+    assert isinstance(reloaded_events[1], LegacyAutoHealEvent)
+    assert isinstance(reloaded_events[2], AutoHealEvent)
