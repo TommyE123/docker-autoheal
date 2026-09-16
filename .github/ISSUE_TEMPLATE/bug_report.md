@@ -32,7 +32,7 @@ Which Autoheal image/tag are you using? (e.g. `latest`, or a specific version if
 
 Autoheal logs around the time of the issue. Please redact any secrets or sensitive information.
 
-```
+```text
 paste logs here
 ```
 

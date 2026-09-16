@@ -1,0 +1,127 @@
+name: Production Smoke Test
+
+# A reusable workflow invoked as a job from docker-build.yml (see the
+# smoke-test job there), not a standalone trigger: workflow_run only fires
+# using the workflow file already on the default branch, so it could never
+# run for the PR that introduces this file. Running as a job in the same
+# pull_request-triggered run avoids that, and gives direct access to the
+# same-repo guard docker-build.yml's own push step already uses.
+on:
+  workflow_call:
+    inputs:
+      image_ref:
+        description: "Exact image reference to test, e.g. ghcr.io/owner/docker-autoheal:sha-abc1234"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  smoke-test:
+    name: Production container smoke test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull the exact PR image
+        env:
+          IMAGE_REF: ${{ inputs.image_ref }}
+        run: docker pull "$IMAGE_REF"
+
+      - name: Start the container with a realistic production configuration
+        env:
+          IMAGE_REF: ${{ inputs.image_ref }}
+        run: |
+          docker run -d --name autoheal-smoke \
+            -v /var/run/docker.sock:/var/run/docker.sock:ro \
+            -p 3131:3131 \
+            -e PYTHONUNBUFFERED=1 \
+            --label autoheal=false \
+            "$IMAGE_REF"
+
+      - name: Wait for the service to become ready
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -sf http://localhost:3131/health >/dev/null; then
+              echo "Service is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Auto-Heal service did not become ready within the timeout"
+          exit 1
+
+      - name: Verify the application can communicate with Docker
+        # /api/status returns HTTP 200 even when Docker is unreachable
+        # (docker_connected: false) rather than failing the request, so the
+        # field itself - not just the HTTP status - has to be checked.
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -sf http://localhost:3131/api/status | jq -e '.docker_connected == true' >/dev/null 2>&1; then
+              echo "Application is connected to Docker"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Application never reported a successful Docker connection"
+          exit 1
+
+      # A short interval makes the deterministic scenario below observable
+      # quickly, without resorting to an arbitrary fixed sleep.
+      - name: Speed up the monitoring interval
+        run: |
+          curl -sf -X PUT http://localhost:3131/api/config/monitor \
+            -H "Content-Type: application/json" \
+            -d '{"interval_seconds": 2, "label_key": "autoheal", "label_value": "true", "include_all": false}' \
+            >/dev/null
+
+      - name: Start a container that will fail and require autoheal
+        run: |
+          docker run -d --name autoheal-victim \
+            --restart no \
+            --label autoheal=true \
+            alpine:latest sh -c "sleep 3 && exit 1"
+
+      - name: Wait for the expected autoheal restart
+        # container_name in the event log is "<name> (<stable_id>)", not an
+        # exact container name, hence contains() rather than ==.
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -sf http://localhost:3131/api/events \
+              | jq -e '.[] | select(.container_name | contains("autoheal-victim")) | select(.event_type == "restart")' \
+              >/dev/null 2>&1; then
+              echo "Autoheal restarted the failed container"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Expected autoheal restart event for autoheal-victim was not observed"
+          exit 1
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          echo "--- docker ps -a ---"
+          docker ps -a
+          echo "--- autoheal-smoke logs ---"
+          docker logs autoheal-smoke || true
+          echo "--- autoheal-victim logs ---"
+          docker logs autoheal-victim || true
+          echo "--- autoheal-smoke inspect ---"
+          docker inspect autoheal-smoke || true
+          if docker logs autoheal-smoke 2>&1 | grep -qi "http+docker\|Not supported URL scheme"; then
+            echo "::error::Confirmed known Docker SDK/requests 'http+docker' transport failure (see PR #61)"
+          fi
+
+      - name: Clean up
+        if: always()
+        run: |
+          docker rm -f autoheal-smoke autoheal-victim 2>/dev/null || true
