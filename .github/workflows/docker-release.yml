@@ -358,19 +358,33 @@ jobs:
       - name: Collect existing release tags
         run: git tag --merged HEAD > tags.txt
 
-      # Replace scripts/ with the parent commit's copy so a PR that modifies
-      # scripts/release/ cannot weaken its own release-time validator.  HEAD^
-      # is the commit before this PR merged — a trusted state this PR could not
-      # have altered.  The Docker build context does not include scripts/, so
-      # this has no effect on the published image.
-      - name: Fetch trusted release tooling from parent commit
+      # Replace scripts/ with a trusted revision's copy so a PR that modifies
+      # scripts/release/ cannot weaken its own release-time validator.
+      # For push events the trusted revision is github.event.before: the main
+      # tip before the update.  HEAD^ is unsafe — a rebase merge places in-PR
+      # commits at HEAD^, so a multi-commit PR could put its own modified
+      # scripts/ there.  github.event.before is always the pre-push main tip,
+      # regardless of merge strategy.  For schedule and workflow_dispatch,
+      # HEAD is already validated (each push to main used github.event.before).
+      - name: Fetch trusted release tooling from pre-push main tip
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
         run: |
-          if git cat-file -e HEAD^:scripts 2>/dev/null; then
-            git checkout HEAD^ -- scripts/
-          else
-            echo "::error::scripts/ not present in parent commit; cannot perform trusted re-validation."
+          if [ "$EVENT_NAME" != "push" ]; then
+            echo "Non-push trigger: using scripts/ already on main HEAD."
+            exit 0
+          fi
+          if [ -z "$BEFORE_SHA" ] || \
+             [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            echo "::error::github.event.before is empty or null SHA; cannot determine trusted tooling revision."
             exit 1
           fi
+          if ! git cat-file -e "${BEFORE_SHA}:scripts" 2>/dev/null; then
+            echo "::error::scripts/ not present at trusted revision ${BEFORE_SHA}; cannot perform trusted re-validation."
+            exit 1
+          fi
+          git checkout "$BEFORE_SHA" -- scripts/
 
       # Re-derive the release plan from scratch using trusted (parent-commit)
       # scripts and raw GitHub API data.  verify-release only validates version

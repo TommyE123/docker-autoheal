@@ -1409,10 +1409,13 @@ class TestReleaseWorkflows:
             "returns PRs for the current commit and misses displaced runs"
         )
 
-    def test_release_job_uses_parent_commit_for_privileged_revalidation(self):
+    def test_release_job_uses_pre_push_tip_for_privileged_revalidation(self):
         # Security guard: the release job (contents:write, packages:write)
-        # must use the parent commit's scripts/ for the re-derive step so a PR
-        # that modifies scripts/release/ cannot weaken its own validator.
+        # must restore scripts/ from github.event.before (the pre-push main tip)
+        # for push events — not from HEAD^.  A rebase merge places in-PR commits
+        # at HEAD^, so a multi-commit PR could put its own modified scripts/ there
+        # and bypass the trusted re-plan.  github.event.before is always the true
+        # pre-push main tip regardless of merge strategy.
         steps = self.load("docker-release.yml")["jobs"]["release"]["steps"]
         names = [s.get("name", "") for s in steps]
 
@@ -1422,11 +1425,18 @@ class TestReleaseWorkflows:
         )
         assert trusted_step is not None, (
             "release job must have a 'Fetch trusted release tooling' step that "
-            "replaces scripts/ with the parent commit's version before re-validating"
+            "restores scripts/ from the pre-push main tip before re-validating"
         )
-        assert "HEAD^" in trusted_step["run"], (
-            "trusted tooling step must use HEAD^ to restore scripts/ from "
-            "before this PR's code was merged"
+        run = trusted_step["run"]
+        assert "HEAD^" not in run, (
+            "trusted tooling step must not use HEAD^ — a rebase merge can "
+            "place in-PR commits at HEAD^, allowing a multi-commit PR to "
+            "substitute its own modified scripts/ as the 'trusted' revision"
+        )
+        assert "github.event.before" in run or "BEFORE_SHA" in run, (
+            "trusted tooling step must use github.event.before (pre-push main "
+            "tip) for push events — this is always the true pre-merge main "
+            "state regardless of whether the merge was squash or rebase"
         )
         trusted_idx = names.index(trusted_step["name"])
         rederive_idx = names.index("Re-derive release plan with trusted tooling and cross-check")
@@ -1436,11 +1446,10 @@ class TestReleaseWorkflows:
         )
 
     def test_trusted_tooling_bootstrap_fallback_fails(self):
-        # Security guard: if scripts/ is not present in the parent commit,
-        # the release job must fail hard rather than fall back to the candidate
-        # (merged PR's) scripts.  After this release system is introduced,
-        # HEAD^ always has scripts/, so the fallback is unreachable in normal
-        # operation - using candidate scripts would be insecure.
+        # Security guard: the release job must fail hard when it cannot
+        # establish a trusted tooling revision — e.g. when github.event.before
+        # is a null SHA, or when scripts/ is absent from that revision.
+        # It must never fall back to the candidate (merged PR's) scripts.
         trusted_step = next(
             s
             for s in self.load("docker-release.yml")["jobs"]["release"]["steps"]
@@ -1448,13 +1457,22 @@ class TestReleaseWorkflows:
         )
         run = trusted_step["run"]
         assert "exit 1" in run, (
-            "Fetch trusted release tooling must exit 1 when scripts/ is not "
-            "present in the parent commit - falling back to candidate scripts "
+            "Fetch trusted release tooling must exit 1 when the trusted "
+            "revision is unavailable - falling back to candidate scripts "
             "would let a PR weaken its own validator"
         )
         assert "::error::" in run, (
             "Fetch trusted release tooling must emit a GitHub Actions error "
-            "annotation (::error::) when the parent commit lacks scripts/"
+            "annotation (::error::) when it cannot determine a trusted revision"
+        )
+        assert (
+            "0000000000000000000000000000000000000000" in run
+            or "null SHA" in run
+            or "null sha" in run.lower()
+        ), (
+            "Fetch trusted release tooling must detect and reject the null SHA "
+            "(all-zeros) that github.event.before carries when a branch is "
+            "first created — accepting it would silently use HEAD scripts"
         )
 
     def test_release_job_re_derives_plan_independently(self):
