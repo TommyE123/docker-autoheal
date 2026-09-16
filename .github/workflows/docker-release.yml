@@ -360,19 +360,36 @@ jobs:
 
       # Replace scripts/ with a trusted revision's copy so a PR that modifies
       # scripts/release/ cannot weaken its own release-time validator.
-      # For push events the trusted revision is github.event.before: the main
-      # tip before the update.  HEAD^ is unsafe — a rebase merge places in-PR
-      # commits at HEAD^, so a multi-commit PR could put its own modified
-      # scripts/ there.  github.event.before is always the pre-push main tip,
-      # regardless of merge strategy.  For schedule and workflow_dispatch,
-      # HEAD is already validated (each push to main used github.event.before).
+      # For push events the trusted revision is github.event.before (the main
+      # tip before the update); HEAD^ is unsafe because a rebase merge places
+      # in-PR commits at HEAD^.  For schedule/workflow_dispatch, github.event.before
+      # is unavailable, so the latest semantic release tag is used instead — every
+      # tag was created by a validated push run.  A push with no prior scripts/ is
+      # the bootstrap; HEAD is the reviewed trust anchor for that one run only.
       - name: Fetch trusted release tooling from pre-push main tip
         env:
           EVENT_NAME: ${{ github.event_name }}
           BEFORE_SHA: ${{ github.event.before }}
         run: |
           if [ "$EVENT_NAME" != "push" ]; then
-            echo "Non-push trigger: using scripts/ already on main HEAD."
+            # github.event.before is only set on push events.  Use the latest
+            # semantic release tag as the trusted anchor: every tag was created
+            # by a validated push-triggered run so its scripts/ were already
+            # independently verified.  If no tag exists yet (pre-bootstrap),
+            # fail closed — the first tag must come from a push-triggered run.
+            LATEST_TAG="$(git tag --merged HEAD \
+              | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)"
+            if [ -z "$LATEST_TAG" ]; then
+              echo "::error::No release tag found; cannot determine trusted tooling for non-push trigger."
+              exit 1
+            fi
+            TAG_SHA="$(git rev-list -n 1 "$LATEST_TAG")"
+            if ! git cat-file -e "${TAG_SHA}:scripts" 2>/dev/null; then
+              echo "::error::scripts/ not present at release tag ${LATEST_TAG} (${TAG_SHA})."
+              exit 1
+            fi
+            git checkout "$TAG_SHA" -- scripts/
+            echo "Restored scripts/ from release tag ${LATEST_TAG} (${TAG_SHA})."
             exit 0
           fi
           if [ -z "$BEFORE_SHA" ] || \
@@ -381,8 +398,13 @@ jobs:
             exit 1
           fi
           if ! git cat-file -e "${BEFORE_SHA}:scripts" 2>/dev/null; then
-            echo "::error::scripts/ not present at trusted revision ${BEFORE_SHA}; cannot perform trusted re-validation."
-            exit 1
+            # scripts/ absent at BEFORE_SHA: bootstrap push that first introduces
+            # scripts/release/ onto main.  There is no prior trusted revision to
+            # restore from; HEAD scripts are the reviewed baseline and are identical
+            # to what the plan job used.  Every subsequent push will have scripts/
+            # at BEFORE_SHA and will be validated against that trusted copy.
+            echo "scripts/ not present at ${BEFORE_SHA}: bootstrap push; HEAD scripts are the trusted baseline."
+            exit 0
           fi
           git checkout "$BEFORE_SHA" -- scripts/
 

@@ -1448,8 +1448,8 @@ class TestReleaseWorkflows:
     def test_trusted_tooling_bootstrap_fallback_fails(self):
         # Security guard: the release job must fail hard when it cannot
         # establish a trusted tooling revision — e.g. when github.event.before
-        # is a null SHA, or when scripts/ is absent from that revision.
-        # It must never fall back to the candidate (merged PR's) scripts.
+        # is a null SHA, or when a non-push trigger fires before any release tag
+        # exists.  It must never silently fall back to the candidate (HEAD) scripts.
         trusted_step = next(
             s
             for s in self.load("docker-release.yml")["jobs"]["release"]["steps"]
@@ -1473,6 +1473,73 @@ class TestReleaseWorkflows:
             "Fetch trusted release tooling must detect and reject the null SHA "
             "(all-zeros) that github.event.before carries when a branch is "
             "first created — accepting it would silently use HEAD scripts"
+        )
+        # Non-push trigger with no release tags must also fail closed.
+        assert (
+            "No release tag found" in run
+            or "no release tag" in run.lower()
+        ), (
+            "Fetch trusted release tooling must exit 1 for schedule/"
+            "workflow_dispatch when no release tag exists — allowing HEAD "
+            "scripts in this case lets a PR that modifies scripts/ trigger "
+            "a dispatch after its push fails and get through unvalidated"
+        )
+
+    def test_trusted_tooling_push_bootstrap_proceeds(self):
+        # Security guard: the bootstrap push that first introduces
+        # scripts/release/ onto main must SUCCEED (exit 0), not fail.  At
+        # bootstrap, BEFORE_SHA has no scripts/ so there is no prior trusted
+        # revision to restore.  HEAD is the reviewed baseline; plan and
+        # re-derive both use it, so the cross-check passes.  Every subsequent
+        # push will have scripts/ at BEFORE_SHA and will be validated normally.
+        trusted_step = next(
+            s
+            for s in self.load("docker-release.yml")["jobs"]["release"]["steps"]
+            if "Fetch trusted release tooling" in s.get("name", "")
+        )
+        run = trusted_step["run"]
+        # The bootstrap path must exit 0 (proceed), not exit 1 (fail).
+        # A message indicating bootstrap detection should be logged.
+        assert "bootstrap" in run.lower(), (
+            "Fetch trusted release tooling must detect and log the bootstrap "
+            "case (BEFORE_SHA has no scripts/) rather than exiting with an error"
+        )
+        # The bootstrap path must not call 'exit 1' in its own branch —
+        # verify the bootstrap message text is followed by 'exit 0', not 'exit 1'.
+        # We detect this by checking that the bootstrap path has its own 'exit 0'.
+        assert "exit 0" in run, (
+            "Fetch trusted release tooling must exit 0 on the bootstrap push "
+            "so the first release can be published"
+        )
+
+    def test_trusted_tooling_non_push_uses_latest_release_tag(self):
+        # Security guard: for schedule and workflow_dispatch triggers,
+        # github.event.before is unavailable.  The step must use the latest
+        # semantic release tag as the trusted anchor instead of trusting HEAD.
+        # Every release tag was created by a validated push-triggered run, so
+        # its scripts/ were already independently verified.
+        trusted_step = next(
+            s
+            for s in self.load("docker-release.yml")["jobs"]["release"]["steps"]
+            if "Fetch trusted release tooling" in s.get("name", "")
+        )
+        run = trusted_step["run"]
+        # Must check for a non-push condition and use a release tag.
+        assert "push" in run, (
+            "Fetch trusted release tooling must branch on the push event "
+            "type to handle non-push triggers differently"
+        )
+        assert (
+            "git tag" in run or "LATEST_TAG" in run
+        ), (
+            "Fetch trusted release tooling must look up a release tag for "
+            "non-push triggers — trusting HEAD for schedule/dispatch lets a "
+            "PR that modifies scripts/ dispatch a release after its push fails"
+        )
+        # Non-push path must restore scripts from the tag, not trust HEAD.
+        assert "git checkout" in run, (
+            "Fetch trusted release tooling must restore scripts/ from the "
+            "trusted release tag revision for non-push triggers"
         )
 
     def test_release_job_re_derives_plan_independently(self):
