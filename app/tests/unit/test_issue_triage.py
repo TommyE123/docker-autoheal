@@ -200,6 +200,28 @@ def test_invalid_response_fails_safe_like_low_confidence():
     assert changes.to_remove == []
 
 
+def test_low_confidence_replaces_needs_information_with_needs_triage():
+    changes = triage.compute_label_changes(
+        triage.Outcome.LOW_CONFIDENCE,
+        current_labels=["status/needs-information", "priority:high"],
+    )
+    assert changes.to_add == ["status/needs-triage"]
+    assert changes.to_remove == ["status/needs-information"]
+    # Unrelated labels must never be touched.
+    assert "priority:high" not in changes.to_remove
+
+
+def test_invalid_replaces_needs_information_with_needs_triage():
+    changes = triage.compute_label_changes(
+        triage.Outcome.INVALID,
+        current_labels=["status/needs-information", "priority:high"],
+    )
+    assert changes.to_add == ["status/needs-triage"]
+    assert changes.to_remove == ["status/needs-information"]
+    # Unrelated labels must never be touched.
+    assert "priority:high" not in changes.to_remove
+
+
 def test_insufficient_info_swaps_needs_triage_for_needs_information():
     changes = triage.compute_label_changes(
         triage.Outcome.INSUFFICIENT_INFO, current_labels=["status/needs-triage"]

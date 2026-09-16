@@ -196,10 +196,12 @@ def compute_label_changes(
         to_remove = sorted({"status/needs-triage"} & current)
         return LabelChanges(to_add=to_add, to_remove=to_remove)
 
-    # LOW_CONFIDENCE or INVALID: fail safe, keep/ensure needs-triage, touch
-    # nothing else. Never partially apply a classification.
+    # LOW_CONFIDENCE or INVALID: fail safe, ensure needs-triage is the only
+    # status label (a prior needs-information must not linger alongside it).
+    # Never partially apply a classification.
     to_add = sorted({"status/needs-triage"} - current)
-    return LabelChanges(to_add=to_add, to_remove=[])
+    to_remove = sorted({"status/needs-information"} & current)
+    return LabelChanges(to_add=to_add, to_remove=to_remove)
 
 
 def compute_desired_labels(

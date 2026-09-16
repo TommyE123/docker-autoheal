@@ -30,6 +30,7 @@
   description: New functionality, improvements or behaviour changes.
   aliases:
     - enhancement
+    - "type:enhancement"
     - "type:story"
 
 - name: kind/documentation
