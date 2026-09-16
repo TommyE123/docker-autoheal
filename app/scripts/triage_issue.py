@@ -19,7 +19,6 @@ import json
 import os
 import sys
 from pathlib import Path
-from urllib.parse import quote
 
 import requests
 
@@ -32,6 +31,7 @@ from app.services.issue_triage import (
     build_gemini_payload,
     build_needs_info_comment,
     call_gemini,
+    compute_desired_labels,
     compute_label_changes,
     decide,
     has_needs_info_comment,
@@ -65,26 +65,22 @@ def _github_session(token: str) -> requests.Session:
     return session
 
 
-def _apply_label_changes(
-    github_session: requests.Session, repo: str, issue_number: int, to_add, to_remove
+def _replace_labels(
+    github_session: requests.Session, repo: str, issue_number: int, desired_labels
 ) -> None:
-    for label in to_remove:
-        # Label names contain "/" (kind/bug, status/needs-triage, ...), which
-        # must be percent-encoded or GitHub reads it as extra path segments.
-        response = github_session.delete(
-            f"{GITHUB_API_HOST}/repos/{repo}/issues/{issue_number}/labels/{quote(label, safe='')}",
-            timeout=30,
-        )
-        if response.status_code not in (200, 404):
-            response.raise_for_status()
+    """Set the issue's full label set in a single call.
 
-    if to_add:
-        response = github_session.post(
-            f"{GITHUB_API_HOST}/repos/{repo}/issues/{issue_number}/labels",
-            json={"labels": to_add},
-            timeout=30,
-        )
-        response.raise_for_status()
+    GitHub's "set labels" endpoint replaces the entire label set atomically,
+    so this can never leave an issue with neither its old nor its new
+    classification - unlike a separate remove-then-add sequence, where a
+    failure between the two calls would do exactly that.
+    """
+    response = github_session.put(
+        f"{GITHUB_API_HOST}/repos/{repo}/issues/{issue_number}/labels",
+        json={"labels": list(desired_labels)},
+        timeout=30,
+    )
+    response.raise_for_status()
 
 
 def _post_needs_info_comment_if_absent(
@@ -170,8 +166,12 @@ def main() -> int:
         print("Dry run: no GitHub mutations performed.")
         return exit_code
 
+    desired_labels = compute_desired_labels(
+        decision.outcome, current_labels, decision.classification
+    )
+
     github_session = _github_session(github_token)
-    _apply_label_changes(github_session, repo, issue_number, changes.to_add, changes.to_remove)
+    _replace_labels(github_session, repo, issue_number, desired_labels)
 
     if decision.outcome == Outcome.INSUFFICIENT_INFO:
         _post_needs_info_comment_if_absent(github_session, repo, issue_number)

@@ -199,6 +199,24 @@ def compute_label_changes(
     return LabelChanges(to_add=to_add, to_remove=[])
 
 
+def compute_desired_labels(
+    outcome: Outcome,
+    current_labels: Iterable[str],
+    classification: Optional[Classification] = None,
+) -> list:
+    """Compute the full label set the issue should have after this decision.
+
+    This is the complete set - unrelated labels included - meant to be
+    applied with a single atomic "replace all labels" call, rather than
+    separate remove/add calls that could leave an issue with neither its
+    old nor its new classification if the second call fails.
+    """
+    current = set(current_labels)
+    changes = compute_label_changes(outcome, current, classification)
+    desired = (current - set(changes.to_remove)) | set(changes.to_add)
+    return sorted(desired)
+
+
 def build_needs_info_comment() -> str:
     return (
         f"{NEEDS_INFO_MARKER}\n"

@@ -1,7 +1,9 @@
 import json
 
 import pytest
+import requests
 
+import app.scripts.triage_issue as triage_script
 from app.services import issue_triage as triage
 
 # --- truncation / pre-flight content check ---------------------------------
@@ -207,6 +209,48 @@ def test_classified_requires_classification_argument():
         triage.compute_label_changes(triage.Outcome.CLASSIFIED, current_labels=[])
 
 
+# --- full desired-label-set computation (for atomic replacement) ------------
+
+
+def test_desired_labels_reclassification_preserves_unrelated_labels():
+    classification = triage.Classification(kind="enhancement", area="docker", confidence=0.9)
+    desired = triage.compute_desired_labels(
+        triage.Outcome.CLASSIFIED,
+        current_labels=["kind/bug", "area/restart", "priority:high", "good first issue"],
+        classification=classification,
+    )
+    assert desired == ["area/docker", "good first issue", "kind/enhancement", "priority:high"]
+
+
+def test_desired_labels_matches_add_remove_semantics_when_classified():
+    classification = triage.Classification(kind="bug", area="restart", confidence=0.9)
+    current = ["kind/bug", "area/docker", "status/needs-triage", "priority:high"]
+    changes = triage.compute_label_changes(
+        triage.Outcome.CLASSIFIED, current_labels=current, classification=classification
+    )
+    desired = triage.compute_desired_labels(
+        triage.Outcome.CLASSIFIED, current_labels=current, classification=classification
+    )
+    expected = (set(current) - set(changes.to_remove)) | set(changes.to_add)
+    assert set(desired) == expected
+    assert set(desired) == {"kind/bug", "area/restart", "priority:high"}
+
+
+def test_desired_labels_insufficient_info_preserves_unrelated_labels():
+    desired = triage.compute_desired_labels(
+        triage.Outcome.INSUFFICIENT_INFO,
+        current_labels=["status/needs-triage", "good first issue"],
+    )
+    assert desired == ["good first issue", "status/needs-information"]
+
+
+def test_desired_labels_low_confidence_is_a_pure_superset_of_current():
+    current = ["priority:high"]
+    desired = triage.compute_desired_labels(triage.Outcome.LOW_CONFIDENCE, current_labels=current)
+    assert set(current) <= set(desired)
+    assert set(desired) - set(current) == {"status/needs-triage"}
+
+
 # --- needs-information comment marker ----------------------------------------
 
 
@@ -256,6 +300,10 @@ class _FakeResponse:
 
     def json(self):
         return self._payload
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise requests.HTTPError(f"HTTP {self.status_code}")
 
 
 class _FakeSession:
@@ -329,3 +377,127 @@ def test_call_gemini_malformed_success_response_is_failure():
     session = _FakeSession([_FakeResponse(200, {"unexpected": "shape"})])
     result = triage.call_gemini(session, "key", "model", {}, sleep_fn=lambda s: None)
     assert result.ok is False
+
+
+# --- end-to-end: label mutation is a single atomic call ----------------------
+
+
+class _RecordingGithubSession:
+    """A session standing in for both the Gemini and GitHub API calls main()
+    makes. delete()/label-endpoint post() raise, so if the script ever
+    regresses to a separate remove-then-add sequence (which could leave an
+    issue with neither its old nor new classification if the second call
+    failed) the test fails immediately rather than merely under-counting.
+    """
+
+    def __init__(self, gemini_text):
+        self.headers = {}
+        self.calls = []
+        self._gemini_text = gemini_text
+
+    def post(self, url, headers=None, json=None, timeout=None):
+        if "generativelanguage.googleapis.com" in url:
+            self.calls.append(("POST", url, json))
+            return _FakeResponse(
+                200,
+                {"candidates": [{"content": {"parts": [{"text": self._gemini_text}]}}]},
+            )
+        if url.endswith("/labels"):
+            raise AssertionError("label mutation must use PUT, not POST")
+        self.calls.append(("POST", url, json))
+        return _FakeResponse(201, {})
+
+    def delete(self, url, headers=None, timeout=None):
+        raise AssertionError("label mutation must use PUT, not DELETE")
+
+    def put(self, url, headers=None, json=None, timeout=None):
+        self.calls.append(("PUT", url, json))
+        return _FakeResponse(200, {})
+
+    def get(self, url, headers=None, params=None, timeout=None):
+        self.calls.append(("GET", url, None))
+        return _FakeResponse(200, [])
+
+
+def _run_main_with_fake_session(monkeypatch, tmp_path, gemini_text, current_labels, title):
+    prompt_path = tmp_path / "system-prompt.txt"
+    prompt_path.write_text("system prompt")
+
+    session = _RecordingGithubSession(gemini_text)
+    monkeypatch.setattr(triage_script.requests, "Session", lambda: session)
+
+    monkeypatch.setenv("GITHUB_REPOSITORY", "TommyE123/docker-autoheal")
+    monkeypatch.setenv("ISSUE_NUMBER", "142")
+    monkeypatch.setenv("ISSUE_TITLE", title)
+    monkeypatch.setenv("ISSUE_BODY", "")
+    monkeypatch.setenv("ISSUE_LABELS_JSON", json.dumps(current_labels))
+    monkeypatch.setenv("GITHUB_TOKEN", "gh-token")
+    monkeypatch.setenv("GEMINI_API_KEY", "gemini-key")
+    monkeypatch.setenv("SYSTEM_PROMPT_PATH", str(prompt_path))
+    monkeypatch.delenv("DRY_RUN", raising=False)
+
+    exit_code = triage_script.main()
+    return exit_code, session
+
+
+def test_main_reclassification_is_single_put_and_preserves_unrelated_labels(
+    monkeypatch, tmp_path
+):
+    gemini_text = json.dumps({"kind": "enhancement", "area": "docker", "confidence": 0.9})
+    current_labels = ["kind/bug", "area/restart", "priority:high", "good first issue"]
+
+    exit_code, session = _run_main_with_fake_session(
+        monkeypatch,
+        tmp_path,
+        gemini_text,
+        current_labels,
+        title="Add support for restart backoff / cooldown period",
+    )
+
+    assert exit_code == 0
+    label_calls = [call for call in session.calls if call[1].endswith("/labels")]
+    assert len(label_calls) == 1
+    method, _url, body = label_calls[0]
+    assert method == "PUT"
+    assert set(body["labels"]) == {
+        "kind/enhancement",
+        "area/docker",
+        "priority:high",
+        "good first issue",
+    }
+
+
+def test_main_low_confidence_never_touches_labels_endpoint_twice(monkeypatch, tmp_path):
+    gemini_text = json.dumps({"kind": "bug", "area": "docker", "confidence": 0.2})
+    exit_code, session = _run_main_with_fake_session(
+        monkeypatch,
+        tmp_path,
+        gemini_text,
+        current_labels=["priority:high"],
+        title="Container does not restart after Uptime Kuma reports DOWN",
+    )
+
+    assert exit_code == 0
+    label_calls = [call for call in session.calls if call[1].endswith("/labels")]
+    assert len(label_calls) == 1
+    method, _url, body = label_calls[0]
+    assert method == "PUT"
+    assert set(body["labels"]) == {"priority:high", "status/needs-triage"}
+
+
+def test_main_insufficient_info_posts_comment_not_label_mutation_twice(monkeypatch, tmp_path):
+    exit_code, session = _run_main_with_fake_session(
+        monkeypatch, tmp_path, gemini_text="", current_labels=[], title="help"
+    )
+
+    assert exit_code == 0
+    label_calls = [call for call in session.calls if call[1].endswith("/labels")]
+    assert len(label_calls) == 1
+    assert label_calls[0][0] == "PUT"
+    assert set(label_calls[0][2]["labels"]) == {"status/needs-information"}
+
+    comment_posts = [
+        call for call in session.calls if call[0] == "POST" and call[1].endswith("/comments")
+    ]
+    assert len(comment_posts) == 1
+    assert triage.NEEDS_INFO_MARKER in comment_posts[0][2]["body"]
