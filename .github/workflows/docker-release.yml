@@ -332,6 +332,7 @@ jobs:
     permissions:
       contents: write
       packages: write
+      issues: read
 
     steps:
       # Defence in depth: the plan job already refuses to run outside main, so

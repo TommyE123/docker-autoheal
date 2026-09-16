@@ -1518,6 +1518,36 @@ class TestReleaseWorkflows:
             "GitHub-controlled and cannot be influenced by candidate code"
         )
 
+    def test_release_job_has_issues_read_permission_for_trusted_rederive(self):
+        # Security guard: the trusted re-derive step calls search/issues and
+        # repos/.../issues/.../events.  These are Issues API endpoints that
+        # require issues: read.  The release job only has contents: write and
+        # packages: write by default; job-level permissions do not inherit from
+        # the plan job.  Without issues: read every normal release that reaches
+        # the re-derive step fails with 403.
+        perms = self.load("docker-release.yml")["jobs"]["release"].get("permissions", {})
+        assert perms.get("issues") == "read", (
+            "release job must declare 'issues: read' — the trusted re-derive "
+            "step calls search/issues and repos/.../issues/.../events, which "
+            "require that permission; without it every release fails with 403"
+        )
+
+        # Verify the step actually uses both APIs that need the permission.
+        step = next(
+            s
+            for s in self.load("docker-release.yml")["jobs"]["release"]["steps"]
+            if "Re-derive release plan with trusted tooling" in s.get("name", "")
+        )
+        run = step["run"]
+        assert "search/issues" in run, (
+            "trusted re-derive step must call search/issues "
+            "(requires issues: read on the release job)"
+        )
+        assert "issues/" in run and "/events" in run, (
+            "trusted re-derive step must call the Issues Events API "
+            "(repos/.../issues/.../events, requires issues: read)"
+        )
+
     def test_release_tags_collected_from_main_history_only(self):
         # IMPORTANT 7: git tag --list includes tags unreachable from HEAD (e.g.
         # a v99.0.0 tag on a feature branch) which would inflate the calculated
