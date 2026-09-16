@@ -618,6 +618,46 @@ class TestHealthCheckManagement:
     async def test_list_health_checks_empty_by_default(self):
         assert await list_health_checks() == {}
 
+    async def test_add_health_check_rejects_when_container_inspection_fails(
+        self, wired_api, monkeypatch
+    ):
+        docker_client, engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+
+        # Make get_container_info return empty dict to simulate inspection failure
+        original_get_info = docker_client.get_container_info
+        docker_client.get_container_info = lambda c: {}
+
+        with pytest.raises(HTTPException) as exc_info:
+            await add_health_check(
+                HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080)
+            )
+
+        docker_client.get_container_info = original_get_info
+        assert exc_info.value.status_code == 500
+        assert "Unable to inspect container" in exc_info.value.detail
+
+    async def test_add_health_check_rejects_when_stable_id_cannot_be_resolved(
+        self, wired_api
+    ):
+        docker_client, engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+
+        # Make get_stable_identifier return None
+        original_get_stable = engine.get_stable_identifier
+        engine.get_stable_identifier = lambda info: None
+
+        with pytest.raises(HTTPException) as exc_info:
+            await add_health_check(
+                HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080)
+            )
+
+        engine.get_stable_identifier = original_get_stable
+        assert exc_info.value.status_code == 500
+        assert "Unable to resolve container stable identifier" in exc_info.value.detail
+
 
 @pytest.mark.asyncio
 class TestNotificationsConfig:
