@@ -72,6 +72,8 @@ Every substantive PR gets a CodeRabbit review before Tom merges it. When a subst
 
 When CodeRabbit reports actionable findings that are valid and related to the PR, fix them (ensuring the PR branch is current with main before the final push), run targeted validation, commit and push the changes, document what was fixed in a PR comment, wait for CI to return to green, and request another full review. Repeat as necessary until no further actionable findings remain. See `.claude/skills/coderabbit-review/SKILL.md` for the detailed workflow.
 
+A CodeRabbit full review covers the state of the PR at the time that review is requested. If material changes are made to the PR after the most recent CodeRabbit full review, a fresh `@coderabbitai full review` must be requested once CI/checks are green, regardless of why those changes were made. Material changes include those made to address Sourcery findings, MegaLinter findings, another reviewer's findings, the original task, or other authorised PR work. However, the existing CodeRabbit fix/review cycle already satisfies this requirement — do not request duplicate reviews. Editorial or mechanical changes that cannot affect behaviour or configuration do not require a fresh review unless explicitly requested. For detailed guidance, see `.claude/skills/coderabbit-review/SKILL.md`.
+
 ## Requesting a Sourcery review (optional)
 
 Sourcery is an optional second opinion, independent of CodeRabbit, and a scarce resource. If you use it, follow the `sourcery-review` skill (`.claude/skills/sourcery-review/SKILL.md`).

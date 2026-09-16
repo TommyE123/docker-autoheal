@@ -43,4 +43,4 @@ The purpose is to ensure the fixes being pushed and subsequently reviewed are ba
 
 ## CI remains authoritative
 
-After pushing, allow the normal CI/validation pipeline to run. CI provides the authoritative full validation, and the final branch check performed by CI is the definitive source of truth for mergeability.
+After pushing, allow the normal CI/validation pipeline to run. CI provides the authoritative full validation; GitHub's branch-protection rules and PR state determine the final mergeability status.
