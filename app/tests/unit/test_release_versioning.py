@@ -96,6 +96,24 @@ class TestVersionCalculation:
         for _ in range(3):
             assert plan_version("patch", EXISTING_TAGS).version == Version(2, 0, 5)
 
+    def test_release_none_fails_closed_with_no_current_release(self):
+        # release:none must not silently succeed when no release exists yet -
+        # the first release must be a real patch/minor/major release.
+        with pytest.raises(ReleaseError, match="could not determine the current release"):
+            plan_version("none", [])
+
+    def test_release_none_fails_closed_even_with_allow_first_release(self):
+        # allow_first_release only ever applies to a real version bump; it must
+        # never let release:none stand in as the repository's first release.
+        with pytest.raises(ReleaseError, match="could not determine the current release"):
+            plan_version("none", [], allow_first_release=True)
+
+    def test_release_none_records_the_current_release(self):
+        plan = plan_version("none", EXISTING_TAGS)
+
+        assert plan.release is False
+        assert plan.current == Version(2, 0, 4)
+
 
 class TestCandidateValidation:
     def test_candidate_matching_the_requested_type_passes(self):

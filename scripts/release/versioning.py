@@ -215,16 +215,23 @@ def plan_version(
         raise ReleaseError(
             f"invalid release type {release_type!r}; expected one of " + ", ".join(RELEASE_TYPES)
         )
+
+    tags = list(tags)
+    # release:none still requires a determinable current release: deferring a
+    # release is only meaningful once something has actually been released.
+    # allow_first_release never applies here - the first release must be a
+    # real patch/minor/major release, never release:none.
+    first_release_ok = allow_first_release and release_type != "none"
+    current = latest_release(tags, allow_first_release=first_release_ok)
     if release_type == "none":
         return ReleasePlan(
             release=False,
             release_type="none",
             reason="release:none - no immediate release; deferred to the next "
             "Friday maintenance release",
+            current=current,
         )
 
-    tags = list(tags)
-    current = latest_release(tags, allow_first_release=allow_first_release)
     candidate = current.bump(release_type)
     validate_candidate(current, candidate, release_type, tags)
     return ReleasePlan(

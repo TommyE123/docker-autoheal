@@ -32,9 +32,10 @@ own pull requests automatically (`renovate.json`).
 
 ## Before merge: the `validate-release` check
 
-`.github/workflows/release-validation.yml` runs on every pull request into `main` and is a
-required status check, so a pull request cannot merge without a valid classification. It
-fails when:
+`.github/workflows/release-validation.yml` runs on every pull request into `main` and fails
+when a pull request's release classification is invalid. It is not yet configured as a
+required status check on `main` — see "Required check: manual setup" below for why and what
+that means until it is enabled. It fails when:
 
 - there is no release label, more than one, or an invalid one;
 - the current release cannot be determined;
@@ -45,6 +46,18 @@ It uses no secrets and needs no registry credentials. Its result is never truste
 own: `docker-release.yml` repeats the whole validation from `main` immediately before it
 publishes, so a pull request cannot talk the release automation into an unsafe release by
 altering the tooling.
+
+### Required check: manual setup
+
+`validate-release` is not yet a required status check in the "Protect Main" ruleset. GitHub
+rulesets are repository configuration, not a file this repository can define or change — an
+administrator has to add `validate-release` to the ruleset's required status checks through
+GitHub's settings (or the API) before a pull request without a valid release label is
+actually blocked from merging. Enabling it before this workflow exists on `main` would block
+every open pull request against a check that cannot yet run, so it is deliberately turned on
+only after this change merges. Until it is enabled, an invalid or missing release
+classification will show as a failed check on the PR, but does not by itself prevent a
+merge.
 
 ## Version calculation
 
@@ -69,9 +82,16 @@ with `cancel-in-progress: false`, so releases are processed one at a time, in th
    ensures no release is lost when GitHub Actions concurrency displaces a pending run;
 2. determine the current release;
 3. calculate and validate the candidate version;
-4. **re-validate everything against the current state of `main`** — another release may
-   have been published since the pull request was validated, and a stale validation result
-   is never trusted;
+4. **re-validate everything against the current state of `main`, using trusted tooling** —
+   before re-deriving the plan, the job restores `scripts/release/` from a revision the merged
+   PR could not have modified (the pre-push tip of `main` for a normal push, or the latest
+   release tag for `schedule`/`workflow_dispatch`), then re-runs the whole classification and
+   plan calculation with that trusted copy and the raw GitHub API data. The result must match
+   the plan job's output exactly; a mismatch aborts the release. This stops a pull request
+   from inflating its own release type or version by editing `scripts/release/` itself — the
+   privileged job never trusts that code's own validation of itself. The image is still built
+   from the merged commit's own code, only the release-safety validator runs from a trusted
+   copy;
 5. create the Git tag through the Git references API, which refuses to create a reference
    that already exists;
 6. verify the tag points at the release commit;

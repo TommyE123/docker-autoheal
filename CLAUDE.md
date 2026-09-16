@@ -55,8 +55,12 @@ Renovate-authored PRs are covered separately by `renovate.json`'s `semanticCommi
 
 ## Release classification label (required)
 
-Every PR into `main` must carry exactly one release label, enforced by
-`.github/workflows/release-validation.yml` (`validate-release` check):
+Every PR into `main` must carry exactly one release label. This is checked by
+`.github/workflows/release-validation.yml` (`validate-release` check), which fails a PR that
+carries no label, more than one, or an invalid one. That check is not yet a required status
+check in the branch ruleset (a manual, external configuration step — see
+`docs/RELEASING.md`), so label your PR correctly regardless of whether the check is
+currently merge-blocking:
 
 - `release:none` — docs, CI, tests, refactors with no behaviour change, normal Renovate updates, formatting/linting.
 - `release:patch` — bug fix, security fix needing a new image, performance improvement.
