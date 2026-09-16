@@ -88,4 +88,19 @@ When CodeRabbit reports findings:
 
 Do not create an infinite review/fix loop. The purpose is to resolve genuine actionable findings, not repeatedly chase reviewer noise.
 
+## CodeRabbit review after subsequent substantive changes
+
+If Claude makes any substantive or material change to the PR after the most recent CodeRabbit full review, a fresh `@coderabbitai full review` must be requested once CI/checks are green, regardless of why the change was made.
+
+Substantive/material changes include those made to address:
+- Sourcery findings
+- MegaLinter findings
+- another reviewer's findings
+- the original task
+- other authorised PR work
+
+**Exception:** Do not create a duplicate review if the current CodeRabbit fix/review cycle already requires another full review — that review satisfies this requirement and avoids unnecessary duplicate reviews.
+
+**Exception:** Trivial-only changes such as wording, comments, formatting, or metadata changes that cannot affect behaviour, configuration, tests, workflows, or meaningful repository guidance do not require a fresh CodeRabbit review unless the task explicitly requests one.
+
 Do not merge the PR yourself — see `CLAUDE.md`'s Merging section. Tom (@TommyE123) is the final gatekeeper.
