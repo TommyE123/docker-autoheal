@@ -65,6 +65,25 @@ def _github_session(token: str) -> requests.Session:
     return session
 
 
+def _fetch_current_labels(
+    github_session: requests.Session, repo: str, issue_number: int
+) -> list:
+    """Read the issue's live label set right before mutating it.
+
+    The webhook payload's label snapshot is taken at event time; Gemini
+    classification (with retries) can take long enough for a label to be
+    added or removed in the meantime. Re-fetching immediately before
+    computing the replacement set keeps that staleness window as small as
+    possible.
+    """
+    response = github_session.get(
+        f"{GITHUB_API_HOST}/repos/{repo}/issues/{issue_number}",
+        timeout=30,
+    )
+    response.raise_for_status()
+    return [label["name"] for label in response.json()["labels"]]
+
+
 def _replace_labels(
     github_session: requests.Session, repo: str, issue_number: int, desired_labels
 ) -> None:
@@ -166,11 +185,11 @@ def main() -> int:
         print("Dry run: no GitHub mutations performed.")
         return exit_code
 
-    desired_labels = compute_desired_labels(
-        decision.outcome, current_labels, decision.classification
-    )
-
     github_session = _github_session(github_token)
+    fresh_labels = _fetch_current_labels(github_session, repo, issue_number)
+    desired_labels = compute_desired_labels(
+        decision.outcome, fresh_labels, decision.classification
+    )
     _replace_labels(github_session, repo, issue_number, desired_labels)
 
     if decision.outcome == Outcome.INSUFFICIENT_INFO:

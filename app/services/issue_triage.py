@@ -309,7 +309,11 @@ def call_gemini(
             return GeminiCallResult(ok=False, error=last_error)
 
         if response.status_code == 200:
-            text = extract_gemini_text(response.json())
+            try:
+                response_json = response.json()
+            except (TypeError, ValueError):
+                return GeminiCallResult(ok=False, error="malformed Gemini response JSON")
+            text = extract_gemini_text(response_json)
             if text is None:
                 return GeminiCallResult(ok=False, error="malformed Gemini response shape")
             return GeminiCallResult(ok=True, text=text)

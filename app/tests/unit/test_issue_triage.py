@@ -406,6 +406,20 @@ def test_call_gemini_malformed_success_response_is_failure():
     assert result.ok is False
 
 
+class _InvalidJSONResponse(_FakeResponse):
+    """A 200 response whose body isn't valid JSON, e.g. truncated output."""
+
+    def json(self):
+        raise ValueError("Expecting value: line 1 column 1 (char 0)")
+
+
+def test_call_gemini_200_with_invalid_json_body_is_failure_not_exception():
+    session = _FakeSession([_InvalidJSONResponse(200)])
+    result = triage.call_gemini(session, "key", "model", {}, sleep_fn=lambda s: None)
+    assert result.ok is False
+    assert result.error is not None
+
+
 # --- end-to-end: label mutation is a single atomic call ----------------------
 
 
@@ -417,10 +431,14 @@ class _RecordingGithubSession:
     failed) the test fails immediately rather than merely under-counting.
     """
 
-    def __init__(self, gemini_text):
+    def __init__(self, gemini_text, issue_labels=()):
         self.headers = {}
         self.calls = []
         self._gemini_text = gemini_text
+        # Labels returned by a fresh GET .../issues/{n} - independent of
+        # whatever stale snapshot the "webhook payload" env var carries, so
+        # tests can simulate a label added while Gemini was still running.
+        self._issue_labels = list(issue_labels)
 
     def post(self, url, headers=None, json=None, timeout=None):
         if "generativelanguage.googleapis.com" in url:
@@ -443,16 +461,30 @@ class _RecordingGithubSession:
 
     def get(self, url, headers=None, params=None, timeout=None):
         self.calls.append(("GET", url, None))
-        return _FakeResponse(200, [])
+        if url.endswith("/comments"):
+            return _FakeResponse(200, [])
+        # GET .../issues/{n}: the fresh label fetch made immediately before
+        # the replacement PUT.
+        return _FakeResponse(200, {"labels": [{"name": name} for name in self._issue_labels]})
 
 
 def _run_main_with_fake_session(
-    monkeypatch, tmp_path, gemini_text, current_labels, title, dry_run=False
+    monkeypatch,
+    tmp_path,
+    gemini_text,
+    current_labels,
+    title,
+    dry_run=False,
+    issue_labels=None,
 ):
     prompt_path = tmp_path / "system-prompt.txt"
     prompt_path.write_text("system prompt")
 
-    session = _RecordingGithubSession(gemini_text)
+    # By default the freshly-fetched labels match the webhook snapshot;
+    # pass issue_labels explicitly to simulate them having diverged.
+    session = _RecordingGithubSession(
+        gemini_text, issue_labels=current_labels if issue_labels is None else issue_labels
+    )
     monkeypatch.setattr(triage_script.requests, "Session", lambda: session)
 
     monkeypatch.setenv("GITHUB_REPOSITORY", "TommyE123/docker-autoheal")
@@ -497,6 +529,33 @@ def test_main_reclassification_is_single_put_and_preserves_unrelated_labels(
         "priority:high",
         "good first issue",
     }
+
+
+def test_main_replace_uses_freshly_fetched_labels_not_stale_webhook_snapshot(
+    monkeypatch, tmp_path
+):
+    """A label added while Gemini was still processing (after the webhook
+    fired, so absent from ISSUE_LABELS_JSON) must survive the eventual PUT.
+    Computing the desired set from the stale event snapshot instead of a
+    fresh fetch would silently drop it.
+    """
+    gemini_text = json.dumps({"kind": "enhancement", "area": "docker", "confidence": 0.9})
+
+    exit_code, session = _run_main_with_fake_session(
+        monkeypatch,
+        tmp_path,
+        gemini_text,
+        current_labels=["kind/bug", "area/restart"],
+        issue_labels=["kind/bug", "area/restart", "priority:high"],
+        title="Add support for restart backoff / cooldown period",
+    )
+
+    assert exit_code == 0
+    label_calls = [call for call in session.calls if call[1].endswith("/labels")]
+    assert len(label_calls) == 1
+    method, _url, body = label_calls[0]
+    assert method == "PUT"
+    assert set(body["labels"]) == {"kind/enhancement", "area/docker", "priority:high"}
 
 
 def test_main_low_confidence_never_touches_labels_endpoint_twice(monkeypatch, tmp_path):
