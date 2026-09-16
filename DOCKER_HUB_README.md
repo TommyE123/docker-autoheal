@@ -78,7 +78,8 @@ services:
       - "3131:3131"   # Web UI
       - "9090:9090"   # Prometheus metrics
     labels:
-      - "autoheal=false"   # exclude Auto-Heal itself from monitoring
+      - "autoheal=false"   # keeps the monitor unselected under the default label-based
+                            # selection; see docs/user/labels.md if you enable include_all
 
   webapp:
     image: nginx:alpine
