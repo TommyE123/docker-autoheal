@@ -15,6 +15,12 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Iterable, Optional
 
+# The runtime allow-list Gemini's classification is validated against. This
+# is intentionally a separate list from the GitHub label definitions in
+# .github/labels.yml (which own name/color/description for the repo's
+# kind/*, area/* labels) and from the values described in
+# .github/triage/system-prompt.txt (which tell the model what it may
+# return) - all three must be updated together when the taxonomy changes.
 ALLOWED_KINDS = ("bug", "enhancement", "documentation", "chore")
 ALLOWED_AREAS = (
     "docker",
@@ -53,6 +59,30 @@ def has_sufficient_content(title: Optional[str], body: Optional[str]) -> bool:
     """Reject only genuinely empty/minimal issues, not merely short ones."""
     combined = f"{title or ''} {body or ''}".strip()
     return len(combined) >= MIN_CONTENT_CHARS
+
+
+def has_issue_changed(
+    original_title: Optional[str],
+    original_body: Optional[str],
+    current_title: Optional[str],
+    current_body: Optional[str],
+) -> bool:
+    """Has the issue's content changed since the title/body we classified?
+
+    The workflow's `cancel-in-progress` concurrency group only cancels a
+    superseded run on a best-effort basis - GitHub Actions cancellation
+    takes a moment to land, so an older run can still be mid-flight (or
+    already past cancellation) when a newer one starts. This is a precise,
+    content-based backstop: comparing the exact title/body a run classified
+    against the issue's current title/body right before that run mutates
+    labels. Unrelated activity (a comment, someone else's label change)
+    never trips it, because only an actual title/body edit does - and any
+    such edit already fires its own `edited` event with a fresh, correct
+    run of its own.
+    """
+    return (original_title or "") != (current_title or "") or (
+        original_body or ""
+    ) != (current_body or "")
 
 
 @dataclass(frozen=True)

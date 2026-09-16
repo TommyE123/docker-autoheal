@@ -51,6 +51,26 @@ def test_minimal_single_word_issue_is_insufficient():
     assert triage.has_sufficient_content("help", "") is False
 
 
+# --- freshness check (cancel-in-progress backstop) ---------------------------
+
+
+def test_has_issue_changed_false_when_title_and_body_match():
+    assert triage.has_issue_changed("same title", "same body", "same title", "same body") is False
+
+
+def test_has_issue_changed_true_when_title_differs():
+    assert triage.has_issue_changed("old title", "body", "new title", "body") is True
+
+
+def test_has_issue_changed_true_when_body_differs():
+    assert triage.has_issue_changed("title", "old body", "title", "new body") is True
+
+
+def test_has_issue_changed_treats_none_and_empty_string_as_equal():
+    assert triage.has_issue_changed("title", None, "title", "") is False
+    assert triage.has_issue_changed(None, "body", "", "body") is False
+
+
 # --- classification validation ----------------------------------------------
 
 
@@ -431,14 +451,17 @@ class _RecordingGithubSession:
     failed) the test fails immediately rather than merely under-counting.
     """
 
-    def __init__(self, gemini_text, issue_labels=()):
+    def __init__(self, gemini_text, issue_labels=(), issue_title=None, issue_body=None):
         self.headers = {}
         self.calls = []
         self._gemini_text = gemini_text
-        # Labels returned by a fresh GET .../issues/{n} - independent of
-        # whatever stale snapshot the "webhook payload" env var carries, so
-        # tests can simulate a label added while Gemini was still running.
+        # Labels/title/body returned by a fresh GET .../issues/{n} -
+        # independent of whatever stale snapshot the "webhook payload" env
+        # vars carry, so tests can simulate the issue having changed while
+        # Gemini was still running.
         self._issue_labels = list(issue_labels)
+        self._issue_title = issue_title
+        self._issue_body = issue_body
 
     def post(self, url, headers=None, json=None, timeout=None):
         if "generativelanguage.googleapis.com" in url:
@@ -460,12 +483,19 @@ class _RecordingGithubSession:
         return _FakeResponse(200, {})
 
     def get(self, url, headers=None, params=None, timeout=None):
-        self.calls.append(("GET", url, None))
+        self.calls.append(("GET", url, params))
         if url.endswith("/comments"):
             return _FakeResponse(200, [])
-        # GET .../issues/{n}: the fresh label fetch made immediately before
+        # GET .../issues/{n}: the fresh issue fetch made immediately before
         # the replacement PUT.
-        return _FakeResponse(200, {"labels": [{"name": name} for name in self._issue_labels]})
+        return _FakeResponse(
+            200,
+            {
+                "title": self._issue_title,
+                "body": self._issue_body,
+                "labels": [{"name": name} for name in self._issue_labels],
+            },
+        )
 
 
 def _run_main_with_fake_session(
@@ -476,21 +506,28 @@ def _run_main_with_fake_session(
     title,
     dry_run=False,
     issue_labels=None,
+    body="",
+    issue_title=None,
+    issue_body=None,
 ):
     prompt_path = tmp_path / "system-prompt.txt"
     prompt_path.write_text("system prompt")
 
-    # By default the freshly-fetched labels match the webhook snapshot;
-    # pass issue_labels explicitly to simulate them having diverged.
+    # By default the freshly-fetched issue matches the webhook snapshot
+    # (same labels, same title/body); pass issue_labels/issue_title/
+    # issue_body explicitly to simulate them having diverged.
     session = _RecordingGithubSession(
-        gemini_text, issue_labels=current_labels if issue_labels is None else issue_labels
+        gemini_text,
+        issue_labels=current_labels if issue_labels is None else issue_labels,
+        issue_title=title if issue_title is None else issue_title,
+        issue_body=body if issue_body is None else issue_body,
     )
     monkeypatch.setattr(triage_script.requests, "Session", lambda: session)
 
     monkeypatch.setenv("GITHUB_REPOSITORY", "TommyE123/docker-autoheal")
     monkeypatch.setenv("ISSUE_NUMBER", "142")
     monkeypatch.setenv("ISSUE_TITLE", title)
-    monkeypatch.setenv("ISSUE_BODY", "")
+    monkeypatch.setenv("ISSUE_BODY", body)
     monkeypatch.setenv("ISSUE_LABELS_JSON", json.dumps(current_labels))
     monkeypatch.setenv("GITHUB_TOKEN", "gh-token")
     monkeypatch.setenv("GEMINI_API_KEY", "gemini-key")
@@ -611,3 +648,92 @@ def test_main_dry_run_performs_no_github_mutations(monkeypatch, tmp_path):
     # nothing may touch the GitHub labels/comments endpoints.
     github_calls = [call for call in session.calls if "api.github.com" in call[1]]
     assert github_calls == []
+
+
+def test_main_skips_mutation_when_issue_body_changed_since_classification(
+    monkeypatch, tmp_path
+):
+    """cancel-in-progress is best-effort; has_issue_changed() is the actual
+    backstop. If the issue's live body no longer matches what was classified
+    (someone edited it while Gemini was processing), no label mutation
+    should happen - a fresher run, already triggered by that edit, owns it.
+    """
+    gemini_text = json.dumps({"kind": "enhancement", "area": "docker", "confidence": 0.9})
+
+    exit_code, session = _run_main_with_fake_session(
+        monkeypatch,
+        tmp_path,
+        gemini_text,
+        current_labels=["kind/bug", "area/restart"],
+        title="Add support for restart backoff / cooldown period",
+        body="original body",
+        issue_body="body edited while Gemini was still running",
+    )
+
+    assert exit_code == 0
+    label_calls = [call for call in session.calls if call[1].endswith("/labels")]
+    assert label_calls == []
+    comment_posts = [
+        call for call in session.calls if call[0] == "POST" and call[1].endswith("/comments")
+    ]
+    assert comment_posts == []
+
+
+def test_main_proceeds_when_issue_unchanged_since_classification(monkeypatch, tmp_path):
+    gemini_text = json.dumps({"kind": "enhancement", "area": "docker", "confidence": 0.9})
+
+    exit_code, session = _run_main_with_fake_session(
+        monkeypatch,
+        tmp_path,
+        gemini_text,
+        current_labels=["kind/bug", "area/restart"],
+        title="Add support for restart backoff / cooldown period",
+        body="same body throughout",
+    )
+
+    assert exit_code == 0
+    label_calls = [call for call in session.calls if call[1].endswith("/labels")]
+    assert len(label_calls) == 1
+    assert label_calls[0][0] == "PUT"
+
+
+# --- comment pagination -------------------------------------------------------
+
+
+class _PaginatedCommentSession:
+    """Serves comment bodies across pages; page 1 is a full 100-item page
+    (to trigger a second request) with the marker only on page 2.
+    """
+
+    def __init__(self, marker_on_second_page):
+        self.calls = []
+        self._pages = {
+            1: ["filler"] * 100,
+            2: [marker_on_second_page],
+        }
+
+    def get(self, url, headers=None, params=None, timeout=None):
+        page = (params or {}).get("page", 1)
+        self.calls.append(("GET", url, page))
+        bodies = self._pages.get(page, [])
+        return _FakeResponse(200, [{"body": body} for body in bodies])
+
+
+def test_fetch_all_comment_bodies_paginates_past_first_page():
+    session = _PaginatedCommentSession(marker_on_second_page=triage.NEEDS_INFO_MARKER)
+    bodies = triage_script._fetch_all_comment_bodies(session, "owner/repo", 1)
+
+    assert len(bodies) == 101
+    assert triage.NEEDS_INFO_MARKER in bodies
+    assert [call[2] for call in session.calls] == [1, 2]
+
+
+def test_post_needs_info_comment_if_absent_finds_marker_beyond_first_page(monkeypatch):
+    session = _PaginatedCommentSession(marker_on_second_page=triage.NEEDS_INFO_MARKER)
+
+    triage_script._post_needs_info_comment_if_absent(session, "owner/repo", 1)
+
+    # The marker was found on page 2, so no duplicate comment is posted -
+    # and this fake session has no post() method at all, so posting one
+    # would raise AttributeError rather than silently passing.
+    assert not any(call[0] == "POST" for call in session.calls)

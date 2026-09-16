@@ -1,5 +1,12 @@
-# Source of truth for the issue-classification label taxonomy used by
-# Gemini-powered issue triage (see .github/workflows/issue-triage.yml).
+# Source of truth for the GitHub *label definitions* (name/color/description)
+# in the issue-classification taxonomy used by Gemini-powered issue triage
+# (see .github/workflows/issue-triage.yml). This file does not define which
+# values Gemini is allowed to return - that allow-list is enforced at
+# runtime by ALLOWED_KINDS/ALLOWED_AREAS in app/services/issue_triage.py
+# (and mirrored for the model's own instructions in
+# .github/triage/system-prompt.txt). All three must be kept in sync by hand
+# when the taxonomy changes; this duplication is intentional; a single
+# generated source has been left out of scope to keep this change minimal.
 #
 # Ownership model:
 #   kind/*   - owned by Gemini triage (what kind of issue this is)
@@ -11,40 +18,33 @@
 #   for this file.
 #
 # Synced to GitHub with EndBug/label-sync (see
-# .github/workflows/labels-sync.yml). `aliases` lets label-sync rename an
-# existing label (preserving which issues carry it) instead of creating a
-# duplicate - used here to fold the old flat/colon-namespaced classification
-# labels into the new slash-namespaced ones.
+# .github/workflows/labels-sync.yml), which only creates/updates the labels
+# listed below by exact name. Deliberately no `aliases` here: a label is a
+# single repository-wide object, so renaming one via label-sync (or deleting
+# one via the repo-wide "delete a label" endpoint) would affect every issue
+# *and every pull request* that happens to carry it - not just the issues
+# this taxonomy is about. Migrating legacy issue labels onto this taxonomy
+# is instead done issue-by-issue in labels-sync.yml's migrate-issue-labels
+# job, which only ever adds/removes labels on individual issues and never
+# touches the shared label object.
 
 # --- kind/* --------------------------------------------------------------
 
 - name: kind/bug
   color: d73a4a
   description: Unexpected behaviour, failures or incorrect results.
-  aliases:
-    - bug
-    - "type:bug"
 
 - name: kind/enhancement
   color: a2eeef
   description: New functionality, improvements or behaviour changes.
-  aliases:
-    - enhancement
-    - "type:enhancement"
-    - "type:story"
 
 - name: kind/documentation
   color: 0075ca
   description: Documentation, README, examples or guides.
-  aliases:
-    - documentation
 
 - name: kind/chore
   color: bfd4f2
   description: Maintenance, refactoring, dependency updates, test coverage.
-  aliases:
-    - "type:chore"
-    - "type:task"
 
 # --- area/* ----------------------------------------------------------------
 
@@ -59,14 +59,10 @@
 - name: area/health-check
   color: 0e8a16
   description: Health monitoring, Uptime Kuma integration, monitor state.
-  aliases:
-    - "area:monitoring"
 
 - name: area/config
   color: fbca04
   description: Configuration, environment variables, config parsing.
-  aliases:
-    - "area:config"
 
 - name: area/logging
   color: c2e0c6
@@ -75,14 +71,10 @@
 - name: area/github-actions
   color: 5319e7
   description: CI/CD, GitHub Actions, releases, repository automation.
-  aliases:
-    - "area:ci"
 
 - name: area/tests
   color: 006b75
   description: Unit tests, integration tests, test coverage.
-  aliases:
-    - "area:testing"
 
 # --- status/* --------------------------------------------------------------
 

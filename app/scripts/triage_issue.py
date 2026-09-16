@@ -34,6 +34,7 @@ from app.services.issue_triage import (
     compute_desired_labels,
     compute_label_changes,
     decide,
+    has_issue_changed,
     has_needs_info_comment,
     has_sufficient_content,
     parse_classification,
@@ -65,23 +66,26 @@ def _github_session(token: str) -> requests.Session:
     return session
 
 
-def _fetch_current_labels(
-    github_session: requests.Session, repo: str, issue_number: int
-) -> list:
-    """Read the issue's live label set right before mutating it.
+def _fetch_current_issue(github_session: requests.Session, repo: str, issue_number: int) -> dict:
+    """Read the issue's live title/body/labels right before mutating it.
 
-    The webhook payload's label snapshot is taken at event time; Gemini
-    classification (with retries) can take long enough for a label to be
-    added or removed in the meantime. Re-fetching immediately before
-    computing the replacement set keeps that staleness window as small as
-    possible.
+    The webhook payload's snapshot is taken at event time; Gemini
+    classification (with retries) can take long enough for the issue to
+    change in the meantime. Re-fetching immediately before mutating keeps
+    that staleness window as small as possible, and gives main() the
+    title/body it needs for the has_issue_changed() freshness check.
     """
     response = github_session.get(
         f"{GITHUB_API_HOST}/repos/{repo}/issues/{issue_number}",
         timeout=30,
     )
     response.raise_for_status()
-    return [label["name"] for label in response.json()["labels"]]
+    payload = response.json()
+    return {
+        "title": payload.get("title"),
+        "body": payload.get("body"),
+        "labels": [label["name"] for label in payload["labels"]],
+    }
 
 
 def _replace_labels(
@@ -102,16 +106,35 @@ def _replace_labels(
     response.raise_for_status()
 
 
-def _post_needs_info_comment_if_absent(
-    github_session: requests.Session, repo: str, issue_number: int
-) -> None:
-    response = github_session.get(
-        f"{GITHUB_API_HOST}/repos/{repo}/issues/{issue_number}/comments",
-        params={"per_page": 100},
-        timeout=30,
-    )
-    response.raise_for_status()
-    comment_bodies = [comment.get("body") for comment in response.json()]
+def _fetch_all_comment_bodies(github_session, repo: str, issue_number: int) -> list:
+    """Read every comment body, paginating past the first 100.
+
+    An issue with a long history could have more than one page of comments;
+    stopping at page one risks missing our own earlier marker comment and
+    posting a duplicate.
+
+    `github_session` is duck-typed (just needs `.get()`), like
+    `call_gemini`'s injected session, so tests can exercise pagination with
+    a minimal fake rather than a real `requests.Session`.
+    """
+    bodies: list = []
+    page = 1
+    while True:
+        response = github_session.get(
+            f"{GITHUB_API_HOST}/repos/{repo}/issues/{issue_number}/comments",
+            params={"per_page": 100, "page": page},
+            timeout=30,
+        )
+        response.raise_for_status()
+        batch = response.json()
+        bodies.extend(comment.get("body") for comment in batch)
+        if len(batch) < 100:
+            return bodies
+        page += 1
+
+
+def _post_needs_info_comment_if_absent(github_session, repo: str, issue_number: int) -> None:
+    comment_bodies = _fetch_all_comment_bodies(github_session, repo, issue_number)
 
     if has_needs_info_comment(comment_bodies):
         print(f"Issue #{issue_number}: needs-information comment already present, skipping.")
@@ -147,8 +170,10 @@ def main() -> int:
 
     repo = os.environ["GITHUB_REPOSITORY"]
     issue_number = int(os.environ["ISSUE_NUMBER"])
-    title = truncate_title(os.environ.get("ISSUE_TITLE", ""))
-    body = truncate_body(os.environ.get("ISSUE_BODY", ""))
+    raw_title = os.environ.get("ISSUE_TITLE", "")
+    raw_body = os.environ.get("ISSUE_BODY", "")
+    title = truncate_title(raw_title)
+    body = truncate_body(raw_body)
     current_labels = json.loads(os.environ.get("ISSUE_LABELS_JSON", "[]"))
     github_token = os.environ["GITHUB_TOKEN"]
     gemini_api_key = os.environ.get("GEMINI_API_KEY", "")
@@ -186,9 +211,18 @@ def main() -> int:
         return exit_code
 
     github_session = _github_session(github_token)
-    fresh_labels = _fetch_current_labels(github_session, repo, issue_number)
+    fresh_issue = _fetch_current_issue(github_session, repo, issue_number)
+
+    if has_issue_changed(raw_title, raw_body, fresh_issue["title"], fresh_issue["body"]):
+        print(
+            f"Issue #{issue_number}: title/body changed since this run started classifying "
+            "it; skipping label mutation so a fresher run (already triggered by that edit) "
+            "doesn't get overwritten."
+        )
+        return exit_code
+
     desired_labels = compute_desired_labels(
-        decision.outcome, fresh_labels, decision.classification
+        decision.outcome, fresh_issue["labels"], decision.classification
     )
     _replace_labels(github_session, repo, issue_number, desired_labels)
 

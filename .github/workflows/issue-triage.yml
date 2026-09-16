@@ -2,8 +2,13 @@ name: Issue Triage
 
 # Re-running classification on every edit is fine - issue volume is low and
 # Gemini API headroom is plentiful. The per-issue concurrency group (below)
-# ensures a later edit's classification always wins over an in-flight
-# earlier one, rather than racing.
+# cancels a superseded run, but GitHub Actions cancellation isn't
+# instantaneous - an older run can still be mid-flight (or past its
+# cancellation point) when a newer one starts, so this alone is not a
+# guarantee against an older run's mutation landing after a newer one's.
+# app/scripts/triage_issue.py's has_issue_changed() check is the actual
+# backstop: it compares the title/body it classified against the issue's
+# live content right before mutating, and skips if they differ.
 on:
   issues:
     types:
