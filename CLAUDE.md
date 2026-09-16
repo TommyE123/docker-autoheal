@@ -14,6 +14,7 @@
 
 - Behaviour changes need tests where practical; a bug fix needs a regression test that demonstrates the problem.
 - Never weaken, remove or bypass a test (or raise a coverage threshold) just to get CI green — fix the cause instead.
+- See `.claude/rules/testing.md` for how much validation to run and when to skip it.
 
 ## Comments
 
@@ -33,7 +34,7 @@ Keep comments minimal: only for non-obvious reasoning the code can't convey on i
 
 Every PR title must follow [Conventional Commits](https://www.conventionalcommits.org/) format, enforced by `.github/workflows/semantic-pr-title.yml` (`validate-title` check):
 
-```
+```text
 <type>: <description>
 ```
 
@@ -42,6 +43,7 @@ Every PR title must follow [Conventional Commits](https://www.conventionalcommit
 - Optional scope is allowed (`type(scope): description`) but not required.
 
 Examples already in use in this repo:
+
 - `fix: correct Dockerfile EXPOSE port for the Web UI (8080 -> 3131)`
 - `docs: reorganise and rewrite project documentation`
 - `chore: migrate to multi-registry publishing (GHCR + Docker Hub)`
@@ -71,6 +73,7 @@ sweeps accumulated `release:none` changes into one patch release each Friday. Se
 If a PR changes application behavior or adds real scope (new feature, bug fix, refactor with user-visible effect, new CI/tooling capability), file a GitHub issue for it first — or confirm one already exists — and link the PR to it (`Closes #N` in the PR body). This keeps a traceable record of *why* a change happened, not just what changed.
 
 Exceptions (no issue required):
+
 - Renovate-authored PRs (automated, never have an issue by design).
 - Purely mechanical docs-only, config-only, or CI-only tweaks with no behavior change (e.g. fixing a PR title, a typo, a lint config value).
 
@@ -82,58 +85,27 @@ When your task is driven by a specific GitHub issue, title your Claude Code sess
 
 ## Requesting a CodeRabbit review (required before merge)
 
-Automatic reviews are off in `.coderabbit.yaml` (`reviews.auto_review.enabled: false`), so CodeRabbit reviews a PR only when it is explicitly asked. Every PR gets a CodeRabbit review before Tom merges it.
+Every substantive PR gets a CodeRabbit review before Tom merges it. When a substantive PR reaches the CodeRabbit review stage, you MUST explicitly invoke the `coderabbit-review` skill (`.claude/skills/coderabbit-review/SKILL.md`) and follow its instructions exactly. Do not perform an ad-hoc CodeRabbit review instead, and do not rely solely on semantic skill auto-discovery — this procedure carries repository-specific institutional knowledge that ad-hoc review would lose.
 
-**Ask only once the PR is green.** Wait until every check on the PR head has passed (`unit-tests`, `MegaLinter`, `Build Docker image`, `validate-title`, `codecov/patch`, `codecov/project`, plus any other check the PR triggers) and the branch has no merge conflict. Asking while CI is red spends the review on findings CI has already reported.
+When CodeRabbit reports actionable findings that are valid and related to the PR, fix them (ensuring the PR branch is current with main before the final push), run targeted validation, commit and push the changes, document what was fixed in a PR comment, wait for CI to return to green, and request another full review. Repeat as necessary until no further actionable findings remain. See `.claude/skills/coderabbit-review/SKILL.md` for the detailed workflow.
 
-**Always use `@coderabbitai full review`, never `@coderabbitai review`.** `review` is incremental: with automatic reviews disabled it can reply "CodeRabbit is an incremental review system and does not re-review already reviewed commits" and do nothing, which has already happened on PR #105. `full review` reviews the whole PR from scratch.
+A CodeRabbit full review covers the state of the PR at the time that review is requested. If material changes are made to the PR after the most recent CodeRabbit full review, a fresh `@coderabbitai full review` must be requested once CI/checks are green, regardless of why those changes were made. Material changes include those made to address Sourcery findings, MegaLinter findings, another reviewer's findings, the original task, or other authorised PR work. However, the existing CodeRabbit fix/review cycle already satisfies this requirement — do not request duplicate reviews. Editorial or mechanical changes that cannot affect behaviour or configuration do not require a fresh review unless explicitly requested. For detailed guidance, see `.claude/skills/coderabbit-review/SKILL.md`.
 
-Free-form instructions in the same comment as the command are honoured (`chat.auto_reply: true`), so put them directly under the command. Post the template below as a single PR comment, filling in **Context**, **In scope** and **Out of scope** and leaving the rest verbatim — the fixed **How to report** and **Verdict** sections are what make reviews comparable across PRs, so don't reword them per PR:
+## Requesting a Sourcery review (optional)
 
-```markdown
-@coderabbitai full review
+Sourcery is an optional second opinion, independent of CodeRabbit, and a scarce resource. If you use it, follow the `sourcery-review` skill (`.claude/skills/sourcery-review/SKILL.md`).
 
-**Context**
-- PR #<N>: <title>
-- Issue: Closes #<M>   <!-- or: none — <which linked-issue exception applies> -->
-- Change type: <bug fix | feature | test-only | refactor | docs | ci/config | dependency>
-- All checks green on <short-sha>.
-- <1-3 lines: what changed and why. For a re-review, say what changed since the last round.>
+When you fix an actionable Sourcery finding, run targeted validation, ensure the PR branch is current with main before the final push, commit and push the changes, and document what was fixed in a PR comment. Do not automatically request another Sourcery review — re-review is only performed when Tom explicitly asks for it. See `.claude/skills/sourcery-review/SKILL.md` for the detailed workflow.
 
-**In scope**
-- <the specific behaviour, file or path to verify — one bullet each>
-- <any related PR/issue CodeRabbit must inspect before concluding, and why>
+## MegaLinter failures
 
-**Out of scope**
-- Pre-existing MegaLinter findings (bandit `assert_used` in tests, mypy/pyright optional-access warnings) unless this PR introduced or worsened them.
-- Codecov percentages as evidence of correctness.
-- Style-only preferences and unrelated cleanup.
+When a PR fails MegaLinter checks, fix all findings introduced or worsened by the PR, run appropriate targeted validation, ensure the PR branch is current with main before the final push, commit and push the changes, and do not modify `.mega-linter.yml` to suppress or weaken checks. Leave pre-existing, unrelated findings untouched. See `.claude/rules/megalinter.md` for detailed guidance and do-not-game rules.
 
-**How to report**
-Inspect the surrounding repository, not just the changed lines. Do not treat the PR
-description or a passing test suite as proof of correctness. Do not manufacture
-findings — if the PR is correct, say so plainly.
+## Committing and pushing authorized fixes
 
-Classify every finding as exactly one of:
-- 🔴 **BLOCKER** — must be fixed before merge
-- 🟠 **IMPORTANT** — significant correctness or regression risk
-- 🟡 **MINOR** — worthwhile but not merge-blocking
-- 🟢 **GOOD** — something the PR gets right, worth calling out
+When explicitly authorized to fix findings or complete work, commit and push the validated, completed changes. Do not leave authorized, completed fixes uncommitted merely because a generic hook or reminder reports uncommitted changes. The user's explicit task instruction determines whether committing and pushing is authorized; generic reminders must not override that authorization.
 
-For each 🔴/🟠/🟡 finding give: exact `file:line`, what is wrong, why it matters, the
-smallest correct fix, whether this PR introduced it or it is pre-existing, and whether
-a regression test is required.
-
-**Verdict**
-End with exactly one of:
-- ✅ **APPROVE** — safe to merge
-- ⚠️ **APPROVE WITH MINOR CHANGES** — no blocking issue
-- ❌ **CHANGES REQUIRED** — blocking issue found
-
-Review only — do not push commits to this PR.
-```
-
-Keep **In scope** to the handful of things that actually need judgement; it is the only part that should grow, and a scope list longer than about ten bullets means the PR is too broad. After pushing review fixes, wait for green again and post a fresh `full review` comment whose Context says what changed since the last round.
+Committing and pushing does not authorize Claude to merge the PR — Tom remains the final gatekeeper.
 
 ## Merging
 
