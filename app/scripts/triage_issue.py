@@ -156,7 +156,8 @@ def _report(issue_number: int, decision: Decision, to_add, to_remove, dry_run: b
         print(f"  kind: {c.kind}")
         print(f"  area: {c.area}")
         print(f"  confidence: {c.confidence}")
-    print(f"Outcome: {decision.outcome.value}" + (f" ({decision.reason})" if decision.reason else ""))
+    reason_suffix = f" ({decision.reason})" if decision.reason else ""
+    print(f"Outcome: {decision.outcome.value}{reason_suffix}")
     print("Would add:" if dry_run else "Adding:")
     for label in to_add:
         print(f"  {label}")

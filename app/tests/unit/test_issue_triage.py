@@ -358,9 +358,11 @@ class _FakeSession:
     def __init__(self, results):
         self._results = list(results)
         self.calls = 0
+        self.urls = []
 
     def post(self, url, headers=None, json=None, timeout=None):
         self.calls += 1
+        self.urls.append(url)
         result = self._results.pop(0)
         if isinstance(result, Exception):
             raise result
@@ -374,7 +376,9 @@ def _ok_response(kind="bug", area="docker", confidence=0.9):
 
 def test_call_gemini_success_on_first_attempt():
     session = _FakeSession([_ok_response()])
-    result = triage.call_gemini(session, "key", "gemini-2.5-flash-lite", {}, sleep_fn=lambda s: None)
+    result = triage.call_gemini(
+        session, "key", "gemini-2.5-flash-lite", {}, sleep_fn=lambda s: None
+    )
     assert result.ok is True
     assert session.calls == 1
 
@@ -384,6 +388,7 @@ def test_call_gemini_api_key_never_in_url_or_error():
     result = triage.call_gemini(session, "super-secret-key", "model", {}, sleep_fn=lambda s: None)
     assert result.ok is False
     assert "super-secret-key" not in (result.error or "")
+    assert all("super-secret-key" not in url for url in session.urls)
 
 
 def test_call_gemini_failure_response_no_retry_on_4xx():
