@@ -658,6 +658,78 @@ class TestHealthCheckManagement:
         assert exc_info.value.status_code == 500
         assert "Unable to resolve container stable identifier" in exc_info.value.detail
 
+    async def test_get_health_check_rejects_when_container_inspection_fails(
+        self, wired_api
+    ):
+        docker_client, engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+
+        # Make get_container_info return empty dict to simulate inspection failure
+        original_get_info = docker_client.get_container_info
+        docker_client.get_container_info = lambda c: {}
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_health_check("web")
+
+        docker_client.get_container_info = original_get_info
+        assert exc_info.value.status_code == 500
+        assert "Unable to inspect container" in exc_info.value.detail
+
+    async def test_get_health_check_rejects_when_stable_id_cannot_be_resolved(
+        self, wired_api
+    ):
+        docker_client, engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+
+        # Make get_stable_identifier return None
+        original_get_stable = engine.get_stable_identifier
+        engine.get_stable_identifier = lambda info: None
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_health_check("web")
+
+        engine.get_stable_identifier = original_get_stable
+        assert exc_info.value.status_code == 500
+        assert "Unable to resolve container stable identifier" in exc_info.value.detail
+
+    async def test_delete_health_check_rejects_when_container_inspection_fails(
+        self, wired_api
+    ):
+        docker_client, engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+
+        # Make get_container_info return empty dict to simulate inspection failure
+        original_get_info = docker_client.get_container_info
+        docker_client.get_container_info = lambda c: {}
+
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_health_check("web")
+
+        docker_client.get_container_info = original_get_info
+        assert exc_info.value.status_code == 500
+        assert "Unable to inspect container" in exc_info.value.detail
+
+    async def test_delete_health_check_rejects_when_stable_id_cannot_be_resolved(
+        self, wired_api
+    ):
+        docker_client, engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+
+        # Make get_stable_identifier return None
+        original_get_stable = engine.get_stable_identifier
+        engine.get_stable_identifier = lambda info: None
+
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_health_check("web")
+
+        engine.get_stable_identifier = original_get_stable
+        assert exc_info.value.status_code == 500
+        assert "Unable to resolve container stable identifier" in exc_info.value.detail
+
 
 @pytest.mark.asyncio
 class TestNotificationsConfig:
