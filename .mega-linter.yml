@@ -21,13 +21,6 @@ VALIDATE_ALL_CODEBASE: true
 YAML_YAMLLINT_ARGUMENTS: "--strict"
 PYTHON_DEFAULT_STYLE: ruff
 
-ENABLE_LINTERS:
-  - PYTHON_RUFF
-  - PYTHON_RUFF_FORMAT
-  - PYTHON_BANDIT
-  - PYTHON_MYPY
-  - PYTHON_PYRIGHT
-
 # Linters below have existing findings in this repository. They remain
 # enabled and their findings stay visible, but do not fail the build until
 # a follow-up issue fixes the underlying findings.
@@ -54,5 +47,3 @@ ACTION_ZIZMOR_UNSECURED_ENV_VARIABLES:
 
 PYTHON_PYRIGHT_PRE_COMMANDS:
   - command: pip install --no-cache-dir -r requirements-dev.txt
-    cwd: workspace
-    run_before_linters: true
