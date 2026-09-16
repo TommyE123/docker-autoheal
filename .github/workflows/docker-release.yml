@@ -26,42 +26,15 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      # The highest major marker reachable from main defines the active release series.
-      # For example, v2 selects the v2.x.x release series; v3 switches to v3.x.x.
-      - name: Determine release series
-        id: series
-        run: |
-          # Pick the highest major marker tag reachable from this commit
-          SERIES_TAG="$(
-            git tag --merged "$GITHUB_SHA" \
-              | grep -E '^v[0-9]+$' \
-              | sort -V \
-              | tail -n 1
-          )"
-
-          if [ -z "$SERIES_TAG" ]; then
-            echo "ERROR: No release-series marker tag was found on main."
-            echo "Create a marker such as v2 on the main branch before releasing."
-            exit 1
-          fi
-
-          MAJOR="${SERIES_TAG#v}"
-
-          echo "Active release series: v${MAJOR}"
-          echo "series_tag=${SERIES_TAG}" >> "$GITHUB_OUTPUT"
-          echo "major=${MAJOR}" >> "$GITHUB_OUTPUT"
-
-      # Find an existing release tag on the current commit first.
-      # This makes retries safe if the image was pushed and the tag already exists.
+      # A previous run may have already tagged this exact commit (e.g. the
+      # build/publish step failed and the workflow was re-run). Reuse that
+      # tag instead of calculating a new one, so a retry never double-bumps.
       - name: Detect existing release for current commit
         id: existing
-        env:
-          MAJOR: ${{ steps.series.outputs.major }}
         run: |
-          # Look for an existing semantic version tag pointing at this commit
           EXISTING_TAG="$(
             git tag --points-at "$GITHUB_SHA" \
-              | grep -E "^v${MAJOR}\.[0-9]+\.[0-9]+$" \
+              | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
               | sort -V \
               | tail -n 1
           )"
@@ -75,60 +48,49 @@ jobs:
             echo "found=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # Calculate the first release or next patch release for the active series.
-      - name: Calculate release version
-        id: release_version
+      # Calculate the next SemVer version from Conventional Commit messages
+      # since the last release tag (fix -> patch, feat -> minor, a
+      # "BREAKING CHANGE:" footer or "!" -> major), and push the new tag.
+      # default_bump: false means a push with no fix/feat/breaking commit
+      # (docs, chore, ci, test, style, refactor, ...) produces no release.
+      - name: Determine next SemVer version
+        id: tag_version
+        if: steps.existing.outputs.found != 'true'
+        uses: mathieudutour/github-tag-action@a22cf08638b34d5badda920f9daf6e72c477b07b # v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          release_branches: main
+          default_bump: false
+
+      # A single output used by every step below: the existing tag on a
+      # retry, or the newly calculated one. Empty means no release this run.
+      - name: Resolve release version
+        id: resolve
         env:
-          MAJOR: ${{ steps.series.outputs.major }}
-          EXISTING_FOUND: ${{ steps.existing.outputs.found }}
           EXISTING_TAG: ${{ steps.existing.outputs.tag }}
+          NEW_TAG: ${{ steps.tag_version.outputs.new_tag }}
         run: |
-          # A previous release attempt may already have created the tag.
-          if [ "$EXISTING_FOUND" = "true" ]; then
-            echo "Reusing existing release tag: $EXISTING_TAG"
-            echo "new_tag=$EXISTING_TAG" >> "$GITHUB_OUTPUT"
-            echo "create_tag=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          LATEST_TAG="$(
-            git tag --merged "$GITHUB_SHA" \
-              | grep -E "^v${MAJOR}\.[0-9]+\.[0-9]+$" \
-              | sort -V \
-              | tail -n 1
-          )"
-
-          if [ -z "$LATEST_TAG" ]; then
-            NEW_TAG="v${MAJOR}.0.0"
-            echo "No previous ${MAJOR}.x.x release found."
-            echo "First release: $NEW_TAG"
+          VERSION="${EXISTING_TAG:-$NEW_TAG}"
+          if [ -z "$VERSION" ]; then
+            echo "No fix/feat/breaking-change commit since the last release; nothing to release."
           else
-            if [[ ! "$LATEST_TAG" =~ ^v${MAJOR}\.([0-9]+)\.([0-9]+)$ ]]; then
-              echo "ERROR: Could not parse latest release tag: $LATEST_TAG"
-              exit 1
-            fi
-
-            MINOR="${BASH_REMATCH[1]}"
-            PATCH="${BASH_REMATCH[2]}"
-            NEW_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
-
-            echo "Latest release: $LATEST_TAG"
-            echo "Next release:   $NEW_TAG"
+            echo "Releasing ${VERSION}."
           fi
-
-          echo "new_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
-          echo "create_tag=true" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       # Configure QEMU to support building images for multiple CPU architectures
       - name: Set up QEMU
+        if: steps.resolve.outputs.version != ''
         uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
 
       # Set up Docker Buildx builder for advanced multi-platform builds
       - name: Set up Docker Buildx
+        if: steps.resolve.outputs.version != ''
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       # Authenticate to Docker Hub for pushing built images
       - name: Login to Docker Hub
+        if: steps.resolve.outputs.version != ''
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: docker.io
@@ -137,6 +99,7 @@ jobs:
 
       # Authenticate to GitHub Container Registry (GHCR) for pushing images
       - name: Login to GHCR
+        if: steps.resolve.outputs.version != ''
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
@@ -145,6 +108,7 @@ jobs:
 
       # Generate image metadata and tags for Docker registries
       - name: Extract metadata
+        if: steps.resolve.outputs.version != ''
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
@@ -152,11 +116,12 @@ jobs:
             docker.io/${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal
             ghcr.io/${{ github.repository_owner }}/docker-autoheal
           tags: |
-            type=raw,value=${{ steps.release_version.outputs.new_tag }}
+            type=raw,value=${{ steps.resolve.outputs.version }}
             type=raw,value=latest
 
       # Build the Docker image for multiple platforms and push to registries
       - name: Build and push Docker image
+        if: steps.resolve.outputs.version != ''
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
@@ -168,25 +133,12 @@ jobs:
           cache-from: type=gha,scope=docker-autoheal
           cache-to: type=gha,mode=max,scope=docker-autoheal
 
-      # Create and push a Git tag for the new release (if needed)
-      - name: Create Git tag
-        if: steps.release_version.outputs.create_tag == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.release_version.outputs.new_tag }}
-        run: |
-          # Configure git identity and push the new tag using the token
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "${VERSION}"
-          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git push origin "${VERSION}"
-
       # Create a GitHub release entry for the new tag with generated notes
       - name: Create GitHub release
+        if: steps.resolve.outputs.version != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG_NAME: ${{ steps.release_version.outputs.new_tag }}
+          TAG_NAME: ${{ steps.resolve.outputs.version }}
         run: |
           if gh release view "${TAG_NAME}" >/dev/null 2>&1; then
             echo "GitHub Release ${TAG_NAME} already exists. Nothing to do."
@@ -200,6 +152,7 @@ jobs:
 
       # Update the repository description on Docker Hub using the README
       - name: Update Docker Hub description
+        if: steps.resolve.outputs.version != ''
         uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}

@@ -6,30 +6,27 @@ Publishing is **fully automatic on every push to `main`** — there is no manual
 step. `.github/workflows/docker-release.yml` ("Docker Release") runs on every push to
 `main` and:
 
-1. Finds the highest `vN` "release series" marker tag reachable from the commit (e.g.
-   `v2` selects the `2.x.x` series). If none exists, the workflow fails — a maintainer
-   must push a marker tag (`git tag v2 && git push origin v2`) before the first release
-   in that series.
-2. Computes the next version in that series: `v{N}.0.0` if no `v{N}.x.x` release exists
-   yet, otherwise the current highest `v{N}.x.x` tag with its patch number incremented by
-   one. There's no way to bump the minor version this way — see below.
+1. Calculates the next [SemVer](https://semver.org/) version from the Conventional Commit
+   messages merged since the last release tag, using
+   [`mathieudutour/github-tag-action`](https://github.com/mathieudutour/github-tag-action):
+   a `fix:` commit bumps the patch version, `feat:` bumps minor, and a `!` after the type
+   or a `BREAKING CHANGE:` footer bumps major. Since PRs are squash-merged, this is driven
+   by the PR title, which `semantic-pr-title.yml` already requires to be a Conventional
+   Commit. A push with no `fix`/`feat`/breaking-change commit (`docs`, `chore`, `ci`,
+   `test`, `style`, `refactor`, ...) produces **no release at all**.
+2. Creates and pushes the new Git tag as part of that calculation.
 3. Builds the image for `linux/amd64` and `linux/arm64` and pushes it to **both** Docker
    Hub (`docker.io/tommye123/docker-autoheal`) and GitHub Container Registry
    (`ghcr.io/tommye123/docker-autoheal`), tagged with the computed version and `latest`.
-4. Creates and pushes the new Git tag, and creates a GitHub release for it with
-   auto-generated notes (skipped if a release for that tag already exists — this makes
-   re-runs after a partial failure safe).
+4. Creates a GitHub release for the new tag with auto-generated notes (skipped if a
+   release for that tag already exists — this makes re-runs after a partial failure safe:
+   if this exact commit is already tagged, that tag is reused rather than recalculated).
 5. Updates the Docker Hub repository description from
    [`DOCKER_HUB_README.md`](../../DOCKER_HUB_README.md).
 
-In other words: **every merge to `main` ships a new patch release** of the active series.
-There is no "hold back a release" step short of not merging, and no dry-run mode.
-
-**To bump the minor or major version** (rather than an automatic patch bump), push a new
-series marker tag yourself — e.g. `git tag v3 && git push origin v3` starts the `3.x.x`
-series at `v3.0.0` on the next push to `main`. There's currently no workflow support for
-an in-series minor bump (`v2.1.0` after `v2.0.5`) other than manually pushing that exact
-tag before the next `main` push (the workflow only auto-increments the patch number).
+In other words: **a merge to `main` ships a release only when it contains a `fix`,
+`feat`, or breaking-change commit**; anything else is a no-op push. There is no manual
+tagging step and no dry-run mode.
 
 **Required repository secrets:** `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`. GHCR push uses
 the workflow's own `GITHUB_TOKEN` — no extra secret needed. Newly published GHCR packages
