@@ -1,4 +1,4 @@
-# 🚀 Getting Started - React UI on Port 8080
+# 🚀 Getting Started - React UI on Port 3131
 
 This guide will get you up and running in **2 minutes**.
 
@@ -6,7 +6,7 @@ This guide will get you up and running in **2 minutes**.
 
 - ✅ Docker installed and running
 - ✅ Docker Compose installed
-- ✅ Port 8080 available
+- ✅ Port 3131 available
 
 That's it! No Node.js required for production.
 
@@ -25,13 +25,13 @@ docker-compose up --build
 **What happens:**
 1. Docker builds the React UI (takes ~30 seconds first time)
 2. Python backend starts
-3. UI is served on port 8080
+3. UI is served on port 3131
 
 ### Step 2: Access the UI
 
 Open your browser:
 ```
-http://localhost:8080
+http://localhost:3131
 ```
 
 You should see the React dashboard with:
@@ -50,18 +50,18 @@ pytest app/tests/integration/test_service_smoke.py
 Or manually check:
 ```bash
 # Health check
-curl http://localhost:8080/health
+curl http://localhost:3131/health
 
 # API status
-curl http://localhost:8080/api/status
+curl http://localhost:3131/api/status
 
 # Open UI
-start http://localhost:8080
+start http://localhost:3131
 ```
 
 ## That's It! 🎉
 
-You're now running the Docker Auto-Heal Service with React UI on port 8080.
+You're now running the Docker Auto-Heal Service with React UI on port 3131.
 
 ## What to Do Next
 
@@ -122,8 +122,7 @@ npm run dev
 
 Now access:
 - Dev UI with hot reload: http://localhost:3000
-- Backend API: http://localhost:8080
-
+- Backend API: http://localhost:3131
 Make changes in `frontend/src/` and see them instantly!
 
 ## Common Commands
@@ -152,7 +151,7 @@ docker ps | grep autoheal
 
 | Port | Service |
 |------|---------|
-| **8080** | **React UI + API** ← Main access point |
+| **3131** | **React UI + API** ← Main Web UI + API access point |
 | 9090 | Prometheus metrics |
 
 ## Troubleshooting
@@ -165,19 +164,19 @@ docker-compose down
 docker-compose up --build
 ```
 
-### Port 8080 already in use
+### Port 3131 already in use
 
 **Solution 1 - Change port:**
 Edit `docker-compose.yml`:
 ```yaml
 ports:
-  - "8081:8080"  # Use 8081 instead
+  - "3132:3131"  # Use 3132 instead
 ```
 
 **Solution 2 - Kill process:**
 ```bash
-# Find process using port 8080
-netstat -ano | findstr :8080
+# Find process using port 3131
+netstat -ano | findstr :3131
 
 # Kill it (replace PID)
 taskkill /PID <pid> /F
@@ -192,7 +191,7 @@ docker logs docker-autoheal
 
 **Common issues:**
 - Docker socket not accessible
-- Port 8080 in use
+- Port 3131 in use
 - Build failed
 
 **Solution:**
@@ -220,7 +219,7 @@ docker-autoheal/
 
 ## Key Features
 
-Access these features at http://localhost:8080:
+Access these features at http://localhost:3131:
 
 - ✅ **Dashboard** - Real-time metrics
 - ✅ **Container Management** - Enable/disable auto-heal
@@ -232,7 +231,7 @@ Access these features at http://localhost:8080:
 
 Interactive docs available at:
 ```
-http://localhost:8080/docs
+http://localhost:3131/docs
 ```
 
 ## Testing
@@ -248,7 +247,7 @@ docker run -d \
   nginx:alpine
 
 # View in UI
-# Go to http://localhost:8080
+# Go to http://localhost:3131
 # See test-nginx in Containers tab
 ```
 
@@ -273,14 +272,14 @@ For production:
 1. **Check logs**: `docker logs docker-autoheal`
 2. **Run test**: `pytest app/tests/integration/test_service_smoke.py`
 3. **Read docs**: See SETUP.md and REACT_ADDED.md
-4. **API docs**: http://localhost:8080/docs
+4. **API docs**: http://localhost:3131/docs
 
 ## Summary
 
-✅ **One command**: `docker-compose up --build`  
-✅ **One port**: http://localhost:8080  
-✅ **React UI**: Built automatically  
-✅ **No Node.js**: Required only for development  
+✅ **One command**: `docker-compose up --build`
+✅ **One port**: http://localhost:3131
+✅ **React UI**: Built automatically
+✅ **No Node.js**: Required only for development
 
 **Start monitoring your containers now! 🚀**
 
