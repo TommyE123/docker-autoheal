@@ -72,13 +72,20 @@ def has_issue_changed(
     The workflow's `cancel-in-progress` concurrency group only cancels a
     superseded run on a best-effort basis - GitHub Actions cancellation
     takes a moment to land, so an older run can still be mid-flight (or
-    already past cancellation) when a newer one starts. This is a precise,
-    content-based backstop: comparing the exact title/body a run classified
-    against the issue's current title/body right before that run mutates
-    labels. Unrelated activity (a comment, someone else's label change)
-    never trips it, because only an actual title/body edit does - and any
-    such edit already fires its own `edited` event with a fresh, correct
-    run of its own.
+    already past cancellation) when a newer one starts. This check shrinks
+    that race window from "the entire Gemini call plus retries" down to
+    "between this fetch and the label PUT that follows it" by comparing the
+    exact title/body a run classified against the issue's content right
+    before that run mutates labels. Unrelated activity (a comment, someone
+    else's label change) never trips it, because only an actual title/body
+    edit does.
+
+    It is a best-effort reduction, not a guarantee: an edit landing in the
+    remaining gap between this check and the PUT could still race. Closing
+    that gap fully would need a server-enforced conditional write (e.g. an
+    ETag/If-Match check on the labels endpoint), which GitHub's REST API
+    does not offer here; building an equivalent locking mechanism ourselves
+    was judged out of proportion to how narrow the remaining window is.
     """
     return (original_title or "") != (current_title or "") or (
         original_body or ""

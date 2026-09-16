@@ -6,9 +6,11 @@ name: Issue Triage
 # instantaneous - an older run can still be mid-flight (or past its
 # cancellation point) when a newer one starts, so this alone is not a
 # guarantee against an older run's mutation landing after a newer one's.
-# app/scripts/triage_issue.py's has_issue_changed() check is the actual
-# backstop: it compares the title/body it classified against the issue's
-# live content right before mutating, and skips if they differ.
+# app/scripts/triage_issue.py's has_issue_changed() check narrows that race
+# considerably (comparing the title/body it classified against the issue's
+# live content right before mutating, and skipping if they differ), but it
+# is a best-effort reduction, not a full guarantee - see its docstring for
+# the remaining gap and why it isn't closed with a locking mechanism.
 on:
   issues:
     types:

@@ -216,8 +216,8 @@ def main() -> int:
     if has_issue_changed(raw_title, raw_body, fresh_issue["title"], fresh_issue["body"]):
         print(
             f"Issue #{issue_number}: title/body changed since this run started classifying "
-            "it; skipping label mutation so a fresher run (already triggered by that edit) "
-            "doesn't get overwritten."
+            "it; deferring to the fresher run that edit already triggered instead of "
+            "mutating labels for content that's no longer current."
         )
         return exit_code
 
