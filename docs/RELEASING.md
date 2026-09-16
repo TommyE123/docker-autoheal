@@ -149,6 +149,21 @@ is resumed. Otherwise a normal release would silently calculate the next version
 or the Friday sweep would use its commit as the boundary and permanently lose the
 `release:none` pull requests that were meant to ride the next release.
 
+## Bootstrapping
+
+The release-time re-derivation (see step 4 above) restores `scripts/release/` from
+`github.event.before` — the tip of `main` immediately before the push — so the plan can be
+re-checked with tooling the pushed commit could not have modified. That has no answer for the
+one commit that introduces `scripts/release/` onto `main` for the first time: `before` has no
+`scripts/` at all, so there is nothing trusted to restore, and falling back to the pushed
+commit's own copy would let that commit's tooling validate itself. The release job fails
+closed in that case instead: it errors out before creating any tag or publishing any image.
+
+This means the commit that adds `scripts/release/` never releases itself automatically — that
+is intentional, not a bug. Every following push has `scripts/release/` at its own
+`before` commit and is validated normally from then on. Nothing further needs to be done: the
+next pull request merged into `main` triggers a normal, fully re-derived release.
+
 ## Ref safety
 
 Both jobs refuse to run unless `github.ref` is `refs/heads/main`, checked before either one

@@ -1503,31 +1503,39 @@ class TestReleaseWorkflows:
             "a dispatch after its push fails and get through unvalidated"
         )
 
-    def test_trusted_tooling_push_bootstrap_proceeds(self):
-        # Security guard: the bootstrap push that first introduces
-        # scripts/release/ onto main must SUCCEED (exit 0), not fail.  At
-        # bootstrap, BEFORE_SHA has no scripts/ so there is no prior trusted
-        # revision to restore.  HEAD is the reviewed baseline; plan and
-        # re-derive both use it, so the cross-check passes.  Every subsequent
-        # push will have scripts/ at BEFORE_SHA and will be validated normally.
+    def test_trusted_tooling_push_bootstrap_fails_closed(self):
+        # Security guard: the push that first introduces scripts/release/ onto
+        # main - where BEFORE_SHA has no scripts/ - must FAIL (exit 1), not
+        # trust HEAD.  HEAD is the candidate's own copy: if that PR had also
+        # modified scripts/release/ to inflate its release type, plan and the
+        # "trusted" re-derivation would both run the tampered code and agree,
+        # defeating the cross-check entirely.  Failing closed here means only
+        # the commit that introduces scripts/ itself never auto-releases;
+        # every later push has scripts/ at BEFORE_SHA and validates normally.
         trusted_step = next(
             s
             for s in self.load("docker-release.yml")["jobs"]["release"]["steps"]
             if "Fetch trusted release tooling" in s.get("name", "")
         )
         run = trusted_step["run"]
-        # The bootstrap path must exit 0 (proceed), not exit 1 (fail).
-        # A message indicating bootstrap detection should be logged.
-        assert "bootstrap" in run.lower(), (
-            "Fetch trusted release tooling must detect and log the bootstrap "
-            "case (BEFORE_SHA has no scripts/) rather than exiting with an error"
+
+        # Find the branch specifically guarding the push-bootstrap case (no
+        # scripts/ at BEFORE_SHA), not the non-push/no-release-tag branch.
+        bootstrap_branch = run.split('if ! git cat-file -e "${BEFORE_SHA}:scripts"', 1)[1]
+        bootstrap_branch = bootstrap_branch.split("git checkout", 1)[0]
+
+        assert "exit 1" in bootstrap_branch, (
+            "Fetch trusted release tooling must exit 1 when BEFORE_SHA has no "
+            "scripts/ - trusting HEAD in this case lets a PR that modifies "
+            "scripts/release/ validate its own tampered release plan"
         )
-        # The bootstrap path must not call 'exit 1' in its own branch —
-        # verify the bootstrap message text is followed by 'exit 0', not 'exit 1'.
-        # We detect this by checking that the bootstrap path has its own 'exit 0'.
-        assert "exit 0" in run, (
-            "Fetch trusted release tooling must exit 0 on the bootstrap push "
-            "so the first release can be published"
+        assert "exit 0" not in bootstrap_branch, (
+            "The push-bootstrap branch must never exit 0 - that would publish "
+            "a release using only candidate-controlled tooling"
+        )
+        assert "::error::" in bootstrap_branch, (
+            "Fetch trusted release tooling must emit a GitHub Actions error "
+            "annotation when BEFORE_SHA has no scripts/"
         )
 
     def test_trusted_tooling_non_push_uses_latest_release_tag(self):

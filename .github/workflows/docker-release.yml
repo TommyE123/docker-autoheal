@@ -364,8 +364,9 @@ jobs:
       # tip before the update); HEAD^ is unsafe because a rebase merge places
       # in-PR commits at HEAD^.  For schedule/workflow_dispatch, github.event.before
       # is unavailable, so the latest semantic release tag is used instead — every
-      # tag was created by a validated push run.  A push with no prior scripts/ is
-      # the bootstrap; HEAD is the reviewed trust anchor for that one run only.
+      # tag was created by a validated push run.  A push with no prior scripts/ -
+      # the commit that first introduces scripts/release/ - has no trusted
+      # revision to check against, so it fails closed rather than trusting HEAD.
       - name: Fetch trusted release tooling from pre-push main tip
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -398,13 +399,20 @@ jobs:
             exit 1
           fi
           if ! git cat-file -e "${BEFORE_SHA}:scripts" 2>/dev/null; then
-            # scripts/ absent at BEFORE_SHA: bootstrap push that first introduces
+            # scripts/ absent at BEFORE_SHA: this is the push that first introduces
             # scripts/release/ onto main.  There is no prior trusted revision to
-            # restore from; HEAD scripts are the reviewed baseline and are identical
-            # to what the plan job used.  Every subsequent push will have scripts/
-            # at BEFORE_SHA and will be validated against that trusted copy.
-            echo "scripts/ not present at ${BEFORE_SHA}: bootstrap push; HEAD scripts are the trusted baseline."
-            exit 0
+            # restore from, so HEAD - the candidate's own copy - cannot be trusted:
+            # a PR that modified scripts/release/ to inflate its own release type
+            # would pass this check and the cross-check below trivially, since both
+            # would run the same tampered code.  Fail closed instead of publishing.
+            # Every later push will have scripts/ at BEFORE_SHA (this commit) and
+            # will be validated normally; only the commit that introduces scripts/
+            # itself never gets an automatic release.
+            echo "::error::scripts/ not present at ${BEFORE_SHA} (pre-push main); no trusted"
+            echo "::error::release tooling revision exists yet. This is expected for the commit"
+            echo "::error::that first introduces scripts/release/ - it cannot safely validate"
+            echo "::error::itself and will not be auto-released. See docs/RELEASING.md#bootstrapping."
+            exit 1
           fi
           git checkout "$BEFORE_SHA" -- scripts/
 
