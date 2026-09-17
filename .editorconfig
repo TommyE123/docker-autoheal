@@ -10,22 +10,10 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 2
 
-# Indentation width is owned by Ruff's formatter; don't duplicate or
-# second-guess it here (it also flags legitimate hanging indents).
+# Indentation width is owned by Ruff's formatter.
 [*.py]
 indent_size = unset
 
 [*.md]
 trim_trailing_whitespace = false
 indent_size = unset
-
-# Pre-existing files that don't conform to the defaults above; left as-is
-# rather than reformatted, per this change's scope (config only).
-[LICENSE]
-insert_final_newline = unset
-
-[.gitignore]
-insert_final_newline = unset
-
-[app/api/api.py]
-trim_trailing_whitespace = unset

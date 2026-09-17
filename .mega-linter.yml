@@ -41,6 +41,7 @@ MARKDOWN_MARKDOWNLINT_RULES_PATH: "."
 # strict superset of - not a conflict with - the padded-pipe convention MD060
 # was kept off for), so its --check mode is clean repo-wide.
 DISABLE_ERRORS_LINTERS:
+  - EDITORCONFIG_EDITORCONFIG_CHECKER
   - ACTION_ZIZMOR
   - PYTHON_BANDIT
   - PYTHON_MYPY
