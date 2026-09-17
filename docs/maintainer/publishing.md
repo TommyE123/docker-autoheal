@@ -33,7 +33,10 @@ package settings before `docker pull ghcr.io/...` works for everyone (see the no
 ## PR-time build verification
 
 `.github/workflows/docker-build.yml` ("Docker Build") runs on every pull request to
-`main` — including the Release PR itself: it builds the image for both platforms but does
+`main`, including the Release PR itself. However, Release Please opens and updates that PR
+using the default `GITHUB_TOKEN`, so its `pull_request` runs require a maintainer to manually
+approve the workflow run before they execute — they are not automatic like an ordinary
+contributor PR's checks. When it does run, it builds the image for both platforms but does
 **not** push anywhere unless the PR is from a branch on this repository itself (not a fork), in
 which case it pushes a `pr-<number>` / commit-SHA tagged image to GHCR as a build cache/
 verification artifact. This is separate from, and has no effect on, the release process above.
