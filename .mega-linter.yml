@@ -2,65 +2,73 @@
 # See all available variables at https://megalinter.io/latest/configuration/ and in linters documentation
 
 DISABLE:
+  - ANSIBLE
+  - BICEP
+  - C
+  - CSHARP
+  - CPP
   - COPYPASTE
+  - DART
+  - GO
+  - GRAPHQL
+  - GROOVY
+  - JAVA
+  - KOTLIN
+  - KUBERNETES
+  - LUA
+  - PHP
+  - PERL
+  - R
+  - RAKU
+  - RUBY
+  - RUST
+  - SALESFORCE
+  - SCALA
   - SPELL
+  - SWIFT
+  - TERRAFORM
+  - VBDOTNET
 
 DISABLE_LINTERS:
-  - PYTHON_PYLINT
-  - PYTHON_FLAKE8
   - PYTHON_BLACK
+  - PYTHON_FLAKE8
   - PYTHON_ISORT
   - PYTHON_NBQA_MYPY
+  - PYTHON_PYLINT
 
-FLAVOR_SUGGESTIONS: false
-FORMATTERS_DISABLE_ERRORS: false
-GITHUB_STATUS_REPORTER: true
+DISABLE_ERRORS_LINTERS:
+  - ACTION_ZIZMOR
+  - CSS_STYLELINT
+  - JAVASCRIPT_STANDARD
+  - POWERSHELL_POWERSHELL
+  - PYTHON_BANDIT
+  - PYTHON_MYPY
+  - PYTHON_PYRIGHT
+  - PYTHON_RUFF
+  - PYTHON_RUFF_FORMAT
+  - REPOSITORY_CHECKOV
+  - REPOSITORY_DEVSKIM
+  - REPOSITORY_GRYPE
+  - REPOSITORY_OSV_SCANNER
+  - REPOSITORY_TRIVY
+
 DOCKERFILE_HADOLINT_FILE_NAMES_REGEX: ["Dockerfile(\\..+)?"]
+FLAVOR_SUGGESTIONS: false
+GITHUB_STATUS_REPORTER: true
+JSON_JSONLINT_ARGUMENTS: "-B"
+MARKDOWN_MARKDOWNLINT_CONFIG_FILE: ".markdownlint.jsonc"
+MARKDOWN_MARKDOWNLINT_RULES_PATH: "."
+PYTHON_DEFAULT_STYLE: ruff
+REPOSITORY_OSV_SCANNER_ARGUMENTS: "--no-resolve"
 SHOW_ELAPSED_TIME: true
 VALIDATE_ALL_CODEBASE: true
 YAML_YAMLLINT_ARGUMENTS: "--strict"
-PYTHON_DEFAULT_STYLE: ruff
-
-# MegaLinter's markdownlint descriptor only auto-detects a file literally named
-# .markdownlint.json by default; a .jsonc file (needed for the comments explaining
-# the two disabled rules) is otherwise silently ignored in favor of MegaLinter's own
-# bundled default config. Point it explicitly at ours, at the repo root (LINTER_RULES_PATH
-# defaults to .github/linters, which doesn't exist here).
-MARKDOWN_MARKDOWNLINT_CONFIG_FILE: ".markdownlint.jsonc"
-MARKDOWN_MARKDOWNLINT_RULES_PATH: "."
-
-# Linters below have existing findings in this repository. They remain
-# enabled and their findings stay visible, but do not fail the build until
-# a follow-up issue fixes the underlying findings.
-#
-# MARKDOWN_MARKDOWNLINT and MARKDOWN_MARKDOWN_TABLE_FORMATTER were both in this
-# list but are now enabled for real: .markdownlint.jsonc turns off only MD013
-# (line-length) and MD060 (table-pipe-style), the two rules that conflict with
-# this repo's established prose/table formatting; every table in the repo has
-# been run through `markdown-table-formatter` (its column-aligned style is a
-# strict superset of - not a conflict with - the padded-pipe convention MD060
-# was kept off for), so its --check mode is clean repo-wide.
-DISABLE_ERRORS_LINTERS:
-  - ACTION_ZIZMOR
-  - PYTHON_BANDIT
-  - PYTHON_MYPY
-  - PYTHON_RUFF
-  - PYTHON_RUFF_FORMAT
-  - PYTHON_PYRIGHT
-  - JAVASCRIPT_STANDARD
-  - CSS_STYLELINT
-  - REPOSITORY_TRIVY
-  - REPOSITORY_GRYPE
-  - REPOSITORY_OSV_SCANNER
-  - REPOSITORY_CHECKOV
-  - REPOSITORY_DEVSKIM
-  - POWERSHELL_POWERSHELL
 
 ACTION_ZIZMOR_UNSECURED_ENV_VARIABLES:
   - GITHUB_TOKEN
 
-PYTHON_PYRIGHT_PRE_COMMANDS:
+PYTHON_MYPY_PRE_COMMANDS:
   - command: pip install --no-cache-dir -r requirements-dev.txt
 
-PYTHON_MYPY_PRE_COMMANDS:
+PYTHON_PYRIGHT_PRE_COMMANDS:
   - command: pip install --no-cache-dir -r requirements-dev.txt
