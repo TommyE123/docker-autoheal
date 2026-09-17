@@ -4,7 +4,9 @@
 
 Proper [Semantic Versioning](https://semver.org/) (`vMAJOR.MINOR.PATCH`, e.g. `v2.1.3`), owned
 entirely by [Release Please](https://github.com/googleapis/release-please). Nothing in this
-repository calculates a version independently.
+repository calculates a version independently. `release-please-config.json` uses the `simple`
+release type, so Release Please tracks and updates the current version directly in
+`version.txt`, and maintains `CHANGELOG.md` as part of the same Release PR.
 
 ## Release Please, not a "release on every merge"
 
@@ -16,7 +18,7 @@ publish anything. `.github/workflows/release-please.yml` runs on every push to `
    and keeps a standing **Release PR** up to date: `fix:` contributes a patch bump, `feat:` a
    minor bump, and a `!` after the type or a `BREAKING CHANGE:` footer a major bump.
 2. Merging that Release PR — a normal push to `main` — is what actually creates the release: the
-   Git tag, the GitHub Release, and the `CHANGELOG.md` entry.
+   Git tag, the GitHub Release, the `version.txt` bump, and the `CHANGELOG.md` entry.
 3. Only then does the `docker-release` job run, building and publishing the Docker image for
    that exact tag.
 
@@ -32,7 +34,9 @@ The project's real release history (`v2.0.0` through `v2.0.16`) predates Release
 preserved, not restarted. `release-please-config.json` sets `bootstrap-sha` to the commit
 tagged `v2.0.16`, and `.release-please-manifest.json` records `2.0.16` as the current version —
 so Release Please's first Release PR only proposes a bump from `2.0.16` onward, using commits
-merged after that point.
+merged after that point. `version.txt` and the initial entries in `CHANGELOG.md` are seeded to
+match — `2.0.16` and the real `v2.0.0`–`v2.0.16` release notes, respectively — and Release Please
+maintains both going forward.
 
 The repository also has a legacy bare `v2` tag from before this project used per-commit SemVer
 tags. Release Please's own tag parser only recognises `vMAJOR.MINOR.PATCH`-shaped tags; a bare
@@ -55,6 +59,7 @@ or added.
 | Docker Hub description update                                  | Yes, only when a release was published (part of `release-please.yml`)     |
 | Dependency updates                                             | Yes, via Renovate (see [Dependency Management](dependency-management.md)) |
 | Changelog file                                                 | Yes — `CHANGELOG.md`, maintained by Release Please                        |
+| Version file                                                   | Yes — `version.txt`, maintained by Release Please                         |
 
 ## See also
 

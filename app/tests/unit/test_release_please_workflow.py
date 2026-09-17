@@ -32,6 +32,19 @@ def test_manifest_starts_from_the_actual_last_released_version():
     assert manifest["."] == "2.0.16"
 
 
+def test_version_file_matches_the_manifest():
+    # The "simple" release-type maintains version.txt as its version file -
+    # it must exist and agree with the manifest, or release-please's next
+    # bump would be calculated from the wrong starting point.
+    assert (REPO_ROOT / "version.txt").read_text(encoding="utf-8").strip() == "2.0.16"
+
+
+def test_changelog_exists_for_release_please_to_maintain():
+    # release-please appends to this file as part of every Release PR - it
+    # must already exist so that process has something to extend.
+    assert (REPO_ROOT / "CHANGELOG.md").exists()
+
+
 def test_docker_job_only_runs_when_a_release_was_actually_created():
     assert "needs.release-please.outputs.release_created == 'true'" in WORKFLOW
 

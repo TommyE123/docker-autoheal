@@ -7,9 +7,9 @@ release PR is merged - **not** on every ordinary merge to `main`.
 `.github/workflows/release-please.yml` ("Release Please") runs on every push to `main` and:
 
 1. Runs the `release-please` job. On an ordinary application PR merging to `main`, this only
-   creates or updates a standing Release PR (its title, description and `CHANGELOG.md` entry
-   reflect every Conventional Commit merged since the last release) and does **not** publish
-   anything.
+   creates or updates a standing Release PR (its title, description, `version.txt` bump and
+   `CHANGELOG.md` entry reflect every Conventional Commit merged since the last release) and
+   does **not** publish anything.
 2. When the Release PR itself is merged, that merge is a normal push to `main` like any other,
    and `release-please` recognises it: it creates the Git tag and GitHub Release for the
    calculated version, and its `release_created` output becomes `true`.
