@@ -1,7 +1,7 @@
 # Changelog
 
 This file is maintained by [Release Please](https://github.com/googleapis/release-please) as
-part of its standing Release PR process. Entries below `v2.0.16` are the project's real,
+part of its standing Release PR process. Entries through `v2.0.16` are the project's real,
 pre-Release-Please release history (from the repository's existing GitHub Releases), seeded here
 so the changelog isn't starting from nothing; entries from this point forward are generated
 automatically from Conventional Commit PR titles.
