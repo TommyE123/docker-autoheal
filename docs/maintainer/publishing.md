@@ -2,48 +2,44 @@
 
 ## Automated (this is how every release actually happens)
 
-Publishing is **fully automatic on every push to `main`** — there is no manual tagging
-step. `.github/workflows/docker-release.yml` ("Docker Release") runs on every push to
-`main` and:
+Publishing happens only when a [Release Please](https://github.com/googleapis/release-please)
+release PR is merged - **not** on every ordinary merge to `main`.
+`.github/workflows/release-please.yml` ("Release Please") runs on every push to `main` and:
 
-1. Finds the highest `vN` "release series" marker tag reachable from the commit (e.g.
-   `v2` selects the `2.x.x` series). If none exists, the workflow fails — a maintainer
-   must push a marker tag (`git tag v2 && git push origin v2`) before the first release
-   in that series.
-2. Computes the next version in that series: `v{N}.0.0` if no `v{N}.x.x` release exists
-   yet, otherwise the current highest `v{N}.x.x` tag with its patch number incremented by
-   one. There's no way to bump the minor version this way — see below.
-3. Builds the image for `linux/amd64` and `linux/arm64` and pushes it to **both** Docker
-   Hub (`docker.io/tommye123/docker-autoheal`) and GitHub Container Registry
-   (`ghcr.io/tommye123/docker-autoheal`), tagged with the computed version and `latest`.
-4. Creates and pushes the new Git tag, and creates a GitHub release for it with
-   auto-generated notes (skipped if a release for that tag already exists — this makes
-   re-runs after a partial failure safe).
-5. Updates the Docker Hub repository description from
+1. Runs the `release-please` job. On an ordinary application PR merging to `main`, this only
+   creates or updates a standing Release PR (its title, description, `version.txt` bump and
+   `CHANGELOG.md` entry reflect every Conventional Commit merged since the last release) and
+   does **not** publish anything.
+2. When the Release PR itself is merged, that merge is a normal push to `main` like any other,
+   and `release-please` recognises it: it creates the Git tag and GitHub Release for the
+   calculated version, and its `release_created` output becomes `true`.
+3. The `docker-release` job runs only when `release_created == 'true'`. It builds the image for
+   `linux/amd64` and `linux/arm64` and pushes it to **both** Docker Hub
+   (`docker.io/tommye123/docker-autoheal`) and GitHub Container Registry
+   (`ghcr.io/tommye123/docker-autoheal`), tagged with `release-please`'s own `tag_name` output
+   and `latest`. The version is never recalculated here - it comes directly from Release Please.
+4. Updates the Docker Hub repository description from
    [`DOCKER_HUB_README.md`](../../DOCKER_HUB_README.md).
 
-In other words: **every merge to `main` ships a new patch release** of the active series.
-There is no "hold back a release" step short of not merging, and no dry-run mode.
+In other words: **merging an ordinary Conventional Commit PR never publishes a release** — it
+only updates the Release PR. A human decides when to actually release by merging that PR.
 
-**To bump the minor or major version** (rather than an automatic patch bump), push a new
-series marker tag yourself — e.g. `git tag v3 && git push origin v3` starts the `3.x.x`
-series at `v3.0.0` on the next push to `main`. There's currently no workflow support for
-an in-series minor bump (`v2.1.0` after `v2.0.5`) other than manually pushing that exact
-tag before the next `main` push (the workflow only auto-increments the patch number).
-
-**Required repository secrets:** `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`. GHCR push uses
-the workflow's own `GITHUB_TOKEN` — no extra secret needed. Newly published GHCR packages
-default to **private**; someone with admin access needs to switch the package to public
-in its GitHub package settings before `docker pull ghcr.io/...` works for everyone (see
-the note in `DOCKER_HUB_README.md`).
+**Required repository secrets:** `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`. GHCR push uses the
+workflow's own `GITHUB_TOKEN` — no extra secret needed. Newly published GHCR packages default
+to **private**; someone with admin access needs to switch the package to public in its GitHub
+package settings before `docker pull ghcr.io/...` works for everyone (see the note in
+`DOCKER_HUB_README.md`).
 
 ## PR-time build verification
 
 `.github/workflows/docker-build.yml` ("Docker Build") runs on every pull request to
-`main`: it builds the image for both platforms but does **not** push anywhere unless the
-PR is from a branch on this repository itself (not a fork), in which case it pushes a
-`pr-<number>` / commit-SHA tagged image to GHCR as a build cache/verification artifact.
-This is separate from, and has no effect on, the release process above.
+`main`, including the Release PR itself. However, Release Please opens and updates that PR
+using the default `GITHUB_TOKEN`, so its `pull_request` runs require a maintainer to manually
+approve the workflow run before they execute — they are not automatic like an ordinary
+contributor PR's checks. When it does run, it builds the image for both platforms but does
+**not** push anywhere unless the PR is from a branch on this repository itself (not a fork), in
+which case it pushes a `pr-<number>` / commit-SHA tagged image to GHCR as a build cache/
+verification artifact. This is separate from, and has no effect on, the release process above.
 
 ## Manual publishing
 

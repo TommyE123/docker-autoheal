@@ -14,5 +14,11 @@
   // pipes (`| Col |`) for readability as plain text, not the "compact" style
   // (`|Col|`) this rule's default wants. Padded pipes are also the far more
   // common GFM convention.
-  "MD060": false
+  "MD060": false,
+
+  // CHANGELOG.md (maintained by Release Please) legitimately repeats section
+  // headings like "### Bug Fixes" under every version's "##" heading - that's
+  // the standard Keep a Changelog / Release Please structure, not a mistake.
+  // siblings_only only flags duplicates under the *same* parent heading.
+  "MD024": { "siblings_only": true }
 }
