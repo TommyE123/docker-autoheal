@@ -9,6 +9,11 @@ permissions:
   contents: read
   issues: read
 engine: gemini
+features:
+  # actionlint (as pinned by this repo's MegaLinter) doesn't yet recognize
+  # the "queue" concurrency key gh-aw emits by default; disable it rather
+  # than exempt the compiled output from linting.
+  group-concurrency-queue: false
 tools:
   github:
     toolsets: [issues]

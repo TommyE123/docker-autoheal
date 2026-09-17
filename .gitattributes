@@ -1,1 +1,11 @@
+# Auto detect text files and normalize line endings to LF in the repository.
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files that must never be diffed or have line endings touched.
+*.png binary
+
 .github/workflows/*.lock.yml linguist-generated=true
