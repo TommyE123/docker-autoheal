@@ -700,7 +700,11 @@ async def get_events(limit: int = 100):
         events = config_manager.get_events(limit)
         return [
             {
-                "timestamp": event.timestamp.isoformat(),
+                "timestamp": (
+                    event.timestamp.isoformat()
+                    if isinstance(event, AutoHealEvent)
+                    else event.timestamp
+                ),
                 "container_id": event.container_id,
                 "container_name": event.container_name,
                 "event_type": event.event_type,
