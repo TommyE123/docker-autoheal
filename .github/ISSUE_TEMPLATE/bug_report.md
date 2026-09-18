@@ -2,7 +2,7 @@
 name: Bug report
 about: Report unexpected behaviour or a defect in Autoheal
 title: ""
-labels: bug
+labels: status/needs-triage
 assignees: ""
 ---
 

@@ -1,0 +1,14 @@
+# Configuration for actionlint (https://github.com/rhysd/actionlint).
+# Documentation: https://github.com/rhysd/actionlint/blob/main/docs/config.md
+
+paths:
+  # *.lock.yml files are compiled by the `gh aw` GitHub Agentic Workflows CLI
+  # from a Markdown source, not hand-authored. The compiler's own
+  # bash-in-bash quoting harness (used to run the agent inside the AWF
+  # sandbox) triggers a shellcheck SC1003 false positive here - it is not a
+  # real quoting bug, and hand-patching generated output would be undone on
+  # every `gh aw compile`. `gh aw compile --strict --actionlint` is the
+  # correct validation for these files instead, and finds no issues.
+  ".github/workflows/*.lock.yml":
+    ignore:
+      - "SC1003"
