@@ -24,6 +24,28 @@ def test_config_bootstraps_from_the_last_real_release_commit():
     assert config["bootstrap-sha"] == "437dd523de66735bedf72d1e90d325fde88fff46"
     assert config["packages"]["."]["release-type"] == "simple"
 
+    expected_sections = {
+        "feat": "Features",
+        "fix": "Bug Fixes",
+        "deps": "Dependencies",
+        "perf": "Performance Improvements",
+        "revert": "Reverts",
+        "chore": "Chores",
+        "docs": "Documentation",
+        "style": "Styles",
+        "refactor": "Refactors",
+        "test": "Tests",
+        "build": "Build System",
+        "ci": "Continuous Integration",
+    }
+
+    actual_sections = {
+        section["type"]: section["section"]
+        for section in config["changelog-sections"]
+    }
+
+    assert actual_sections == expected_sections
+
 
 def test_manifest_starts_from_the_actual_last_released_version():
     manifest = json.loads((REPO_ROOT / ".release-please-manifest.json").read_text())
