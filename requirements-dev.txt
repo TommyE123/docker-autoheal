@@ -5,7 +5,7 @@ pytest-asyncio==1.4.0
 pytest-cov==7.1.0
 
 # Type stubs for runtime dependencies that ship no inline types (no
-# py.typed marker), needed so mypy/Pyright can resolve them instead of
-# reporting import-untyped/reportMissingImports noise.
+# py.typed marker), required to give mypy typed interfaces for a fair
+# comparison with Pyright.
 types-docker==7.2.0.20260827
 types-aiofiles==23.2.0.20240623
