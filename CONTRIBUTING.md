@@ -35,16 +35,19 @@ servers, and building a local Docker image — are in
    See [docs/developer/testing.md](docs/developer/testing.md) for what's covered and how
    the test fixtures work.
 
-2. **If you changed the frontend**, confirm the production build succeeds:
+2. **If you changed the frontend**, confirm the production build succeeds and run the
+   linter/formatter checks:
 
    ```bash
    cd frontend
    npm run build
+   npm run lint
+   npm run format:check
    ```
 
-   (`npm run lint` exists in `package.json` but has no ESLint config file yet, so it
-   currently fails regardless of code changes — see
-   [docs/developer/frontend.md](docs/developer/frontend.md#linting).)
+   The frontend has pre-existing ESLint and Prettier findings that predate this tooling
+   being wired up; MegaLinter reports them without failing the build — see
+   [docs/developer/frontend.md](docs/developer/frontend.md#linting-and-formatting.
 
 3. **Keep documentation in sync.** If your change affects user-facing behavior
    (configuration fields, API endpoints, ports, labels), update the relevant page under
