@@ -3,8 +3,3 @@
 pytest==9.1.1
 pytest-asyncio==1.4.0
 pytest-cov==7.1.0
-
-# Type stubs for runtime dependencies that ship no inline types (no
-# py.typed marker), required to give Pyright typed interfaces.
-types-docker==7.2.0.20260827
-types-aiofiles==23.2.0.20240623
