@@ -157,7 +157,7 @@ async def list_containers(include_stopped: bool = False):
 
         containers = docker_client.list_containers(all_containers=include_stopped)
         result = []
-        
+
         # Get Uptime Kuma configuration
         config = config_manager.get_config()
         uptime_kuma_enabled = config.uptime_kuma.enabled
@@ -185,11 +185,11 @@ async def list_containers(include_stopped: bool = False):
 
             # Get locally tracked restart count (persists across container recreations)
             locally_tracked_restarts = config_manager.get_total_restart_count(stable_id)
-            
+
             # Check for Uptime Kuma mapping and status using uptime_kuma_monitor
             uptime_kuma_status = None
             uptime_kuma_monitor_name = None
-            
+
             if uptime_kuma_enabled and uptime_kuma_monitor:
                 # Check if container is mapped
                 if uptime_kuma_monitor.is_container_mapped(stable_id):
