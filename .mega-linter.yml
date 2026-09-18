@@ -103,3 +103,13 @@ JAVASCRIPT_PRETTIER_FILTER_REGEX_INCLUDE: "frontend/"
 
 PYTHON_PYRIGHT_PRE_COMMANDS:
   - command: pip install --no-cache-dir -r requirements-dev.txt
+
+REPOSITORY_SEMGREP_RULESETS:
+  - p/security-audit
+  - p/secrets
+  - p/owasp-top-ten
+  - p/python
+  - p/javascript
+  - p/react
+  - p/dockerfile
+  - p/command-injection
