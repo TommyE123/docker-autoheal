@@ -1,0 +1,173 @@
+name: Sync issue labels
+
+# One-off/manual synchronisation of the issue-classification label taxonomy
+# defined in .github/labels.yml. Not run on every issue event - see
+# .github/workflows/issue-triage.md (a GitHub Agentic Workflow) for the
+# per-issue classification workflow that this label set supports.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync-labels:
+    name: Sync labels.yml to GitHub
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout labels config
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            .github/labels.yml
+          sparse-checkout-cone-mode: false
+
+      # Creates/updates the kind/*, area/*, status/* labels by exact name
+      # only - labels.yml intentionally has no `aliases`, since renaming an
+      # existing label is a repository-wide operation that would also touch
+      # any pull request carrying that label. Migrating issues onto this
+      # taxonomy is handled separately below, issue-by-issue.
+      - name: Sync labels
+        uses: EndBug/label-sync@52074158190acb45f3077f9099fea818aa43f97a # v2.3.3
+        with:
+          config-file: .github/labels.yml
+          delete-other-labels: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  migrate-issue-labels:
+    name: Migrate legacy issue labels and flag unclassified issues
+    needs: sync-labels
+    runs-on: ubuntu-latest
+    steps:
+      # Migrates each open ISSUE (never a PR) off the retired flat/
+      # colon-namespaced classification labels, then flags anything left
+      # unclassified with status/needs-triage.
+      #
+      # A GitHub label is a single object shared by every issue and pull
+      # request that carries it - there is no such thing as an issue-scoped
+      # rename or delete of the label itself. Renaming it (as EndBug/
+      # label-sync's `aliases` would) or deleting it repo-wide (as
+      # `DELETE /repos/{owner}/{repo}/labels/{name}` would) changes it for
+      # any PR that happens to carry the same name too, which would violate
+      # "PR/release labels remain untouched". So this step only ever calls
+      # the issue-scoped label endpoints - `POST .../issues/{n}/labels` and
+      # `DELETE .../issues/{n}/labels/{name}` - which change one issue's
+      # label associations and never the shared label definition. Retired
+      # labels with no new-taxonomy equivalent are therefore removed from
+      # issues but deliberately left in place as repository label
+      # definitions (potentially unused, but harmless) rather than deleted
+      # repo-wide.
+      - name: Migrate legacy labels and flag unclassified issues
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            // Old label -> new taxonomy label, for names with a direct
+            // equivalent (mirrors the `aliases` labels.yml used before it
+            // was made PR-safe).
+            const OLD_TO_NEW = {
+              bug: 'kind/bug',
+              'type:bug': 'kind/bug',
+              enhancement: 'kind/enhancement',
+              'type:enhancement': 'kind/enhancement',
+              'type:story': 'kind/enhancement',
+              documentation: 'kind/documentation',
+              'type:chore': 'kind/chore',
+              'type:task': 'kind/chore',
+              'area:monitoring': 'area/health-check',
+              'area:config': 'area/config',
+              'area:ci': 'area/github-actions',
+              'area:testing': 'area/tests',
+            };
+
+            // Retired labels with no new-taxonomy equivalent: stripped from
+            // issues, left in place as repository label definitions.
+            const RETIRED_NO_MAPPING = [
+              'area:security',
+              'area:dependencies',
+              'area:documentation',
+              'area:build',
+              'area:frontend',
+              'area:application',
+              'priority:high',
+              'priority:medium',
+              'priority:low',
+              'phase:foundation',
+              'phase:polish',
+              'ai:ready',
+            ];
+
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+
+            for (const issue of issues) {
+              if (issue.pull_request) continue;
+
+              const labelNames = issue.labels.map((label) =>
+                typeof label === 'string' ? label : label.name
+              );
+              const labelSet = new Set(labelNames);
+
+              const toAdd = new Set();
+              const toRemove = new Set();
+
+              for (const [oldName, newName] of Object.entries(OLD_TO_NEW)) {
+                if (labelSet.has(oldName)) {
+                  toRemove.add(oldName);
+                  if (!labelSet.has(newName)) toAdd.add(newName);
+                }
+              }
+              for (const oldName of RETIRED_NO_MAPPING) {
+                if (labelSet.has(oldName)) toRemove.add(oldName);
+              }
+
+              if (toAdd.size > 0) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: [...toAdd],
+                });
+              }
+              for (const name of toRemove) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    name,
+                  });
+                } catch (error) {
+                  if (error.status !== 404) throw error;
+                }
+              }
+              if (toAdd.size > 0 || toRemove.size > 0) {
+                core.info(
+                  `Issue #${issue.number}: +[${[...toAdd].join(', ')}] -[${[...toRemove].join(', ')}]`
+                );
+              }
+
+              // Effective label set after the migration above, so flagging
+              // below doesn't need a second fetch.
+              const finalLabels = new Set(labelNames);
+              for (const name of toRemove) finalLabels.delete(name);
+              for (const name of toAdd) finalLabels.add(name);
+
+              const hasKind = [...finalLabels].some((name) => name.startsWith('kind/'));
+              const hasArea = [...finalLabels].some((name) => name.startsWith('area/'));
+              const hasStatus = [...finalLabels].some((name) => name.startsWith('status/'));
+
+              if ((hasKind && hasArea) || hasStatus) continue;
+
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: ['status/needs-triage'],
+              });
+              core.info(`Issue #${issue.number}: added status/needs-triage`);
+            }

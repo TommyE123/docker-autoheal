@@ -7,3 +7,5 @@
 
 # Binary files that must never be diffed or have line endings touched.
 *.png binary
+
+.github/workflows/*.lock.yml linguist-generated=true
