@@ -1,0 +1,27 @@
+# Semgrep config file (not a custom-rule file) — this just tells Semgrep which
+# registry rulesets to run. Run locally with:
+#   semgrep --config .semgrep.yml .
+
+rules:
+  # Broad security coverage — moderate confidence, may need triage
+  - p/security-audit
+
+  # Hardcoded secrets / credentials / tokens
+  - p/secrets
+
+  # OWASP Top 10 mapped rules — useful for compliance-style reporting
+  - p/owasp-top-ten
+
+  # Backend: Python / FastAPI
+  - p/python
+
+  # Frontend: JavaScript + React
+  - p/javascript
+  - p/react
+
+  # Dockerfile-specific misconfigurations (this repo builds a multi-stage image)
+  - p/dockerfile
+
+  # Command/argument injection patterns — relevant given this app shells out
+  # to interact with the Docker socket/API
+  - p/command-injection
