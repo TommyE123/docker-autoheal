@@ -37,6 +37,7 @@ DISABLE_LINTERS:
   - PYTHON_BLACK
   - PYTHON_FLAKE8
   - PYTHON_ISORT
+  - PYTHON_MYPY
   - PYTHON_NBQA_MYPY
   - PYTHON_PYLINT
 
@@ -48,7 +49,6 @@ DISABLE_ERRORS_LINTERS:
   - JAVASCRIPT_PRETTIER
   - POWERSHELL_POWERSHELL
   - PYTHON_BANDIT
-  - PYTHON_MYPY
   - PYTHON_PYRIGHT
   - PYTHON_RUFF
   - PYTHON_RUFF_FORMAT
@@ -91,9 +91,6 @@ JAVASCRIPT_ES_CLI_EXECUTABLE: ["frontend/node_modules/.bin/eslint"]
 
 JAVASCRIPT_PRETTIER_FILE_EXTENSIONS: [".js", ".jsx"]
 JAVASCRIPT_PRETTIER_FILTER_REGEX_INCLUDE: "frontend/"
-
-PYTHON_MYPY_PRE_COMMANDS:
-  - command: pip install --no-cache-dir -r requirements-dev.txt
 
 PYTHON_PYRIGHT_PRE_COMMANDS:
   - command: pip install --no-cache-dir -r requirements-dev.txt
