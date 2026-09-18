@@ -61,10 +61,10 @@ test isolation works.
 pull request targeting `main`, covering Python, JavaScript, YAML, Dockerfile, Markdown,
 and several security scanners in one pass — see `.mega-linter.yml` for the exact set.
 Several of those linters (`PYTHON_PYLINT`, `PYTHON_FLAKE8`, `PYTHON_RUFF`, `PYTHON_BANDIT`,
-and others listed in `.mega-linter.yml`'s `DISABLE_ERRORS_LINTERS`) currently have
-pre-existing findings and are configured not to fail the build over them; they still run
-and report. There is no repository-wide Python formatter/import-sorter enforced beyond
-what MegaLinter reports.
+`JAVASCRIPT_ES`, `JAVASCRIPT_PRETTIER`, and others listed in `.mega-linter.yml`'s
+`DISABLE_ERRORS_LINTERS`) currently have pre-existing findings and are configured not to
+fail the build over them; they still run and report. There is no repository-wide Python
+formatter/import-sorter enforced beyond what MegaLinter reports.
 
 Markdown *is* fully enforced — neither `MARKDOWN_MARKDOWNLINT` nor
 `MARKDOWN_MARKDOWN_TABLE_FORMATTER` is in that disabled list, so every Markdown file must
@@ -78,8 +78,8 @@ npx markdownlint-cli2 "**/*.md" "#node_modules" "#frontend/node_modules"
 npx markdown-table-formatter --check "**/*.md"   # drop --check to auto-fix
 ```
 
-The frontend has an `npm run lint` script (ESLint) but no ESLint configuration file yet —
-see [Frontend Development](frontend.md#linting).
+The frontend has `npm run lint` (ESLint) and `npm run format:check` (Prettier) scripts —
+see [Frontend Development](frontend.md#linting-and-formatting).
 
 ## Data directory when developing locally
 

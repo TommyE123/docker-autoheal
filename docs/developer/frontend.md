@@ -90,12 +90,20 @@ note that its `workbox-build` dependency declares `engines.node >= 20`, while th
 project's Docker build stage uses Node 18 — see
 [Dependency Management](../maintainer/dependency-management.md) for the details.
 
-## Linting
+## Linting and formatting
 
-`package.json` defines `npm run lint` (ESLint, with dependencies already in
-`devDependencies`), but there is currently **no ESLint configuration file** in
-`frontend/` — running it fails with "ESLint couldn't find a configuration file" until one
-is added.
+- `npm run lint` — ESLint (`frontend/eslint.config.js`), covering JS/JSX code quality
+  (correctness, React/JSX and React Hooks rules). ESLint does not enforce formatting;
+  `eslint-config-prettier` disables the handful of stylistic rules that would otherwise
+  conflict with Prettier.
+- `npm run format` — Prettier, formats `src/**/*.{js,jsx}`.
+- `npm run format:check` — Prettier, checks the same scope without writing changes.
+
+These also run in CI via MegaLinter (`JAVASCRIPT_ES` and `JAVASCRIPT_PRETTIER`, scoped to
+`frontend/`). Both currently have pre-existing findings across `src/` that predate this
+tooling being wired up — MegaLinter is configured to report them without failing the
+build (see `.mega-linter.yml`'s `DISABLE_ERRORS_LINTERS`); fix them incrementally rather
+than in one mass reformat/cleanup.
 
 ## Docker build
 

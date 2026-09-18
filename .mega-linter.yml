@@ -41,7 +41,8 @@ DISABLE_ERRORS_LINTERS:
   - ACTION_ZIZMOR
   - CSS_STYLELINT
   - EDITORCONFIG_EDITORCONFIG_CHECKER
-  - JAVASCRIPT_STANDARD
+  - JAVASCRIPT_ES
+  - JAVASCRIPT_PRETTIER
   - POWERSHELL_POWERSHELL
   - PYTHON_BANDIT
   - PYTHON_MYPY
@@ -57,6 +58,10 @@ DISABLE_ERRORS_LINTERS:
 DOCKERFILE_HADOLINT_FILE_NAMES_REGEX: ["Dockerfile(\\..+)?"]
 FLAVOR_SUGGESTIONS: false
 GITHUB_STATUS_REPORTER: true
+# Use Prettier as the JavaScript/JSX formatter instead of the zero-config
+# StandardJS style, now that ESLint (JAVASCRIPT_ES) is the project's JS/JSX
+# linter and StandardJS would otherwise compete with it.
+JAVASCRIPT_DEFAULT_STYLE: prettier
 MARKDOWN_MARKDOWNLINT_CONFIG_FILE: ".markdownlint.jsonc"
 MARKDOWN_MARKDOWNLINT_RULES_PATH: "."
 PYTHON_DEFAULT_STYLE: ruff
@@ -66,6 +71,21 @@ YAML_YAMLLINT_ARGUMENTS: "--strict"
 
 ACTION_ZIZMOR_UNSECURED_ENV_VARIABLES:
   - GITHUB_TOKEN
+
+# Only the frontend has JavaScript/JSX, and eslint.config.js's flat config
+# needs project-local packages (e.g. eslint-plugin-react) resolved from
+# frontend/node_modules rather than MegaLinter's own bundled npm install.
+JAVASCRIPT_ES_FILE_EXTENSIONS: [".js", ".jsx"]
+JAVASCRIPT_ES_FILTER_REGEX_INCLUDE: "frontend/"
+JAVASCRIPT_ES_CONFIG_FILE: "frontend/eslint.config.js"
+JAVASCRIPT_ES_PRE_COMMANDS:
+  - command: npm ci --prefix frontend
+    cwd: workspace
+    continue_if_failed: false
+JAVASCRIPT_ES_CLI_EXECUTABLE: "frontend/node_modules/.bin/eslint"
+
+JAVASCRIPT_PRETTIER_FILE_EXTENSIONS: [".js", ".jsx"]
+JAVASCRIPT_PRETTIER_FILTER_REGEX_INCLUDE: "frontend/"
 
 PYTHON_MYPY_PRE_COMMANDS:
   - command: pip install --no-cache-dir -r requirements-dev.txt
