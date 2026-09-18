@@ -64,7 +64,9 @@ DISABLE_ERRORS_LINTERS:
   - REPOSITORY_TRIVY
 
 DOCKERFILE_HADOLINT_FILE_NAMES_REGEX: ["Dockerfile(\\..+)?"]
+FILTER_REGEX_EXCLUDE: '(^|/)\.github/workflows/issue-triage\.lock\.yml$'
 FLAVOR_SUGGESTIONS: false
+FORMATTERS_DISABLE_ERRORS: false
 GITHUB_STATUS_REPORTER: true
 # Use Prettier as the JavaScript/JSX formatter instead of the zero-config
 # StandardJS style, now that ESLint (JAVASCRIPT_ES) is the project's JS/JSX
