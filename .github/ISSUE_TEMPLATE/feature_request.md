@@ -2,7 +2,7 @@
 name: Feature request
 about: Suggest an idea or improvement for Autoheal
 title: ""
-labels: enhancement
+labels: status/needs-triage
 assignees: ""
 ---
 
