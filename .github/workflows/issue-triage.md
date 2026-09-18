@@ -26,7 +26,12 @@ safe-outputs:
     pull-requests: false
   remove-labels:
     allowed: ["kind/*", "area/*", "status/needs-triage", "status/needs-information"]
-    max: 3
+    # Outcome A must be able to remove every stale kind/*, area/*, and
+    # status/* label in one run, not just the usual one-of-each case. 13 is
+    # the full current taxonomy size (4 kind/* + 7 area/* + 2 status/*, see
+    # .github/labels.yml) so this can never silently truncate the removal
+    # set - a lower cap here is a real correctness bug, not a safety limit.
+    max: 13
     pull-requests: false
   add-comment:
     max: 1
