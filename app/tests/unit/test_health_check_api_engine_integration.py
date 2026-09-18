@@ -65,11 +65,6 @@ class TestCustomHealthCheckDiscoveryAcrossRecreation:
         assert needs_restart is True
         assert reason == "Custom health check failed (tcp)"
 
-    @pytest.mark.xfail(
-        raises=AssertionError,
-        reason="Known regression tracked by #30; expected to pass when the fix lands.",
-        strict=True,
-    )
     async def test_check_still_found_after_container_is_recreated(self, wired_api):
         """
         Reproduces #30: a container recreation gives Docker a brand new
