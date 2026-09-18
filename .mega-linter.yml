@@ -13,6 +13,7 @@ DISABLE:
   - GRAPHQL
   - GROOVY
   - JAVA
+  - JSX
   - KOTLIN
   - KUBERNETES
   - LUA
@@ -79,10 +80,12 @@ JAVASCRIPT_ES_FILE_EXTENSIONS: [".js", ".jsx"]
 JAVASCRIPT_ES_FILTER_REGEX_INCLUDE: "frontend/"
 JAVASCRIPT_ES_CONFIG_FILE: "frontend/eslint.config.js"
 JAVASCRIPT_ES_PRE_COMMANDS:
-  - command: npm ci --prefix frontend
+  # NODE_ENV=development forces npm to install devDependencies (eslint and
+  # its plugins) even though MegaLinter's image sets NODE_ENV=production.
+  - command: NODE_ENV=development npm ci --prefix frontend
     cwd: workspace
     continue_if_failed: false
-JAVASCRIPT_ES_CLI_EXECUTABLE: "frontend/node_modules/.bin/eslint"
+JAVASCRIPT_ES_CLI_EXECUTABLE: ["frontend/node_modules/.bin/eslint"]
 
 JAVASCRIPT_PRETTIER_FILE_EXTENSIONS: [".js", ".jsx"]
 JAVASCRIPT_PRETTIER_FILTER_REGEX_INCLUDE: "frontend/"
