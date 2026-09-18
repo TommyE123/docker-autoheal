@@ -87,11 +87,6 @@ ACTION_ZIZMOR_UNSECURED_ENV_VARIABLES:
 JAVASCRIPT_ES_FILE_EXTENSIONS: [".js", ".jsx"]
 JAVASCRIPT_ES_FILTER_REGEX_INCLUDE: "frontend/"
 JAVASCRIPT_ES_CONFIG_FILE: "frontend/eslint.config.js"
-# ESLint 8's -c/--config flag otherwise loads frontend/eslint.config.js
-# through the legacy config engine, which cannot parse a flat config array.
-JAVASCRIPT_ES_UNSECURED_ENV_VARIABLES:
-  - ESLINT_USE_FLAT_CONFIG
-ESLINT_USE_FLAT_CONFIG: "true"
 JAVASCRIPT_ES_PRE_COMMANDS:
   # NODE_ENV=development forces npm to install devDependencies (eslint and
   # its plugins) even though MegaLinter's image sets NODE_ENV=production.
