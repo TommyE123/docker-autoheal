@@ -105,7 +105,8 @@ JAVASCRIPT_PRETTIER_FILTER_REGEX_INCLUDE: "frontend/"
 PYTHON_PYRIGHT_PRE_COMMANDS:
   - command: pip install --no-cache-dir -r requirements-dev.txt
 
-REPOSITORY_SEMGREP_ARGUMENTS: ["--exclude", ".github/workflows/issue-triage.lock.yml"]
+REPOSITORY_SEMGREP_ARGUMENTS:
+  ["--exclude", ".github/workflows/issue-triage.lock.yml"]
 REPOSITORY_SEMGREP_RULESETS:
   - p/command-injection
   - p/docker-compose
