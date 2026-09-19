@@ -63,6 +63,7 @@ DISABLE_ERRORS_LINTERS:
   - PYTHON_RUFF_FORMAT
   - REPOSITORY_CHECKOV
   - REPOSITORY_OSV_SCANNER
+  - REPOSITORY_SEMGREP
   - REPOSITORY_TRIVY
 
 DOCKERFILE_HADOLINT_FILE_NAMES_REGEX: ["Dockerfile(\\..+)?"]
@@ -103,3 +104,16 @@ JAVASCRIPT_PRETTIER_FILTER_REGEX_INCLUDE: "frontend/"
 
 PYTHON_PYRIGHT_PRE_COMMANDS:
   - command: pip install --no-cache-dir -r requirements-dev.txt
+
+REPOSITORY_SEMGREP_ARGUMENTS:
+  ["--exclude", ".github/workflows/issue-triage.lock.yml"]
+REPOSITORY_SEMGREP_RULESETS:
+  - p/command-injection
+  - p/docker-compose
+  - p/github-actions
+  - p/insecure-transport
+  - p/javascript
+  - p/owasp-top-ten
+  - p/python
+  - p/react
+  - p/security-audit
