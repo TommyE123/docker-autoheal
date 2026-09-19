@@ -11,6 +11,8 @@
   "rebaseWhen": "behind-base-branch",
   "semanticCommits": "enabled",
   "semanticCommitType": "chore",
+  "prConcurrentLimit": 15,
+  "prHourlyLimit": 5,
   "packageRules": [
     {
       "description": "Require manual review and merge for all dependency updates. No Renovate update is automatically merged.",
