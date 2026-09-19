@@ -27,7 +27,7 @@ services:
 
   # Test container 1: Healthy nginx
   nginx-healthy:
-    image: nginx:alpine@sha256:72ba65eb42c10344912a84ff42408db7d34f2feb642204570ab8fc5ffd29f1d3
+    image: nginx:alpine@sha256:62ff2089abf5a9ed33bd232895bef5e22f7bb4b200675cec49a5ebc48e3d4ac8
     container_name: nginx-healthy
     restart: unless-stopped
     ports:
@@ -94,7 +94,7 @@ services:
 
   # Test container 5: Container not monitored (no label)
   nginx-no-autoheal:
-    image: nginx:alpine@sha256:72ba65eb42c10344912a84ff42408db7d34f2feb642204570ab8fc5ffd29f1d3
+    image: nginx:alpine@sha256:62ff2089abf5a9ed33bd232895bef5e22f7bb4b200675cec49a5ebc48e3d4ac8
     container_name: nginx-no-autoheal
     restart: unless-stopped
     ports:

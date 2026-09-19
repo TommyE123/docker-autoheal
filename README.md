@@ -151,7 +151,7 @@ For more, see the full [Troubleshooting guide](docs/user/troubleshooting.md).
 | [Migration](docs/user/migration.md)                         |                                                          |                                                                   |
 
 The full documentation index, including historical/superseded documents, is in
-[docs/README.md](docs/README.md).
+[docs/index.md](docs/index.md).
 
 ## Contributing
 
@@ -161,3 +161,5 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) to get set up,
 ## License
 
 [MIT](LICENSE)
+
+This project was originally created by [@satya-sovan](https://github.com/satya-sovan). Thank you to the original author for making the project available as open source.

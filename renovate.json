@@ -5,6 +5,11 @@
     "helpers:pinGitHubActionDigests",
     "customManagers:dockerfileVersions"
   ],
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/bower_components/**",
+    ".github/workflows/issue-triage.lock.yml"
+  ],
   "description": "Dependency-update policy for docker-autoheal. Renovate creates and maintains dependency PRs, but all updates require manual review and merge. See docs/maintainer/dependency-management.md for the full explanation.",
   "forkProcessing": "enabled",
   "platformAutomerge": false,
@@ -22,17 +27,22 @@
     {
       "description": "Label Renovate patch updates.",
       "matchUpdateTypes": ["patch"],
-      "addLabels": ["renovate/patch"]
+      "addLabels": ["renovate:patch"]
     },
     {
       "description": "Label Renovate minor updates.",
       "matchUpdateTypes": ["minor"],
-      "addLabels": ["renovate/minor"]
+      "addLabels": ["renovate:minor"]
     },
     {
       "description": "Label Renovate major updates.",
       "matchUpdateTypes": ["major"],
-      "addLabels": ["renovate/major"]
+      "addLabels": ["renovate:major"]
+    },
+    {
+      "description": "Label Renovate digest updates.",
+      "matchUpdateTypes": ["digest", "pin"],
+      "addLabels": ["renovate:digest"]
     },
     {
       "description": "Pin Docker image tags to an immutable SHA256 digest as well as their human-readable tag/version where the registry supports digests.",
