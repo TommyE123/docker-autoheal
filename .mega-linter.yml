@@ -7,13 +7,16 @@ DISABLE:
   - CPP
   - COPYPASTE
   - GO
+  - GRAPHQL
   - GROOVY
   - JAVA
   - JSX
   - KOTLIN
+  - KUBERNETES
   - PHP
   - RUBY
   - RUST
+  - SALESFORCE
   - SQL
   - SPELL
   - SWIFT
