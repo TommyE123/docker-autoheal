@@ -1,0 +1,32 @@
+ls:
+  .py: snake_case
+  .js: camelCase | lowercase
+  .jsx: PascalCase | lowercase
+  .json: lowercase
+  .jsonc: lowercase
+  .yml: kebab-case
+  .yaml: kebab-case
+
+  app:
+    .dir: snake_case
+
+  docs:
+    .dir: kebab-case
+    .md: kebab-case
+
+  frontend/src:
+    .jsx: PascalCase | lowercase
+    .js: camelCase | lowercase
+
+  frontend/src/components:
+    .jsx: PascalCase
+    .js: PascalCase
+
+ignore:
+  - .git
+  - node_modules
+  - frontend/node_modules
+  - frontend/dist
+  - coverage
+  - htmlcov
+  - megalinter-reports
