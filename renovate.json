@@ -36,7 +36,7 @@
     },
     {
       "description": "Label Renovate digest updates.",
-      "matchUpdateTypes": ["digest"],
+      "matchUpdateTypes": ["digest", "pin"],
       "addLabels": ["renovate:digest"]
     },
     {
