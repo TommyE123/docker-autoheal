@@ -62,7 +62,7 @@ jobs:
 
       # Configure QEMU to support building images for multiple CPU architectures
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
 
       # Set up Docker Buildx builder for advanced multi-platform builds
       - name: Set up Docker Buildx
