@@ -9,7 +9,7 @@ project layout, frontend tooling, testing internals — lives under
 
 - Report bugs or propose features via [GitHub Issues](https://github.com/TommyE123/docker-autoheal/issues).
 - Fix bugs or implement features and open a pull request.
-- Improve documentation — see [docs/README.md](docs/README.md) for the documentation map.
+- Improve documentation — see [docs/index.md](docs/index.md) for the documentation map.
 
 ## Getting set up
 

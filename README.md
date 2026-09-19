@@ -151,7 +151,7 @@ For more, see the full [Troubleshooting guide](docs/user/troubleshooting.md).
 | [Migration](docs/user/migration.md)                         |                                                          |                                                                   |
 
 The full documentation index, including historical/superseded documents, is in
-[docs/README.md](docs/README.md).
+[docs/index.md](docs/index.md).
 
 ## Contributing
 

@@ -22,6 +22,9 @@ ls:
     .jsx: PascalCase
     .js: PascalCase
 
+  frontend/src/components/config:
+    index.js: lowercase
+
 ignore:
   - .git
   - node_modules
