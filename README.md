@@ -161,3 +161,4 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) to get set up,
 ## License
 
 [MIT](LICENSE)
+This project was originally created by [@satya-sovan](https://github.com/satya-sovan). Thank you to the original author for making the project available as open source.
