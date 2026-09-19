@@ -11,11 +11,28 @@
   "rebaseWhen": "behind-base-branch",
   "semanticCommits": "enabled",
   "semanticCommitType": "chore",
+  "prConcurrentLimit": 15,
+  "prHourlyLimit": 5,
   "packageRules": [
     {
       "description": "Require manual review and merge for all dependency updates. No Renovate update is automatically merged.",
       "matchPackageNames": ["*"],
       "automerge": false
+    },
+    {
+      "description": "Label Renovate patch updates.",
+      "matchUpdateTypes": ["patch"],
+      "addLabels": ["renovate/patch"]
+    },
+    {
+      "description": "Label Renovate minor updates.",
+      "matchUpdateTypes": ["minor"],
+      "addLabels": ["renovate/minor"]
+    },
+    {
+      "description": "Label Renovate major updates.",
+      "matchUpdateTypes": ["major"],
+      "addLabels": ["renovate/major"]
     },
     {
       "description": "Pin Docker image tags to an immutable SHA256 digest as well as their human-readable tag/version where the registry supports digests.",
