@@ -1,0 +1,59 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Autoheal: Run Backend",
+      "type": "shell",
+      "command": "python -m app.main",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run React Frontend",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run Python Unit Tests",
+      "type": "shell",
+      "command": "python -m pytest",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run Python Integration Tests",
+      "type": "shell",
+      "command": "python -m pytest app/tests/integration",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Build Frontend",
+      "type": "shell",
+      "command": "npm run build",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run Megalinter Cupcake",
+      "type": "shell",
+      "command": "docker run --rm -v \"${workspaceFolder}:/tmp/lint\" ghcr.io/oxsecurity/megalinter-cupcake:v10",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run Megalinter Cupcake (Beta)",
+      "type": "shell",
+      "command": "docker run --rm -v \"${workspaceFolder}:/tmp/lint\" ghcr.io/oxsecurity/megalinter-cupcake:beta",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run Docker Stack",
+      "type": "shell",
+      "command": "docker compose up --build",
+      "problemMatcher": []
+    }
+  ]
+}
