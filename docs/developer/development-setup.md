@@ -60,7 +60,7 @@ test isolation works.
 `.github/workflows/mega-linter.yml` runs [MegaLinter](https://megalinter.io/) on every
 pull request targeting `main`, covering Python, JavaScript, YAML, Dockerfile, Markdown,
 and several security scanners in one pass — see `.mega-linter.yml` for the exact set.
-Several of those linters (`PYTHON_PYLINT`, `PYTHON_FLAKE8`, `PYTHON_RUFF`,`JAVASCRIPT_ES`,
+Several of those linters (`PYTHON_PYLINT`, `PYTHON_FLAKE8`, `PYTHON_RUFF`, `JAVASCRIPT_ES`,
 `JAVASCRIPT_PRETTIER`, and others listed in `.mega-linter.yml`'s `DISABLE_ERRORS_LINTERS`)
 currently have pre-existing findings and are configured not to fail the build over them;
 they still run and report. There is no repository-wide Python formatter/import-sorter
