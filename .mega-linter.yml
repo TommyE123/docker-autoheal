@@ -3,61 +3,37 @@
 
 DISABLE:
   - ANSIBLE
-  - BICEP
-  - C
-  - CSHARP
-  - CPP
   - COPYPASTE
-  - DART
-  - GO
   - GRAPHQL
-  - GROOVY
-  - JAVA
   - JSX
-  - KOTLIN
   - KUBERNETES
-  - LUA
-  - PHP
-  - PERL
-  - R
-  - RAKU
-  - RUBY
-  - RUST
   - SALESFORCE
-  - SCALA
   - SQL
   - SPELL
   - SWIFT
-  - TERRAFORM
+  - TSX
   - TYPESCRIPT
-  - VBDOTNET
 
 DISABLE_LINTERS:
   - CSS_BIOME
-  - JAVASCRIPT_BIOME
   - JAVASCRIPT_STANDARD
   - JSON_BIOME
   - JSON_NPM_PACKAGE_JSON_LINT
-  - JSX_BIOME
+  - JAVASCRIPT_BIOME
   - MARKDOWN_RUMDL
   - PYTHON_BLACK
   - PYTHON_FLAKE8
   - PYTHON_ISORT
   - PYTHON_MYPY
-  - PYTHON_NBQA_MYPY
   - PYTHON_PYLINT
-  - REPOSITORY_DEVSKIM
   - REPOSITORY_GRYPE
   - REPOSITORY_SYFT
-  - TSX_BIOME
 
 DISABLE_ERRORS_LINTERS:
   - ACTION_ZIZMOR
   - CSS_STYLELINT
   - JAVASCRIPT_ES
   - JAVASCRIPT_PRETTIER
-  - POWERSHELL_POWERSHELL
-  - PYTHON_BANDIT
   - PYTHON_PYRIGHT
   - PYTHON_RUFF
   - PYTHON_RUFF_FORMAT
@@ -66,44 +42,73 @@ DISABLE_ERRORS_LINTERS:
   - REPOSITORY_SEMGREP
   - REPOSITORY_TRIVY
 
-DOCKERFILE_HADOLINT_FILE_NAMES_REGEX: ["Dockerfile(\\..+)?"]
+# ---------------------------------------------------------------------------
+# Global MegaLinter configuration
+# ---------------------------------------------------------------------------
+
 FILTER_REGEX_EXCLUDE: '(^|/)\.github/workflows/issue-triage\.lock\.yml$'
 FLAVOR_SUGGESTIONS: false
 FORMATTERS_DISABLE_ERRORS: false
 GITHUB_STATUS_REPORTER: true
-# Use Prettier as the JavaScript/JSX formatter instead of the zero-config
-# StandardJS style, now that ESLint (JAVASCRIPT_ES) is the project's JS/JSX
-# linter and StandardJS would otherwise compete with it.
-JAVASCRIPT_DEFAULT_STYLE: prettier
-MARKDOWN_MARKDOWNLINT_CONFIG_FILE: ".markdownlint.jsonc"
-MARKDOWN_MARKDOWNLINT_RULES_PATH: "."
-PYTHON_DEFAULT_STYLE: ruff
 SHOW_ELAPSED_TIME: true
 VALIDATE_ALL_CODEBASE: true
-YAML_YAMLLINT_ARGUMENTS: "--strict"
 
-ACTION_ZIZMOR_UNSECURED_ENV_VARIABLES:
-  - GITHUB_TOKEN
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+
+PYTHON_DEFAULT_STYLE: ruff
+
+PYTHON_PYRIGHT_PRE_COMMANDS:
+  - command: pip install --no-cache-dir -r requirements-dev.txt
+
+# ---------------------------------------------------------------------------
+# JavaScript / JSX
+# ---------------------------------------------------------------------------
+
+JAVASCRIPT_DEFAULT_STYLE: prettier
 
 # Only the frontend has JavaScript/JSX, and eslint.config.js's flat config
 # needs project-local packages (e.g. eslint-plugin-react) resolved from
 # frontend/node_modules rather than MegaLinter's own bundled npm install.
+JAVASCRIPT_ES_CLI_EXECUTABLE: ["frontend/node_modules/.bin/eslint"]
+JAVASCRIPT_ES_CONFIG_FILE: "frontend/eslint.config.js"
 JAVASCRIPT_ES_FILE_EXTENSIONS: [".js", ".jsx"]
 JAVASCRIPT_ES_FILTER_REGEX_INCLUDE: "frontend/"
-JAVASCRIPT_ES_CONFIG_FILE: "frontend/eslint.config.js"
 JAVASCRIPT_ES_PRE_COMMANDS:
   # NODE_ENV=development forces npm to install devDependencies (eslint and
   # its plugins) even though MegaLinter's image sets NODE_ENV=production.
   - command: NODE_ENV=development npm ci --prefix frontend
     cwd: workspace
     continue_if_failed: false
-JAVASCRIPT_ES_CLI_EXECUTABLE: ["frontend/node_modules/.bin/eslint"]
 
 JAVASCRIPT_PRETTIER_FILE_EXTENSIONS: [".js", ".jsx"]
 JAVASCRIPT_PRETTIER_FILTER_REGEX_INCLUDE: "frontend/"
 
-PYTHON_PYRIGHT_PRE_COMMANDS:
-  - command: pip install --no-cache-dir -r requirements-dev.txt
+# ---------------------------------------------------------------------------
+# Markdown
+# ---------------------------------------------------------------------------
+
+MARKDOWN_MARKDOWNLINT_CONFIG_FILE: ".markdownlint.jsonc"
+
+# ---------------------------------------------------------------------------
+# YAML
+# ---------------------------------------------------------------------------
+
+YAML_YAMLLINT_ARGUMENTS: "--strict"
+
+# ---------------------------------------------------------------------------
+# Dockerfile
+# ---------------------------------------------------------------------------
+
+DOCKERFILE_HADOLINT_FILE_NAMES_REGEX: ["Dockerfile(\\..+)?"]
+
+# ---------------------------------------------------------------------------
+# Security
+# ---------------------------------------------------------------------------
+
+ACTION_ZIZMOR_UNSECURED_ENV_VARIABLES:
+  - GITHUB_TOKEN
 
 REPOSITORY_SEMGREP_ARGUMENTS:
   ["--exclude", ".github/workflows/issue-triage.lock.yml"]

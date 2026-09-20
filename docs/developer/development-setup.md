@@ -58,13 +58,13 @@ test isolation works.
 ## Linting
 
 `.github/workflows/mega-linter.yml` runs [MegaLinter](https://megalinter.io/) on every
-pull request targeting `main`, covering Python, JavaScript, YAML, Dockerfile, Markdown,
-and several security scanners in one pass — see `.mega-linter.yml` for the exact set.
-Several of those linters (`PYTHON_PYLINT`, `PYTHON_FLAKE8`, `PYTHON_RUFF`, `PYTHON_BANDIT`,
+pull request targeting `main`, covering Python, JavaScript, YAML, Dockerfile,
+Markdown, and security checks provided by Ruff's `S` rules — see `.mega-linter.yml`
+for the exact set. Several of those linters (`PYTHON_PYLINT`, `PYTHON_FLAKE8`, `PYTHON_RUFF`,
 `JAVASCRIPT_ES`, `JAVASCRIPT_PRETTIER`, and others listed in `.mega-linter.yml`'s
-`DISABLE_ERRORS_LINTERS`) currently have pre-existing findings and are configured not to
-fail the build over them; they still run and report. There is no repository-wide Python
-formatter/import-sorter enforced beyond what MegaLinter reports.
+`DISABLE_ERRORS_LINTERS`) currently have pre-existing findings and are configured not
+to fail the build over them; they still run and report. There is no repository-wide Python
+ formatter/import-sorter enforced beyond what MegaLinter reports.
 
 Markdown *is* fully enforced — neither `MARKDOWN_MARKDOWNLINT` nor
 `MARKDOWN_MARKDOWN_TABLE_FORMATTER` is in that disabled list, so every Markdown file must
