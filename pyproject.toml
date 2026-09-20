@@ -88,8 +88,12 @@ known-first-party = ["app"]
 #            `docker_client`, `update_config`, or a lambda's unused `k`;
 #            a standard pytest pattern for autouse or injected fixtures
 #            that a given test doesn't need to reference directly.
+#   S105, S106              - hardcoded-password/secret detections, e.g. a
+#            fake token or password string used to construct a mock
+#            notification config; these are test fixtures, not real
+#            credentials, so the rule is a false positive here specifically.
 # Revisit alongside the select-level deferrals above.
-"**/tests/**" = ["S101", "SLF001", "PLR2004", "ARG001", "ARG002", "ARG005"]
+"**/tests/**" = ["S101", "SLF001", "PLR2004", "ARG001", "ARG002", "ARG005", "S105", "S106"]
 
 [tool.ruff.format]
 quote-style = "double"
