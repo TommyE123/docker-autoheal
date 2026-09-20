@@ -1,0 +1,50 @@
+{
+  "name": "Docker Auto-Heal",
+  "image": "mcr.microsoft.com/devcontainers/python:3.14-bookworm@sha256:0f900e5c9aec62a7c3663b94afbff192fb7452192c5ab0e79ba0097199478ae2",
+
+  "features": {
+    "ghcr.io/devcontainers/features/node:2": {
+      "version": "24"
+    },
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+  },
+
+  "postCreateCommand": "python -m pip install --no-cache-dir -r requirements-dev.txt && npm ci --prefix frontend",
+
+  "updateContentCommand": "python -m pip install --no-cache-dir -r requirements-dev.txt && npm ci --prefix frontend",
+
+  "forwardPorts": [3000, 3131, 9090],
+
+  "portsAttributes": {
+    "3000": {
+      "label": "Frontend"
+    },
+    "3131": {
+      "label": "Autoheal API"
+    },
+    "9090": {
+      "label": "Metrics"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "charliermarsh.ruff",
+        "dbaeumer.vscode-eslint",
+        "editorconfig.editorconfig",
+        "esbenp.prettier-vscode",
+        "github.vscode-github-actions",
+        "ms-azuretools.vscode-docker",
+        "ms-python.python",
+        "redhat.vscode-xml",
+        "redhat.vscode-yaml",
+        "stylelint.vscode-stylelint",
+        "yzhang.markdown-all-in-one"
+      ]
+    }
+  },
+
+  "remoteUser": "vscode",
+  "shutdownAction": "stopContainer"
+}
