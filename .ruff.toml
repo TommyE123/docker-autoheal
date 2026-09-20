@@ -1,0 +1,100 @@
+target-version = "py314"
+line-length = 100
+
+[lint]
+select = [
+    "E",
+    "W",
+    "F",
+    "I",
+    "B",
+    "C4",
+    "SIM",
+    "PERF",
+    "S",
+    "PL",
+    "ARG",
+    "PTH",
+    "DTZ",
+    "PT",
+    "RET",
+    "RSE",
+    "TCH",
+    "ASYNC",
+    "TID",
+    "SLF",
+    "ERA",
+    "LOG",
+    "N",
+    "PIE",
+    "RUF",
+
+    # --- Deferred families --------------------------------------------
+    # Pulled out of select rather than ignored code-by-code: these were
+    # the largest categories in the latest megalinter run and we're
+    # committing to fixing them properly, not nibbling at them.
+    # Re-add to select (and delete this comment) when that work starts.
+    #   "G",    # logging format - mainly f-strings passed to logger calls
+    #            instead of lazy `%` formatting, plus a couple of
+    #            logging.exception vs logging.error(exc_info=True) spots;
+    #            worth a pass since some of these do affect what gets logged.
+    #   "UP",   # pyupgrade / syntax modernization - Optional[X] -> X | None,
+    #            Dict/List -> dict/list, datetime.utc -> datetime.UTC, etc.;
+    #            purely mechanical and largely auto-fixable in one sweep.
+    #   "TRY",  # exception-handling style (tryceratops) - things like
+    #            logging.error instead of logging.exception inside except
+    #            blocks, raising inside a try that could be restructured,
+    #            and overly long inline exception messages.
+    #   "ANN",  # type annotations - missing parameter/return annotations
+    #            across the app's public functions; a real typing gap,
+    #            worth doing as a dedicated typing pass rather than piecemeal.
+    #   "D",    # pydocstyle - missing/malformed docstrings on modules,
+    #            classes and functions; overlaps with the ANN pass above
+    #            in terms of which files need attention.
+]
+
+ignore = [
+    "E111",
+    "E114",
+    "E117",
+    "E501",
+
+    # --- Deferred: local/lazy imports -----------------------------------
+    # PLC0415 (`import` should be at top-level) - flags function-local
+    # imports, mostly inside api.py's route handlers and demo.py. Some of
+    # these are a deliberate pattern (avoiding circular imports, keeping
+    # startup-time imports light) and some may just be unintentional
+    # sprawl; worth going through each occurrence individually rather than
+    # blanket-fixing, since the right fix differs case by case.
+    "PLC0415",
+]
+
+[lint.isort]
+known-first-party = ["app"]
+
+[lint.per-file-ignores]
+# --- Deferred: test-only noise ---------------------------------------
+# ANN and D are already off everywhere (see the select comment above), so
+# only the test-specific rules need listing here:
+#   SLF001                  - private-member access, e.g.
+#            `engine._handle_container_restart` or `engine._last_restart_times`
+#            reached into directly from a test; unit tests routinely do this
+#            to assert on internal state, so it's expected here, not a smell.
+#   PLR2004                 - literal ("magic") values used in comparisons,
+#            e.g. `== 3`, `== 20`, `== 80` in assertions; those are expected
+#            test data/fixture values, not constants that need naming.
+#   ARG001, ARG002, ARG005  - unused fixture/mock/lambda arguments, e.g.
+#            `docker_client`, `update_config`, or a lambda's unused `k`;
+#            a standard pytest pattern for autouse or injected fixtures
+#            that a given test doesn't need to reference directly.
+#   S105, S106              - hardcoded-password/secret detections, e.g. a
+#            fake token or password string used to construct a mock
+#            notification config; these are test fixtures, not real
+#            credentials, so the rule is a false positive here specifically.
+# Revisit alongside the select-level deferrals above.
+"**/tests/**" = ["S101", "SLF001", "PLR2004", "ARG001", "ARG002", "ARG005", "S105", "S106"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
