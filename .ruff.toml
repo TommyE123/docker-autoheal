@@ -1,8 +1,7 @@
-[tool.ruff]
 target-version = "py314"
 line-length = 100
 
-[tool.ruff.lint]
+[lint]
 select = [
     "E",
     "W",
@@ -70,10 +69,10 @@ ignore = [
     "PLC0415",
 ]
 
-[tool.ruff.lint.isort]
+[lint.isort]
 known-first-party = ["app"]
 
-[tool.ruff.lint.per-file-ignores]
+[lint.per-file-ignores]
 # --- Deferred: test-only noise ---------------------------------------
 # ANN and D are already off everywhere (see the select comment above), so
 # only the test-specific rules need listing here:
@@ -95,7 +94,7 @@ known-first-party = ["app"]
 # Revisit alongside the select-level deferrals above.
 "**/tests/**" = ["S101", "SLF001", "PLR2004", "ARG001", "ARG002", "ARG005", "S105", "S106"]
 
-[tool.ruff.format]
+[format]
 quote-style = "double"
 indent-style = "space"
 line-ending = "auto"
