@@ -111,7 +111,12 @@ ACTION_ZIZMOR_UNSECURED_ENV_VARIABLES:
   - GITHUB_TOKEN
 
 REPOSITORY_SEMGREP_ARGUMENTS:
-  ["--exclude", ".github/workflows/issue-triage.lock.yml", "--exclude", "Dockerfile*"]
+  [
+    "--exclude",
+    ".github/workflows/issue-triage.lock.yml",
+    "--exclude",
+    "Dockerfile*",
+  ]
 REPOSITORY_SEMGREP_RULESETS:
   - p/command-injection
   - p/docker-compose
