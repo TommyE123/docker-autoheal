@@ -1,0 +1,57 @@
+name: Dev Container
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  devcontainer:
+    name: Build and test Dev Container
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build and test Dev Container
+        uses: devcontainers/ci@513af61f4de4f75d37e4438f184ba4358f0fc1ca # v0.3.1900000450
+        with:
+          runCmd: |
+            set -e
+
+            echo "== Versions =="
+            python --version
+            node --version
+            npm --version
+            docker --version
+            docker compose version
+
+            echo "== Development tools =="
+            pytest --version
+            ruff --version
+            pyright --version
+            checkov --version
+            semgrep --version
+            yamllint --version
+            djlint --version
+
+            echo "== Frontend development tools =="
+            npm exec eslint --version
+            npm exec prettier --version
+
+            echo "== Backend import =="
+            python -c "import app.main"
+
+            echo "== Python tests =="
+            python -m pytest
+
+            echo "== Integration tests =="
+            python -m pytest app/tests/integration
+
+            echo "== Frontend build =="
+            npm run build --prefix frontend
+
+            echo "== Docker access =="
+            docker run --rm hello-world
