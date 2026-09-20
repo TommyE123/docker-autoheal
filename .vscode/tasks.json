@@ -9,6 +9,7 @@
     },
     {
       "label": "Autoheal: Run React Frontend",
+
       "type": "shell",
       "command": "npm run dev",
       "options": {
