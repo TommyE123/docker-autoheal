@@ -125,4 +125,3 @@ REPOSITORY_SEMGREP_RULESETS:
   - p/owasp-top-ten
   - p/python
   - p/react
-  - p/security-audit
