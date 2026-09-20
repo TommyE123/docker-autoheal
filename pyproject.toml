@@ -25,3 +25,7 @@ known-first-party = ["app"]
 quote-style = "double"
 indent-style = "space"
 line-ending = "auto"
+
+[tool.ruff.lint.per-file-ignores]
+"**/test_*.py" = ["S101"]
+"**/*_test.py" = ["S101"]
