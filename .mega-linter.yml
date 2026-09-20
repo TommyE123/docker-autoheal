@@ -3,9 +3,12 @@
 
 DISABLE:
   - ANSIBLE
+  - BICEP
   - C
+  - CSHARP
   - CPP
   - COPYPASTE
+  - DART
   - GO
   - GRAPHQL
   - GROOVY
@@ -13,15 +16,21 @@ DISABLE:
   - JSX
   - KOTLIN
   - KUBERNETES
+  - LUA
   - PHP
+  - PERL
+  - R
+  - RAKU
   - RUBY
   - RUST
   - SALESFORCE
+  - SCALA
   - SQL
   - SPELL
   - SWIFT
   - TERRAFORM
   - TYPESCRIPT
+  - VBDOTNET
 
 DISABLE_LINTERS:
   - CSS_BIOME
