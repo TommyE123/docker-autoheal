@@ -9,18 +9,14 @@ select = [
     "F",
     "I",
     "B",
-    "UP",
     "C4",
     "SIM",
     "PERF",
     "S",
-    "D",
-    "ANN",
     "PL",
     "ARG",
     "PTH",
     "DTZ",
-    "TRY",
     "PT",
     "RET",
     "RSE",
@@ -29,11 +25,22 @@ select = [
     "TID",
     "SLF",
     "ERA",
-    "G",
     "LOG",
     "N",
     "PIE",
     "RUF",
+
+    # --- Deferred 2026-09-20 ------------------------------------------
+    # Pulled out of select rather than ignored code-by-code: these are
+    # the five largest categories in the 2026-09-20 megalinter run and
+    # we're committing to fixing them properly, not nibbling at them.
+    # Re-add to select (and delete this comment) when that work starts.
+    #   "G",    # logging format (f-strings in log calls, etc.)
+    #   "UP",   # pyupgrade / syntax modernization
+    #   "TRY",  # exception-handling style (tryceratops)
+    #   "ANN",  # type annotations
+    #   "D",    # pydocstyle
+    # Revisit by 2026-12-31.
 ]
 
 ignore = [
@@ -41,19 +48,6 @@ ignore = [
     "E114",
     "E117",
     "E501",
-
-    # --- Deferred 2026-09-20: docstring wording/formatting nits -----------
-    # These fire only once a docstring already exists (D100-D104, which
-    # catch a *missing* docstring, are left enabled). They're purely
-    # mechanical wording/formatting issues, largely auto-fixable in a single
-    # `ruff check --fix` pass. Deferring them to a dedicated docstring
-    # cleanup pass rather than fixing scattered call sites piecemeal now.
-    # Revisit / remove this block by 2026-12-31.
-    "D205",  # 1 blank line required between summary line and description
-    "D400",  # First line should end with a period
-    "D401",  # First line of docstring should be in imperative mood
-    "D413",  # Missing blank line after last section
-    "D415",  # First line should end with punctuation
 ]
 
 [tool.ruff.lint.isort]
@@ -61,13 +55,8 @@ known-first-party = ["app"]
 
 [tool.ruff.lint.per-file-ignores]
 # --- Deferred 2026-09-20: test-only noise ---------------------------------
-# Rules below fire overwhelmingly inside app/tests/** (per the 2026-09-20
-# megalinter run) and are low-value or actively counter to normal pytest
-# style there:
-#   ANN                     - fixtures, mocks and helper functions in tests
-#            aren't a public API; annotating every parameter buys little.
-#   D                       - test functions are documented by their name +
-#            docstring-as-spec convention, not formal D1xx docstrings.
+# ANN and D are already off everywhere (see the select comment above), so
+# only the test-specific rules need listing here:
 #   SLF001                  - unit tests routinely reach into
 #            `engine._private_attr` to assert on internal state; that's the
 #            point of a white-box test, not a smell.
@@ -77,9 +66,8 @@ known-first-party = ["app"]
 #   ARG001, ARG002, ARG005  - unused fixture/mock arguments
 #            (`docker_client`, `update_config`, lambda `k`) are a standard
 #            pytest pattern for autouse/injected fixtures.
-# Revisit by re-enabling one family at a time once the test suite has a
-# docstring/typing pass, rather than reintroducing all of it at once.
-"**/tests/**" = ["S101", "ANN", "D", "SLF001", "PLR2004", "ARG001", "ARG002", "ARG005"]
+# Revisit alongside the select-level deferrals above.
+"**/tests/**" = ["S101", "SLF001", "PLR2004", "ARG001", "ARG002", "ARG005"]
 
 [tool.ruff.format]
 quote-style = "double"
