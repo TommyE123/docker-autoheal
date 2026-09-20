@@ -5,14 +5,20 @@ DISABLE:
   - ANSIBLE
   - COPYPASTE
   - GRAPHQL
+  - JSX
   - KUBERNETES
   - SALESFORCE
   - SQL
   - SPELL
   - SWIFT
+  - TSX
   - TYPESCRIPT
 
 DISABLE_LINTERS:
+  - CSS_BIOME
+  - JSON_BIOME
+  - JSON_NPM_PACKAGE_JSON_LINT
+  - JAVASCRIPT_BIOME
   - PYTHON_FLAKE8
   - PYTHON_ISORT
   - PYTHON_MYPY
@@ -48,7 +54,6 @@ VALIDATE_ALL_CODEBASE: true
 # ---------------------------------------------------------------------------
 
 PYTHON_DEFAULT_STYLE: ruff
-PYTHON_RUFF_CONFIG_FILE: "pyproject.toml"
 
 PYTHON_PYRIGHT_PRE_COMMANDS:
   - command: pip install --no-cache-dir -r requirements-dev.txt
@@ -62,16 +67,16 @@ JAVASCRIPT_DEFAULT_STYLE: prettier
 # Only the frontend has JavaScript/JSX, and eslint.config.js's flat config
 # needs project-local packages (e.g. eslint-plugin-react) resolved from
 # frontend/node_modules rather than MegaLinter's own bundled npm install.
+JAVASCRIPT_ES_CLI_EXECUTABLE: ["frontend/node_modules/.bin/eslint"]
+JAVASCRIPT_ES_CONFIG_FILE: "frontend/eslint.config.js"
 JAVASCRIPT_ES_FILE_EXTENSIONS: [".js", ".jsx"]
 JAVASCRIPT_ES_FILTER_REGEX_INCLUDE: "frontend/"
-JAVASCRIPT_ES_CONFIG_FILE: "frontend/eslint.config.js"
 JAVASCRIPT_ES_PRE_COMMANDS:
   # NODE_ENV=development forces npm to install devDependencies (eslint and
   # its plugins) even though MegaLinter's image sets NODE_ENV=production.
   - command: NODE_ENV=development npm ci --prefix frontend
     cwd: workspace
     continue_if_failed: false
-JAVASCRIPT_ES_CLI_EXECUTABLE: ["frontend/node_modules/.bin/eslint"]
 
 JAVASCRIPT_PRETTIER_FILE_EXTENSIONS: [".js", ".jsx"]
 JAVASCRIPT_PRETTIER_FILTER_REGEX_INCLUDE: "frontend/"
@@ -81,7 +86,6 @@ JAVASCRIPT_PRETTIER_FILTER_REGEX_INCLUDE: "frontend/"
 # ---------------------------------------------------------------------------
 
 MARKDOWN_MARKDOWNLINT_CONFIG_FILE: ".markdownlint.jsonc"
-MARKDOWN_MARKDOWNLINT_RULES_PATH: "."
 
 # ---------------------------------------------------------------------------
 # YAML
