@@ -17,6 +17,7 @@ rules:
     max: 200
   truthy:
     ignore: |
+      .github/workflows/devcontainer.yml
       .github/workflows/docker-build.yml
       .github/workflows/greetings.yml
       .github/workflows/labels-sync.yml
