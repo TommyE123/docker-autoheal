@@ -1,3 +1,119 @@
+
+Claude finished the response
+Ran a command
+926 total now (down from 3,306, as expected). Let me group these.
+
+Ran 4 commands, read a file, edited a file
+Grouped errors (v2 report, 926 total, post-first-pass)
+The test-file relaxation worked — only 99 of 926 remain in tests/. This report is now almost entirely app-code findings (827, 89%):
+
+Family	Count	%	Top codes
+G (logging)	207	22%	G004 195, G201 12
+UP (pyupgrade)	143	15%	UP045 54, UP006 42, UP017 20
+TRY (exceptions)	136	15%	TRY400 67, TRY300 29, TRY301 26
+ANN (annotations)	102	11%	ANN201 72 (app-code public functions)
+D (docstrings)	96	10%	D212 51, D204 18
+PL (pylint)	57	6%	PLC0415 25, PLR2004 15
+everything else	185	20%	scattered
+Top files: api.py (266), config_manager.py (108), monitoring_engine.py (97), notification_manager.py (92).
+
+The worst-offending, least-important one: G004
+It's the single biggest code by a wide margin — more than double ANN201, the next-highest — and it's the lowest-value rule in the list:
+
+What it flags: logger.warning(f"...{e}") instead of logger.warning("...%s", e).
+What it actually costs you: the f-string gets built even when the log level would suppress the message — a micro-perf nit, not a bug, not a security issue, not lost information.
+Contrast with G201 (12 hits, kept enabled): that one flags logger.error(..., exc_info=True) instead of logger.exception(...) — that changes what gets logged, so it's a real quality issue, not just style.
+Contrast with TRY400 (67 hits, kept enabled): same idea — flags swallowed tracebacks, a genuine debuggability problem, not a style nit.
+So G004 is exactly the kind of rule to defer: it's the biggest number on the page, and fixing it buys you almost nothing. I added it to the global ignore list with the same dated/rationale comment pattern as before, right below the docstring block.
+
+That leaves the report at roughly 719 (926 − 207), with what's left concentrated in UP/TRY/ANN/D — modernization suggestions and real exception-handling/typing gaps in api.py and config_manager.py that are worth actually fixing rather than deferring.
+
+Presented file
+Presented file
+Updated file below.
+
+
+Pyproject
+TOML
+we will get around to fixing them all but for now defer
+
+G (logging)20722%G004 195, G201 12UP (pyupgrade)14315%UP045 54, UP006 42, UP017 20TRY (exceptions)13615%TRY400 67, TRY300 29, TRY301 26ANN (annotations)10211%ANN201 72 (app-code public functions)D (docstrings)9610%D212 51, D204 18
+
+Ran a command
+Since we're now deferring the entire G, UP, TRY, ANN, and D families (not just a couple of codes each), the cleanest move is to pull them out of select entirely rather than keep growing the ignore list — that also lets me delete the now-redundant D/G entries in ignore and the ANN/D entries in the test per-file-ignores.
+
+Created a file, ran 2 commands
+Done. Changes:
+
+G, UP, TRY, ANN, D removed from select entirely — that's ~684 of the current 926 findings (74%) gone in one shot, all commented as a dated block with the exact families listed so it's easy to flip back on later.
+Cleaned up the now-redundant ignore entries (D205, D400, D401, D413, D415, G004) — pointless to keep individual codes ignored when the whole family is off.
+Trimmed the test per-file-ignores — ANN and D dropped from that list since they're off globally now; kept S101, SLF001, PLR2004, ARG001/002/005, which are genuinely test-specific rather than "defer everything" rules.
+What's still enforced: E/W/F (real bugs/syntax), B (bugbear), S (security), SIM/PERF/RET/RUF, PL minus the parts you'd expect from PLR2004 in tests, PTH, ARG (outside tests), SLF (outside tests), etc. So this pass is deferring style/modernization/documentation debt, not correctness or security checks.
+
+Presented file
+Presented file
+Updated file below.
+
+
+Pyproject
+TOML
+megalinter ruff report v3.txt
+megalinter ruff r
+eport v3
+.txt
+TXT
+do the same exersise again. group and see whats the worst offending.
+
+Ran 3 commands, read a file
+Grouped errors (v3 report, 242 total)
+Big shift in character here — after cutting G/UP/TRY/ANN/D, what's left is mostly real code-quality signal, not noise:
+
+Family	Count	%	Top codes
+PL (pylint)	57	24%	PLC0415 25, PLR2004 15, PLR0912 7
+B (bugbear)	37	15%	B904 33
+I (isort)	27	11%	I001 27
+PTH (pathlib)	20	8%	PTH123 20
+S (security)	17	7%	S113 7, S104 4, S106 4
+F (pyflakes)	16	7%	F841 6, F401 5, F541 5
+everything else	68	28%	scattered
+By single rule code, B904 (33) is actually the largest — but it's the one you don't want to defer: it's flagging raise HTTPException(...) inside an except Exception as e: block with no from e, which silently discards the original traceback. That's a real debugging problem in production, not a style nit.
+
+The actual worst-offending, least-important one: PLC0415
+Second-largest at 25, and it's the low-value one:
+
+What it flags: import statements inside functions instead of at module top-level — e.g. from fastapi.responses import FileResponse inside a route handler.
+Why it's often intentional, not a mistake: lazy/local imports are a normal, deliberate pattern for avoiding circular imports and for keeping startup-time imports light (e.g. demo.py's dependencies). Flagging every one of these means fighting a pattern the codebase already uses on purpose.
+Contrast with B904, S113 (kept): those catch real bugs — swallowed exceptions and network calls with no timeout, respectively.
+I'm deferring PLC0415 the same way as before (dated comment, revisit later).
+
+One thing I'm not deferring: I001 (27, import sorting). It's just as mechanical/low-value as PLC0415, but unlike it, there's no reason to defer something ruff check --fix --select I001 fixes in one shot with zero risk — deferring it only leaves imports messy for no benefit. Worth running that command instead, whenever's convenient.
+
+Edited a file, ran a command, shared files
+Updated file below.
+
+
+Pyproject
+TOML
+remove dates, but very very very slight extend each code and rule description so i can come back later and sort them out.
+
+Read a file pyproject.toml
+Rewriting all three deferred blocks: strip the dates, add one extra clause per rule/code so each has a bit more context to sort through later.
+
+Ran 2 commands, created a file
+All dates gone, TOML still valid, and each deferred code now has a one-line-longer note (what it actually flags, plus a hint at the fix) so it's easier to triage later without re-deriving context from scratch.
+
+Presented file
+Presented file
+Updated file below.
+
+
+Pyproject
+TOML
+
+
+
+Claude is AI and can make mistakes. Please double-check responses.
+Pyproject · TOML
 [tool.ruff]
 target-version = "py314"
 line-length = 100
@@ -30,17 +146,28 @@ select = [
     "PIE",
     "RUF",
 
-    # --- Deferred 2026-09-20 ------------------------------------------
-    # Pulled out of select rather than ignored code-by-code: these are
-    # the five largest categories in the 2026-09-20 megalinter run and
-    # we're committing to fixing them properly, not nibbling at them.
+    # --- Deferred families --------------------------------------------
+    # Pulled out of select rather than ignored code-by-code: these were
+    # the largest categories in the latest megalinter run and we're
+    # committing to fixing them properly, not nibbling at them.
     # Re-add to select (and delete this comment) when that work starts.
-    #   "G",    # logging format (f-strings in log calls, etc.)
-    #   "UP",   # pyupgrade / syntax modernization
-    #   "TRY",  # exception-handling style (tryceratops)
-    #   "ANN",  # type annotations
-    #   "D",    # pydocstyle
-    # Revisit by 2026-12-31.
+    #   "G",    # logging format - mainly f-strings passed to logger calls
+    #            instead of lazy `%` formatting, plus a couple of
+    #            logging.exception vs logging.error(exc_info=True) spots;
+    #            worth a pass since some of these do affect what gets logged.
+    #   "UP",   # pyupgrade / syntax modernization - Optional[X] -> X | None,
+    #            Dict/List -> dict/list, datetime.utc -> datetime.UTC, etc.;
+    #            purely mechanical and largely auto-fixable in one sweep.
+    #   "TRY",  # exception-handling style (tryceratops) - things like
+    #            logging.error instead of logging.exception inside except
+    #            blocks, raising inside a try that could be restructured,
+    #            and overly long inline exception messages.
+    #   "ANN",  # type annotations - missing parameter/return annotations
+    #            across the app's public functions; a real typing gap,
+    #            worth doing as a dedicated typing pass rather than piecemeal.
+    #   "D",    # pydocstyle - missing/malformed docstrings on modules,
+    #            classes and functions; overlaps with the ANN pass above
+    #            in terms of which files need attention.
 ]
 
 ignore = [
@@ -48,24 +175,35 @@ ignore = [
     "E114",
     "E117",
     "E501",
+
+    # --- Deferred: local/lazy imports -----------------------------------
+    # PLC0415 (`import` should be at top-level) - flags function-local
+    # imports, mostly inside api.py's route handlers and demo.py. Some of
+    # these are a deliberate pattern (avoiding circular imports, keeping
+    # startup-time imports light) and some may just be unintentional
+    # sprawl; worth going through each occurrence individually rather than
+    # blanket-fixing, since the right fix differs case by case.
+    "PLC0415",
 ]
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
 
 [tool.ruff.lint.per-file-ignores]
-# --- Deferred 2026-09-20: test-only noise ---------------------------------
+# --- Deferred: test-only noise ---------------------------------------
 # ANN and D are already off everywhere (see the select comment above), so
 # only the test-specific rules need listing here:
-#   SLF001                  - unit tests routinely reach into
-#            `engine._private_attr` to assert on internal state; that's the
-#            point of a white-box test, not a smell.
-#   PLR2004                 - literal values in assertions (`== 3`, `== 20`)
-#            are expected test data, not "magic numbers" to extract into
-#            constants.
-#   ARG001, ARG002, ARG005  - unused fixture/mock arguments
-#            (`docker_client`, `update_config`, lambda `k`) are a standard
-#            pytest pattern for autouse/injected fixtures.
+#   SLF001                  - private-member access, e.g.
+#            `engine._handle_container_restart` or `engine._last_restart_times`
+#            reached into directly from a test; unit tests routinely do this
+#            to assert on internal state, so it's expected here, not a smell.
+#   PLR2004                 - literal ("magic") values used in comparisons,
+#            e.g. `== 3`, `== 20`, `== 80` in assertions; those are expected
+#            test data/fixture values, not constants that need naming.
+#   ARG001, ARG002, ARG005  - unused fixture/mock/lambda arguments, e.g.
+#            `docker_client`, `update_config`, or a lambda's unused `k`;
+#            a standard pytest pattern for autouse or injected fixtures
+#            that a given test doesn't need to reference directly.
 # Revisit alongside the select-level deferrals above.
 "**/tests/**" = ["S101", "SLF001", "PLR2004", "ARG001", "ARG002", "ARG005"]
 
@@ -73,3 +211,9 @@ known-first-party = ["app"]
 quote-style = "double"
 indent-style = "space"
 line-ending = "auto"
+
+
+
+
+
+
