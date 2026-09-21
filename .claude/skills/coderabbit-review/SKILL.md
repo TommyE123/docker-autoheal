@@ -64,12 +64,12 @@ When CodeRabbit has reviewed the PR:
 
 Ignore or explain findings that are:
 
-* Incorrect.
-* Pre-existing and unrelated to the PR.
-* Speculative without a credible failure path.
-* Purely stylistic.
-* Already covered by existing automated tooling without a distinct issue.
-* Outside the scope of the PR.
+- Incorrect.
+- Pre-existing and unrelated to the PR.
+- Speculative without a credible failure path.
+- Purely stylistic.
+- Already covered by existing automated tooling without a distinct issue.
+- Outside the scope of the PR.
 
 Do not manufacture additional findings or perform a general repository audit.
 
@@ -103,9 +103,9 @@ Before the final review-fix commit and push:
 
 ## Commit and Push
 
-* Follow the repository's normal commit conventions.
-* Keep review-fix commits focused.
-* Push the changes to the PR branch.
+- Follow the repository's normal commit conventions.
+- Keep review-fix commits focused.
+- Push the changes to the PR branch.
 
 ## Document the Resolution
 
@@ -138,12 +138,12 @@ A CodeRabbit review covers the PR state available when that review runs.
 
 Material changes made afterwards remain subject to the normal CodeRabbit review cycle, including changes resulting from:
 
-* CodeRabbit findings.
-* Sourcery findings.
-* MegaLinter findings.
-* Other reviewer findings.
-* Additional changes to the original task.
-* Other authorised changes to the PR.
+- CodeRabbit findings.
+- Sourcery findings.
+- MegaLinter findings.
+- Other reviewer findings.
+- Additional changes to the original task.
+- Other authorised changes to the PR.
 
 Allow the automatic incremental review mechanism to cover those changes.
 

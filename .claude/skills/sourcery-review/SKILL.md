@@ -70,12 +70,12 @@ When Sourcery has reviewed the PR:
 
 Ignore or explain findings that are:
 
-* Incorrect.
-* Pre-existing and unrelated to the PR.
-* Speculative without a credible failure path.
-* Purely stylistic.
-* Already covered by existing automated tooling without a distinct issue.
-* Outside the scope of the PR.
+- Incorrect.
+- Pre-existing and unrelated to the PR.
+- Speculative without a credible failure path.
+- Purely stylistic.
+- Already covered by existing automated tooling without a distinct issue.
+- Outside the scope of the PR.
 
 Do not manufacture additional findings or perform a broader repository audit.
 
@@ -111,9 +111,9 @@ Before the final review-fix commit and push:
 
 ## Commit and Push
 
-* Follow the repository's normal commit conventions.
-* Keep review-fix commits focused.
-* Push the changes to the PR branch.
+- Follow the repository's normal commit conventions.
+- Keep review-fix commits focused.
+- Push the changes to the PR branch.
 
 ## Document the Resolution
 
@@ -146,11 +146,11 @@ A Sourcery review covers the PR state available when that review runs.
 
 Subsequent material changes may result from:
 
-* Sourcery findings.
-* CodeRabbit findings.
-* MegaLinter findings.
-* Human reviewer feedback.
-* Additional authorised changes.
+- Sourcery findings.
+- CodeRabbit findings.
+- MegaLinter findings.
+- Human reviewer feedback.
+- Additional authorised changes.
 
 Do not assume those changes will receive another Sourcery review.
 
@@ -172,10 +172,10 @@ If an eligible PR has no Sourcery review:
 
 Do not:
 
-* Trigger a first review.
-* Attempt to work around review capacity limits.
-* Create special automation to force a review.
-* Block the PR solely because Sourcery has not reviewed it.
+- Trigger a first review.
+- Attempt to work around review capacity limits.
+- Create special automation to force a review.
+- Block the PR solely because Sourcery has not reviewed it.
 
 ## Explicit Sourcery Re-Review Requests
 

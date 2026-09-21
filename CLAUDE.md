@@ -2,37 +2,37 @@
 
 ## Before making changes
 
-* Inspect the existing implementation, config and tests before proposing a change; prefer an existing repository pattern over inventing a new one.
+- Inspect the existing implementation, config and tests before proposing a change; prefer an existing repository pattern over inventing a new one.
 
-* For GitHub Actions, APIs, schemas or config formats, check current official docs or established examples rather than guessing syntax.
+- For GitHub Actions, APIs, schemas or config formats, check current official docs or established examples rather than guessing syntax.
 
-* Check existing issues, PRs and workflows before creating or changing them.
+- Check existing issues, PRs and workflows before creating or changing them.
 
-* If the request is ambiguous or an important implementation detail is unclear, clarify the relevant point with the user before making changes. Do not guess when different interpretations could materially change the outcome.
+- If the request is ambiguous or an important implementation detail is unclear, clarify the relevant point with the user before making changes. Do not guess when different interpretations could materially change the outcome.
 
-* Once the requirements are clear, make a concise plan, then implement the requested change.
+- Once the requirements are clear, make a concise plan, then implement the requested change.
 
-* After implementation, run the appropriate tests and validation, review the final diff, and address any issues introduced by the change before declaring the work complete.
+- After implementation, run the appropriate tests and validation, review the final diff, and address any issues introduced by the change before declaring the work complete.
 
 ## Keep changes focused
 
-* Do exactly what the issue/request requires. Don't bundle unrelated dependency bumps, refactors, lint fixes, documentation changes, or "while you're here" improvements into the same change.
+- Do exactly what the issue/request requires. Don't bundle unrelated dependency bumps, refactors, lint fixes, documentation changes, or "while you're here" improvements into the same change.
 
-* If the requested change makes existing documentation inaccurate, incomplete or misleading, update the affected documentation as part of the same change. Do not expand this into unrelated documentation cleanup.
+- If the requested change makes existing documentation inaccurate, incomplete or misleading, update the affected documentation as part of the same change. Do not expand this into unrelated documentation cleanup.
 
-* Do not fix unrelated pre-existing test, lint, CI, or tooling failures unless the task explicitly includes them.
+- Do not fix unrelated pre-existing test, lint, CI, or tooling failures unless the task explicitly includes them.
 
-* Don't add new infrastructure when an existing GitHub/CI capability already solves the problem.
+- Don't add new infrastructure when an existing GitHub/CI capability already solves the problem.
 
-* Once the requested change is implemented, validated and reviewed, stop. Do not continue making additional improvements, cleanup or refactoring unless requested.
+- Once the requested change is implemented, validated and reviewed, stop. Do not continue making additional improvements, cleanup or refactoring unless requested.
 
 ## Tests for behaviour changes
 
-* Behaviour changes need tests where practical; a bug fix needs a regression test that demonstrates the problem.
+- Behaviour changes need tests where practical; a bug fix needs a regression test that demonstrates the problem.
 
-* Never weaken, remove or bypass a test (or raise a coverage threshold) just to get CI green — fix the cause instead.
+- Never weaken, remove or bypass a test (or raise a coverage threshold) just to get CI green — fix the cause instead.
 
-* See `.claude/rules/testing.md` for how much validation to run and when to skip it.
+- See `.claude/rules/testing.md` for how much validation to run and when to skip it.
 
 ## Comments
 
@@ -40,17 +40,17 @@ Keep comments minimal: only for non-obvious reasoning the code can't convey on i
 
 ## Before declaring work complete
 
-* Run the relevant tests and linting for the files you changed, and check the final diff for unrelated changes.
+- Run the relevant tests and linting for the files you changed, and check the final diff for unrelated changes.
 
-* Never report work, investigation, validation, reproduction, or review that was not actually performed.
+- Never report work, investigation, validation, reproduction, or review that was not actually performed.
 
-* Report only validation that was actually performed.
+- Report only validation that was actually performed.
 
 ## GitHub workflow
 
-* Prefer a native GitHub Actions feature over a custom script/API call when one already provides the behaviour.
+- Prefer a native GitHub Actions feature over a custom script/API call when one already provides the behaviour.
 
-* Do not fix unrelated pre-existing GitHub Actions failures unless the task explicitly includes them.
+- Do not fix unrelated pre-existing GitHub Actions failures unless the task explicitly includes them.
 
 ## Pull request titles (required)
 
@@ -60,21 +60,21 @@ Every PR title must follow [Conventional Commits](https://www.conventionalcommit
 <type>: <description>
 ```
 
-* `type` must be one of: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
+- `type` must be one of: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
 
-* `description` should be concise and describe the change, not the issue.
+- `description` should be concise and describe the change, not the issue.
 
-* Optional scope is allowed (`type(scope): description`) but not required.
+- Optional scope is allowed (`type(scope): description`) but not required.
 
 Examples already in use in this repo:
 
-* `fix: correct Dockerfile EXPOSE port for the Web UI (8080 -> 3131)`
+- `fix: correct Dockerfile EXPOSE port for the Web UI (8080 -> 3131)`
 
-* `docs: reorganise and rewrite project documentation`
+- `docs: reorganise and rewrite project documentation`
 
-* `chore: migrate to multi-registry publishing (GHCR + Docker Hub)`
+- `chore: migrate to multi-registry publishing (GHCR + Docker Hub)`
 
-* `ci: add welcome workflow for first-time contributors`
+- `ci: add welcome workflow for first-time contributors`
 
 Set the title correctly when you open the PR — don't rely on a later retitle. This applies to every PR you open yourself, including dependency/config-only changes (use `chore:` for those unless another type fits better, e.g. `ci:` for GitHub Actions workflow changes).
 
@@ -90,9 +90,9 @@ When an issue exists, link the PR to it (`Closes #N` in the PR body). This keeps
 
 Exceptions (no issue required):
 
-* Renovate-authored PRs (automated and issue-less by design).
+- Renovate-authored PRs (automated and issue-less by design).
 
-* Purely mechanical docs-only, config-only, or CI-only tweaks with no behaviour change (for example fixing a PR title, a typo, or a lint config value).
+- Purely mechanical docs-only, config-only, or CI-only tweaks with no behaviour change (for example fixing a PR title, a typo, or a lint config value).
 
 When in doubt, ask whether an issue should be created rather than creating one automatically.
 
@@ -118,13 +118,13 @@ If the task is not tied to a GitHub issue or PR, use a short descriptive session
 
 ## Agent governance
 
-* Repository-specific instructions take precedence over generic assumptions, general AI coding practices, or personal preferences.
+- Repository-specific instructions take precedence over generic assumptions, general AI coding practices, or personal preferences.
 
-* Do not modify `CLAUDE.md`, `.claude/rules/`, `.claude/skills/`, or other agent-governance files as part of ordinary implementation work unless the issue explicitly requires a change to agent behaviour.
+- Do not modify `CLAUDE.md`, `.claude/rules/`, `.claude/skills/`, or other agent-governance files as part of ordinary implementation work unless the issue explicitly requires a change to agent behaviour.
 
-* Do not weaken, remove, or bypass an existing agent instruction to make a task easier.
+- Do not weaken, remove, or bypass an existing agent instruction to make a task easier.
 
-* If an issue explicitly requires a change to agent behaviour, treat the governance change as the primary scope of that issue and do not make unrelated implementation changes alongside it.
+- If an issue explicitly requires a change to agent behaviour, treat the governance change as the primary scope of that issue and do not make unrelated implementation changes alongside it.
 
 ## Requesting a CodeRabbit review (required before merge)
 
@@ -132,27 +132,27 @@ Every substantive PR gets a CodeRabbit review before the repository owner merges
 
 When a substantive PR reaches the CodeRabbit review stage, you MUST invoke the `coderabbit-review` skill and follow its instructions exactly. This workflow contains repository-specific institutional knowledge and must not be replaced with an ad hoc review process.
 
-* Do not perform an ad hoc CodeRabbit review.
+- Do not perform an ad hoc CodeRabbit review.
 
-* Do not rely solely on automatic skill discovery.
+- Do not rely solely on automatic skill discovery.
 
-* Follow `.claude/skills/coderabbit-review/SKILL.md`.
+- Follow `.claude/skills/coderabbit-review/SKILL.md`.
 
 CodeRabbit automatic reviews are enabled for PRs targeting `main`. Do not manually invoke `@coderabbitai full review` for the initial review. Let the automatic review run.
 
 When CodeRabbit reports actionable findings that are valid and related to the PR:
 
-* Investigate and fix them.
+- Investigate and fix them.
 
-* Ensure the PR branch is current with `main` before final validation and push, when required.
+- Ensure the PR branch is current with `main` before final validation and push, when required.
 
-* Run targeted validation.
+- Run targeted validation.
 
-* Commit and push the changes.
+- Commit and push the changes.
 
-* Document what was fixed in a PR comment.
+- Document what was fixed in a PR comment.
 
-* Wait for the relevant CI checks to complete successfully.
+- Wait for the relevant CI checks to complete successfully.
 
 CodeRabbit's automatic incremental review should then review the updated PR. Repeat as necessary until no further actionable findings remain.
 
@@ -176,11 +176,11 @@ Sourcery provides an independent second opinion alongside CodeRabbit. Sourcery r
 
 When Sourcery has reviewed the PR, you MUST invoke the `sourcery-review` skill and follow its instructions exactly. This workflow contains repository-specific institutional knowledge and must not be replaced with an ad hoc review process.
 
-* Do not perform an ad hoc Sourcery review.
+- Do not perform an ad hoc Sourcery review.
 
-* Do not rely solely on automatic skill discovery.
+- Do not rely solely on automatic skill discovery.
 
-* Follow `.claude/skills/sourcery-review/SKILL.md`.
+- Follow `.claude/skills/sourcery-review/SKILL.md`.
 
 Sourcery should normally be treated as a secondary review after the CodeRabbit review cycle has completed and the PR is otherwise ready for merge.
 
@@ -188,15 +188,15 @@ Sourcery findings are advisory and do not replace the required CodeRabbit review
 
 When Sourcery reports an actionable finding that is valid and related to the PR:
 
-* Investigate and fix it.
+- Investigate and fix it.
 
-* Run targeted validation.
+- Run targeted validation.
 
-* Ensure the PR branch is current with `main` before the final push.
+- Ensure the PR branch is current with `main` before the final push.
 
-* Commit and push the changes.
+- Commit and push the changes.
 
-* Document what was fixed in a PR comment.
+- Document what was fixed in a PR comment.
 
 Because Sourcery review capacity is limited, do not automatically request a re-review after making fixes. Re-review should only be performed when the repository owner explicitly requests it.
 
