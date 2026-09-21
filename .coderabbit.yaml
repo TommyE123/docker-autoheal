@@ -1,16 +1,25 @@
-# CodeRabbit configuration for docker-autoheal
-# https://docs.coderabbit.ai/reference/configuration
-# yaml-language-server: $schema=https://storage.googleapis.com/coderabbit_public_assets/schema.v2.json
-
-language: "en-GB"
-
 reviews:
+  profile: "chill"
+
   auto_review:
     enabled: true
-    drafts: false
-    base_branches:
-      - "main"
-    auto_pause_after_reviewed_commits: 0
+
+  path_instructions:
+    - path: "{**/*,**/.*,**/.*/**}"
+      instructions: |
+        Apply the repository review standard in REVIEW.md.
+
+        REVIEW.md is the canonical review guidance for this repository.
+        Use it as the authoritative source for review scope, evidence threshold,
+        priorities, production-safety checks, and the definition of a surgical
+        review.
+
+        Review only issues introduced or materially worsened by this PR.
+        Do not perform a general repository audit or request unrelated cleanup.
+
+        Follow the review methodology and reporting requirements defined in
+        REVIEW.md. If the changed code is sound, confirm that no changes are
+        required.
 
 knowledge_base:
   code_guidelines:
