@@ -1,5 +1,3 @@
-version: "3.8"
-
 # Docker Auto-Heal - Auto-Monitoring Example
 # This compose file demonstrates the auto-monitoring feature
 # Containers with autoheal=true label are automatically monitored

@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   autoheal:
     # This is our own published image (built by .github/workflows/docker-publish.yml), not a
