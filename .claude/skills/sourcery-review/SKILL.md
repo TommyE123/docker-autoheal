@@ -1,52 +1,213 @@
 ---
 name: sourcery-review
-description: How to treat Sourcery's automatic PR reviews in this repository, on top of the mandatory CodeRabbit review. Sourcery reviews PRs automatically via its installed GitHub App — this skill is about not disturbing that automation and not requesting unnecessary re-reviews, not about manually triggering a first review.
+description: Handle Sourcery's secondary automatic PR review process. Use when a Sourcery review exists on a PR, or when checking whether one exists. Sourcery is a secondary reviewer alongside CodeRabbit and is not normally a merge gate.
 ---
 
-# Sourcery review
+# Sourcery Review
 
-Sourcery is installed as a GitHub App and reviews PRs automatically — Claude does not need to (and should not try to) trigger a first review. It is independent of CodeRabbit, which remains the normal mandatory PR review process; do not make Sourcery a mandatory gate unless Tom explicitly requests it. Do not create automatic coordination or feedback loops between Sourcery and CodeRabbit.
+## Purpose
 
-- Do not disable, suppress, or otherwise manipulate Sourcery's automatic reviews.
-- The verified GitHub review author is `sourcery-ai`. Do not use `sourcery-ai[bot]`. Check the PR's existing reviews/comments for a review by `sourcery-ai` before assuming none exists.
-- An existing Sourcery review on a PR counts as *the* Sourcery review for that PR.
-- After making fixes based on that review, do not automatically request a Sourcery re-review — a re-review is only requested when Tom explicitly asks for one.
-- Do not create Sourcery → fix → Sourcery re-review loops.
-- Do not attempt to determine, manage, or work around the account-wide Sourcery review budget.
-- If Sourcery reports that its review budget is exhausted, do not attempt another review.
-- Do not add labels, workflows, hooks, status checks, or other automation to control Sourcery.
-- Do not reproduce Sourcery locally.
+Sourcery is a secondary automated reviewer alongside CodeRabbit.
 
-## Handling actionable findings
+CodeRabbit remains the repository's mandatory PR review process.
 
-When Sourcery reports findings and you fix them:
+Sourcery reviews eligible pull requests automatically through its GitHub App when review capacity is available.
 
-1. **Fix valid, actionable findings** — integrate the changes into the PR.
-2. **Run appropriate targeted validation** — use the smallest relevant check for the changed behaviour. For guidance on validation scope, see `.claude/rules/testing.md`.
-3. **Check if the PR branch is behind main** — before committing and pushing the fixes, verify that the PR branch is current with main. If it is behind, update the branch using the repository's established branch-update or rebase workflow, resolve any conflicts carefully, and re-run appropriate targeted validation. See `.claude/rules/branch-currency.md` for detailed guidance.
-4. **Commit and push the fixes** — commit and push the completed, validated changes.
-5. **Post a concise PR comment** explaining what Sourcery identified and what was fixed:
+A missing Sourcery review is not, by itself, a reason to block a pull request.
 
-   ```text
-   Addressed the actionable Sourcery findings:
+Do not use Sourcery as a replacement for CodeRabbit.
 
-   - Fixed "<finding>" in "<file>".
-   - Fixed "<finding>" in "<file>".
+## Review Model
 
-   Targeted validation completed: "<checks>".
-   ```
-
-6. **Do not automatically request another review** — the cycle stops here. Sourcery re-review is only performed when Tom explicitly asks for it.
-
-If Tom subsequently asks for a Sourcery re-review, follow the existing Sourcery workflow and update the PR discussion with the result. Do not create an automatic Sourcery fix/re-review loop.
-
-## Boundary with CodeRabbit
+The expected workflow is:
 
 ```text
-CodeRabbit → fix actionable findings → comment → green → request full re-review → repeat if needed
-Sourcery   → fix actionable findings → comment → stop; Tom decides whether re-review is needed
+automatic review
+→ assess findings
+→ fix valid findings
+→ targeted validation
+→ CI
+→ stop
 ```
 
-Do not create automatic coordination loops or feedback dependencies between Sourcery and CodeRabbit (such as automated labels, workflows, or status checks that tie one to the other). However, when a Sourcery-driven material change is made to a PR that has previously received a CodeRabbit review, a fresh `@coderabbitai full review` remains required once CI returns to green (per the CodeRabbit workflow in `CLAUDE.md`). The requirement for fresh CodeRabbit reviews after material changes — including Sourcery-driven changes — overrides any notion of avoiding coordination.
+Do not create automated coordination, dependencies, or feedback loops between Sourcery and CodeRabbit.
 
-Do not merge the PR yourself — see `CLAUDE.md`'s Merging section. Tom (@TommyE123) is the final gatekeeper.
+Sourcery does not normally require a re-review after fixes.
+
+## Before Considering the Review Complete
+
+Sourcery should normally be considered after the CodeRabbit review cycle has completed and the PR is otherwise ready for merge.
+
+1. Check whether Sourcery has reviewed the current PR state.
+2. If a review exists, read and assess it.
+3. If no review exists, continue with the normal repository process.
+4. Before the PR is ready for merge, ensure relevant CI/checks are green.
+5. Do not manually trigger an initial Sourcery review.
+
+The verified review author is:
+
+```text
+sourcery-ai
+```
+
+Do not search for:
+
+```text
+sourcery-ai[bot]
+```
+
+Check both PR reviews and PR comments when determining whether a Sourcery review exists.
+
+## Assessing Findings
+
+When Sourcery has reviewed the PR:
+
+1. Read the complete review.
+2. Assess each finding against the actual code and PR scope.
+3. Use `REVIEW.md` as the repository-specific review standard.
+4. Treat a review with no actionable findings as a valid outcome.
+5. Treat only valid, actionable, PR-related findings as requiring action.
+
+Ignore or explain findings that are:
+
+* Incorrect.
+* Pre-existing and unrelated to the PR.
+* Speculative without a credible failure path.
+* Purely stylistic.
+* Already covered by existing automated tooling without a distinct issue.
+* Outside the scope of the PR.
+
+Do not manufacture additional findings or perform a broader repository audit.
+
+## Fixing Actionable Findings
+
+For each valid, actionable, PR-related finding:
+
+1. Confirm the reported behaviour from the actual code.
+2. Determine whether the PR introduced or materially worsened the issue.
+3. Make the smallest appropriate change.
+4. Keep the fix within the PR scope.
+5. Do not suppress or work around a valid finding without a sound technical reason.
+
+Do not make a change solely because Sourcery reported it.
+
+If Sourcery reports that review capacity has been exhausted, take no further action and continue with the normal review process.
+
+## Validation
+
+Run the smallest relevant tests or checks that provide confidence in the fix.
+
+Follow `.claude/rules/testing.md`.
+
+Do not claim checks were run unless they were actually run.
+
+## Branch Currency
+
+Before the final review-fix commit and push:
+
+1. Ensure the branch satisfies `.claude/rules/branch-currency.md`.
+2. If the branch needs updating, resolve conflicts carefully.
+3. Re-run relevant validation after any required branch update.
+
+## Commit and Push
+
+* Follow the repository's normal commit conventions.
+* Keep review-fix commits focused.
+* Push the changes to the PR branch.
+
+## Document the Resolution
+
+Post a concise PR comment describing the actionable findings addressed.
+
+For example:
+
+```text
+Addressed the actionable Sourcery findings from the latest review:
+
+- Fixed "<finding>" in "<file>".
+- Fixed "<finding>" in "<file>".
+
+Targeted validation completed: "<checks>".
+```
+
+Only mention a branch update if the branch was actually updated.
+
+## CI
+
+After pushing review fixes:
+
+1. Allow relevant checks to complete.
+2. Resolve failures caused by the review fixes.
+3. Do not treat unrelated or pre-existing failures as review findings.
+
+## Subsequent Changes
+
+A Sourcery review covers the PR state available when that review runs.
+
+Subsequent material changes may result from:
+
+* Sourcery findings.
+* CodeRabbit findings.
+* MegaLinter findings.
+* Human reviewer feedback.
+* Additional authorised changes.
+
+Do not assume those changes will receive another Sourcery review.
+
+Material changes remain subject to the mandatory CodeRabbit review process.
+
+If a material change is made after CodeRabbit has reviewed the PR, allow the normal automatic CodeRabbit review cycle to cover the updated PR state.
+
+Do not create a Sourcery → CodeRabbit or CodeRabbit → Sourcery review dependency.
+
+Purely editorial or mechanical changes that cannot affect behaviour, configuration, tests, workflows, or meaningful project guidance do not require special Sourcery handling.
+
+## When No Sourcery Review Exists
+
+If an eligible PR has no Sourcery review:
+
+1. Check the PR reviews and comments for `sourcery-ai`.
+2. Confirm that no Sourcery review exists.
+3. Continue with the normal CodeRabbit process and repository checks.
+
+Do not:
+
+* Trigger a first review.
+* Attempt to work around review capacity limits.
+* Create special automation to force a review.
+* Block the PR solely because Sourcery has not reviewed it.
+
+## Explicit Sourcery Re-Review Requests
+
+Only perform a Sourcery re-review when the repository owner explicitly requests one.
+
+If an approved repository workflow for requesting a re-review already exists and the repository owner has explicitly requested one, that workflow may be used.
+
+Assess the resulting review using this skill:
+
+1. Fix valid, actionable findings.
+2. Run targeted validation.
+3. Ensure branch currency.
+4. Commit and push the fixes.
+5. Document the changes in the PR discussion.
+
+Do not request another Sourcery review afterwards unless the repository owner explicitly requests one again.
+
+## Completion Criteria
+
+The Sourcery review stage is complete when:
+
+1. Any existing Sourcery review has been assessed.
+2. Valid, actionable Sourcery findings have been resolved.
+3. Relevant validation has passed.
+4. The branch satisfies repository currency requirements.
+5. CI is green.
+6. Any material changes are covered by the normal CodeRabbit process.
+
+If no Sourcery review exists, do not block the PR solely because of the missing review.
+
+The repository owner remains the final gatekeeper.
+
+## Do Not Merge
+
+Do not merge the PR unless instructed to do so.
