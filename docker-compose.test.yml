@@ -1,8 +1,6 @@
 # Test script to verify Docker Auto-Heal Service
 # Run with Docker Compose to test the auto-heal functionality
 
-version: "3.8"
-
 services:
   autoheal:
     build: .
