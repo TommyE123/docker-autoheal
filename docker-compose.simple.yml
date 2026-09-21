@@ -1,7 +1,5 @@
 # Alternative docker-compose for local React build
 
-version: "3.8"
-
 services:
   autoheal:
     build:
