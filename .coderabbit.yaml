@@ -3,3 +3,11 @@
 # yaml-language-server: $schema=https://storage.googleapis.com/coderabbit_public_assets/schema.v2.json
 
 language: "en-GB"
+
+reviews:
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - "main"
+    auto_pause_after_reviewed_commits: 0
