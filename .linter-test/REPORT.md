@@ -14,6 +14,14 @@ prefix outside the repo).
 Section 4 explains how "MegaLinter-combined" is reconstructed from direct
 tool runs instead, and why that reconstruction is trustworthy for this repo.
 
+**Update — verified against the real container.** Opened
+[PR #239](https://github.com/TommyE123/docker-autoheal/pull/239) with this
+whole `.linter-test/` directory so the actual MegaLinter GitHub Action would
+lint the fixtures for real. Raw job log excerpt saved at
+`results/real-megalinter-ci-run.txt`. Section 10 covers what it confirmed
+and one real discrepancy it surfaced in `v8r`'s wiring that this session's
+Docker-less local reconstruction could not have found.
+
 ---
 
 ## 1. Inventory and clean baseline
@@ -342,3 +350,78 @@ None of the three is running on a weak config that's silently missing
 things a realistic reconfiguration would fix without cost; the one real
 config lever (yamllint's `line-length.max: 200`) is a deliberate,
 reasonable trade-off, not an oversight.
+
+---
+
+## 10. Confirmed against the real MegaLinter container (PR #239)
+
+`yamllint` and `prettier` in the real CI run matched the local
+reconstruction closely enough to trust it:
+
+- **yamllint**: identical rule hits, identical messages, on identical
+  lines, for every fixture (real run used the same `.yamllint.yml`,
+  same `--strict`).
+- **prettier**: same 4 files hard-erroring (syntax-broken: `01`, `08`, in
+  both `fixtures/` and their untouched `prettier-fixed/` copies) and same
+  5 files needing formatting (`02`, `03`, `03b`, `09`, `12`). Real CI used
+  prettier v3.9.6 vs. this session's v3.8.1, so the *wording* of the two
+  syntax-error messages differs slightly (e.g. "A block sequence may not
+  be used as an implicit map key" vs. this session's "All collection
+  items must start at the same column" for the same indentation defect)
+  — cosmetic, not a behavior difference; same files, same pass/fail.
+
+`v8r` did not match: real CI reported **0 errors, 0 warnings across all
+54 files** — including fixtures `05`, `06b`, and `10`, which this
+session's schema-pinned local testing (section 5) confirmed *should* fail
+schema validation. Two hypotheses, tested directly:
+
+1. *Does MegaLinter's `--ignore-errors` flag mask a real, correctly
+   schema-matched violation?* Tested directly: `v8r --ignore-errors -s
+   github-workflow.json fixtures/10-missing-required-keys-workflow.yml`
+   still printed `✖ ... is invalid` / `must have required property
+   'jobs'` and still exited 99. **No** — `--ignore-errors` only
+   suppresses *infrastructure* failures (a failed catalog/schema fetch),
+   not a validation result that actually completed. Confirmed this
+   distinction separately: pointing v8r at an empty local catalog (so no
+   schema can ever match) still exits 0 with a `✖ Failed fetching
+   https://www.schemastore.org/schema-catalog.json` line — that's the
+   shape of failure `--ignore-errors` swallows, and it's visibly
+   different from a completed, failing validation.
+2. *Did any fixture actually get schema-matched at all?* No — checked
+   the fixture paths (`.linter-test/fixtures/05-wrong-data-type.yml`,
+   `.linter-test/prettier-fixed/10-missing-required-keys-workflow.yml`,
+   etc.) against schemastore's own catalog `fileMatch` globs (section 2):
+   none of them match anything, because they don't live at
+   `docker-compose*.yml` or under `.github/workflows/`. v8r's real
+   auto-detect correctly found no schema for any of them and fell back to
+   syntax-only parsing. That also explains why fixtures `01` and `08`
+   (genuine YAML syntax breaks that this session's schema-pinned local run
+   caught via v8r's parser, independent of any schema) didn't register
+   either: with 54 files sharing one `v8r --ignore-errors <all files>`
+   invocation, a single unmatched file's fetch/lookup outcome isn't
+   necessarily isolated per-file in what MegaLinter's summary reports —
+   the run-level result came back as one clean "successful" line with no
+   per-file detail at all, unlike yamllint/prettier's runs which printed a
+   `--Error detail:` block per failing file. This is a **fixture-placement
+   artifact of this test suite**, not a demonstrated MegaLinter/v8r bug:
+   keeping fixtures in a clearly-separate, descriptively-named scratch
+   directory means none of them resemble a real compose or workflow file
+   by name, so nothing about the real repository's actual
+   `docker-compose*.yml` / `.github/workflows/*.yml` files can be inferred
+   from this round alone.
+
+To close that gap, added two more files that *do* match real naming
+conventions: `.linter-test/schema-match-check/docker-compose.yml` (ports
+given as a string, same defect as fixture `05`) and
+`.linter-test/schema-match-check/.github/workflows/broken.yml` (missing
+`jobs:`, same defect as fixture `10`). If the next MegaLinter run on PR
+#239 reports a `YAML_V8R` failure on these two specifically, it confirms
+v8r's real wiring works exactly as the schema-pinned local testing
+predicted and the section 9 recommendation to keep it as-is stands
+unchanged. If it *still* reports 0 errors even for these correctly-named
+files, that overturns the "v8r — keep as-is" recommendation: it would mean
+the current auto-detect + `--ignore-errors` wiring never actually blocks a
+bad PR in this repo in practice, regardless of what v8r is theoretically
+capable of, and pinning schemas explicitly (`YAML_V8R_ARGUMENTS` with
+`-s`, or a `.v8rrc`) would stop being a nice-to-have and become the only
+way to get real signal from this linter.

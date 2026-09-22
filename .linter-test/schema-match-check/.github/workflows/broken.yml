@@ -1,0 +1,6 @@
+name: Broken Workflow For Schema Match Check
+
+on:
+  push:
+    branches:
+      - main
