@@ -430,3 +430,22 @@ class TestAlertResponseHandling:
 
         assert config_manager.is_quarantined("web") is True
         assert len(events_of_type("quarantine")) == 1
+
+
+def test_cleanup_restart_counts_is_disabled_and_leaves_all_entries_untouched():
+    """cleanup_restart_counts() is intentionally a no-op (see its own docstring):
+    auto-cleanup was removing manually curated restart-count entries because
+    stable_id matching is complex. This locks in that disabled behaviour so a
+    future change can't silently reactivate cleanup without a deliberate,
+    tested decision.
+    """
+    config_manager.record_restart("web")
+    config_manager.record_restart("stale-container")
+    config_manager.record_restart("stale-container")
+
+    config_manager.cleanup_restart_counts(active_container_ids=["web"])
+
+    assert config_manager.get_config().containers.restart_counts == {
+        "web": 1,
+        "stale-container": 2,
+    }
