@@ -8,21 +8,21 @@ Do not manufacture findings. If no actionable issue exists, state that clearly.
 
 ---
 
-# Review Status
+## Review Status
 
 Every review must begin with one of the following statuses.
 
-## 🟢 GREEN — READY
+### 🟢 GREEN — READY
 
 No actionable issues found.
 
 The PR is safe to proceed from a code review perspective.
 
-## 🟠 AMBER — CHANGES RECOMMENDED
+### 🟠 AMBER — CHANGES RECOMMENDED
 
 No blocking issue was found, but worthwhile actionable improvements remain.
 
-## 🔴 RED — CHANGES REQUIRED
+### 🔴 RED — CHANGES REQUIRED
 
 A genuine correctness, security, reliability, or regression issue must be resolved before the PR is ready.
 
@@ -30,7 +30,7 @@ The status is a summary of the review outcome, not a score. Do not invent findin
 
 ---
 
-# Core Review Principles
+## Core Review Principles
 
 Prioritise:
 
@@ -55,7 +55,7 @@ A GREEN review is preferred over a weak, speculative, or low-confidence finding.
 
 ---
 
-# Evidence Threshold
+## Evidence Threshold
 
 Only raise a finding when the issue can be reasonably demonstrated from the changed code and represents a realistic failure scenario.
 
@@ -74,7 +74,7 @@ Avoid speculation. Point to the specific code path that produces the problem.
 
 ---
 
-# Correctness and Reliability
+## Correctness and Reliability
 
 Look for:
 
@@ -88,7 +88,7 @@ Look for:
 
 ---
 
-# Docker and Container Behaviour
+## Docker and Container Behaviour
 
 `docker-autoheal` directly interacts with Docker and may restart or stop production containers.
 
@@ -109,7 +109,7 @@ Findings in this area may have significant production impact, so ensure they are
 
 ---
 
-# Application Behaviour
+## Application Behaviour
 
 Review API, service, configuration, and application changes for:
 
@@ -123,7 +123,7 @@ Review API, service, configuration, and application changes for:
 
 ---
 
-# Metrics, Logging, Notifications and Observability
+## Metrics, Logging, Notifications and Observability
 
 Pay attention to changes affecting:
 
@@ -138,7 +138,7 @@ Flag cases where observable behaviour no longer reflects actual application stat
 
 ---
 
-# CI, Release and Deployment
+## CI, Release and Deployment
 
 Review workflow and deployment changes for:
 
@@ -154,7 +154,7 @@ Review workflow and deployment changes for:
 
 ---
 
-# Tests
+## Tests
 
 Tests should provide meaningful confidence for the behaviour being changed.
 
@@ -169,7 +169,7 @@ Do not request new tests for purely mechanical or low-risk changes where additio
 
 ---
 
-# Documentation
+## Documentation
 
 Flag documentation only when the PR introduces behaviour that makes existing documentation inaccurate or misleading.
 
@@ -188,7 +188,7 @@ Do not request documentation updates purely because documentation could be expan
 
 ---
 
-# Scope and Noise
+## Scope and Noise
 
 Review the changes made by the PR, not the repository as a whole.
 
@@ -203,7 +203,7 @@ Prefer a small number of high-confidence findings over a large number of specula
 
 ---
 
-# When No Issues Are Found
+## When No Issues Are Found
 
 A GREEN review is a valid outcome.
 

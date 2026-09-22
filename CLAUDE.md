@@ -132,20 +132,20 @@ Every substantive PR targeting `main` must receive a CodeRabbit review before th
 
 When a substantive PR reaches the CodeRabbit review stage, you MUST invoke the `coderabbit-review` skill and follow its instructions exactly.
 
-* Do not perform an ad hoc CodeRabbit review.
-* Do not rely solely on automatic skill discovery.
-* Follow `.claude/skills/coderabbit-review/SKILL.md`.
+- Do not perform an ad hoc CodeRabbit review.
+- Do not rely solely on automatic skill discovery.
+- Follow `.claude/skills/coderabbit-review/SKILL.md`.
 
 The CodeRabbit skill defines the complete review workflow, including:
 
-* When the initial review should be requested.
-* The required full initial review.
-* Assessment and resolution of findings.
-* Handling disputed findings.
-* Branch currency and validation.
-* CI handling.
-* Targeted follow-up reviews after material changes.
-* Completion criteria.
+- When the initial review should be requested.
+- The required full initial review.
+- Assessment and resolution of findings.
+- Handling disputed findings.
+- Branch currency and validation.
+- CI handling.
+- Targeted follow-up reviews after material changes.
+- Completion criteria.
 
 The first CodeRabbit request must be a full review. Subsequent requests must be targeted follow-ups. Never request another full review.
 
@@ -167,9 +167,9 @@ Sourcery reviews eligible PRs automatically when review capacity is available. A
 
 When a Sourcery review exists, you MUST invoke the `sourcery-review` skill and follow its instructions exactly.
 
-* Do not perform an ad hoc Sourcery review.
-* Do not rely solely on automatic skill discovery.
-* Follow `.claude/skills/sourcery-review/SKILL.md`.
+- Do not perform an ad hoc Sourcery review.
+- Do not rely solely on automatic skill discovery.
+- Follow `.claude/skills/sourcery-review/SKILL.md`.
 
 The normal review order is:
 
@@ -185,12 +185,12 @@ Do not manually trigger an initial Sourcery review.
 
 The Sourcery skill defines the complete workflow for:
 
-* Detecting and assessing Sourcery reviews.
-* Handling valid and disputed findings.
-* Branch currency and validation.
-* CI handling.
-* Situations where no Sourcery review is available.
-* Explicitly requested Sourcery re-reviews.
+- Detecting and assessing Sourcery reviews.
+- Handling valid and disputed findings.
+- Branch currency and validation.
+- CI handling.
+- Situations where no Sourcery review is available.
+- Explicitly requested Sourcery re-reviews.
 
 Sourcery findings are advisory and do not replace the required CodeRabbit review or independently authorise a merge.
 
