@@ -18,6 +18,7 @@ reviews:
     - "!**/dist/**"
     - "!**/node_modules/**"
     - "!frontend/dist/**"
+    - "!frontend/package-lock.json"
     - "!**/coverage.xml"
     - "!**/*.min.js"
     - "!**/*.min.css"
