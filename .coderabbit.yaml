@@ -1,25 +1,30 @@
+language: en-GB
+
 reviews:
-  profile: "chill"
+  profile: chill
 
   auto_review:
     enabled: true
+    auto_pause_after_reviewed_commits: 0
 
   path_instructions:
     - path: "{**/*,**/.*,**/.*/**}"
       instructions: |
-        Apply the repository review standard in REVIEW.md.
+        Apply REVIEW.md as the canonical review standard for this repository.
 
-        REVIEW.md is the canonical review guidance for this repository.
-        Use it as the authoritative source for review scope, evidence threshold,
-        priorities, production-safety checks, and the definition of a surgical
-        review.
+        Perform a surgical review of this PR. Review only issues introduced or
+        materially worsened by the PR's changes.
 
-        Review only issues introduced or materially worsened by this PR.
-        Do not perform a general repository audit or request unrelated cleanup.
+        Follow the review scope, evidence threshold, priorities, production-safety
+        checks, and reporting requirements defined in REVIEW.md.
 
-        Follow the review methodology and reporting requirements defined in
-        REVIEW.md. If the changed code is sound, confirm that no changes are
-        required.
+        Do not perform a general repository audit or request unrelated cleanup,
+        formatting, refactoring, or cosmetic changes.
+
+        Do not manufacture findings. Prefer a small number of high-confidence
+        findings over speculative or low-value comments.
+
+        If no actionable issue exists, report that clearly as a GREEN review.
 
 knowledge_base:
   code_guidelines:
