@@ -12,7 +12,7 @@ ui, alerts, observability, uptime_kuma, uptime_kuma_mappings, notifications.
 
 import json
 
-from app.config.config_manager import AutoHealConfig
+from app.config.config_manager import AutoHealConfig, ConfigManager
 
 
 def _valid_config_dict() -> dict:
@@ -242,3 +242,39 @@ def test_invalid_autoheal_section_does_not_prevent_custom_health_checks_loading(
     assert config.restart == default_restart
     assert "web" in isolated_config_manager._custom_health_checks
     assert isolated_config_manager._custom_health_checks["web"].check_type == "http"
+
+
+def test_real_config_manager_init_retains_valid_sections_and_health_checks(
+    monkeypatch, tmp_path
+):
+    """Exercise the actual __init__ lifecycle, not just _load_config() in
+    isolation: _load_custom_health_checks() only returns whatever
+    _load_config() already set on self, so a real construction is the only
+    way to prove that hand-off survives a partially invalid config.json."""
+    payload = _valid_config_dict()
+    payload["restart"]["cooldown_seconds"] = "not-a-number"
+    payload["custom_health_checks"] = {
+        "web": {
+            "container_id": "web",
+            "check_type": "http",
+            "http_endpoint": "/healthz",
+        }
+    }
+    (tmp_path / "config.json").write_text(json.dumps(payload))
+
+    monkeypatch.setattr(ConfigManager, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(ConfigManager, "CONFIG_FILE", tmp_path / "config.json")
+    monkeypatch.setattr(ConfigManager, "EVENTS_FILE", tmp_path / "events.json")
+    monkeypatch.setattr(ConfigManager, "RESTART_COUNTS_FILE", tmp_path / "restart_counts.json")
+    monkeypatch.setattr(ConfigManager, "QUARANTINE_FILE", tmp_path / "quarantine.json")
+    monkeypatch.setattr(ConfigManager, "MAINTENANCE_FILE", tmp_path / "maintenance.json")
+
+    manager = ConfigManager()
+
+    default_restart = AutoHealConfig().restart
+    assert manager._config.restart == default_restart
+    assert manager._config.monitor.interval_seconds == 45
+    assert manager._config.containers.selected == ["web"]
+    assert manager._config.filters.whitelist_names == ["web-*"]
+    assert "web" in manager._custom_health_checks
+    assert manager._custom_health_checks["web"].check_type == "http"
