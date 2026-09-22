@@ -1,0 +1,169 @@
+##[group]❌ Linted [YAML] files with [prettier]: Found 32 error(s) and 5 warning(s) - (0.8s) (expand for details)
+- Using [prettier v3.9.6] https://megalinter.io/10.1.0/descriptors/yaml_prettier
+- MegaLinter key: [YAML_PRETTIER]
+- Rules config: identified by [prettier]
+- Number of files analyzed: [56]
+- CWD: [/github/workspace]
+- Command: [prettier --check .codecov.yml .coderabbit.yaml .github/ISSUE_TEMPLATE/config.yml .github/actionlint.yaml .github/labels.yml .github/workflows/docker-build.yml .github/workflows/greetings.yml .github/workflows/labels-sync.yml .github/workflows/mega-li...(truncated)]
+--Error detail:
+Checking formatting...
+[error] .linter-test/fixtures/01-indentation.yml: SyntaxError: A block sequence may not be used as an implicit map key (8:1)
+[error]    6 |     volumes:
+[error]    7 |         - /var/run/docker.sock:/var/run/docker.sock:ro
+[error] >  8 |       - ./data:/data
+[error]      | ^
+[error]    9 |     ports:
+[error]   10 |       - "3131:3131"
+[error]   11 |     environment:
+[warn] .linter-test/fixtures/02-trailing-whitespace.yml
+[warn] .linter-test/fixtures/03-missing-blank-line-eof.yml
+[warn] .linter-test/fixtures/03b-extra-blank-lines-eof.yml
+[error] .linter-test/fixtures/08-tabs.yml: SyntaxError: Tabs are not allowed as indentation (3:1)
+[error]   1 | services:
+[error]   2 |   autoheal:
+[error] > 3 | 	image: tommye123/docker-autoheal:latest
+[error]     | ^
+[error]   4 | 	container_name: docker-autoheal
+[error]   5 |     restart: unless-stopped
+[error]   6 |     ports:
+[warn] .linter-test/fixtures/09-line-length.yml
+[warn] .linter-test/fixtures/12-quote-style.yml
+[error] .linter-test/prettier-fixed/01-indentation.yml: SyntaxError: A block sequence may not be used as an implicit map key (8:1)
+[error]    6 |     volumes:
+[error]    7 |         - /var/run/docker.sock:/var/run/docker.sock:ro
+[error] >  8 |       - ./data:/data
+[error]      | ^
+[error]    9 |     ports:
+[error]   10 |       - "3131:3131"
+[error]   11 |     environment:
+[error] .linter-test/prettier-fixed/08-tabs.yml: SyntaxError: Tabs are not allowed as indentation (3:1)
+[error]   1 | services:
+[error]   2 |   autoheal:
+[error] > 3 | 	image: tommye123/docker-autoheal:latest
+[error]     | ^
+[error]   4 | 	container_name: docker-autoheal
+[error]   5 |     restart: unless-stopped
+[error]   6 |     ports:
+Error occurred when checking code style in 4 files.
+
+##[endgroup]
+##[group]❌ Linted [YAML] files with [v8r]: Found 1 error(s) and 0 warning(s) - (10.42s) (expand for details)
+- Using [v8r v6.1.0] https://megalinter.io/10.1.0/descriptors/yaml_v8r
+- MegaLinter key: [YAML_V8R]
+- Rules config: identified by [v8r]
+- Number of files analyzed: [56]
+- CWD: [/github/workspace]
+- Command: [v8r --ignore-errors .codecov.yml .coderabbit.yaml .github/ISSUE_TEMPLATE/config.yml .github/actionlint.yaml .github/labels.yml .github/workflows/docker-build.yml .github/workflows/greetings.yml .github/workflows/labels-sync.yml .github/workflows/mega...(truncated)]
+--Error detail:
+✖ .linter-test/schema-match-check/.github/workflows/broken.yml is invalid
+
+.linter-test/schema-match-check/.github/workflows/broken.yml# must have required property 'jobs'
+
+✖ .linter-test/schema-match-check/docker-compose.yml is invalid
+
+.linter-test/schema-match-check/docker-compose.yml#/services/autoheal/ports must be array
+.linter-test/schema-match-check/docker-compose.yml#/services/autoheal must NOT have unevaluated properties
+##[endgroup]
+##[group]❌ Linted [YAML] files with [yamllint]: Found 23 error(s) and 0 warning(s) - (0.56s) (expand for details)
+- Using [yamllint v1.38.0] https://megalinter.io/10.1.0/descriptors/yaml_yamllint
+- MegaLinter key: [YAML_YAMLLINT]
+- Rules config: [/github/workspace/.yamllint.yml]
+- Number of files analyzed: [56]
+- CWD: [/github/workspace]
+- Command: [yamllint --format standard --strict -c /github/workspace/.yamllint.yml .codecov.yml .coderabbit.yaml .github/ISSUE_TEMPLATE/config.yml .github/actionlint.yaml .github/labels.yml .github/workflows/docker-build.yml .github/workflows/greetings.yml .gith...(truncated)]
+--Error detail:
+.linter-test/fixtures/01-indentation.yml
+  7:9       error    wrong indentation: expected 6 but found 8  (indentation)
+  8:7       error    syntax error: expected <block end>, but found '<block sequence start>' (syntax)
+
+.linter-test/fixtures/02-trailing-whitespace.yml
+  2:12      error    trailing spaces  (trailing-spaces)
+  4:36      error    trailing spaces  (trailing-spaces)
+
+.linter-test/fixtures/03-missing-blank-line-eof.yml
+  7:20      error    no new line character at the end of file  (new-line-at-end-of-file)
+
+.linter-test/fixtures/03b-extra-blank-lines-eof.yml
+  10:1      error    too many blank lines (3 > 0)  (empty-lines)
+
+.linter-test/fixtures/04-duplicate-keys.yml
+  6:5       error    duplication of key "restart" in mapping  (key-duplicates)
+
+.linter-test/fixtures/06b-invalid-schema-workflow-on.yml
+  3:1       warning  truthy value should be one of [false, true]  (truthy)
+
+.linter-test/fixtures/07-broken-anchor.yml
+  6:18      error    found undeclared alias "healthcheck-defaults"  (anchors)
+
+.linter-test/fixtures/08-tabs.yml
+  3:1       error    syntax error: found character '\t' that cannot start any token (syntax)
+
+.linter-test/fixtures/10-missing-required-keys-workflow.yml
+  3:1       warning  truthy value should be one of [false, true]  (truthy)
+
+.linter-test/fixtures/11-truthy.yml
+  6:10      warning  truthy value should be one of [false, true]  (truthy)
+  7:17      warning  truthy value should be one of [false, true]  (truthy)
+
+.linter-test/prettier-fixed/01-indentation.yml
+  7:9       error    wrong indentation: expected 6 but found 8  (indentation)
+  8:7       error    syntax error: expected <block end>, but found '<block sequence start>' (syntax)
+
+.linter-test/prettier-fixed/04-duplicate-keys.yml
+  6:5       error    duplication of key "restart" in mapping  (key-duplicates)
+
+.linter-test/prettier-fixed/06b-invalid-schema-workflow-on.yml
+  3:1       warning  truthy value should be one of [false, true]  (truthy)
+
+.linter-test/prettier-fixed/07-broken-anchor.yml
+  6:18      error    found undeclared alias "healthcheck-defaults"  (anchors)
+
+.linter-test/prettier-fixed/08-tabs.yml
+  3:1       error    syntax error: found character '\t' that cannot start any token (syntax)
+
+.linter-test/prettier-fixed/10-missing-required-keys-workflow.yml
+  3:1       warning  truthy value should be one of [false, true]  (truthy)
+
+.linter-test/prettier-fixed/11-truthy.yml
+  6:10      warning  truthy value should be one of [false, true]  (truthy)
+  7:17      warning  truthy value should be one of [false, true]  (truthy)
+
+.linter-test/schema-match-check/.github/workflows/broken.yml
+  3:1       warning  truthy value should be one of [false, true]  (truthy)
+
+
+##[endgroup]
+
++----SUMMARY-----+--------------------------+---------------+-------+-------+--------+------------+----------+--------------+
+| Descriptor     | Linter                   | Mode          | Files | Fixed | Errors | Max errors | Warnings | Elapsed time |
++----------------+--------------------------+---------------+-------+-------+--------+------------+----------+--------------+
+| ✅ ACTION       | actionlint               | list_of_files |     8 |       |      0 |            |        0 | 0.08s        |
+| ⚠️ ACTION      | zizmor                   | list_of_files |     8 |       |     29 |            |        0 | 4.71s        |
+| ⚠️ CSS         | stylelint                | list_of_files |     1 |       |     43 |            |        0 | 0.91s        |
+| ✅ DOCKERFILE   | hadolint                 | list_of_files |     2 |       |      0 |            |        0 | 0.03s        |
+| ❌ EDITORCONFIG | editorconfig-checker     | list_of_files |   328 |       |      1 |            |        0 | 0.1s         |
+| ✅ HTML         | djlint                   | list_of_files |     1 |       |      0 |            |        0 | 0.69s        |
+| ✅ HTML         | htmlhint                 | list_of_files |     1 |       |      0 |            |        0 | 0.11s        |
+| ⚠️ JAVASCRIPT  | eslint                   | list_of_files |    27 |       |     23 |            |        0 | 7.56s        |
+| ⚠️ JAVASCRIPT  | prettier                 | list_of_files |    27 |       |      1 |            |        0 | 0.79s        |
+| ✅ JSON         | jsonlint                 | list_of_files |    10 |       |      0 |            |        0 | 0.07s        |
+| ❌ JSON         | prettier                 | list_of_files |    10 |       |      1 |            |        0 | 0.55s        |
+| ✅ JSON         | v8r                      | list_of_files |    10 |       |      0 |            |        0 | 6.97s        |
+| ❌ MARKDOWN     | markdownlint             | list_of_files |    38 |       |      2 |            |        0 | 0.63s        |
+| ❌ MARKDOWN     | markdown-table-formatter | list_of_files |    38 |       |      1 |            |        0 | 0.18s        |
+| ⚠️ PYTHON      | pyright                  | list_of_files |    51 |       |    115 |            |        0 | 13.23s       |
+| ⚠️ PYTHON      | ruff                     | list_of_files |    51 |       |    197 |            |        0 | 0.98s        |
+| ⚠️ PYTHON      | ruff-format              | list_of_files |    51 |       |      1 |            |        0 | 0.03s        |
+| ✅ REPOSITORY   | betterleaks              | project       |   n/a |       |      0 |            |        0 | 0.56s        |
+| ⚠️ REPOSITORY  | checkov                  | project       |   n/a |       |      2 |            |        0 | 13.5s        |
+| ✅ REPOSITORY   | git_diff                 | project       |   n/a |       |      0 |            |        0 | 0.02s        |
+| ✅ REPOSITORY   | ls-lint                  | project       |   n/a |       |      0 |            |        0 | 0.01s        |
+| ⚠️ REPOSITORY  | osv-scanner              | project       |   n/a |       |     52 |            |        0 | 4.15s        |
+| ✅ REPOSITORY   | secretlint               | project       |   n/a |       |      0 |            |        0 | 0.69s        |
+| ⚠️ REPOSITORY  | semgrep                  | project       |   n/a |       |      3 |            |        0 | 15.08s       |
+| ⚠️ REPOSITORY  | trivy                    | project       |   n/a |       |      1 |            |        0 | 9.17s        |
+| ✅ REPOSITORY   | trivy-sbom               | project       |   n/a |       |      0 |            |        0 | 0.53s        |
+| ✅ REPOSITORY   | trufflehog               | project       |   n/a |       |      0 |            |        0 | 2.11s        |
+| ❌ YAML         | prettier                 | list_of_files |    56 |       |     32 |            |        5 | 0.8s         |
+| ❌ YAML         | v8r                      | list_of_files |    56 |       |      1 |            |        0 | 10.42s       |
+| ❌ YAML         | yamllint                 | list_of_files |    56 |       |     23 |            |        0 | 0.56s        |

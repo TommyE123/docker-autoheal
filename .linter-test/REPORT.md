@@ -414,14 +414,35 @@ To close that gap, added two more files that *do* match real naming
 conventions: `.linter-test/schema-match-check/docker-compose.yml` (ports
 given as a string, same defect as fixture `05`) and
 `.linter-test/schema-match-check/.github/workflows/broken.yml` (missing
-`jobs:`, same defect as fixture `10`). If the next MegaLinter run on PR
-#239 reports a `YAML_V8R` failure on these two specifically, it confirms
-v8r's real wiring works exactly as the schema-pinned local testing
-predicted and the section 9 recommendation to keep it as-is stands
-unchanged. If it *still* reports 0 errors even for these correctly-named
-files, that overturns the "v8r — keep as-is" recommendation: it would mean
-the current auto-detect + `--ignore-errors` wiring never actually blocks a
-bad PR in this repo in practice, regardless of what v8r is theoretically
-capable of, and pinning schemas explicitly (`YAML_V8R_ARGUMENTS` with
-`-s`, or a `.v8rrc`) would stop being a nice-to-have and become the only
-way to get real signal from this linter.
+`jobs:`, same defect as fixture `10`). Pushed and re-ran on PR #239.
+
+**Result: confirmed.** The follow-up MegaLinter run reported:
+
+```
+✖ .linter-test/schema-match-check/.github/workflows/broken.yml is invalid
+.linter-test/schema-match-check/.github/workflows/broken.yml# must have required property 'jobs'
+
+✖ .linter-test/schema-match-check/docker-compose.yml is invalid
+.linter-test/schema-match-check/docker-compose.yml#/services/autoheal/ports must be array
+.linter-test/schema-match-check/docker-compose.yml#/services/autoheal must NOT have unevaluated properties
+```
+
+Identical messages to the schema-pinned local prediction, on both files,
+and the `YAML_V8R` check went from ✅ to ❌ in MegaLinter's summary table
+the moment a correctly-named/pathed broken file was introduced. This
+closes the loop cleanly: `v8r`'s real, currently-wired invocation (bare
+auto-detect + `--ignore-errors`) **does** block a bad PR when the file is
+one schemastore recognizes by name — which covers every real YAML file in
+this repository (compose files and workflow files both matched, per the
+catalog check in section 2). The 0-errors result on the first CI run was
+conclusively a fixture-placement artifact of this test suite, not a gap in
+the real wiring. **The section 9 recommendation stands unchanged: keep
+`v8r` as-is.**
+
+One reporting quirk worth flagging, unrelated to detection: MegaLinter's
+own summary table showed `v8r` `Errors: 1` even though two distinct files
+were reported invalid — `v8r` evidently returns one process-level failure
+exit code for the whole multi-file invocation rather than a per-file
+count, and MegaLinter's table reflects that. The per-file `--Error
+detail:` text is accurate and complete regardless; this only affects the
+single summary number, not whether the check fails or what's reported.
