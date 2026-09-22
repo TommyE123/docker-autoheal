@@ -3,13 +3,15 @@ Configuration management for Docker Auto-Heal Service
 Handles in-memory configuration state with JSON export/import support
 """
 
-from typing import Any, List, Dict, Optional, Union
-from pydantic import BaseModel, Field, ValidationError, field_validator
-from datetime import datetime, timedelta, timezone
 import json
-import threading
-from pathlib import Path
 import logging
+import threading
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+
+from pydantic import BaseModel, Field, ValidationError, field_validator
+
 from app.config.init_defaults import initialize_defaults
 
 logger = logging.getLogger(__name__)
@@ -304,7 +306,7 @@ class ConfigManager:
             return AutoHealConfig()
 
         try:
-            with open(self.CONFIG_FILE, 'r') as f:
+            with self.CONFIG_FILE.open('r') as f:
                 data = json.load(f)
         except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
             logger.warning(f"Config file {self.CONFIG_FILE} is not valid JSON: {e}, using defaults")
@@ -371,7 +373,7 @@ class ConfigManager:
             config_dict['custom_health_checks'] = {
                 cid: hc.model_dump() for cid, hc in self._custom_health_checks.items()
             }
-            with open(self.CONFIG_FILE, 'w') as f:
+            with self.CONFIG_FILE.open('w') as f:
                 json.dump(config_dict, f, indent=2, default=str)
             logger.debug("Configuration saved to disk")
         except Exception as e:
@@ -381,7 +383,7 @@ class ConfigManager:
         """Load current and legacy events without losing valid history."""
         try:
             if self.EVENTS_FILE.exists():
-                with open(self.EVENTS_FILE, 'r') as f:
+                with self.EVENTS_FILE.open('r') as f:
                     data = json.load(f)
                     events: List[StoredAutoHealEvent] = []
                     for index, event in enumerate(data):
@@ -410,7 +412,7 @@ class ConfigManager:
         """Save events to file"""
         try:
             events_data = [event.model_dump(mode='json') for event in self._event_log]
-            with open(self.EVENTS_FILE, 'w') as f:
+            with self.EVENTS_FILE.open('w') as f:
                 json.dump(events_data, f, indent=2, default=str)
             logger.debug(f"Saved {len(self._event_log)} events to disk")
         except Exception as e:
@@ -426,7 +428,7 @@ class ConfigManager:
         """Load quarantine list from file or return empty set"""
         try:
             if self.QUARANTINE_FILE.exists():
-                with open(self.QUARANTINE_FILE, 'r') as f:
+                with self.QUARANTINE_FILE.open('r') as f:
                     data = json.load(f)
                     quarantine = set(data)
                     logger.info(f"Loaded {len(quarantine)} quarantined containers from disk")
@@ -438,7 +440,7 @@ class ConfigManager:
     def _save_quarantine(self) -> None:
         """Save quarantine list to file"""
         try:
-            with open(self.QUARANTINE_FILE, 'w') as f:
+            with self.QUARANTINE_FILE.open('w') as f:
                 json.dump(list(self._quarantined_containers), f, indent=2)
             logger.debug(f"Saved {len(self._quarantined_containers)} quarantined containers to disk")
         except Exception as e:
@@ -448,7 +450,7 @@ class ConfigManager:
         """Load maintenance mode state from file"""
         try:
             if self.MAINTENANCE_FILE.exists():
-                with open(self.MAINTENANCE_FILE, 'r') as f:
+                with self.MAINTENANCE_FILE.open('r') as f:
                     data = json.load(f)
                     self._maintenance_mode = data.get('enabled', False)
                     start_time = data.get('start_time')
@@ -465,7 +467,7 @@ class ConfigManager:
                 'enabled': self._maintenance_mode,
                 'start_time': self._maintenance_start_time.isoformat() if self._maintenance_start_time else None
             }
-            with open(self.MAINTENANCE_FILE, 'w') as f:
+            with self.MAINTENANCE_FILE.open('w') as f:
                 json.dump(data, f, indent=2)
             logger.debug(f"Saved maintenance mode state: {self._maintenance_mode}")
         except Exception as e:
