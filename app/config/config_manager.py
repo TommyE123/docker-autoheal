@@ -3,13 +3,15 @@ Configuration management for Docker Auto-Heal Service
 Handles in-memory configuration state with JSON export/import support
 """
 
-from typing import List, Dict, Optional, Union
-from pydantic import BaseModel, Field, ValidationError, field_validator
-from datetime import datetime, timedelta, timezone
 import json
-import threading
-from pathlib import Path
 import logging
+import threading
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+
+from pydantic import BaseModel, Field, ValidationError, field_validator
+
 from app.config.init_defaults import initialize_defaults
 
 logger = logging.getLogger(__name__)
@@ -217,6 +219,22 @@ class LegacyAutoHealEvent(BaseModel):
 StoredAutoHealEvent = Union[AutoHealEvent, LegacyAutoHealEvent]
 
 
+# Top-level AutoHealConfig sections that are themselves a single model and can
+# be validated independently of one another. uptime_kuma_mappings is handled
+# separately below since it is a list rather than a single model.
+_CONFIG_SECTION_MODELS: Dict[str, type] = {
+    "monitor": MonitorConfig,
+    "containers": ContainersConfig,
+    "restart": RestartConfig,
+    "filters": FiltersConfig,
+    "ui": UIConfig,
+    "alerts": AlertsConfig,
+    "observability": ObservabilityConfig,
+    "uptime_kuma": UptimeKumaConfig,
+    "notifications": NotificationsConfig,
+}
+
+
 class ConfigManager:
     """
     Thread-safe configuration manager with file-based persistence
@@ -274,22 +292,79 @@ class ConfigManager:
         self.MAINTENANCE_FILE = self.DATA_DIR / "maintenance.json"
 
     def _load_config(self) -> AutoHealConfig:
-        """Load configuration from file or return default"""
+        """Load configuration from file, containing failures to the section that caused them.
+
+        Malformed JSON has nothing to selectively recover, so it falls back to
+        full defaults, same as before. Once the JSON parses, each top-level
+        AutoHealConfig section is validated independently: a section that
+        fails validation is reset to its own default and logged by name,
+        while every other section is kept exactly as loaded from disk. This
+        mirrors the per-record recovery _load_events() already does for the
+        events log.
+        """
+        if not self.CONFIG_FILE.exists():
+            return AutoHealConfig()
+
         try:
-            if self.CONFIG_FILE.exists():
-                with open(self.CONFIG_FILE, 'r') as f:
-                    data = json.load(f)
-                    # Extract custom health checks separately
-                    self._custom_health_checks = {
-                        cid: HealthCheckConfig(**hc)
-                        for cid, hc in data.pop('custom_health_checks', {}).items()
-                    }
-                    config = AutoHealConfig(**data)
-                    logger.info("Configuration loaded from disk")
-                    return config
-        except Exception as e:
-            logger.warning(f"Failed to load config from disk: {e}, using defaults")
-        return AutoHealConfig()
+            with self.CONFIG_FILE.open('r') as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
+            logger.warning(f"Config file {self.CONFIG_FILE} is not valid JSON: {e}, using defaults")
+            return AutoHealConfig()
+
+        if not isinstance(data, dict):
+            logger.warning(
+                f"Config file {self.CONFIG_FILE} did not contain a JSON object, using defaults"
+            )
+            return AutoHealConfig()
+
+        # Extracting and parsing custom health checks is kept separate from
+        # AutoHealConfig section loading below, so a failure in one can never
+        # cascade into resetting the other.
+        self._custom_health_checks = self._parse_custom_health_checks(
+            data.pop('custom_health_checks', {})
+        )
+
+        config = self._build_config_from_sections(data)
+        logger.info("Configuration loaded from disk")
+        return config
+
+    def _parse_custom_health_checks(self, raw: Any) -> Dict[str, HealthCheckConfig]:
+        """Parse the custom_health_checks block, defaulting to empty on failure."""
+        try:
+            return {cid: HealthCheckConfig(**hc) for cid, hc in raw.items()}
+        except (ValidationError, TypeError, AttributeError) as error:
+            logger.warning(f"Failed to load custom_health_checks from disk: {error}, using defaults")
+            return {}
+
+    def _build_config_from_sections(self, data: dict) -> AutoHealConfig:
+        """Build AutoHealConfig one top-level section at a time.
+
+        Each section is validated independently so a single bad section (a
+        wrong type, an unrecognized shape, a future field an older version
+        can't read) can't discard the rest of a working configuration.
+        """
+        sections: Dict[str, Any] = {}
+
+        for name, model in _CONFIG_SECTION_MODELS.items():
+            if name not in data:
+                continue
+            try:
+                sections[name] = model(**data[name])
+            except (ValidationError, TypeError) as error:
+                logger.warning(f"Resetting config section '{name}' to defaults: {error}")
+
+        if 'uptime_kuma_mappings' in data:
+            try:
+                sections['uptime_kuma_mappings'] = [
+                    UptimeKumaMapping(**item) for item in data['uptime_kuma_mappings']
+                ]
+            except (ValidationError, TypeError) as error:
+                logger.warning(
+                    f"Resetting config section 'uptime_kuma_mappings' to defaults: {error}"
+                )
+
+        return AutoHealConfig(**sections)
 
     def _save_config(self) -> None:
         """Save configuration to file"""
@@ -298,7 +373,7 @@ class ConfigManager:
             config_dict['custom_health_checks'] = {
                 cid: hc.model_dump() for cid, hc in self._custom_health_checks.items()
             }
-            with open(self.CONFIG_FILE, 'w') as f:
+            with self.CONFIG_FILE.open('w') as f:
                 json.dump(config_dict, f, indent=2, default=str)
             logger.debug("Configuration saved to disk")
         except Exception as e:
@@ -308,7 +383,7 @@ class ConfigManager:
         """Load current and legacy events without losing valid history."""
         try:
             if self.EVENTS_FILE.exists():
-                with open(self.EVENTS_FILE, 'r') as f:
+                with self.EVENTS_FILE.open('r') as f:
                     data = json.load(f)
                     events: List[StoredAutoHealEvent] = []
                     for index, event in enumerate(data):
@@ -337,7 +412,7 @@ class ConfigManager:
         """Save events to file"""
         try:
             events_data = [event.model_dump(mode='json') for event in self._event_log]
-            with open(self.EVENTS_FILE, 'w') as f:
+            with self.EVENTS_FILE.open('w') as f:
                 json.dump(events_data, f, indent=2, default=str)
             logger.debug(f"Saved {len(self._event_log)} events to disk")
         except Exception as e:
@@ -353,7 +428,7 @@ class ConfigManager:
         """Load quarantine list from file or return empty set"""
         try:
             if self.QUARANTINE_FILE.exists():
-                with open(self.QUARANTINE_FILE, 'r') as f:
+                with self.QUARANTINE_FILE.open('r') as f:
                     data = json.load(f)
                     quarantine = set(data)
                     logger.info(f"Loaded {len(quarantine)} quarantined containers from disk")
@@ -365,7 +440,7 @@ class ConfigManager:
     def _save_quarantine(self) -> None:
         """Save quarantine list to file"""
         try:
-            with open(self.QUARANTINE_FILE, 'w') as f:
+            with self.QUARANTINE_FILE.open('w') as f:
                 json.dump(list(self._quarantined_containers), f, indent=2)
             logger.debug(f"Saved {len(self._quarantined_containers)} quarantined containers to disk")
         except Exception as e:
@@ -375,7 +450,7 @@ class ConfigManager:
         """Load maintenance mode state from file"""
         try:
             if self.MAINTENANCE_FILE.exists():
-                with open(self.MAINTENANCE_FILE, 'r') as f:
+                with self.MAINTENANCE_FILE.open('r') as f:
                     data = json.load(f)
                     self._maintenance_mode = data.get('enabled', False)
                     start_time = data.get('start_time')
@@ -392,7 +467,7 @@ class ConfigManager:
                 'enabled': self._maintenance_mode,
                 'start_time': self._maintenance_start_time.isoformat() if self._maintenance_start_time else None
             }
-            with open(self.MAINTENANCE_FILE, 'w') as f:
+            with self.MAINTENANCE_FILE.open('w') as f:
                 json.dump(data, f, indent=2)
             logger.debug(f"Saved maintenance mode state: {self._maintenance_mode}")
         except Exception as e:
