@@ -30,6 +30,37 @@ The status is a summary of the review outcome, not a score. Do not invent findin
 
 ---
 
+## Per-Finding Reporting Format
+
+Every individual finding also gets its own tag, separate from the overall review status above:
+
+- 🔴 **RED** — must be fixed before merge (blocking)
+- 🟠 **AMBER** — worth fixing, not necessarily blocking
+- 🟢 **GREEN** — something the PR gets right, or a minor/non-blocking observation worth noting
+
+Only 🔴 RED and 🟠 AMBER findings are actionable. A 🟢 GREEN finding does not affect the overall review status — a review can carry GREEN call-outs and still conclude an overall GREEN — READY status, since GREEN findings are not actionable.
+
+For each 🔴/🟠 finding, give:
+
+- exact `file:line`
+- what is wrong
+- why it matters
+- the smallest correct fix
+- whether this PR introduced it or it is pre-existing
+- whether a regression test is required
+
+Inspect the surrounding repository, not just the changed lines. Do not treat the PR description or a passing test suite as proof of correctness.
+
+End every review with exactly one verdict:
+
+- ✅ **APPROVE** — safe to merge
+- ⚠️ **APPROVE WITH MINOR CHANGES** — no blocking (RED) issue
+- ❌ **CHANGES REQUIRED** — at least one RED (blocking) issue found
+
+Review only — do not push commits to the PR.
+
+---
+
 ## Core Review Principles
 
 Prioritise:
@@ -59,16 +90,7 @@ A GREEN review is preferred over a weak, speculative, or low-confidence finding.
 
 Only raise a finding when the issue can be reasonably demonstrated from the changed code and represents a realistic failure scenario.
 
-Findings should be limited to issues introduced or materially worsened by the PR.
-
-Every finding should identify:
-
-- What is wrong.
-- Where it occurs.
-- Why it matters.
-- How the PR introduced or worsened the issue.
-- The smallest reasonable fix.
-- Whether a regression test would be useful.
+Findings should be limited to issues introduced or materially worsened by the PR. See "Per-Finding Reporting Format" above for what each finding must include.
 
 Avoid speculation. Point to the specific code path that produces the problem.
 

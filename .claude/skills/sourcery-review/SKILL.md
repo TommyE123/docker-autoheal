@@ -105,6 +105,8 @@ For each valid finding:
 
 Do not change code solely because Sourcery suggested it.
 
+Do not reply on Sourcery's comment threads yet — replies happen only after the fix is pushed and CI is green. See CI below.
+
 ## Disputed Findings
 
 If Claude disagrees with a Sourcery finding:
@@ -148,7 +150,10 @@ Push the changes to the PR branch.
 
 ## Documenting Resolution
 
-When appropriate, leave a concise PR comment documenting the resolved findings.
+Do not post replies or a documenting comment while a fix is only staged locally or CI is still running on it. Wait until CI is green on the commit that carries the fix (see CI below), then, in one pass:
+
+1. Reply on each Sourcery comment thread the fix addresses, naming the commit.
+2. Leave a concise PR comment documenting the resolved findings.
 
 For example:
 
@@ -173,12 +178,14 @@ After pushing fixes:
 3. Run the relevant validation.
 4. Push the fix.
 5. Check CI again.
-6. If CI is still running, report that status and stop.
-7. Resume when invoked again and current results are available.
+6. If CI is still running or failing, do not reply or comment yet — wait and re-check rather than posting a reply against a red or pending build.
+7. Once CI is green on the commit with the fix, post the thread replies and documenting comment from "Documenting Resolution".
 
 Do not asynchronously monitor CI.
 
 Do not proceed to CodeRabbit while relevant CI is failing or still running.
+
+Do not reply on a Sourcery thread or post the documenting comment while CI is red or still running on the fix commit.
 
 Unrelated or pre-existing CI failures are not automatically Sourcery findings.
 

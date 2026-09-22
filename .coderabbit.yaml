@@ -2,15 +2,14 @@
 language: en-GB
 
 tone_instructions: >-
-  Follow REVIEW.md's format exactly: RED/AMBER per finding, blockers (RED)
-  listed first, end with one verdict: APPROVE / APPROVE WITH MINOR CHANGES /
-  CHANGES REQUIRED.
+  Follow REVIEW.md's format exactly: the overall review status, the
+  per-finding RED/AMBER/GREEN tags, and the single closing verdict.
 
 reviews:
   profile: chill
   request_changes_workflow: false
   high_level_summary: true
-  review_status: true
+  review_status: false
   collapse_walkthrough: false
 
   path_filters:
@@ -26,28 +25,16 @@ reviews:
   path_instructions:
     - path: "{**/*,**/.*,**/.*/**}"
       instructions: |
-        Use REVIEW.md as the authoritative review standard for this repository.
-        This overrides CodeRabbit's default review format.
+        Use REVIEW.md as the authoritative review standard for this
+        repository, in full — its review status, per-finding tags, and
+        verdict format all apply. This overrides CodeRabbit's default
+        review format.
 
         Perform a surgical review: only issues introduced or materially
         worsened by this PR's changes. Do not perform a general repository
         audit or request unrelated cleanup, formatting, or refactoring.
 
-        Classify each actionable finding as exactly one of:
-        - RED — must be fixed before merge (blocking)
-        - AMBER — significant risk, not necessarily blocking
-
-        For each RED/AMBER finding, give: file:line, what is wrong, why it
-        matters, and the smallest correct fix. Do not tag individual
-        findings GREEN — GREEN is reserved for the overall review status
-        when no actionable issues are found.
-
         Do not manufacture findings. If the PR is correct, say so plainly.
-
-        End the review with exactly one verdict:
-        - APPROVE — safe to merge
-        - APPROVE WITH MINOR CHANGES — no blocking (RED) issue
-        - CHANGES REQUIRED — at least one RED (blocking) issue found
 
   auto_review:
     enabled: false
