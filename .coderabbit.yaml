@@ -1,25 +1,17 @@
-# CodeRabbit Configuration
-# Schema: https://coderabbit.ai/integrations/schema.v2.json
+# yaml-language-server: $schema=https://storage.googleapis.com/coderabbit_public_assets/schema.v2.json
+language: en-GB
 
-language: "en-GB"
-
-tone_instructions: >
-  Follow the review format and standards defined in REVIEW.md exactly.
-  Use GREEN / AMBER / RED statuses. List blocking issues first.
-  End with a clear merge recommendation.
-
-knowledge_base:
-  code_guidelines:
-    enabled: true
-    filePatterns:
-      - "REVIEW.md"
+tone_instructions: >-
+  Follow REVIEW.md's format exactly: RED/AMBER/GREEN per section and per
+  finding, blockers (RED) listed first, end with one verdict: APPROVE /
+  APPROVE WITH MINOR CHANGES / CHANGES REQUIRED.
 
 reviews:
-  profile: "chill"
+  profile: chill
+  request_changes_workflow: false
   high_level_summary: true
   review_status: true
   collapse_walkthrough: false
-  request_changes_workflow: false
 
   path_filters:
     - "!**/*.lock"
@@ -27,15 +19,35 @@ reviews:
     - "!node_modules/**"
 
   path_instructions:
-    - path: "**/*"
+    - path: "{**/*,**/.*,**/.*/**}"
       instructions: |
-        Use REVIEW.md as the authoritative source for review structure,
-        status labels (GREEN / AMBER / RED), and merge recommendations.
+        Use REVIEW.md as the authoritative review standard for this repository.
         This overrides CodeRabbit's default review format.
 
-  auto_review:
-    enabled: true
-    drafts: false
+        Perform a surgical review: only issues introduced or materially
+        worsened by this PR's changes. Do not perform a general repository
+        audit or request unrelated cleanup, formatting, or refactoring.
 
-chat:
-  auto_reply: true
+        Classify every finding as exactly one of:
+        - RED — must be fixed before merge (blocking)
+        - AMBER — significant risk, not necessarily blocking
+        - GREEN — correct, or a minor/non-blocking observation
+
+        For each RED/AMBER finding, give: file:line, what is wrong, why it
+        matters, and the smallest correct fix.
+
+        Do not manufacture findings. If the PR is correct, say so plainly.
+
+        End the review with exactly one verdict:
+        - APPROVE — safe to merge
+        - APPROVE WITH MINOR CHANGES — no blocking (RED) issue
+        - CHANGES REQUIRED — at least one RED (blocking) issue found
+
+  auto_review:
+    enabled: false
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - REVIEW.md
