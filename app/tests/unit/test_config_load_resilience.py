@@ -192,6 +192,19 @@ def test_unparseable_json_falls_back_to_full_defaults_without_raising(isolated_c
     assert str(isolated_config_manager.CONFIG_FILE) in caplog.text
 
 
+def test_invalid_utf8_config_file_falls_back_to_full_defaults_without_raising(
+    isolated_config_manager, caplog
+):
+    """A config.json with bytes that can't even be decoded as text must not crash init."""
+    isolated_config_manager.CONFIG_FILE.write_bytes(b"\xff\xfe\x00invalid-utf8")
+
+    config = isolated_config_manager._load_config()
+
+    assert config == AutoHealConfig()
+    assert "not valid JSON" in caplog.text
+    assert str(isolated_config_manager.CONFIG_FILE) in caplog.text
+
+
 def test_broken_custom_health_check_does_not_reset_autoheal_config_sections(
     isolated_config_manager, caplog
 ):

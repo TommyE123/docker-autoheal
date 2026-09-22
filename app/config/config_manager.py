@@ -306,7 +306,7 @@ class ConfigManager:
         try:
             with open(self.CONFIG_FILE, 'r') as f:
                 data = json.load(f)
-        except (OSError, json.JSONDecodeError) as e:
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
             logger.warning(f"Config file {self.CONFIG_FILE} is not valid JSON: {e}, using defaults")
             return AutoHealConfig()
 
