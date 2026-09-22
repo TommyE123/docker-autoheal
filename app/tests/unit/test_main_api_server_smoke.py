@@ -16,7 +16,6 @@ mock, so Uvicorn genuinely binds a socket and serves requests.
 """
 
 import asyncio
-import socket
 from contextlib import suppress
 from typing import ClassVar
 from unittest.mock import patch
@@ -30,19 +29,6 @@ import app.main as main_module
 _POLL_INTERVAL_SECONDS = 0.01
 _STARTUP_TIMEOUT_SECONDS = 5
 _SHUTDOWN_TIMEOUT_SECONDS = 5
-
-
-def _find_free_port() -> int:
-    """Ask the OS for a currently-free localhost port, then release it.
-
-    ``UIConfig.listen_port`` is validated ``ge=1``, so the config path can't
-    be pointed at the usual "OS-assigned" port 0 directly. Finding a free
-    port up front and configuring Uvicorn to bind it keeps the config real
-    and validated while still avoiding a fixed/production port.
-    """
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        return sock.getsockname()[1]
 
 
 class _RecordingServer(uvicorn.Server):
@@ -74,9 +60,15 @@ class TestRunApiServerRealUvicornSmoke:
 
     @pytest.mark.asyncio
     async def test_serves_health_and_status_over_real_http(self, update_config):
-        port = _find_free_port()
+        # Port 0 asks the OS to assign a free ephemeral port at bind time, so
+        # there is no gap between picking a port and Uvicorn binding it (unlike
+        # discovering a free port up front and handing the number back to
+        # Uvicorn, which another process could steal in between).
+        # AutoHealConfig doesn't validate on plain attribute assignment or on
+        # config_manager.update_config()'s model_copy(), so this bypasses the
+        # ge=1 field constraint meant for persisted/user-facing config.
         update_config(lambda config: setattr(config.ui, "listen_address", "127.0.0.1"))
-        update_config(lambda config: setattr(config.ui, "listen_port", port))
+        update_config(lambda config: setattr(config.ui, "listen_port", 0))
 
         _RecordingServer.instances.clear()
 
@@ -99,6 +91,7 @@ class TestRunApiServerRealUvicornSmoke:
                     _STARTUP_TIMEOUT_SECONDS,
                     "uvicorn server did not start listening in time",
                 )
+                port = server.servers[0].sockets[0].getsockname()[1]
                 base_url = f"http://127.0.0.1:{port}"
 
                 health_response = await asyncio.to_thread(
