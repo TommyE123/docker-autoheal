@@ -1,33 +1,41 @@
-language: en-GB
+# CodeRabbit Configuration
+# Schema: https://coderabbit.ai/integrations/schema.v2.json
 
-reviews:
-  profile: chill
+language: "en-GB"
 
-  auto_review:
-    enabled: true
-    auto_pause_after_reviewed_commits: 0
-
-  path_instructions:
-    - path: "{**/*,**/.*,**/.*/**}"
-      instructions: |
-        Apply REVIEW.md as the canonical review standard for this repository.
-
-        Perform a surgical review of this PR. Review only issues introduced or
-        materially worsened by the PR's changes.
-
-        Follow the review scope, evidence threshold, priorities, production-safety
-        checks, and reporting requirements defined in REVIEW.md.
-
-        Do not perform a general repository audit or request unrelated cleanup,
-        formatting, refactoring, or cosmetic changes.
-
-        Do not manufacture findings. Prefer a small number of high-confidence
-        findings over speculative or low-value comments.
-
-        If no actionable issue exists, report that clearly as a GREEN review.
+tone_instructions: >
+  Follow the review format and standards defined in REVIEW.md exactly.
+  Use GREEN / AMBER / RED statuses. List blocking issues first.
+  End with a clear merge recommendation.
 
 knowledge_base:
   code_guidelines:
     enabled: true
     filePatterns:
       - "REVIEW.md"
+
+reviews:
+  profile: "chill"
+  high_level_summary: true
+  review_status: true
+  collapse_walkthrough: false
+  request_changes_workflow: false
+
+  path_filters:
+    - "!**/*.lock"
+    - "!dist/**"
+    - "!node_modules/**"
+
+  path_instructions:
+    - path: "**/*"
+      instructions: |
+        Use REVIEW.md as the authoritative source for review structure,
+        status labels (GREEN / AMBER / RED), and merge recommendations.
+        This overrides CodeRabbit's default review format.
+
+  auto_review:
+    enabled: true
+    drafts: false
+
+chat:
+  auto_reply: true
