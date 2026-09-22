@@ -127,8 +127,15 @@ class TestRunApiServerRealUvicornSmoke:
                         )
                 if not server_task.done():
                     server_task.cancel()
-                    with suppress(asyncio.CancelledError):
-                        await server_task
+                    try:
+                        await asyncio.wait_for(server_task, timeout=_SHUTDOWN_TIMEOUT_SECONDS)
+                    except asyncio.CancelledError:
+                        pass
+                    except TimeoutError:
+                        raise AssertionError(
+                            "server_task did not finish even after cancellation "
+                            "-- a socket may have leaked"
+                        ) from None
 
             assert health_response.status_code == 200
             health_json = health_response.json()
