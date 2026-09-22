@@ -128,41 +128,28 @@ If the task is not tied to a GitHub issue or PR, use a short descriptive session
 
 ## Requesting a CodeRabbit review (required before merge)
 
-Every substantive PR gets a CodeRabbit review before the repository owner merges it.
+Every substantive PR targeting `main` must receive a CodeRabbit review before the repository owner merges it.
 
-When a substantive PR reaches the CodeRabbit review stage, you MUST invoke the `coderabbit-review` skill and follow its instructions exactly. This workflow contains repository-specific institutional knowledge and must not be replaced with an ad hoc review process.
+When a substantive PR reaches the CodeRabbit review stage, you MUST invoke the `coderabbit-review` skill and follow its instructions exactly.
 
-- Do not perform an ad hoc CodeRabbit review.
+* Do not perform an ad hoc CodeRabbit review.
+* Do not rely solely on automatic skill discovery.
+* Follow `.claude/skills/coderabbit-review/SKILL.md`.
 
-- Do not rely solely on automatic skill discovery.
+The CodeRabbit skill defines the complete review workflow, including:
 
-- Follow `.claude/skills/coderabbit-review/SKILL.md`.
+* When the initial review should be requested.
+* The required full initial review.
+* Assessment and resolution of findings.
+* Handling disputed findings.
+* Branch currency and validation.
+* CI handling.
+* Targeted follow-up reviews after material changes.
+* Completion criteria.
 
-CodeRabbit automatic reviews are enabled for PRs targeting `main`. Do not manually invoke `@coderabbitai full review` for the initial review. Let the automatic review run.
+The first CodeRabbit request must be a full review. Subsequent requests must be targeted follow-ups. Never request another full review.
 
-When CodeRabbit reports actionable findings that are valid and related to the PR:
-
-- Investigate and fix them.
-
-- Ensure the PR branch is current with `main` before final validation and push, when required.
-
-- Run targeted validation.
-
-- Commit and push the changes.
-
-- Document what was fixed in a PR comment.
-
-- Wait for the relevant CI checks to complete successfully.
-
-CodeRabbit's automatic incremental review should then review the updated PR. Repeat as necessary until no further actionable findings remain.
-
-If CodeRabbit has not automatically reviewed an eligible PR, check the PR status and repository configuration before taking any manual review action. Do not manually trigger a full review simply because the automatic review has not appeared yet.
-
-A CodeRabbit review only covers the state of the PR at the time it runs. Material changes made afterwards remain subject to the normal CodeRabbit review cycle and must receive a subsequent automatic incremental review before merge.
-
-Do not manually request duplicate reviews unless the repository owner explicitly asks for one or the automatic review mechanism cannot cover the change.
-
-For detailed guidance, see `.claude/skills/coderabbit-review/SKILL.md`.
+If no Sourcery review is available, do not block the PR waiting for one. Follow the CodeRabbit skill once the PR is otherwise ready.
 
 A substantive PR is one that makes a material change to application behaviour, functionality, production configuration, CI/CD, automation, security, testing infrastructure, repository tooling, or other non-trivial repository capabilities.
 
@@ -170,37 +157,44 @@ Purely mechanical changes such as typo fixes, formatting-only changes, or other 
 
 If there is uncertainty about whether a PR is substantive, treat it as substantive and follow the CodeRabbit review process.
 
+For detailed guidance, see `.claude/skills/coderabbit-review/SKILL.md`.
+
 ## Requesting a Sourcery review (secondary)
 
-Sourcery provides an independent second opinion alongside CodeRabbit. Sourcery reviews PRs automatically when review capacity is available, but reviews may not run when its available tokens or capacity are exhausted.
+Sourcery is a secondary automated reviewer that may provide input before the mandatory CodeRabbit review stage.
 
-When Sourcery has reviewed the PR, you MUST invoke the `sourcery-review` skill and follow its instructions exactly. This workflow contains repository-specific institutional knowledge and must not be replaced with an ad hoc review process.
+Sourcery reviews eligible PRs automatically when review capacity is available. A missing Sourcery review is not, by itself, a reason to block the PR.
 
-- Do not perform an ad hoc Sourcery review.
+When a Sourcery review exists, you MUST invoke the `sourcery-review` skill and follow its instructions exactly.
 
-- Do not rely solely on automatic skill discovery.
+* Do not perform an ad hoc Sourcery review.
+* Do not rely solely on automatic skill discovery.
+* Follow `.claude/skills/sourcery-review/SKILL.md`.
 
-- Follow `.claude/skills/sourcery-review/SKILL.md`.
+The normal review order is:
 
-Sourcery should normally be treated as a secondary review after the CodeRabbit review cycle has completed and the PR is otherwise ready for merge.
+Sourcery, if available
+→ assess and resolve valid findings
+→ relevant validation
+→ CI green
+→ CodeRabbit full review
+
+If no Sourcery review exists, proceed without waiting for one.
+
+Do not manually trigger an initial Sourcery review.
+
+The Sourcery skill defines the complete workflow for:
+
+* Detecting and assessing Sourcery reviews.
+* Handling valid and disputed findings.
+* Branch currency and validation.
+* CI handling.
+* Situations where no Sourcery review is available.
+* Explicitly requested Sourcery re-reviews.
 
 Sourcery findings are advisory and do not replace the required CodeRabbit review or independently authorise a merge.
 
-When Sourcery reports an actionable finding that is valid and related to the PR:
-
-- Investigate and fix it.
-
-- Run targeted validation.
-
-- Ensure the PR branch is current with `main` before the final push.
-
-- Commit and push the changes.
-
-- Document what was fixed in a PR comment.
-
-Because Sourcery review capacity is limited, do not automatically request a re-review after making fixes. Re-review should only be performed when the repository owner explicitly requests it.
-
-Material changes made after a Sourcery review remain subject to the normal CodeRabbit review process. Do not use Sourcery as a replacement for the required CodeRabbit review.
+Material changes made after a Sourcery review remain subject to the mandatory CodeRabbit review process.
 
 For detailed guidance, see `.claude/skills/sourcery-review/SKILL.md`.
 
