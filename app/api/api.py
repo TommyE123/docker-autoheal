@@ -19,7 +19,7 @@ from app.config.config_manager import (
     MonitorConfig,
     RestartConfig,
     NotificationService,
-    NotificationsConfig, AutoHealEvent
+    AutoHealEvent,
 )
 from app.docker_client.docker_client_wrapper import DockerClientWrapper
 from app.monitor.monitoring_engine import MonitoringEngine
@@ -437,7 +437,7 @@ async def unquarantine_container(container_id: str):
             event_type="unquarantine",
             restart_count=0,
             status="success",
-            message=f"Container un-quarantined by user request"
+            message="Container un-quarantined by user request"
         )
         config_manager.add_event(event)
 
