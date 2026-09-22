@@ -42,7 +42,7 @@ services:
   # Example 2: API with custom health check
   # Auto-monitored with health endpoint
   api:
-    image: python:3.14-alpine@sha256:016508ba505da24f7139765bc4bb669df4e88eb2f12eeadd571bf2f88d7533df
+    image: python:3.14-alpine@sha256:9e9fde4d32eedce0b661d9ab91e826b62dddf28e928c230ec55f1866cac66b01
     container_name: demo-api-server
     labels:
       - "autoheal=true"
@@ -79,7 +79,7 @@ services:
   # Example 3: Database - NOT auto-monitored
   # No autoheal label, so it won't be automatically monitored
   database:
-    image: postgres:14-alpine@sha256:1a916758fce623be724e9371461f13e0d48627b434989bd1873d96343d017f94
+    image: postgres:14-alpine@sha256:4ea9e5ed06591da7ea23eb65465e8d3187fe79f4d5ec3ae976d29a33b013e77a
     container_name: demo-database
     environment:
       POSTGRES_PASSWORD: example
@@ -93,7 +93,7 @@ services:
   # Example 4: Cache with auto-monitoring
   # Redis with automatic monitoring
   cache:
-    image: redis:7-alpine@sha256:520775a41a63e77e06c73e35d2fd9cc15921a609516818796b4ecbb813078bc7
+    image: redis:7-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
     container_name: demo-cache
     labels:
       - "autoheal=true"

@@ -3,7 +3,7 @@
 # ============================================
 # Stage 1: Build React Frontend
 # ============================================
-FROM node:18-alpine@sha256:8d6421d663b4c28fd3ebc498332f249011d118945588d0a35cb9bc4b8ca09d9e AS frontend-builder
+FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS frontend-builder
 
 WORKDIR /frontend
 
