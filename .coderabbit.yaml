@@ -2,9 +2,9 @@
 language: en-GB
 
 tone_instructions: >-
-  Follow REVIEW.md's format exactly: RED/AMBER/GREEN per section and per
-  finding, blockers (RED) listed first, end with one verdict: APPROVE /
-  APPROVE WITH MINOR CHANGES / CHANGES REQUIRED.
+  Follow REVIEW.md's format exactly: RED/AMBER per finding, blockers (RED)
+  listed first, end with one verdict: APPROVE / APPROVE WITH MINOR CHANGES /
+  CHANGES REQUIRED.
 
 reviews:
   profile: chill
@@ -15,8 +15,12 @@ reviews:
 
   path_filters:
     - "!**/*.lock"
-    - "!dist/**"
-    - "!node_modules/**"
+    - "!**/dist/**"
+    - "!**/node_modules/**"
+    - "!frontend/dist/**"
+    - "!**/coverage.xml"
+    - "!**/*.min.js"
+    - "!**/*.min.css"
 
   path_instructions:
     - path: "{**/*,**/.*,**/.*/**}"
@@ -28,13 +32,14 @@ reviews:
         worsened by this PR's changes. Do not perform a general repository
         audit or request unrelated cleanup, formatting, or refactoring.
 
-        Classify every finding as exactly one of:
+        Classify each actionable finding as exactly one of:
         - RED — must be fixed before merge (blocking)
         - AMBER — significant risk, not necessarily blocking
-        - GREEN — correct, or a minor/non-blocking observation
 
         For each RED/AMBER finding, give: file:line, what is wrong, why it
-        matters, and the smallest correct fix.
+        matters, and the smallest correct fix. Do not tag individual
+        findings GREEN — GREEN is reserved for the overall review status
+        when no actionable issues are found.
 
         Do not manufacture findings. If the PR is correct, say so plainly.
 
@@ -45,6 +50,9 @@ reviews:
 
   auto_review:
     enabled: false
+
+chat:
+  auto_reply: true
 
 knowledge_base:
   code_guidelines:
