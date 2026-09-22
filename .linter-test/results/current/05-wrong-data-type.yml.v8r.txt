@@ -1,0 +1,9 @@
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/05-wrong-data-type.yml
+ℹ Validating .linter-test/fixtures/05-wrong-data-type.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✖ .linter-test/fixtures/05-wrong-data-type.yml is invalid
+
+.linter-test/fixtures/05-wrong-data-type.yml#/services/autoheal/ports must be array
+.linter-test/fixtures/05-wrong-data-type.yml#/services/autoheal must NOT have unevaluated properties
+

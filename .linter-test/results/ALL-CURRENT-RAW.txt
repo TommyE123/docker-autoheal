@@ -1,0 +1,358 @@
+########## 01-indentation.yml ##########
+--- yamllint ---
+.linter-test/fixtures/01-indentation.yml
+  7:9       error    wrong indentation: expected 6 but found 8  (indentation)
+  8:7       error    syntax error: expected <block end>, but found '<block sequence start>' (syntax)
+
+--- prettier ---
+Checking formatting...
+[error] .linter-test/fixtures/01-indentation.yml: SyntaxError: All collection items must start at the same column (3:5)
+[error]    1 | services:
+[error]    2 |   autoheal:
+[error] >  3 |     image: tommye123/docker-autoheal:latest
+[error]      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] >  4 |     container_name: docker-autoheal
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] >  5 |     restart: unless-stopped
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] >  6 |     volumes:
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] >  7 |         - /var/run/docker.sock:/var/run/docker.sock:ro
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] >  8 |       - ./data:/data
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] >  9 |     ports:
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] > 10 |       - "3131:3131"
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] > 11 |     environment:
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] > 12 |       - PYTHONUNBUFFERED=1
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] > 13 |     labels:
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] > 14 |       - "autoheal=false"
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] > 15 |
+[error]      | ^
+Error occurred when checking code style in the above file.
+--- v8r ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/01-indentation.yml
+ℹ Validating .linter-test/fixtures/01-indentation.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✖ bad indentation of a mapping entry (8:7)
+
+ 5 |     restart: unless-stopped
+ 6 |     volumes:
+ 7 |         - /var/run/docker.sock:/var/ru ...
+ 8 |       - ./data:/data
+-----------^
+ 9 |     ports:
+ 10 |       - "3131:3131"
+
+
+########## 02-trailing-whitespace.yml ##########
+--- yamllint ---
+.linter-test/fixtures/02-trailing-whitespace.yml
+  2:12      error    trailing spaces  (trailing-spaces)
+  4:36      error    trailing spaces  (trailing-spaces)
+
+--- prettier ---
+Checking formatting...
+[warn] .linter-test/fixtures/02-trailing-whitespace.yml
+[warn] Code style issues found in the above file. Run Prettier with --write to fix.
+--- v8r ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/02-trailing-whitespace.yml
+ℹ Validating .linter-test/fixtures/02-trailing-whitespace.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✔ .linter-test/fixtures/02-trailing-whitespace.yml is valid
+
+
+########## 03-missing-blank-line-eof.yml ##########
+--- yamllint ---
+.linter-test/fixtures/03-missing-blank-line-eof.yml
+  7:20      error    no new line character at the end of file  (new-line-at-end-of-file)
+
+--- prettier ---
+Checking formatting...
+[warn] .linter-test/fixtures/03-missing-blank-line-eof.yml
+[warn] Code style issues found in the above file. Run Prettier with --write to fix.
+--- v8r ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/03-missing-blank-line-eof.yml
+ℹ Validating .linter-test/fixtures/03-missing-blank-line-eof.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✔ .linter-test/fixtures/03-missing-blank-line-eof.yml is valid
+
+
+########## 03b-extra-blank-lines-eof.yml ##########
+--- yamllint ---
+.linter-test/fixtures/03b-extra-blank-lines-eof.yml
+  10:1      error    too many blank lines (3 > 0)  (empty-lines)
+
+--- prettier ---
+Checking formatting...
+[warn] .linter-test/fixtures/03b-extra-blank-lines-eof.yml
+[warn] Code style issues found in the above file. Run Prettier with --write to fix.
+--- v8r ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/03b-extra-blank-lines-eof.yml
+ℹ Validating .linter-test/fixtures/03b-extra-blank-lines-eof.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✔ .linter-test/fixtures/03b-extra-blank-lines-eof.yml is valid
+
+
+########## 04-duplicate-keys.yml ##########
+--- yamllint ---
+.linter-test/fixtures/04-duplicate-keys.yml
+  6:5       error    duplication of key "restart" in mapping  (key-duplicates)
+
+--- prettier ---
+Checking formatting...
+[error] .linter-test/fixtures/04-duplicate-keys.yml: SyntaxError: Map keys must be unique; "restart" is repeated (3:5)
+[error]   1 | services:
+[error]   2 |   autoheal:
+[error] > 3 |     image: tommye123/docker-autoheal:latest
+[error]     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] > 4 |     container_name: docker-autoheal
+[error]     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] > 5 |     restart: unless-stopped
+[error]     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] > 6 |     restart: always
+[error]     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] > 7 |     ports:
+[error]     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] > 8 |       - "3131:3131"
+[error]     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] > 9 |
+[error]     | ^
+Error occurred when checking code style in the above file.
+--- v8r ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/04-duplicate-keys.yml
+ℹ Validating .linter-test/fixtures/04-duplicate-keys.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✖ duplicated mapping key (6:5)
+
+ 3 |     image: tommye123/docker-autoheal ...
+ 4 |     container_name: docker-autoheal
+ 5 |     restart: unless-stopped
+ 6 |     restart: always
+---------^
+ 7 |     ports:
+ 8 |       - "3131:3131"
+
+
+########## 05-wrong-data-type.yml ##########
+--- yamllint ---
+--- prettier ---
+Checking formatting...
+All matched files use Prettier code style!
+--- v8r ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/05-wrong-data-type.yml
+ℹ Validating .linter-test/fixtures/05-wrong-data-type.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✖ .linter-test/fixtures/05-wrong-data-type.yml is invalid
+
+.linter-test/fixtures/05-wrong-data-type.yml#/services/autoheal/ports must be array
+.linter-test/fixtures/05-wrong-data-type.yml#/services/autoheal must NOT have unevaluated properties
+
+
+########## 06-invalid-schema-compose.yml ##########
+--- yamllint ---
+--- prettier ---
+Checking formatting...
+All matched files use Prettier code style!
+--- v8r ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/06-invalid-schema-compose.yml
+ℹ Validating .linter-test/fixtures/06-invalid-schema-compose.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✔ .linter-test/fixtures/06-invalid-schema-compose.yml is valid
+
+
+########## 06b-invalid-schema-workflow-on.yml ##########
+--- yamllint ---
+.linter-test/fixtures/06b-invalid-schema-workflow-on.yml
+  3:1       warning  truthy value should be one of [false, true]  (truthy)
+
+--- prettier ---
+Checking formatting...
+All matched files use Prettier code style!
+--- v8r ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/06b-invalid-schema-workflow-on.yml
+ℹ Validating .linter-test/fixtures/06b-invalid-schema-workflow-on.yml against schema from .linter-test/configs/schemas/github-workflow.json ...
+✖ .linter-test/fixtures/06b-invalid-schema-workflow-on.yml is invalid
+
+.linter-test/fixtures/06b-invalid-schema-workflow-on.yml#/on must be equal to one of the allowed values
+.linter-test/fixtures/06b-invalid-schema-workflow-on.yml#/on must be array
+.linter-test/fixtures/06b-invalid-schema-workflow-on.yml#/on must be object
+.linter-test/fixtures/06b-invalid-schema-workflow-on.yml#/on must match exactly one schema in oneOf
+
+
+########## 07-broken-anchor.yml ##########
+--- yamllint ---
+.linter-test/fixtures/07-broken-anchor.yml
+  6:18      error    found undeclared alias "healthcheck-defaults"  (anchors)
+
+--- prettier ---
+Checking formatting...
+[error] .linter-test/fixtures/07-broken-anchor.yml: SyntaxError: Aliased anchor not found: healthcheck-defaults (6:18)
+[error]   4 |     container_name: docker-autoheal
+[error]   5 |     restart: unless-stopped
+[error] > 6 |     healthcheck: *healthcheck-defaults
+[error]     |                  ^^^^^^^^^^^^^^^^^^^^^
+[error]   7 |     ports:
+[error]   8 |       - "3131:3131"
+[error]   9 |
+Error occurred when checking code style in the above file.
+--- v8r ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/07-broken-anchor.yml
+ℹ Validating .linter-test/fixtures/07-broken-anchor.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✖ unidentified alias "healthcheck-defaults" (6:39)
+
+ 3 |  ... ge: tommye123/docker-autoheal:latest
+ 4 |  ... tainer_name: docker-autoheal
+ 5 |  ... tart: unless-stopped
+ 6 |  ... lthcheck: *healthcheck-defaults
+-----------------------------------------^
+ 7 |  ... ts:
+ 8 |  ...  "3131:3131"
+
+
+########## 08-tabs.yml ##########
+--- yamllint ---
+.linter-test/fixtures/08-tabs.yml
+  3:1       error    syntax error: found character '\t' that cannot start any token (syntax)
+
+--- prettier ---
+Checking formatting...
+[error] .linter-test/fixtures/08-tabs.yml: SyntaxError: All collection items must start at the same column (1:1)
+[error] > 1 | services:
+[error]     | ^^^^^^^^^
+[error] > 2 |   autoheal:
+[error]     | ^^^^^^^^^^^
+[error] > 3 | 	image: tommye123/docker-autoheal:latest
+[error]     | ^^^^^^^^^^^
+[error] > 4 | 	container_name: docker-autoheal
+[error]     | ^^^^^^^^^^^
+[error] > 5 |     restart: unless-stopped
+[error]     | ^^^^^^^^^^^
+[error] > 6 |     ports:
+[error]     | ^^^^^^^^^^^
+[error] > 7 |       - "3131:3131"
+[error]     | ^^^^^^^^^^^
+[error] > 8 |
+[error]     | ^
+Error occurred when checking code style in the above file.
+--- v8r ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/08-tabs.yml
+ℹ Validating .linter-test/fixtures/08-tabs.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✖ tab characters must not be used in indentation (3:1)
+
+ 1 | services:
+ 2 |   autoheal:
+ 3 | →image: tommye123/docker-autohea ...
+-----^
+ 4 | →container_name: docker-autoheal
+ 5 |     restart: unless-stopped
+
+
+########## 09-line-length.yml ##########
+--- yamllint ---
+--- prettier ---
+Checking formatting...
+[warn] .linter-test/fixtures/09-line-length.yml
+[warn] Code style issues found in the above file. Run Prettier with --write to fix.
+--- v8r ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/09-line-length.yml
+ℹ Validating .linter-test/fixtures/09-line-length.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✔ .linter-test/fixtures/09-line-length.yml is valid
+
+
+########## 10-missing-required-keys-workflow.yml ##########
+--- yamllint ---
+.linter-test/fixtures/10-missing-required-keys-workflow.yml
+  3:1       warning  truthy value should be one of [false, true]  (truthy)
+
+--- prettier ---
+Checking formatting...
+All matched files use Prettier code style!
+--- v8r ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/10-missing-required-keys-workflow.yml
+ℹ Validating .linter-test/fixtures/10-missing-required-keys-workflow.yml against schema from .linter-test/configs/schemas/github-workflow.json ...
+✖ .linter-test/fixtures/10-missing-required-keys-workflow.yml is invalid
+
+.linter-test/fixtures/10-missing-required-keys-workflow.yml# must have required property 'jobs'
+
+
+########## 11-truthy.yml ##########
+--- yamllint ---
+.linter-test/fixtures/11-truthy.yml
+  6:10      warning  truthy value should be one of [false, true]  (truthy)
+  7:17      warning  truthy value should be one of [false, true]  (truthy)
+
+--- prettier ---
+Checking formatting...
+All matched files use Prettier code style!
+--- v8r ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/11-truthy.yml
+ℹ Validating .linter-test/fixtures/11-truthy.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✔ .linter-test/fixtures/11-truthy.yml is valid
+
+
+########## 12-quote-style.yml ##########
+--- yamllint ---
+--- prettier ---
+Checking formatting...
+[warn] .linter-test/fixtures/12-quote-style.yml
+[warn] Code style issues found in the above file. Run Prettier with --write to fix.
+--- v8r ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/12-quote-style.yml
+ℹ Validating .linter-test/fixtures/12-quote-style.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✔ .linter-test/fixtures/12-quote-style.yml is valid
+
+
+########## 13-document-start-missing.yml ##########
+--- yamllint ---
+--- prettier ---
+Checking formatting...
+All matched files use Prettier code style!
+--- v8r ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/13-document-start-missing.yml
+ℹ Validating .linter-test/fixtures/13-document-start-missing.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✔ .linter-test/fixtures/13-document-start-missing.yml is valid
+
+
+########## 13b-document-start-present.yml ##########
+--- yamllint ---
+--- prettier ---
+Checking formatting...
+All matched files use Prettier code style!
+--- v8r ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/13b-document-start-present.yml
+ℹ Validating .linter-test/fixtures/13b-document-start-present.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✔ .linter-test/fixtures/13b-document-start-present.yml is valid
+
+

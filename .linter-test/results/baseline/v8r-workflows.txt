@@ -1,0 +1,56 @@
+--- .github/workflows/docker-build.yml ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .github/workflows/docker-build.yml
+ℹ Validating .github/workflows/docker-build.yml against schema from .linter-test/configs/schemas/github-workflow.json ...
+✔ .github/workflows/docker-build.yml is valid
+
+--- .github/workflows/greetings.yml ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .github/workflows/greetings.yml
+ℹ Validating .github/workflows/greetings.yml against schema from .linter-test/configs/schemas/github-workflow.json ...
+✔ .github/workflows/greetings.yml is valid
+
+--- .github/workflows/labels-sync.yml ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .github/workflows/labels-sync.yml
+ℹ Validating .github/workflows/labels-sync.yml against schema from .linter-test/configs/schemas/github-workflow.json ...
+✔ .github/workflows/labels-sync.yml is valid
+
+--- .github/workflows/mega-linter.yml ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .github/workflows/mega-linter.yml
+ℹ Validating .github/workflows/mega-linter.yml against schema from .linter-test/configs/schemas/github-workflow.json ...
+✔ .github/workflows/mega-linter.yml is valid
+
+--- .github/workflows/production-smoke-test.yml ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .github/workflows/production-smoke-test.yml
+ℹ Validating .github/workflows/production-smoke-test.yml against schema from .linter-test/configs/schemas/github-workflow.json ...
+✔ .github/workflows/production-smoke-test.yml is valid
+
+--- .github/workflows/release-please.yml ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .github/workflows/release-please.yml
+ℹ Validating .github/workflows/release-please.yml against schema from .linter-test/configs/schemas/github-workflow.json ...
+✔ .github/workflows/release-please.yml is valid
+
+--- .github/workflows/semantic-pr-title.yml ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .github/workflows/semantic-pr-title.yml
+ℹ Validating .github/workflows/semantic-pr-title.yml against schema from .linter-test/configs/schemas/github-workflow.json ...
+✔ .github/workflows/semantic-pr-title.yml is valid
+
+--- .github/workflows/tests.yml ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .github/workflows/tests.yml
+ℹ Validating .github/workflows/tests.yml against schema from .linter-test/configs/schemas/github-workflow.json ...
+✔ .github/workflows/tests.yml is valid
+

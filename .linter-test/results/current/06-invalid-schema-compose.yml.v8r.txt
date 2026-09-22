@@ -1,0 +1,6 @@
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/06-invalid-schema-compose.yml
+ℹ Validating .linter-test/fixtures/06-invalid-schema-compose.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✔ .linter-test/fixtures/06-invalid-schema-compose.yml is valid
+

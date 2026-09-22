@@ -1,0 +1,3 @@
+.linter-test/fixtures/12-quote-style.yml
+  1:1       warning  missing document start "---"  (document-start)
+

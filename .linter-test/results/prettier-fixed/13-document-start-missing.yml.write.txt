@@ -1,0 +1,1 @@
+.linter-test/prettier-fixed/13-document-start-missing.yml 22ms (unchanged)

@@ -1,0 +1,1 @@
+.linter-test/prettier-fixed/11-truthy.yml 21ms (unchanged)

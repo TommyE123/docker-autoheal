@@ -1,0 +1,14 @@
+.linter-test/fixtures/09-line-length.yml
+  1:1       warning  missing document start "---"  (document-start)
+  6:15      error    string value is redundantly quoted with double quotes  (quoted-strings)
+  6:29      error    string value is redundantly quoted with double quotes  (quoted-strings)
+  6:43      error    string value is redundantly quoted with double quotes  (quoted-strings)
+  6:59      error    string value is redundantly quoted with double quotes  (quoted-strings)
+  6:74      error    string value is redundantly quoted with double quotes  (quoted-strings)
+  6:89      error    string value is redundantly quoted with double quotes  (quoted-strings)
+  6:103     error    string value is redundantly quoted with double quotes  (quoted-strings)
+  6:119     error    string value is redundantly quoted with double quotes  (quoted-strings)
+  6:135     error    string value is redundantly quoted with double quotes  (quoted-strings)
+  6:150     error    string value is redundantly quoted with double quotes  (quoted-strings)
+  8:9       error    string value is redundantly quoted with double quotes  (quoted-strings)
+

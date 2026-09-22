@@ -1,0 +1,1 @@
+.linter-test/prettier-fixed/12-quote-style.yml 22ms

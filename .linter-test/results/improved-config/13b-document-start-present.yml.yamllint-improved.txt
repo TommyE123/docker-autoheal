@@ -1,0 +1,3 @@
+.linter-test/fixtures/13b-document-start-present.yml
+  8:9       error    string value is redundantly quoted with double quotes  (quoted-strings)
+

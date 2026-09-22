@@ -1,0 +1,8 @@
+.linter-test/fixtures/12-quote-style.yml
+  1:1       warning  missing document start "---"  (document-start)
+  3:12      error    string value is redundantly quoted with double quotes  (quoted-strings)
+  5:14      error    string value is redundantly quoted with double quotes  (quoted-strings)
+  7:9       error    string value is redundantly quoted with double quotes  (quoted-strings)
+  8:9       error    string value is redundantly quoted with double quotes  (quoted-strings)
+  10:9      error    string value is redundantly quoted with double quotes  (quoted-strings)
+

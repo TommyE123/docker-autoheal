@@ -1,0 +1,11 @@
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/06b-invalid-schema-workflow-on.yml
+ℹ Validating .linter-test/fixtures/06b-invalid-schema-workflow-on.yml against schema from .linter-test/configs/schemas/github-workflow.json ...
+✖ .linter-test/fixtures/06b-invalid-schema-workflow-on.yml is invalid
+
+.linter-test/fixtures/06b-invalid-schema-workflow-on.yml#/on must be equal to one of the allowed values
+.linter-test/fixtures/06b-invalid-schema-workflow-on.yml#/on must be array
+.linter-test/fixtures/06b-invalid-schema-workflow-on.yml#/on must be object
+.linter-test/fixtures/06b-invalid-schema-workflow-on.yml#/on must match exactly one schema in oneOf
+

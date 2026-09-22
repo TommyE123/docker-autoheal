@@ -1,0 +1,7 @@
+.linter-test/fixtures/01-indentation.yml
+  1:1       warning  missing document start "---"  (document-start)
+  7:9       error    wrong indentation: expected 6 but found 8  (indentation)
+  8:7       error    syntax error: expected <block end>, but found '<block sequence start>' (syntax)
+  10:9      error    string value is redundantly quoted with double quotes  (quoted-strings)
+  14:9      error    string value is redundantly quoted with double quotes  (quoted-strings)
+

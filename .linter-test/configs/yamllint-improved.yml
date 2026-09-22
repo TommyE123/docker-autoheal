@@ -1,0 +1,27 @@
+# Candidate "improved" yamllint config used only to test whether stricter
+# rules would catch more of the fixture issues than the repo's current
+# .yamllint.yml. Not applied to the real repo config.
+extends: default
+
+ignore: |
+  .github/workflows/*.lock.yml
+
+rules:
+  comments:
+    min-spaces-from-content: 1
+  document-start: enable
+  line-length:
+    max: 200
+  truthy:
+    ignore: |
+      .github/workflows/docker-build.yml
+      .github/workflows/greetings.yml
+      .github/workflows/labels-sync.yml
+      .github/workflows/mega-linter.yml
+      .github/workflows/production-smoke-test.yml
+      .github/workflows/release-please.yml
+      .github/workflows/semantic-pr-title.yml
+      .github/workflows/tests.yml
+  quoted-strings:
+    quote-type: double
+    required: only-when-needed

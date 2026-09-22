@@ -1,0 +1,13 @@
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/08-tabs.yml
+ℹ Validating .linter-test/fixtures/08-tabs.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✖ tab characters must not be used in indentation (3:1)
+
+ 1 | services:
+ 2 |   autoheal:
+ 3 | →image: tommye123/docker-autohea ...
+-----^
+ 4 | →container_name: docker-autoheal
+ 5 |     restart: unless-stopped
+

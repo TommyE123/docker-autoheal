@@ -1,0 +1,9 @@
+services:
+  autoheal:
+    image: tommye123/docker-autoheal:latest
+    container_name: docker-autoheal
+    restart: unless-stopped
+    ports:
+      - "3131:3131"
+    environment:
+      - PYTHONUNBUFFERED=1

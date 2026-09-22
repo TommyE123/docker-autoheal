@@ -1,0 +1,8 @@
+services:
+  autoheal:
+    image: tommye123/docker-autoheal:latest
+    container_name: docker-autoheal
+    restart: unless-stopped
+    command: ["--flag-one", "--flag-two", "--flag-three", "--flag-four", "--flag-five", "--flag-six", "--flag-seven", "--flag-eight", "--flag-nine", "--flag-ten"]
+    ports:
+      - "3131:3131"

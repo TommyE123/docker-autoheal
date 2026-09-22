@@ -1,0 +1,3 @@
+Checking formatting...
+[warn] .linter-test/fixtures/12-quote-style.yml
+[warn] Code style issues found in the above file. Run Prettier with --write to fix.

@@ -1,0 +1,3 @@
+.linter-test/fixtures/05-wrong-data-type.yml
+  1:1       warning  missing document start "---"  (document-start)
+

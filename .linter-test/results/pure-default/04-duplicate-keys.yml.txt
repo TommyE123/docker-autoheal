@@ -1,0 +1,4 @@
+.linter-test/fixtures/04-duplicate-keys.yml
+  1:1       warning  missing document start "---"  (document-start)
+  6:5       error    duplication of key "restart" in mapping  (key-duplicates)
+

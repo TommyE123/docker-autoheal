@@ -1,0 +1,31 @@
+Checking formatting...
+[error] .linter-test/fixtures/01-indentation.yml: SyntaxError: All collection items must start at the same column (3:5)
+[error]    1 | services:
+[error]    2 |   autoheal:
+[error] >  3 |     image: tommye123/docker-autoheal:latest
+[error]      |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] >  4 |     container_name: docker-autoheal
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] >  5 |     restart: unless-stopped
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] >  6 |     volumes:
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] >  7 |         - /var/run/docker.sock:/var/run/docker.sock:ro
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] >  8 |       - ./data:/data
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] >  9 |     ports:
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] > 10 |       - "3131:3131"
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] > 11 |     environment:
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] > 12 |       - PYTHONUNBUFFERED=1
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] > 13 |     labels:
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] > 14 |       - "autoheal=false"
+[error]      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error] > 15 |
+[error]      | ^
+Error occurred when checking code style in the above file.

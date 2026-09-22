@@ -1,0 +1,4 @@
+.linter-test/fixtures/06b-invalid-schema-workflow-on.yml
+  1:1       warning  missing document start "---"  (document-start)
+  3:1       warning  truthy value should be one of [false, true]  (truthy)
+

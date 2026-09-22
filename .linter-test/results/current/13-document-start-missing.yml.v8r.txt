@@ -1,0 +1,6 @@
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/13-document-start-missing.yml
+ℹ Validating .linter-test/fixtures/13-document-start-missing.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✔ .linter-test/fixtures/13-document-start-missing.yml is valid
+

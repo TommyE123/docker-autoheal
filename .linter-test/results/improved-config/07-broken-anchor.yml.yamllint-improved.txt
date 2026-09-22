@@ -1,0 +1,5 @@
+.linter-test/fixtures/07-broken-anchor.yml
+  1:1       warning  missing document start "---"  (document-start)
+  6:18      error    found undeclared alias "healthcheck-defaults"  (anchors)
+  8:9       error    string value is redundantly quoted with double quotes  (quoted-strings)
+

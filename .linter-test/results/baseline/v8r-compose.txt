@@ -1,0 +1,28 @@
+--- docker-compose.yml ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing docker-compose.yml
+ℹ Validating docker-compose.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✔ docker-compose.yml is valid
+
+--- docker-compose.example.yml ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing docker-compose.example.yml
+ℹ Validating docker-compose.example.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✔ docker-compose.example.yml is valid
+
+--- docker-compose.simple.yml ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing docker-compose.simple.yml
+ℹ Validating docker-compose.simple.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✔ docker-compose.simple.yml is valid
+
+--- docker-compose.test.yml ---
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing docker-compose.test.yml
+ℹ Validating docker-compose.test.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✔ docker-compose.test.yml is valid
+

@@ -1,0 +1,4 @@
+.linter-test/fixtures/09-line-length.yml
+  1:1       warning  missing document start "---"  (document-start)
+  6:81      error    line too long (162 > 80 characters)  (line-length)
+

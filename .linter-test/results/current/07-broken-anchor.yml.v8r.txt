@@ -1,0 +1,14 @@
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/07-broken-anchor.yml
+ℹ Validating .linter-test/fixtures/07-broken-anchor.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✖ unidentified alias "healthcheck-defaults" (6:39)
+
+ 3 |  ... ge: tommye123/docker-autoheal:latest
+ 4 |  ... tainer_name: docker-autoheal
+ 5 |  ... tart: unless-stopped
+ 6 |  ... lthcheck: *healthcheck-defaults
+-----------------------------------------^
+ 7 |  ... ts:
+ 8 |  ...  "3131:3131"
+

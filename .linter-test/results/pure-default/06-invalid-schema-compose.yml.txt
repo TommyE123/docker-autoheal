@@ -1,0 +1,3 @@
+.linter-test/fixtures/06-invalid-schema-compose.yml
+  1:1       warning  missing document start "---"  (document-start)
+

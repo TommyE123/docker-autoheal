@@ -1,0 +1,4 @@
+.linter-test/fixtures/03b-extra-blank-lines-eof.yml
+  1:1       warning  missing document start "---"  (document-start)
+  10:1      error    too many blank lines (3 > 0)  (empty-lines)
+

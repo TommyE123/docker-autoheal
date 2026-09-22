@@ -1,0 +1,4 @@
+.linter-test/fixtures/11-truthy.yml
+  6:10      warning  truthy value should be one of [false, true]  (truthy)
+  7:17      warning  truthy value should be one of [false, true]  (truthy)
+

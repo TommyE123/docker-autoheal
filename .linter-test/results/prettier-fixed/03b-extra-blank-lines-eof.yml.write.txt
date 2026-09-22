@@ -1,0 +1,1 @@
+.linter-test/prettier-fixed/03b-extra-blank-lines-eof.yml 20ms

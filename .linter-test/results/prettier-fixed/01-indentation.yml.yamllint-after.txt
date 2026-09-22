@@ -1,0 +1,4 @@
+.linter-test/prettier-fixed/01-indentation.yml
+  7:9       error    wrong indentation: expected 6 but found 8  (indentation)
+  8:7       error    syntax error: expected <block end>, but found '<block sequence start>' (syntax)
+

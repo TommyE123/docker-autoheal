@@ -1,0 +1,14 @@
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/04-duplicate-keys.yml
+ℹ Validating .linter-test/fixtures/04-duplicate-keys.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✖ duplicated mapping key (6:5)
+
+ 3 |     image: tommye123/docker-autoheal ...
+ 4 |     container_name: docker-autoheal
+ 5 |     restart: unless-stopped
+ 6 |     restart: always
+---------^
+ 7 |     ports:
+ 8 |       - "3131:3131"
+

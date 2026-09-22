@@ -1,0 +1,1 @@
+.linter-test/prettier-fixed/05-wrong-data-type.yml 21ms (unchanged)

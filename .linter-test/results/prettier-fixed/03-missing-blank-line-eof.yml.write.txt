@@ -1,0 +1,1 @@
+.linter-test/prettier-fixed/03-missing-blank-line-eof.yml 24ms

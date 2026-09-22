@@ -1,0 +1,3 @@
+.linter-test/prettier-fixed/07-broken-anchor.yml
+  6:18      error    found undeclared alias "healthcheck-defaults"  (anchors)
+

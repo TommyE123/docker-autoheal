@@ -1,0 +1,3 @@
+.linter-test/fixtures/08-tabs.yml
+  3:1       error    syntax error: found character '\t' that cannot start any token (syntax)
+

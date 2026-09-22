@@ -1,0 +1,4 @@
+.linter-test/fixtures/03-missing-blank-line-eof.yml
+  1:1       warning  missing document start "---"  (document-start)
+  7:20      error    no new line character at the end of file  (new-line-at-end-of-file)
+

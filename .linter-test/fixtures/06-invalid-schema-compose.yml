@@ -1,0 +1,7 @@
+services:
+  autoheal:
+    image: tommye123/docker-autoheal:latest
+    container_name: docker-autoheal
+    restart: sometimes
+    ports:
+      - "3131:3131"

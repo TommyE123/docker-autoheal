@@ -1,0 +1,14 @@
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/01-indentation.yml
+ℹ Validating .linter-test/fixtures/01-indentation.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✖ bad indentation of a mapping entry (8:7)
+
+ 5 |     restart: unless-stopped
+ 6 |     volumes:
+ 7 |         - /var/run/docker.sock:/var/ru ...
+ 8 |       - ./data:/data
+-----------^
+ 9 |     ports:
+ 10 |       - "3131:3131"
+

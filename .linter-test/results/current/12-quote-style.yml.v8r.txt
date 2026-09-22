@@ -1,0 +1,6 @@
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/12-quote-style.yml
+ℹ Validating .linter-test/fixtures/12-quote-style.yml against schema from .linter-test/configs/schemas/compose-spec.json ...
+✔ .linter-test/fixtures/12-quote-style.yml is valid
+

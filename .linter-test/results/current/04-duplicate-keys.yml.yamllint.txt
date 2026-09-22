@@ -1,0 +1,3 @@
+.linter-test/fixtures/04-duplicate-keys.yml
+  6:5       error    duplication of key "restart" in mapping  (key-duplicates)
+

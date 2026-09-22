@@ -1,0 +1,10 @@
+Checking formatting...
+[error] .linter-test/fixtures/07-broken-anchor.yml: SyntaxError: Aliased anchor not found: healthcheck-defaults (6:18)
+[error]   4 |     container_name: docker-autoheal
+[error]   5 |     restart: unless-stopped
+[error] > 6 |     healthcheck: *healthcheck-defaults
+[error]     |                  ^^^^^^^^^^^^^^^^^^^^^
+[error]   7 |     ports:
+[error]   8 |       - "3131:3131"
+[error]   9 |
+Error occurred when checking code style in the above file.

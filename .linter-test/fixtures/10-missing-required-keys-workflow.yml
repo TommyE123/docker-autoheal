@@ -1,0 +1,6 @@
+name: No Jobs Workflow
+
+on:
+  push:
+    branches:
+      - main

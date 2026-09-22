@@ -1,0 +1,5 @@
+.linter-test/fixtures/02-trailing-whitespace.yml
+  1:1       warning  missing document start "---"  (document-start)
+  2:12      error    trailing spaces  (trailing-spaces)
+  4:36      error    trailing spaces  (trailing-spaces)
+

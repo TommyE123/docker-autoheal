@@ -1,0 +1,19 @@
+Checking formatting...
+[error] .linter-test/fixtures/08-tabs.yml: SyntaxError: All collection items must start at the same column (1:1)
+[error] > 1 | services:
+[error]     | ^^^^^^^^^
+[error] > 2 |   autoheal:
+[error]     | ^^^^^^^^^^^
+[error] > 3 | 	image: tommye123/docker-autoheal:latest
+[error]     | ^^^^^^^^^^^
+[error] > 4 | 	container_name: docker-autoheal
+[error]     | ^^^^^^^^^^^
+[error] > 5 |     restart: unless-stopped
+[error]     | ^^^^^^^^^^^
+[error] > 6 |     ports:
+[error]     | ^^^^^^^^^^^
+[error] > 7 |       - "3131:3131"
+[error]     | ^^^^^^^^^^^
+[error] > 8 |
+[error]     | ^
+Error occurred when checking code style in the above file.

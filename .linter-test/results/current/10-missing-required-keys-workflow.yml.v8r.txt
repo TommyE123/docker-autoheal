@@ -1,0 +1,8 @@
+ℹ No config file found
+ℹ Pre-warming the cache
+ℹ Processing .linter-test/fixtures/10-missing-required-keys-workflow.yml
+ℹ Validating .linter-test/fixtures/10-missing-required-keys-workflow.yml against schema from .linter-test/configs/schemas/github-workflow.json ...
+✖ .linter-test/fixtures/10-missing-required-keys-workflow.yml is invalid
+
+.linter-test/fixtures/10-missing-required-keys-workflow.yml# must have required property 'jobs'
+
