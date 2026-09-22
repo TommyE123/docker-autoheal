@@ -112,8 +112,19 @@ class TestRunApiServerRealUvicornSmoke:
             finally:
                 if _RecordingServer.instances:
                     _RecordingServer.instances[0].should_exit = True
+                # asyncio.shield() keeps server_task running if this wait
+                # times out, instead of cancelling it and skipping Uvicorn's
+                # own socket-closing shutdown sequence.
                 with suppress(TimeoutError):
-                    await asyncio.wait_for(server_task, timeout=_SHUTDOWN_TIMEOUT_SECONDS)
+                    await asyncio.wait_for(
+                        asyncio.shield(server_task), timeout=_SHUTDOWN_TIMEOUT_SECONDS
+                    )
+                if not server_task.done() and _RecordingServer.instances:
+                    _RecordingServer.instances[0].force_exit = True
+                    with suppress(TimeoutError):
+                        await asyncio.wait_for(
+                            asyncio.shield(server_task), timeout=_SHUTDOWN_TIMEOUT_SECONDS
+                        )
                 if not server_task.done():
                     server_task.cancel()
                     with suppress(asyncio.CancelledError):
