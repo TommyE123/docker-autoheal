@@ -26,6 +26,14 @@ import uvicorn
 
 import app.main as main_module
 
+# Captured at module import time, before the autouse `recorded_sleeps`
+# fixture in conftest.py monkeypatches `asyncio.sleep` per test. That fixture
+# collapses every sleep to a zero-duration yield, which would also hit
+# Uvicorn's own `Server.main_loop()` tick delay and defeat the point of this
+# smoke test genuinely exercising Uvicorn. Restored for the real-server
+# portion of the test below.
+_real_asyncio_sleep = asyncio.sleep
+
 _POLL_INTERVAL_SECONDS = 0.01
 _STARTUP_TIMEOUT_SECONDS = 5
 _SHUTDOWN_TIMEOUT_SECONDS = 5
@@ -76,6 +84,7 @@ class TestRunApiServerRealUvicornSmoke:
             patch("app.main.uvicorn.Server", _RecordingServer),
             patch("app.api.api.docker_client", None),
             patch("app.api.api.monitoring_engine", None),
+            patch("asyncio.sleep", _real_asyncio_sleep),
         ):
             server_task = asyncio.create_task(main_module.run_api_server())
             try:
