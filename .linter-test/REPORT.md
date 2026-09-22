@@ -446,3 +446,38 @@ exit code for the whole multi-file invocation rather than a per-file
 count, and MegaLinter's table reflects that. The per-file `--Error
 detail:` text is accurate and complete regardless; this only affects the
 single summary number, not whether the check fails or what's reported.
+
+---
+
+## 11. Two follow-up questions on `v8r`
+
+**Can `v8r` be made to fail on deprecated fields (e.g. the old top-level
+`version:` compose key)?** No, and not as a config gap — the compose-spec
+schema does mark some fields `"deprecated": true` (`version` among them,
+`configs/schemas/compose-spec.json:10`), but JSON Schema defines
+`deprecated` as a pure annotation keyword with no effect on validation
+outcome, meant for IDE hints, not pass/fail rules. Confirmed empirically:
+added `fixtures/14-deprecated-version-key.yml` (a compose file using the
+deprecated `version: "3.8"` key) and validated it against the real schema
+— `v8r` reports it `✔ ... is valid`. Also checked `v8r`'s dependency
+`ajv` (the schema engine) directly: no handling of the `deprecated`
+keyword anywhere in its source, and no option to opt into treating it as
+an error. Catching deprecated-field usage would need a different
+mechanism entirely (a custom `ajv` keyword/plugin, or a separate rule
+outside JSON Schema validation) — not achievable by reconfiguring `v8r`
+as shipped.
+
+**Would a `# yaml-language-server: $schema=...` comment at the top of a
+file help `v8r` recognize files that don't match a schemastore filename
+pattern (the root cause in section 10)?** No. Checked `v8r`'s source
+directly (`src/catalogs.js`, `src/cache-prewarm.js`, `src/bootstrap.js`):
+its only schema-resolution paths are an explicit `-s`/`--schema`, a
+custom `-c`/`--catalogs` file consulted before schemastore.org, or the
+default schemastore.org catalog matched purely by **filename glob** —
+nothing reads file content for this. The `$schema`-comment convention is
+implemented by the VS Code YAML extension (and similar editor tooling),
+not by `v8r`; adding it would help IDE autocomplete but do nothing for
+`v8r`'s CLI runs in MegaLinter. The actual lever for extending schema
+coverage to non-standard filenames is a `.v8rrc` config or
+`YAML_V8R_ARGUMENTS`/`YAML_V8R_CONFIG_FILE` in `.mega-linter.yml` pointing
+`-c` at a small custom catalog with extra `fileMatch` globs.
