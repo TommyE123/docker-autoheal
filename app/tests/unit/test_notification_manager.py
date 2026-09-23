@@ -688,19 +688,59 @@ async def test_send_webhook_includes_priority_and_custom_headers(isolated_config
     assert call["headers"]["Content-Type"] == "application/json"
 
 
-class _PerUrlSession:
-    """Fake session where behaviour depends on the target URL, so one
-    provider can fail while another succeeds in the same notification run."""
+class _StartBarrier:
+    """Releases every waiter only once `count` providers have started
+    sending. A sequential implementation would await one provider to
+    completion before starting the next, so the second provider would never
+    reach the barrier and every waiter would hang forever; only genuine
+    concurrent execution (e.g. via asyncio.gather) lets all of them arrive
+    and proceed."""
 
-    def __init__(self, failing_url: str):
+    def __init__(self, count: int):
+        self._count = count
+        self._arrived = 0
+        self._event = asyncio.Event()
+
+    async def wait_for_all(self) -> None:
+        self._arrived += 1
+        if self._arrived >= self._count:
+            self._event.set()
+        await self._event.wait()
+
+
+class _BarrierResponse:
+    def __init__(self, barrier: _StartBarrier, *, fail: bool, status: int = 200):
+        self._barrier = barrier
+        self._fail = fail
+        self.status = status
+
+    async def text(self) -> str:
+        return ""
+
+    async def __aenter__(self):
+        await self._barrier.wait_for_all()
+        if self._fail:
+            raise ConnectionError("network unreachable")
+        return self
+
+    async def __aexit__(self, *exc_info):
+        return False
+
+
+class _PerUrlBarrierSession:
+    """Fake session where behaviour depends on the target URL, so one
+    provider can fail while another succeeds in the same notification run.
+    Each response only resolves once every provider has started sending,
+    which proves they run concurrently rather than one after another."""
+
+    def __init__(self, failing_url: str, barrier: _StartBarrier):
         self._failing_url = failing_url
+        self._barrier = barrier
         self.calls: list[dict] = []
 
     def post(self, url, **kwargs):
         self.calls.append({"url": url, **kwargs})
-        if url == self._failing_url:
-            raise ConnectionError("network unreachable")
-        return _FakeResponse(200)
+        return _BarrierResponse(self._barrier, fail=(url == self._failing_url))
 
 
 @pytest.mark.asyncio
@@ -708,10 +748,18 @@ async def test_one_provider_failure_does_not_block_other_notifications(
     caplog, isolated_config_manager, manager
 ):
     """A single failing service must not stop sibling services in the same
-    notification batch (they run concurrently via asyncio.gather)."""
+    notification batch (they run concurrently via asyncio.gather).
+
+    Both fake responses only resolve once both providers have started
+    sending (see `_StartBarrier`), so this test would hang and time out
+    under a sequential implementation that awaits one provider before
+    starting the next -- it only passes when the providers genuinely run
+    concurrently.
+    """
     failing_url = "https://example.invalid/webhook"
     working_url = "https://example.invalid/discord"
-    manager._session = _PerUrlSession(failing_url=failing_url)
+    barrier = _StartBarrier(count=2)
+    manager._session = _PerUrlBarrierSession(failing_url=failing_url, barrier=barrier)
 
     config = isolated_config_manager.get_config()
     config.notifications.enabled = True
@@ -722,7 +770,7 @@ async def test_one_provider_failure_does_not_block_other_notifications(
     isolated_config_manager.update_config(config)
 
     with caplog.at_level(logging.ERROR):
-        await manager._process_notification(_make_event("restart"))
+        await asyncio.wait_for(manager._process_notification(_make_event("restart")), timeout=2)
 
     called_urls = {call["url"] for call in manager._session.calls}
     assert called_urls == {failing_url, working_url}
