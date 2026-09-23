@@ -45,7 +45,7 @@ Sourcery review, if available
 → push PR fix
 → check CI
 → if CI fails, fix and push
-→ once CI is green, Claude requests `@coderabbitai` follow-up
+→ once CI is green, Claude requests `@coderabbitai review` as a targeted follow-up
 → assess follow-up findings
 → repeat if necessary
 → repository owner final review/merge
@@ -128,7 +128,7 @@ For each valid finding:
 4. Keep the fix within the PR scope.
 5. Follow `.claude/rules/testing.md`.
 6. Ensure branch currency before pushing.
-7. Commit and push the focused fix.
+7. Commit and push the focused fix only when the user's task explicitly authorises committing and pushing; otherwise report the fix and stop.
 
 Do not change code solely because CodeRabbit suggested it.
 
@@ -153,7 +153,7 @@ After making fixes:
 
 1. Run the smallest relevant validation required by `.claude/rules/testing.md`.
 2. Do not claim checks were run unless they were actually run.
-3. Commit and push the validated fix.
+3. Commit and push the validated fix only when the user's task explicitly authorises committing and pushing.
 4. Check the current CI status.
 5. If CI failed because of the changes, diagnose and fix the failure.
 6. Rerun relevant validation.
@@ -173,7 +173,7 @@ After valid findings have been addressed, changes have been pushed, and relevant
 Use a message such as:
 
 ```text
-@coderabbitai
+@coderabbitai review
 
 Addressed the actionable findings from the previous review:
 
@@ -200,7 +200,7 @@ For findings from a CodeRabbit follow-up:
 2. Fix valid findings or escalate disputed findings.
 3. Run relevant validation.
 4. Ensure branch currency before pushing.
-5. Commit and push.
+5. Commit and push only when the user's task explicitly authorises committing and pushing.
 6. Check CI.
 7. If CI fails because of the changes, diagnose and fix it.
 8. If CI is still running, stop and report.

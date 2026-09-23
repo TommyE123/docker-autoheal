@@ -101,7 +101,7 @@ For each valid finding:
 4. Keep the fix within the PR scope.
 5. Follow `.claude/rules/testing.md`.
 6. Ensure branch currency before pushing.
-7. Commit and push the focused fix.
+7. Commit and push the focused fix only when the user's task explicitly authorises committing and pushing; otherwise report the fix and stop.
 
 Do not change code solely because Sourcery suggested it.
 
@@ -146,7 +146,7 @@ Use the repository's normal commit conventions.
 
 Keep commits focused on the Sourcery findings being addressed.
 
-Push the changes to the PR branch.
+Push the changes to the PR branch only when the user's task explicitly authorises committing and pushing.
 
 ## Documenting Resolution
 
