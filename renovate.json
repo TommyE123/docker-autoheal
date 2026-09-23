@@ -55,5 +55,17 @@
       "matchPackageNames": ["tommye123/docker-autoheal"],
       "enabled": false
     }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update devcontainer release tools",
+      "managerFilePatterns": ["/.devcontainer\\/tools\\.json$/"],
+      "matchStrings": [
+        "\\\"repository\\\":\\s*\\\"(?<depName>[^\\\"]+)\\\",\\s*\\\"version\\\":\\s*\\\"v?(?<currentValue>[^\\\"]+)\\\""
+      ],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    }
   ]
 }

@@ -39,6 +39,242 @@
       "problemMatcher": []
     },
     {
+      "label": "Autoheal: Lint Python",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "Autoheal: Lint Python with Ruff",
+        "Autoheal: Check Python Formatting",
+        "Autoheal: Type Check Python"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Lint Python with Ruff",
+      "type": "shell",
+      "command": "ruff check app",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Python Formatting",
+      "type": "shell",
+      "command": "ruff format --check app",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Type Check Python",
+      "type": "shell",
+      "command": "pyright",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Lint Frontend",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "Autoheal: Lint JavaScript",
+        "Autoheal: Check JavaScript Formatting",
+        "Autoheal: Lint CSS"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Lint JavaScript",
+      "type": "shell",
+      "command": "npm run lint",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check JavaScript Formatting",
+      "type": "shell",
+      "command": "npm run format:check",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Lint CSS",
+      "type": "shell",
+      "command": "stylelint \"frontend/src/**/*.css\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Lint Workflows",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "Autoheal: Lint GitHub Actions",
+        "Autoheal: Lint Workflow Security"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Lint GitHub Actions",
+      "type": "shell",
+      "command": "actionlint",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Lint Workflow Security",
+      "type": "shell",
+      "command": "zizmor .github/workflows",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Lint Markup and Data",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "Autoheal: Lint Markdown",
+        "Autoheal: Check Markdown Tables",
+        "Autoheal: Lint YAML",
+        "Autoheal: Lint HTML",
+        "Autoheal: Check JSON",
+        "Autoheal: Check JSON and YAML Formatting",
+        "Autoheal: Validate JSON and YAML"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Lint Markdown",
+      "type": "shell",
+      "command": "markdownlint-cli2 \"**/*.md\" \"#node_modules\" \"#frontend/node_modules\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Markdown Tables",
+      "type": "shell",
+      "command": "markdown-table-formatter --check \"**/*.md\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Lint YAML",
+      "type": "shell",
+      "command": "yamllint --strict .",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Lint HTML",
+      "type": "shell",
+      "command": "djlint frontend/index.html && htmlhint frontend/index.html",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check JSON",
+      "type": "shell",
+      "command": "jsonlint .devcontainer/devcontainer.json && jsonlint .devcontainer/tools.json",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check JSON and YAML Formatting",
+      "type": "shell",
+      "command": "prettier --check \"**/*.json\" \"**/*.{yml,yaml}\" --ignore-path .gitignore",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Validate JSON and YAML",
+      "type": "shell",
+      "command": "v8r .",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Lint Dockerfiles",
+      "type": "shell",
+      "command": "hadolint Dockerfile Dockerfile.simple",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Repository Conventions",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "Autoheal: Check EditorConfig",
+        "Autoheal: Check Paths",
+        "Autoheal: Check Secrets"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check EditorConfig",
+      "type": "shell",
+      "command": "ec",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Paths",
+      "type": "shell",
+      "command": "ls-lint",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Secrets",
+      "type": "shell",
+      "command": "secretlint \"**/*\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run Security Scanners",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "Autoheal: Run Checkov",
+        "Autoheal: Run Semgrep",
+        "Autoheal: Run OSV Scanner",
+        "Autoheal: Run Trivy",
+        "Autoheal: Run TruffleHog",
+        "Autoheal: Run Betterleaks"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run Checkov",
+      "type": "shell",
+      "command": "checkov -d .",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run Semgrep",
+      "type": "shell",
+      "command": "semgrep scan --config p/command-injection --config p/docker-compose --config p/insecure-transport --config p/javascript --config p/owasp-top-ten --config p/python --config p/react --exclude .github/workflows/issue-triage.lock.yml --exclude Dockerfile* .",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run OSV Scanner",
+      "type": "shell",
+      "command": "osv-scanner scan source -r .",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run Trivy",
+      "type": "shell",
+      "command": "trivy fs --scanners vuln,misconfig,secret .",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run TruffleHog",
+      "type": "shell",
+      "command": "trufflehog filesystem --directory . --no-update",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run Betterleaks",
+      "type": "shell",
+      "command": "betterleaks scan --path .",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run Local Linters",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "Autoheal: Lint Python",
+        "Autoheal: Lint Frontend",
+        "Autoheal: Lint Workflows",
+        "Autoheal: Lint Markup and Data",
+        "Autoheal: Lint Dockerfiles",
+        "Autoheal: Check Repository Conventions",
+        "Autoheal: Run Security Scanners"
+      ],
+      "problemMatcher": []
+    },
+    {
       "label": "Autoheal: Run Megalinter Cupcake",
       "type": "shell",
       "command": "docker run --rm -v \"${workspaceFolder}:/tmp/lint\" ghcr.io/oxsecurity/megalinter-cupcake:v10",

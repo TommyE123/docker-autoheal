@@ -27,6 +27,12 @@ jobs:
             npm --version
             docker --version
             docker compose version
+            actionlint --version
+            hadolint --version
+            osv-scanner --version
+            trivy --version
+            trufflehog --version
+            betterleaks --version
 
             echo "== Development tools =="
             pytest --version
@@ -34,8 +40,18 @@ jobs:
             pyright --version
             checkov --version
             semgrep --version
+            zizmor --version
             yamllint --version
             djlint --version
+            editorconfig-checker --version
+            htmlhint --version
+            jsonlint --help
+            markdownlint-cli2 --version
+            markdown-table-formatter --version
+            secretlint --version
+            stylelint --version
+            v8r --version
+            ls-lint --version
 
             echo "== Frontend development tools =="
             npm exec eslint --version

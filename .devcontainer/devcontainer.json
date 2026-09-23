@@ -9,9 +9,9 @@
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
   },
 
-  "postCreateCommand": "python -m pip install --no-cache-dir -r requirements-dev.txt && npm ci --prefix frontend",
+  "postCreateCommand": "python -m pip install --no-cache-dir -r requirements-dev.txt && npm ci --prefix frontend && npm ci --ignore-scripts --prefix .devcontainer && bash .devcontainer/install-tools.sh",
 
-  "updateContentCommand": "python -m pip install --no-cache-dir -r requirements-dev.txt && npm ci --prefix frontend",
+  "updateContentCommand": "python -m pip install --no-cache-dir -r requirements-dev.txt && npm ci --prefix frontend && npm ci --ignore-scripts --prefix .devcontainer && bash .devcontainer/install-tools.sh",
 
   "forwardPorts": [3000, 3131, 9090],
 
@@ -39,10 +39,15 @@
         "ms-python.python",
         "redhat.vscode-xml",
         "redhat.vscode-yaml",
+        "DavidAnson.vscode-markdownlint",
         "stylelint.vscode-stylelint",
         "yzhang.markdown-all-in-one"
       ]
     }
+  },
+
+  "remoteEnv": {
+    "PATH": "${containerWorkspaceFolder}/.devcontainer/node_modules/.bin:${containerEnv:HOME}/.local/bin:${containerEnv:PATH}"
   },
 
   "remoteUser": "vscode",
