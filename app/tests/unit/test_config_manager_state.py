@@ -140,7 +140,7 @@ def test_event_log_persists_across_a_fresh_manager(isolated_config_manager, monk
 
 
 def test_export_and_import_round_trip_includes_custom_health_checks_and_restart_counts(
-    isolated_config_manager, monkeypatch
+    isolated_config_manager, monkeypatch, tmp_path
 ):
     config = isolated_config_manager.get_config()
     config.monitor.interval_seconds = 45
@@ -155,7 +155,10 @@ def test_export_and_import_round_trip_includes_custom_health_checks_and_restart_
     isolated_config_manager.add_custom_health_check(health_check)
     exported = isolated_config_manager.export_config()
 
-    _redirect_manager_paths(monkeypatch, isolated_config_manager.DATA_DIR)
+    # A separate, empty data directory ensures the assertions below can only
+    # pass if import_config() actually restored this state, not because
+    # ConfigManager() loaded it from disk on init.
+    _redirect_manager_paths(monkeypatch, tmp_path)
     imported = ConfigManager()
     imported.import_config(exported)
 
