@@ -2,7 +2,6 @@
 name: sourcery-review
 
 description: Handle Sourcery's secondary automatic PR review process. Use when a Sourcery review exists on a PR, or when checking whether one exists. Sourcery is a secondary reviewer that may provide input before the mandatory CodeRabbit review stage and is not normally a merge gate.
-allowed-tools: Read, Grep, Glob, Edit, Bash
 ---
 
 # Sourcery Review
