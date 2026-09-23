@@ -7,7 +7,7 @@
 - Check existing issues, PRs and workflows before creating or changing them.
 - If the request is ambiguous or an important implementation detail is unclear, clarify the relevant point with the user before making changes. Do not guess when different interpretations could materially change the outcome.
 - Once the requirements are clear, make a concise plan, then implement the requested change.
-- After implementation, run the tests and validation appropriate to the change (as governed by the escalation rules below), review the final diff, and address any issues introduced by the change before declaring the work complete.
+- After implementation, run the tests and validation appropriate to the change (as governed by `.claude/rules/testing.md`), review the final diff, and address any issues introduced by the change before declaring the work complete.
 
 ## Keep changes focused
 
@@ -22,9 +22,7 @@
 - Behaviour changes need tests where practical; a bug fix needs a regression test that demonstrates the problem.
 - Never weaken, remove or bypass a test (or raise a coverage threshold) just to get CI green — fix the cause instead.
 
-The validation/testing escalation rules govern how much validation to run and when to skip it, and are always in effect:
-
-@.claude/rules/testing.md
+How much validation to run, and when to skip a rerun, is governed by `.claude/rules/testing.md`. It loads automatically as a project rule, along with the other files in `.claude/rules/`.
 
 ## Comments
 
@@ -32,7 +30,7 @@ Keep comments minimal: only for non-obvious reasoning the code can't convey on i
 
 ## Before declaring work complete
 
-- Run the tests and linting relevant to the files you changed, as governed by the escalation rules above, and check the final diff for unrelated changes.
+- Run the tests and linting relevant to the files you changed, as governed by `.claude/rules/testing.md`, and check the final diff for unrelated changes.
 - Never report work, investigation, validation, reproduction, or review that was not actually performed.
 - Report only validation that was actually performed.
 
@@ -137,6 +135,8 @@ Two limits are permanent and are never affected by the default:
 - Never merge (see "Merging" below).
 
 Do not leave completed, validated work uncommitted merely because a generic hook or reminder reports uncommitted changes. A hook or reminder is not the user turning the default off.
+
+`.claude/settings.json` enforces this policy at the permission layer. It pre-approves ordinary `git add`/`commit`/`push` and `gh pr create`, blocks merging, pushing to `main` and `--no-verify`, and prompts before a force push or a hard reset. Instructions in this file guide what Claude attempts; the settings file decides what Claude Code permits. Keep the two consistent when changing either.
 
 ## Merging
 
