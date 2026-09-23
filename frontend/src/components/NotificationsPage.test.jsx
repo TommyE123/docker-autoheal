@@ -283,7 +283,15 @@ describe("NotificationsPage", () => {
 
   it("disables an enabled service", async () => {
     const user = userEvent.setup();
-    getNotificationsConfig.mockResolvedValue({ data: configWithServices });
+    const configAfterDisable = {
+      ...configWithServices,
+      services: configWithServices.services.map((service) =>
+        service.name === "My Webhook" ? { ...service, enabled: false } : service,
+      ),
+    };
+    getNotificationsConfig
+      .mockResolvedValueOnce({ data: configWithServices })
+      .mockResolvedValueOnce({ data: configAfterDisable });
     updateNotificationService.mockResolvedValue({});
 
     render(<NotificationsPage />);
@@ -305,12 +313,25 @@ describe("NotificationsPage", () => {
     expect(
       await screen.findByText(/notification service updated successfully/i),
     ).toBeInTheDocument();
+
+    const row = screen.getByText("My Webhook").closest("tr");
+    await waitFor(() =>
+      expect(within(row).getByText("Disabled")).toBeInTheDocument(),
+    );
   });
 
   it("deletes a service after confirming", async () => {
     const user = userEvent.setup();
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
-    getNotificationsConfig.mockResolvedValue({ data: configWithServices });
+    const configAfterDelete = {
+      ...configWithServices,
+      services: configWithServices.services.filter(
+        (service) => service.name !== "My Webhook",
+      ),
+    };
+    getNotificationsConfig
+      .mockResolvedValueOnce({ data: configWithServices })
+      .mockResolvedValueOnce({ data: configAfterDelete });
     deleteNotificationService.mockResolvedValue({});
 
     render(<NotificationsPage />);
@@ -325,6 +346,10 @@ describe("NotificationsPage", () => {
     expect(
       await screen.findByText(/notification service deleted successfully/i),
     ).toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(screen.queryByText("My Webhook")).not.toBeInTheDocument(),
+    );
 
     confirmSpy.mockRestore();
   });
