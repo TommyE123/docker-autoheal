@@ -307,6 +307,9 @@ class TestTcpHealth:
             return_value=mock_sock,
         ):
             assert wrapper.check_tcp_health(container, port=8080) is False
+        # Proves the health check actually attempted a connection rather than
+        # returning False before ever calling connect_ex.
+        mock_sock.connect_ex.assert_called_once_with(("172.17.0.2", 8080))
 
     def test_tcp_health_check_fails_on_non_zero_connect_result(self, wrapper):
         # connect_ex normally reports failure by returning a non-zero errno
@@ -332,6 +335,9 @@ class TestTcpHealth:
             return_value=mock_sock,
         ):
             assert wrapper.check_tcp_health(container, port=8080) is False
+        # Proves the health check actually attempted a connection rather than
+        # returning False before ever calling connect_ex.
+        mock_sock.connect_ex.assert_called_once_with(("172.17.0.2", 8080))
 
     def test_tcp_health_check_fails_on_dns_resolution_failure(self, wrapper):
         container = make_sdk_container()
@@ -343,6 +349,9 @@ class TestTcpHealth:
             return_value=mock_sock,
         ):
             assert wrapper.check_tcp_health(container, port=8080) is False
+        # Proves the health check actually attempted a connection rather than
+        # returning False before ever calling connect_ex.
+        mock_sock.connect_ex.assert_called_once_with(("172.17.0.2", 8080))
 
     def test_tcp_health_check_fails_on_invalid_port(self, wrapper):
         container = make_sdk_container()
