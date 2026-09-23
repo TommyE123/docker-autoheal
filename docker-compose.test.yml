@@ -52,7 +52,7 @@ services:
 
   # Test container 3: Container with custom health check (HTTP)
   http-test:
-    image: python:3.14-alpine@sha256:016508ba505da24f7139765bc4bb669df4e88eb2f12eeadd571bf2f88d7533df
+    image: python:3.14-alpine@sha256:9e9fde4d32eedce0b661d9ab91e826b62dddf28e928c230ec55f1866cac66b01
     container_name: http-test
     restart: unless-stopped
     labels:
@@ -77,7 +77,7 @@ services:
 
   # Test container 4: Redis with TCP health check
   redis-test:
-    image: redis:alpine@sha256:bd999b5cfee25fb24b8320a31fddbd69f462df44c8138c66e369582937beebc0
+    image: redis:alpine@sha256:ba6e394f6acc2a695ef1b6944f161b9ca813711739be68319fa0db3470673f1d
     container_name: redis-test
     restart: unless-stopped
     labels:

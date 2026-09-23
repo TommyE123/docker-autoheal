@@ -6,8 +6,7 @@ Supports: Webhook, Discord, Slack, Telegram, Email, Ntfy, Gotify, Pushover
 import asyncio
 import logging
 import aiohttp
-import json
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 from enum import Enum
 
@@ -191,7 +190,7 @@ class NotificationManager:
         # Send all notifications concurrently
         if tasks:
             results = await asyncio.gather(*tasks, return_exceptions=True)
-            for i, result in enumerate(results):
+            for result in results:
                 if isinstance(result, Exception):
                     logger.error(f"Notification failed: {result}")
 
