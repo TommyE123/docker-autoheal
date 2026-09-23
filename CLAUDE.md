@@ -136,7 +136,7 @@ Two limits are permanent and are never affected by the default:
 
 Do not leave completed, validated work uncommitted merely because a generic hook or reminder reports uncommitted changes. A hook or reminder is not the user turning the default off.
 
-`.claude/settings.json` enforces this policy at the permission layer. It pre-approves ordinary `git add`/`commit`/`push` and `gh pr create`, blocks merging, pushing to `main` and `--no-verify`, and prompts before a force push or a hard reset. Instructions in this file guide what Claude attempts; the settings file decides what Claude Code permits. Keep the two consistent when changing either.
+`.claude/settings.json` backs this policy at the permission layer: it pre-approves ordinary `git add`/`commit`/`push` and `gh pr create`, denies `gh pr merge`, force pushes, `--no-verify` and the common forms of pushing to `main`, and prompts before `git reset --hard`. That coverage is pattern-based and therefore partial — it cannot match every spelling of a command, and the repository's "Protect Main" ruleset, not these rules, is the primary protection for `main`. Instructions in this file guide what Claude attempts; the settings file decides what Claude Code permits. Keep the two consistent when changing either.
 
 ## Merging
 

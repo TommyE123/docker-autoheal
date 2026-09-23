@@ -124,7 +124,7 @@ The follow-up should focus on the changes made in response to the previous revie
 
 ## Subsequent Findings
 
-For findings from a CodeRabbit follow-up, apply the same shared workflow (assess, fix or escalate, validate, branch currency, CI) as the initial review. Never request another full review unless the repository owner explicitly asks for one — otherwise request another targeted follow-up. Continue until there are no unresolved actionable findings.
+For findings from a CodeRabbit follow-up, apply the same shared workflow (assess, fix or escalate, validate, branch currency, CI) as the initial review. Never request another full review — only another targeted follow-up. Continue until there are no unresolved actionable findings.
 
 ## Review Scope
 
