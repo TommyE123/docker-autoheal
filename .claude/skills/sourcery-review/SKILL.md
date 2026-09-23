@@ -2,6 +2,8 @@
 name: sourcery-review
 
 description: Handle Sourcery's secondary automatic PR review process. Use when a Sourcery review exists on a PR, or when checking whether one exists. Sourcery is a secondary reviewer that may provide input before the mandatory CodeRabbit review stage and is not normally a merge gate.
+disable-model-invocation: true
+allowed-tools: Read, Grep, Glob, Edit, Bash
 ---
 
 # Sourcery Review
@@ -17,6 +19,8 @@ Sourcery reviews eligible pull requests automatically through its GitHub App whe
 A missing Sourcery review is not, by itself, a reason to block a pull request.
 
 Do not use Sourcery as a replacement for CodeRabbit.
+
+Follow `.claude/rules/review-fix-workflow.md` for REVIEW.md authority, assessing findings, fixing findings, disputed findings, CI handling, and commit/push authorisation. This skill covers only what's specific to Sourcery: detecting a review, its optional/secondary status, and reply/documentation timing.
 
 ## Review Model
 
@@ -61,92 +65,11 @@ Check both PR reviews and PR comments when determining whether a Sourcery review
 
 If no Sourcery review exists at the time of assessment, do not block the PR waiting for one.
 
-## REVIEW.md
+## Assessing and Fixing Findings
 
-Use `REVIEW.md` as the repository-specific review standard.
-
-`REVIEW.md` takes precedence over generic Sourcery recommendations where they conflict.
-
-Findings must still be assessed against the actual code and PR scope.
-
-## Assessing Findings
-
-When Sourcery has reviewed the PR:
-
-1. Read the complete review.
-2. Assess each finding against the actual code and PR scope.
-3. Apply `REVIEW.md`.
-4. Treat no actionable findings as a successful review outcome.
-5. Take no further Sourcery action unless the owner explicitly requests a re-review.
-6. Only valid, actionable, PR-related findings require action.
-
-Ignore findings that are:
-
-- Incorrect.
-- Pre-existing and not materially affected by the PR.
-- Speculative without a credible failure path.
-- Purely stylistic.
-- Already covered by existing tooling without a distinct issue.
-- Outside the PR scope.
-
-Do not manufacture findings or turn the Sourcery review into a general repository audit.
-
-## Fixing Findings
-
-For each valid finding:
-
-1. Confirm the reported behaviour.
-2. Determine whether the PR introduces or materially worsens the issue.
-3. Make the smallest appropriate fix.
-4. Keep the fix within the PR scope.
-5. Follow `.claude/rules/testing.md`.
-6. Ensure branch currency before pushing.
-7. Commit and push the focused fix only when the user's task explicitly authorises committing and pushing; otherwise report the fix and stop.
-
-Do not change code solely because Sourcery suggested it.
+Apply the shared workflow. Treat no actionable findings as a successful review outcome, and take no further Sourcery action unless the owner explicitly requests a re-review. Keep commits focused on the Sourcery findings being addressed, using the repository's normal commit conventions.
 
 Do not reply on Sourcery's comment threads yet — replies happen only after the fix is pushed and CI is green. See CI below.
-
-## Disputed Findings
-
-If Claude disagrees with a Sourcery finding:
-
-- Do not change the code solely to satisfy Sourcery.
-- Do not silently dismiss the finding.
-- Present the owner with:
-  - the finding;
-  - Claude's assessment;
-  - the relevant code or behaviour;
-  - the specific reason for disagreement;
-  - supporting evidence or validation.
-
-The repository owner decides whether a disputed finding should be fixed or otherwise addressed.
-
-## Validation
-
-After making fixes:
-
-- Run the smallest relevant validation required by `.claude/rules/testing.md`.
-- Do not claim checks were run unless they were actually run.
-- Do not broaden validation unnecessarily.
-
-## Branch Currency
-
-Before pushing a Sourcery fix:
-
-1. Follow `.claude/rules/branch-currency.md`.
-2. Update the branch if required.
-3. Rerun affected validation after the update.
-
-The branch must also be current before the initial CodeRabbit review.
-
-## Commit and Push
-
-Use the repository's normal commit conventions.
-
-Keep commits focused on the Sourcery findings being addressed.
-
-Push the changes to the PR branch only when the user's task explicitly authorises committing and pushing.
 
 ## Documenting Resolution
 
@@ -171,23 +94,9 @@ Only mention a branch update if the branch was actually updated.
 
 ## CI
 
-After pushing fixes:
+Follow the shared CI handling in `.claude/rules/review-fix-workflow.md`, with one addition specific to Sourcery: if CI is still running or failing, do not reply or comment yet — wait and re-check rather than posting a reply against a red or pending build. Once CI is green on the commit with the fix, post the thread replies and documenting comment from "Documenting Resolution".
 
-1. Check the current CI status.
-2. If CI failed because of the changes, diagnose and fix the failure.
-3. Run the relevant validation.
-4. Push the fix only when the user's task explicitly authorises committing and pushing.
-5. Check CI again.
-6. If CI is still running or failing, do not reply or comment yet — wait and re-check rather than posting a reply against a red or pending build.
-7. Once CI is green on the commit with the fix, post the thread replies and documenting comment from "Documenting Resolution".
-
-Do not asynchronously monitor CI.
-
-Do not proceed to CodeRabbit while relevant CI is failing or still running.
-
-Do not reply on a Sourcery thread or post the documenting comment while CI is red or still running on the fix commit.
-
-Unrelated or pre-existing CI failures are not automatically Sourcery findings.
+Do not proceed to CodeRabbit while relevant CI is failing or still running. Unrelated or pre-existing CI failures are not automatically Sourcery findings.
 
 ## Relationship With CodeRabbit
 
@@ -244,14 +153,7 @@ Do not trigger an initial Sourcery review, work around Sourcery capacity limits,
 
 Only request or perform a Sourcery re-review when the repository owner explicitly asks for one.
 
-If an approved workflow exists and the owner requests it:
-
-1. Assess the resulting review using this skill.
-2. Fix valid findings.
-3. Validate the changes.
-4. Ensure branch currency.
-5. Commit and push only when the user's task explicitly authorises committing and pushing.
-6. Document the resolution where appropriate.
+If an approved workflow exists and the owner requests it, assess the resulting review using this skill and the shared workflow, then document the resolution where appropriate.
 
 A Sourcery re-review does not replace or alter the mandatory CodeRabbit process.
 

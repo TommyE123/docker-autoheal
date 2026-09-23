@@ -2,6 +2,8 @@
 name: coderabbit-review
 
 description: Handle the repository's mandatory CodeRabbit review process for a substantive PR. Use after Sourcery has been addressed when a review is available, or proceed if no Sourcery review exists. The first CodeRabbit request must be a full review; subsequent requests must be targeted follow-ups covering changes made in response to the review.
+disable-model-invocation: true
+allowed-tools: Read, Grep, Glob, Edit, Bash
 ---
 
 # CodeRabbit Review
@@ -15,6 +17,8 @@ Every substantive PR targeting `main` must receive a CodeRabbit review before th
 CodeRabbit does not automatically review a PR when it is submitted. Claude is responsible for requesting the review at the appropriate stage.
 
 The repository owner remains the final gatekeeper.
+
+Follow `.claude/rules/review-fix-workflow.md` for REVIEW.md authority, assessing findings, fixing findings, disputed findings, CI handling, and commit/push authorisation. This skill covers only what's specific to CodeRabbit: when to request a review, the full-vs-follow-up distinction, and completion criteria.
 
 ## Substantive PR
 
@@ -78,14 +82,6 @@ Before requesting the initial review:
 
 Do not request CodeRabbit before these prerequisites are satisfied.
 
-## REVIEW.md
-
-Use `REVIEW.md` as the repository-specific review standard.
-
-`REVIEW.md` takes precedence over generic CodeRabbit recommendations where they conflict.
-
-Findings must still be assessed against the actual code and PR scope.
-
 ## Initial CodeRabbit Review
 
 Claude requests the first review only after the prerequisites above are satisfied:
@@ -96,73 +92,7 @@ Claude requests the first review only after the prerequisites above are satisfie
 
 This is the only full CodeRabbit review request permitted for the PR.
 
-## Assessing Findings
-
-When CodeRabbit reviews the PR:
-
-1. Read the complete review.
-2. Assess each finding against the actual code and PR scope.
-3. Apply `REVIEW.md`.
-4. Treat a GREEN review as a successful review outcome.
-5. Take no further CodeRabbit action unless subsequent material changes require review.
-6. Only valid, actionable, PR-related findings require action.
-
-Ignore findings that are:
-
-- Incorrect.
-- Pre-existing and not materially affected by the PR.
-- Speculative without a credible failure path.
-- Purely stylistic.
-- Already covered by existing tooling without a distinct issue.
-- Outside the PR scope.
-
-Do not manufacture findings or turn the CodeRabbit review into a general repository audit.
-
-## Fixing Findings
-
-For each valid finding:
-
-1. Confirm the reported behaviour.
-2. Determine whether the PR introduces or materially worsens the issue.
-3. Make the smallest appropriate fix.
-4. Keep the fix within the PR scope.
-5. Follow `.claude/rules/testing.md`.
-6. Ensure branch currency before pushing.
-7. Commit and push the focused fix only when the user's task explicitly authorises committing and pushing; otherwise report the fix and stop.
-
-Do not change code solely because CodeRabbit suggested it.
-
-## Disputed Findings
-
-If Claude disagrees with a CodeRabbit finding:
-
-- Do not change the code solely to satisfy CodeRabbit.
-- Do not silently dismiss the finding.
-- Present the owner with:
-  - the finding;
-  - Claude's assessment;
-  - the relevant code or behaviour;
-  - the specific reason for disagreement;
-  - supporting evidence or validation.
-
-The repository owner decides whether a disputed finding should be fixed or otherwise addressed.
-
-## Validation and CI
-
-After making fixes:
-
-1. Run the smallest relevant validation required by `.claude/rules/testing.md`.
-2. Do not claim checks were run unless they were actually run.
-3. Commit and push the validated fix only when the user's task explicitly authorises committing and pushing.
-4. Check the current CI status.
-5. If CI failed because of the changes, diagnose and fix the failure.
-6. Rerun relevant validation.
-7. Push the fix only when the user's task explicitly authorises committing and pushing.
-8. Check CI again.
-9. If CI is still running, report that status and stop.
-10. Resume when invoked again and current results are available.
-
-Do not asynchronously monitor CI.
+Treat a GREEN review as a successful review outcome; take no further CodeRabbit action unless subsequent material changes require review.
 
 Do not request a CodeRabbit follow-up while relevant CI is failing or still running.
 
@@ -194,33 +124,7 @@ The follow-up should focus on the changes made in response to the previous revie
 
 ## Subsequent Findings
 
-For findings from a CodeRabbit follow-up:
-
-1. Assess them against the actual code and PR scope.
-2. Fix valid findings or escalate disputed findings.
-3. Run relevant validation.
-4. Ensure branch currency before pushing.
-5. Commit and push only when the user's task explicitly authorises committing and pushing.
-6. Check CI.
-7. If CI fails because of the changes, diagnose and fix it.
-8. If CI is still running, stop and report.
-9. Once CI is green, request another targeted CodeRabbit follow-up if further material changes require review.
-
-Never request another full review.
-
-Continue until there are no unresolved actionable findings and the repository owner is satisfied.
-
-## Branch Currency
-
-Before each review-fix push:
-
-1. Follow `.claude/rules/branch-currency.md`.
-2. Update the branch if required.
-3. Rerun affected validation after the update.
-
-The branch must also be current before the initial CodeRabbit review.
-
-Only mention a branch update if the branch was actually updated.
+For findings from a CodeRabbit follow-up, apply the same shared workflow (assess, fix or escalate, validate, branch currency, CI) as the initial review. Never request another full review — only another targeted follow-up. Continue until there are no unresolved actionable findings and the repository owner is satisfied.
 
 ## Review Scope
 

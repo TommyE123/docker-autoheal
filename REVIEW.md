@@ -40,6 +40,8 @@ Every individual finding also gets its own tag, separate from the overall review
 
 Only 🔴 RED and 🟠 AMBER findings are actionable. A 🟢 GREEN finding does not affect the overall review status — a review can carry GREEN call-outs and still conclude an overall GREEN — READY status, since GREEN findings are not actionable.
 
+Report at most 5 🟠 AMBER findings per review; prefer fewer, high-confidence findings over an exhaustive list.
+
 For each 🔴/🟠 finding, give:
 
 - exact `file:line`
@@ -61,52 +63,9 @@ Review only — do not push commits to the PR.
 
 ---
 
-## Core Review Principles
-
-Prioritise:
-
-1. Correctness
-2. Reliability
-3. Production safety
-4. Security
-5. Observability
-6. Maintainability
-
-Focus on the changed code and its direct impact.
-
-Do not:
-
-- Report stylistic preferences unless they create a real problem.
-- Perform a general audit of the repository.
-- Report unrelated pre-existing issues.
-- Speculate about hypothetical failures without a credible failure path.
-- Inflate severity.
-
-A GREEN review is preferred over a weak, speculative, or low-confidence finding.
-
----
-
 ## Evidence Threshold
 
-Only raise a finding when the issue can be reasonably demonstrated from the changed code and represents a realistic failure scenario.
-
-Findings should be limited to issues introduced or materially worsened by the PR. See "Per-Finding Reporting Format" above for what each finding must include.
-
-Avoid speculation. Point to the specific code path that produces the problem.
-
----
-
-## Correctness and Reliability
-
-Look for:
-
-- Incorrect behaviour or broken logic.
-- Behavioural regressions.
-- Error paths that leave the application in an incorrect state.
-- Race conditions and unsafe assumptions.
-- Resource leaks or cleanup failures.
-- Production failures not obvious from the happy path.
-- Configuration changes that alter behaviour unexpectedly.
+Only raise a finding when the issue can be reasonably demonstrated from the changed code and represents a realistic failure scenario, and is introduced or materially worsened by the PR. Avoid speculation — point to the specific code path that produces the problem. A GREEN review is preferred over a weak, speculative, or low-confidence finding.
 
 ---
 
@@ -128,20 +87,6 @@ Pay particular attention to:
 - Situations that could create restart loops or prevent recovery.
 
 Findings in this area may have significant production impact, so ensure they are supported by a clearly explained failure path.
-
----
-
-## Application Behaviour
-
-Review API, service, configuration, and application changes for:
-
-- Behavioural regressions.
-- Invalid input handling.
-- Error handling.
-- State consistency.
-- Background task behaviour.
-- Configuration compatibility.
-- Unexpected deployment or operational impact.
 
 ---
 
