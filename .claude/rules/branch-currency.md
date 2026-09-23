@@ -1,45 +1,39 @@
 # Keeping the PR branch current with main
 
-When Claude is already working on a PR and preparing to commit and push completed changes, the PR branch should be current with main to ensure the fixes are based on the latest main.
+A PR branch being behind `main` is normal and usually harmless. Update it only when being behind actually matters.
 
 ## When to update the branch
 
-Before the final validation and push of completed fixes, check whether the PR branch is behind main:
+Update the branch when any of these is true:
 
-- If the branch is current with main, proceed with validation and push as normal.
-- If the branch is behind main, update it before the final validation and push.
+- GitHub reports a conflict with `main`.
+- A required check or branch-protection rule requires the branch to be up to date before merging.
+- The work depends on, or could be invalidated by, something that changed in `main` (for example the code being fixed was since modified, or CI on the branch is failing for a reason already fixed on `main`).
+
+Otherwise leave the branch alone and let the merge bring `main` in. Do not update the branch merely because `main` has moved on.
 
 ## How to update the branch
 
-Use the repository's established branch-update or rebase workflow. This is typically:
-
-```bash
-git fetch origin main
-git rebase origin/main
-```
-
-Or, depending on repository convention:
+This repository updates PR branches by merging `main` into the branch:
 
 ```bash
 git fetch origin main
 git merge origin/main
 ```
 
-Check the repository's contribution guidelines or recent PR history for the established workflow.
+Use merge rather than rebase. It matches the repository's existing history and avoids rewriting pushed commits, so no force push is needed.
 
 ## After updating the branch
 
 1. **Resolve any conflicts carefully** — do not automatically accept either side of a conflict. Understand what changed on main and how it relates to the PR's changes. Apply fixes appropriately.
-2. **Re-run appropriate targeted validation** — after a branch update and conflict resolution, re-run the validation checks for the changed code to ensure the merge/rebase did not introduce issues.
-3. **Proceed with the final push** — once validation passes after the branch update, commit (if needed after rebase) and push.
+2. **Re-run appropriate targeted validation** — after a branch update and conflict resolution, re-run the validation checks for the changed code to ensure the merge did not introduce issues.
+3. **Push the result** — see the commit and push policy in `CLAUDE.md`.
 
 ## Do not over-update
 
-Do not perform unnecessary branch updates when the branch is already current with main.
+Do not turn this into a separate polling or repeated branch-checking loop, and do not re-check currency on every push.
 
-Do not turn this into a separate polling or repeated branch-checking loop.
-
-The purpose is to ensure the fixes being pushed and subsequently reviewed are based on the current main, not to maintain ongoing synchronization with main throughout the session.
+The purpose is to ensure fixes are based on a `main` they are still valid against — not to maintain ongoing synchronisation with `main` throughout the session.
 
 ## CI remains authoritative
 
