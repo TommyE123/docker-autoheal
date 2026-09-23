@@ -143,6 +143,32 @@ class TestScanExistingContainers:
         assert config_manager.get_config().containers.selected == []
         assert config_manager.get_events() == []
 
+    async def test_container_with_non_true_autoheal_value_is_ignored(self, engine, docker_client):
+        container, info = make_container(name="web", labels={"autoheal": "false"})
+        docker_client.add_container(container, info)
+
+        await engine._scan_existing_containers()
+
+        assert config_manager.get_config().containers.selected == []
+        assert config_manager.get_events() == []
+
+    async def test_notification_failure_does_not_prevent_container_from_being_added(
+        self, engine, docker_client, mock_notification_manager
+    ):
+        mock_notification_manager.send_event_notification.side_effect = RuntimeError(
+            "notification transport unavailable"
+        )
+        container, info = make_container(name="web", labels={"autoheal": "true"})
+        docker_client.add_container(container, info)
+
+        await engine._scan_existing_containers()
+
+        assert config_manager.get_config().containers.selected == ["web"]
+        assert [e.event_type for e in config_manager.get_events()] == ["auto_monitor"]
+        mock_notification_manager.send_event_notification.assert_awaited_once()
+        (notified_event,) = mock_notification_manager.send_event_notification.await_args.args
+        assert notified_event.event_type == "auto_monitor"
+
     async def test_already_selected_container_is_not_added_twice(
         self, engine, docker_client, update_config
     ):
@@ -324,6 +350,31 @@ class TestProcessContainerStartEvent:
         await engine._process_container_start_event(start_event(container.id, "web"))
 
         assert config_manager.get_config().containers.selected == []
+
+    async def test_container_with_non_true_autoheal_value_is_ignored(self, engine, docker_client):
+        container, info = make_container(name="web", labels={"autoheal": "false"})
+        docker_client.add_container(container, info)
+
+        await engine._process_container_start_event(start_event(container.id, "web"))
+
+        assert config_manager.get_config().containers.selected == []
+
+    async def test_notification_failure_does_not_prevent_container_from_being_added(
+        self, engine, docker_client, mock_notification_manager
+    ):
+        mock_notification_manager.send_event_notification.side_effect = RuntimeError(
+            "notification transport unavailable"
+        )
+        container, info = make_container(name="web", labels={"autoheal": "true"})
+        docker_client.add_container(container, info)
+
+        await engine._process_container_start_event(start_event(container.id, "web"))
+
+        assert config_manager.get_config().containers.selected == ["web"]
+        assert [e.event_type for e in config_manager.get_events()] == ["auto_monitor"]
+        mock_notification_manager.send_event_notification.assert_awaited_once()
+        (notified_event,) = mock_notification_manager.send_event_notification.await_args.args
+        assert notified_event.event_type == "auto_monitor"
 
 
 @pytest.mark.asyncio
