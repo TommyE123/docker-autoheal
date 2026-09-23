@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { format } from "date-fns";
 
 vi.mock("../services/api", () => ({
   getEvents: vi.fn(),
@@ -112,6 +113,9 @@ describe("EventsPage", () => {
     expect(screen.getByText(/health check failed/i)).toBeInTheDocument();
     expect(screen.getByText("abc123")).toBeInTheDocument();
     expect(screen.getByText("Restarts: 3")).toBeInTheDocument();
+
+    const expectedTimestamp = format(new Date("2024-01-03T08:15:00Z"), "PPpp");
+    expect(screen.getByText(expectedTimestamp)).toBeInTheDocument();
   });
 
   it("cancels clearing events without calling the API", async () => {
