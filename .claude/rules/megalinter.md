@@ -14,23 +14,9 @@ MegaLinter is configured in `.mega-linter.yml` and runs as part of CI. When a PR
 3. **Fix findings introduced or worsened by the PR** — these must be addressed as part of the PR.
 4. **Leave pre-existing, unrelated findings untouched** — do not use a PR to clean up the repository's baseline unless the PR explicitly includes work to address them.
 5. **Run appropriate targeted validation** — after making fixes, run relevant targeted checks for the changed code. For guidance on validation scope, see `.claude/rules/testing.md`. The normal CI/MegaLinter checks remain the authoritative full validation.
-6. **Check if the PR branch is behind main** — when preparing to commit and push the completed fixes, verify that the PR branch is current with main. If it is behind, update the branch using the repository's established branch-update or rebase workflow, resolve any conflicts carefully, and re-run appropriate targeted validation. See `.claude/rules/branch-currency.md` for detailed guidance.
-7. **Commit and push the fixes** — commit and push the completed, validated changes.
-8. **Do not modify `.mega-linter.yml`** — do not weaken checks, add exclusions, or disable linters to suppress PR findings.
-
-## Durable guidance: do not hard-code linter configuration
-
-Permanent Claude guidance should not unnecessarily enumerate the repository's current individual linters or their current rules. The enabled linters may be removed, replaced or reconfigured in future.
-
-Use durable generic wording such as:
-
-- "linting finding"
-- "MegaLinter finding"
-- "validation finding"
-
-Only use an exact linter or tool name where it is genuinely required by a specific procedure (for example, the exact reference to `.mega-linter.yml`).
-
-Do not add examples based on today's particular linter configuration merely for illustration.
+6. **Check whether the branch needs updating** — see `.claude/rules/branch-currency.md`. Update the branch only when being behind `main` actually matters.
+7. **Commit and push the fixes** — commit and push the completed, validated changes, following the commit and push policy in `CLAUDE.md`.
+8. **Do not modify `.mega-linter.yml` to suppress PR findings** — do not weaken checks, add exclusions, or disable linters to make this PR's own findings go away. A configuration change the task explicitly asks for is legitimate and is not covered by this rule.
 
 ## Do not game MegaLinter
 
@@ -44,7 +30,7 @@ Do not manipulate the validation configuration to hide genuine PR-related proble
 - Altering coverage thresholds to pass codecov checks
 - Using other CI bypass techniques
 
-The existing `.mega-linter.yml` baseline and its handling of pre-existing findings must be preserved.
+The existing `.mega-linter.yml` baseline and its handling of pre-existing findings must be preserved, unless the task explicitly asks for a configuration change.
 
 ## Example workflow
 
