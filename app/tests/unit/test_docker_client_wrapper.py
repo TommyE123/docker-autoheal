@@ -307,6 +307,9 @@ class TestTcpHealth:
             return_value=mock_sock,
         ):
             assert wrapper.check_tcp_health(container, port=8080) is False
+        # check_tcp_health only closes the socket after a successful
+        # connect_ex call; when connect_ex raises, close() is never reached.
+        mock_sock.close.assert_not_called()
 
     def test_tcp_health_check_fails_on_non_zero_connect_result(self, wrapper):
         # connect_ex normally reports failure by returning a non-zero errno
@@ -332,6 +335,7 @@ class TestTcpHealth:
             return_value=mock_sock,
         ):
             assert wrapper.check_tcp_health(container, port=8080) is False
+        mock_sock.close.assert_not_called()
 
     def test_tcp_health_check_fails_on_dns_resolution_failure(self, wrapper):
         container = make_sdk_container()
@@ -343,6 +347,7 @@ class TestTcpHealth:
             return_value=mock_sock,
         ):
             assert wrapper.check_tcp_health(container, port=8080) is False
+        mock_sock.close.assert_not_called()
 
     def test_tcp_health_check_fails_on_invalid_port(self, wrapper):
         container = make_sdk_container()
@@ -354,6 +359,10 @@ class TestTcpHealth:
             return_value=mock_sock,
         ):
             assert wrapper.check_tcp_health(container, port=99999) is False
+        # Proves the caller-supplied invalid port reached connect_ex
+        # unmodified, rather than being normalized or ignored.
+        mock_sock.connect_ex.assert_called_once_with(("172.17.0.2", 99999))
+        mock_sock.close.assert_not_called()
 
     def test_tcp_health_check_fails_on_missing_port(self, wrapper):
         container = make_sdk_container()
@@ -365,6 +374,8 @@ class TestTcpHealth:
             return_value=mock_sock,
         ):
             assert wrapper.check_tcp_health(container, port=None) is False
+        mock_sock.connect_ex.assert_called_once_with(("172.17.0.2", None))
+        mock_sock.close.assert_not_called()
 
     def test_tcp_health_check_fails_when_container_has_no_ip_address(self, wrapper):
         container = make_sdk_container()
