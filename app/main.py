@@ -6,18 +6,18 @@ import asyncio
 import logging
 import signal
 import sys
-from typing import Optional
 from pathlib import Path
+from typing import Optional
 
 import uvicorn
-from prometheus_client import start_http_server, Counter, Gauge
+from prometheus_client import Counter, Gauge, start_http_server
 
+from app.api.api import app, init_api
 from app.config.config_manager import config_manager
 from app.docker_client.docker_client_wrapper import DockerClientWrapper
 from app.monitor.monitoring_engine import MonitoringEngine
 from app.monitor.uptime_kuma_monitor import UptimeKumaMonitor
 from app.notifications.notification_manager import notification_manager
-from app.api.api import app, init_api
 
 # Ensure /data/logs directory exists
 LOG_DIR = Path("/data/logs")
@@ -48,9 +48,7 @@ class CancelledErrorFilter(logging.Filter):
     """Filter to suppress CancelledError from uvicorn.error logs during shutdown"""
     def filter(self, record):
         # Suppress CancelledError tracebacks from uvicorn (these are expected during shutdown)
-        if record.name == "uvicorn.error" and "CancelledError" in record.getMessage():
-            return False
-        return True
+        return not (record.name == "uvicorn.error" and "CancelledError" in record.getMessage())
 
 
 def update_log_level(level_name: str):
@@ -207,7 +205,7 @@ class AutoHealService:
 service: Optional[AutoHealService] = None
 
 
-def signal_handler(signum, frame):
+def signal_handler(signum, _frame):
     """Handle shutdown signals"""
     logger.info(f"Received signal {signum}, initiating shutdown...")
     if service:
@@ -217,9 +215,6 @@ def signal_handler(signum, frame):
 async def run_api_server():
     """Run FastAPI server"""
     config = config_manager.get_config()
-
-    # Map our log level to uvicorn format (lowercase)
-    uvicorn_log_level = config.observability.log_level.lower()
 
     # Disable all uvicorn access logs completely
     uvicorn_config = uvicorn.Config(
