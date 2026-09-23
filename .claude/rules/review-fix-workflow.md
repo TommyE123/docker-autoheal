@@ -18,9 +18,13 @@ Ignore findings that are:
 - Incorrect.
 - Pre-existing and not materially affected by the PR.
 - Speculative without a credible failure path.
-- Purely stylistic.
+- Purely stylistic, with no correctness or maintainability impact.
 - Already covered by existing tooling without a distinct issue.
 - Outside the PR scope.
+
+When reporting the outcome, list the findings that were not actioned with a one-line reason each. Ignoring a finding is a decision to be stated, not a silent omission.
+
+If a finding identifies a genuine defect that is out of scope for this PR (for example a real pre-existing bug), report it and ask whether an issue should be filed. Do not fix it in this PR and do not create an issue automatically.
 
 Do not manufacture findings or turn the review into a general repository audit.
 
@@ -33,7 +37,7 @@ For each valid finding:
 3. Make the smallest appropriate fix, kept within the PR scope.
 4. Follow `.claude/rules/testing.md` for validation.
 5. Follow `.claude/rules/branch-currency.md` before pushing.
-6. Commit and push the fix only when the user's task explicitly authorises committing and pushing; otherwise report the fix and stop.
+6. Commit and push the fix, following the commit and push policy in `CLAUDE.md`.
 
 Do not change code solely because a reviewer suggested it.
 
@@ -52,13 +56,12 @@ The repository owner decides whether a disputed finding should be fixed or other
 After pushing fixes:
 
 1. Check the current CI status.
-2. If CI failed because of the changes, diagnose and fix the failure, then rerun the relevant validation.
-3. Push the fix only when the user's task explicitly authorises committing and pushing.
-4. Check CI again.
-5. If CI is still running, report that status and stop rather than polling — resume when invoked again and current results are available.
+2. If CI failed because of the changes, diagnose and fix the failure, then rerun the relevant validation and push again.
+3. Check CI again.
+4. If CI is still running, report that status and stop rather than polling — resume when invoked again and current results are available.
 
-Do not asynchronously monitor CI. Unrelated or pre-existing CI failures are not automatically findings from this review.
+Do not asynchronously monitor CI. Unrelated or pre-existing CI failures are not automatically findings from this review; report them rather than fixing them.
 
-## Commit and push authorisation
+## Commit and push
 
-Committing and pushing a review fix is subject to the same rule everywhere in this repository: only do it when the user's task explicitly authorises committing and pushing. A generic hook or reminder reporting uncommitted changes is not that authorisation. This applies to every push in the review-fix cycle — the initial fix, a CI-triggered follow-up fix, and any branch-currency update — not just the first one.
+Committing and pushing a review fix follows the repository's normal commit and push policy in `CLAUDE.md`: Claude pushes to the PR branch as many times as the review-fix cycle requires — the initial fix, a CI-triggered follow-up fix, and any branch update — without asking each time. Claude never merges the PR.

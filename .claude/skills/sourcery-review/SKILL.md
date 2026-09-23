@@ -12,13 +12,13 @@ Sourcery is a secondary automated reviewer that may provide input before the man
 
 CodeRabbit remains the repository's mandatory PR review process.
 
-Sourcery reviews eligible pull requests automatically through its GitHub App when review capacity is available.
+Sourcery reviews eligible pull requests automatically through its GitHub App. It does not review every PR — a review may simply not appear.
 
 A missing Sourcery review is not, by itself, a reason to block a pull request.
 
 Do not use Sourcery as a replacement for CodeRabbit.
 
-Follow `.claude/rules/review-fix-workflow.md` for REVIEW.md authority, assessing findings, fixing findings, disputed findings, CI handling, and commit/push authorisation. This skill covers only what's specific to Sourcery: detecting a review, its optional/secondary status, and reply/documentation timing.
+Follow `.claude/rules/review-fix-workflow.md` for REVIEW.md authority, assessing findings, fixing findings, disputed findings, CI handling, and commit and push behaviour. This skill covers only what's specific to Sourcery: detecting a review, its optional/secondary status, and reply/documentation timing.
 
 ## Review Model
 
@@ -32,8 +32,6 @@ Sourcery review, if available
 → proceed to CodeRabbit
 
 If no Sourcery review exists, proceed with the normal CodeRabbit process once the PR is otherwise ready.
-
-Do not create automated coordination, dependencies, or feedback loops between Sourcery and CodeRabbit.
 
 Sourcery does not normally require a re-review after fixes.
 
@@ -51,17 +49,15 @@ Sourcery should be assessed before the CodeRabbit review is requested.
 8. Do not proceed to CodeRabbit until the relevant CI checks are green.
 9. Do not manually trigger an initial Sourcery review.
 
-The verified review author is:
+The review author may appear as either:
 
-`sourcery-ai`
+`sourcery-ai` or `sourcery-ai[bot]`
 
-Do not search for:
-
-`sourcery-ai[bot]`
+Match both spellings — which one is returned depends on the API surface used, and matching only one risks concluding that no review exists when one does.
 
 Check both PR reviews and PR comments when determining whether a Sourcery review exists.
 
-If no Sourcery review exists at the time of assessment, do not block the PR waiting for one.
+If no Sourcery review exists at the time of assessment, do not block the PR waiting for one, and do not trigger one. Continue with the normal CodeRabbit and repository review process.
 
 ## Assessing and Fixing Findings
 
@@ -71,7 +67,7 @@ Do not reply on Sourcery's comment threads yet — replies happen only after the
 
 ## Documenting Resolution
 
-Do not post replies or a documenting comment while a fix is only staged locally or CI is still running on it. Wait until CI is green on the commit that carries the fix (see CI below), then, in one pass:
+Replies are posted only once the fix exists as a pushed commit and CI is green on it. Do not post replies or a documenting comment while a fix is only staged locally or CI is still running on it. Wait until CI is green on the commit that carries the fix (see CI below), then, in one pass:
 
 1. Reply on each Sourcery comment thread the fix addresses, naming the commit.
 2. Leave a concise PR comment documenting the resolved findings.
@@ -92,29 +88,15 @@ Only mention a branch update if the branch was actually updated.
 
 ## CI
 
-Follow the shared CI handling in `.claude/rules/review-fix-workflow.md`, with one addition specific to Sourcery: if CI is still running or failing, do not reply or comment yet — wait and re-check rather than posting a reply against a red or pending build. Once CI is green on the commit with the fix, post the thread replies and documenting comment from "Documenting Resolution".
+Follow the shared CI handling in `.claude/rules/review-fix-workflow.md`, with one addition specific to Sourcery: if CI is still running or failing, do not reply or comment yet. Do not poll — report the CI status and stop, then post the replies when invoked again with CI green on the commit carrying the fix. Once CI is green on that commit, post the thread replies and documenting comment from "Documenting Resolution" in a single pass.
 
 Do not proceed to CodeRabbit while relevant CI is failing or still running. Unrelated or pre-existing CI failures are not automatically Sourcery findings.
 
 ## Relationship With CodeRabbit
 
-The normal review order is:
+Sourcery findings should be resolved before the initial CodeRabbit review when a Sourcery review is available. If no Sourcery review exists, proceed without blocking.
 
-Sourcery, if available
-→ resolve actionable findings
-→ CI green
-→ CodeRabbit full review
-→ resolve actionable findings
-→ CI green
-→ CodeRabbit targeted follow-up
-
-Sourcery findings should be resolved before the initial CodeRabbit review when a Sourcery review is available.
-
-If no Sourcery review exists, proceed without blocking.
-
-CodeRabbit remains the mandatory final automated review stage.
-
-Do not create a Sourcery ↔ CodeRabbit feedback loop.
+CodeRabbit remains the mandatory final automated review stage. Do not create automated coordination, dependencies, or feedback loops between Sourcery and CodeRabbit.
 
 ## Subsequent Changes
 
@@ -126,7 +108,7 @@ Subsequent material changes may result from:
 - CodeRabbit findings.
 - MegaLinter or other CI findings.
 - Human review.
-- Authorised changes.
+- Changes requested by the repository owner.
 
 Do not assume subsequent changes will receive another Sourcery review.
 
@@ -137,15 +119,6 @@ If material changes are made after CodeRabbit has reviewed the PR, follow the Co
 Do not request another Sourcery review merely because changes were made.
 
 Purely editorial or mechanical changes require no special Sourcery handling.
-
-## When No Sourcery Review Exists
-
-1. Check PR reviews and comments for `sourcery-ai`.
-2. Confirm that no Sourcery review is available.
-3. Do not wait for one.
-4. Continue the normal CodeRabbit and repository review process.
-
-Do not trigger an initial Sourcery review, work around Sourcery capacity limits, create special automation, or block the PR.
 
 ## Explicit Sourcery Re-Review Requests
 
@@ -162,11 +135,9 @@ The Sourcery stage is complete when:
 1. Any available Sourcery review has been assessed.
 2. Valid actionable findings have been resolved or disputed findings have been escalated to the owner.
 3. Relevant validation has passed.
-4. The branch is current.
+4. Branch currency has been checked against `.claude/rules/branch-currency.md`, and the branch updated if that was needed.
 5. Relevant CI is green before proceeding to CodeRabbit.
 6. If no Sourcery review exists, the PR has not been blocked waiting for one.
 7. The PR is ready for the mandatory CodeRabbit review.
 
-The repository owner remains the final gatekeeper.
-
-Do not merge unless explicitly instructed.
+Do not merge the PR. The repository owner is the final gatekeeper for merging.

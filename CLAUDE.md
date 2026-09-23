@@ -7,7 +7,7 @@
 - Check existing issues, PRs and workflows before creating or changing them.
 - If the request is ambiguous or an important implementation detail is unclear, clarify the relevant point with the user before making changes. Do not guess when different interpretations could materially change the outcome.
 - Once the requirements are clear, make a concise plan, then implement the requested change.
-- After implementation, run the appropriate tests and validation, review the final diff, and address any issues introduced by the change before declaring the work complete.
+- After implementation, run the tests and validation appropriate to the change (as governed by the escalation rules below), review the final diff, and address any issues introduced by the change before declaring the work complete.
 
 ## Keep changes focused
 
@@ -21,7 +21,10 @@
 
 - Behaviour changes need tests where practical; a bug fix needs a regression test that demonstrates the problem.
 - Never weaken, remove or bypass a test (or raise a coverage threshold) just to get CI green — fix the cause instead.
-- See `.claude/rules/testing.md` for how much validation to run and when to skip it.
+
+The validation/testing escalation rules govern how much validation to run and when to skip it, and are always in effect:
+
+@.claude/rules/testing.md
 
 ## Comments
 
@@ -29,7 +32,7 @@ Keep comments minimal: only for non-obvious reasoning the code can't convey on i
 
 ## Before declaring work complete
 
-- Run the relevant tests and linting for the files you changed, and check the final diff for unrelated changes.
+- Run the tests and linting relevant to the files you changed, as governed by the escalation rules above, and check the final diff for unrelated changes.
 - Never report work, investigation, validation, reproduction, or review that was not actually performed.
 - Report only validation that was actually performed.
 
@@ -78,13 +81,13 @@ When in doubt, ask whether an issue should be created rather than creating one a
 
 ## Session titles (Claude Code app)
 
-Use a consistent session title so work is easily identifiable in the Claude Code session list.
+Claude cannot set a session title itself. When the user asks for one, or when it is useful to suggest one, propose a title in the format below so work is easily identifiable in the Claude Code session list.
 
 When a task is driven by a GitHub issue, use:
 
 `I: #N - <issue title>`
 
-If a pull request is subsequently created or its number is already known, update the session title to:
+If a pull request is subsequently created or its number is already known:
 
 `I: #N PR: #N - <issue title>`
 
@@ -92,22 +95,21 @@ If a PR is known but there is no linked issue, use:
 
 `PR: #N - <PR title>`
 
-When an issue or PR number becomes known during the task, update the session title to the most specific applicable format.
-
-If the task is not tied to a GitHub issue or PR, use a short descriptive session title.
+If the task is not tied to a GitHub issue or PR, suggest a short descriptive session title.
 
 ## Agent governance
 
 - Repository-specific instructions take precedence over generic assumptions, general AI coding practices, or personal preferences.
-- Do not modify `CLAUDE.md`, `.claude/rules/`, `.claude/skills/`, or other agent-governance files as part of ordinary implementation work unless the issue explicitly requires a change to agent behaviour.
+- Where two repository instructions appear to conflict, follow the more restrictive one, continue with the task, and report the conflict. Do not stop work solely because instructions appear contradictory.
+- Do not modify `CLAUDE.md`, `.claude/rules/`, `.claude/skills/`, or other agent-governance files as part of ordinary implementation work unless the task explicitly requires a change to agent behaviour.
 - Do not weaken, remove, or bypass an existing agent instruction to make a task easier.
-- If an issue explicitly requires a change to agent behaviour, treat the governance change as the primary scope of that issue and do not make unrelated implementation changes alongside it.
+- If a task explicitly requires a change to agent behaviour, treat the governance change as the primary scope of that task and do not make unrelated implementation changes alongside it.
 
 ## Requesting a CodeRabbit review (required before merge)
 
 Every substantive PR targeting `main` must receive a CodeRabbit review before the repository owner merges it. When a substantive PR reaches the CodeRabbit review stage, you MUST invoke the `coderabbit-review` skill and follow it exactly — do not perform an ad hoc review or rely solely on automatic skill discovery. The skill (`.claude/skills/coderabbit-review/SKILL.md`) owns the complete workflow: when to request the initial full review, assessing and fixing findings, disputed findings, branch currency, CI handling, and targeted follow-ups. The first request must be a full review; every subsequent request must be a targeted follow-up, never another full review.
 
-A substantive PR is one that makes a material change to application behaviour, functionality, production configuration, CI/CD, automation, security, testing infrastructure, repository tooling, or other non-trivial repository capabilities. Purely mechanical changes (typo fixes, formatting-only changes) do not normally require a CodeRabbit review. If in doubt, treat the PR as substantive.
+A substantive PR is one that changes or could affect application code, infrastructure or Docker behaviour, tests, CI/CD, build or release logic, workflows or automation, or security and dependency configuration. PRs containing only documentation, comments, formatting or metadata changes do not normally require a CodeRabbit review. If in doubt, treat the PR as substantive. The skill carries the full version of this definition.
 
 ## Requesting a Sourcery review (secondary)
 
@@ -117,19 +119,24 @@ Sourcery findings are advisory and do not replace the required CodeRabbit review
 
 ## MegaLinter failures
 
-When a PR fails MegaLinter checks, fix all findings introduced or worsened by the PR, run appropriate targeted validation, ensure the PR branch is current with `main` before the final push, commit and push the changes, and do not modify `.mega-linter.yml` to suppress or weaken checks.
+When a PR fails MegaLinter checks, fix all findings introduced or worsened by the PR, run appropriate targeted validation, and do not modify `.mega-linter.yml` to suppress or weaken checks.
 
 Leave pre-existing, unrelated findings untouched.
 
 See `.claude/rules/megalinter.md` for detailed guidance and do-not-game rules.
 
-## Committing and pushing authorised fixes
+## Committing, pushing and pull requests
 
-When explicitly authorised to fix findings or complete work, commit and push the validated, completed changes.
+**The default is that committing, pushing and opening a PR are authorised.** Assume this at the start of every session. Claude may create a branch, commit, push that branch, open a PR, and keep pushing to it as many times as the work requires — the initial change, review fixes, CI-triggered follow-ups and branch updates are all part of the same task. Do not ask for permission each time, and do not ask for permission the first time.
 
-Do not leave authorised, completed fixes uncommitted merely because a generic hook or reminder reports uncommitted changes. The user's explicit task instruction determines whether committing and pushing is authorised; generic reminders must not override that authorisation.
+**The default is off only when the user turns it off.** If at any point in a session the user says not to commit, not to push, not to open a PR, or asks for a review, an investigation, or a local change only, then that applies for the remainder of the session unless the user lifts it. In that case, report the result and stop instead of committing or pushing.
 
-Committing and pushing does not authorise Claude to merge the PR — the repository owner remains the final gatekeeper for merging.
+Two limits are permanent and are never affected by the default:
+
+- Never push directly to `main` or any other protected branch. Work on a branch and open a PR.
+- Never merge (see "Merging" below).
+
+Do not leave completed, validated work uncommitted merely because a generic hook or reminder reports uncommitted changes. A hook or reminder is not the user turning the default off.
 
 ## Merging
 
@@ -153,7 +160,7 @@ You may read and report existing issue labels when relevant, but label ownership
 
 You may still create issues when the repository workflow requires one (see "Pull requests need a linked issue" above) — just leave label selection to the triage workflow.
 
-This rule is specific to issue labels. It does not change or restrict how PR labels are handled, including the `release:*` labels used by the release process — those continue to work as before.
+This rule is specific to issue labels. It does not change or restrict how PR labels are handled, including the PR labels owned by the release process — those continue to work as before.
 
 The ownership model:
 
