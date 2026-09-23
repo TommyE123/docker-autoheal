@@ -513,3 +513,265 @@ async def test_stop_when_not_running_is_a_noop():
 
     assert instance._running is False
     assert instance._session is None
+
+
+# ---------------------------------------------------------------------------
+# Gap-fill: missing credentials, HTTP failures and request exceptions for
+# providers not already covered above (webhook 4xx/5xx + exception, telegram
+# missing-config, and every provider's payload/priority shape already have
+# dedicated tests further up this file).
+# ---------------------------------------------------------------------------
+
+
+def _service_missing_webhook_url():
+    return NotificationService(name="Webhook", type="webhook", enabled=True)
+
+
+def _service_missing_discord_url():
+    return NotificationService(name="Discord", type="discord", enabled=True)
+
+
+def _service_missing_slack_url():
+    return NotificationService(name="Slack", type="slack", enabled=True)
+
+
+def _service_missing_ntfy_topic():
+    return NotificationService(name="Ntfy", type="ntfy", enabled=True)
+
+
+def _service_missing_gotify_credentials():
+    return NotificationService(name="Gotify", type="gotify", enabled=True)
+
+
+def _service_missing_pushover_credentials():
+    return NotificationService(name="Pushover", type="pushover", enabled=True)
+
+
+@pytest.mark.parametrize(
+    ("service_factory", "expected_warning"),
+    [
+        (_service_missing_webhook_url, "Webhook URL not configured"),
+        (_service_missing_discord_url, "Discord webhook URL not configured"),
+        (_service_missing_slack_url, "Slack webhook URL not configured"),
+        (_service_missing_ntfy_topic, "Ntfy topic not configured"),
+        (_service_missing_gotify_credentials, "Gotify server URL or app token not configured"),
+        (_service_missing_pushover_credentials, "Pushover user key or API token not configured"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_missing_credentials_skip_request_without_calling_session(
+    caplog, isolated_config_manager, manager, service_factory, expected_warning
+):
+    """Each provider must bail out before touching the HTTP session."""
+    _configure_service(isolated_config_manager, service_factory())
+
+    with caplog.at_level(logging.WARNING):
+        await manager._process_notification(_make_event("restart"))
+
+    assert manager._session.calls == []
+    assert any(expected_warning in r.message for r in caplog.records)
+
+
+def _service_discord():
+    return NotificationService(
+        name="Discord", type="discord", enabled=True, url="https://example.invalid/discord"
+    )
+
+
+def _service_slack():
+    return NotificationService(
+        name="Slack", type="slack", enabled=True, url="https://example.invalid/slack"
+    )
+
+
+def _service_telegram():
+    return NotificationService(
+        name="Telegram", type="telegram", enabled=True, bot_token="abc123", chat_id="999"
+    )
+
+
+def _service_ntfy():
+    return NotificationService(name="Ntfy", type="ntfy", enabled=True, topic="alerts")
+
+
+def _service_gotify():
+    return NotificationService(
+        name="Gotify",
+        type="gotify",
+        enabled=True,
+        server_url="https://gotify.example.invalid",
+        app_token="tok123",
+    )
+
+
+def _service_pushover():
+    return NotificationService(
+        name="Pushover", type="pushover", enabled=True, user_key="userkey", api_token="apitoken"
+    )
+
+
+@pytest.mark.parametrize(
+    ("service_factory", "expected_log"),
+    [
+        (_service_discord, "Discord webhook failed with status 500"),
+        (_service_slack, "Slack webhook failed with status 500"),
+        (_service_telegram, "Telegram API failed with status 500"),
+        (_service_ntfy, "Ntfy failed with status 500"),
+        (_service_gotify, "Gotify failed with status 500"),
+        (_service_pushover, "Pushover failed with status 500"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_http_error_status_is_logged_not_raised(
+    caplog, isolated_config_manager, manager, service_factory, expected_log
+):
+    """A 5xx response must be logged, not propagated to the caller."""
+    manager._session = _FakeSession(status=500)
+    _configure_service(isolated_config_manager, service_factory())
+
+    with caplog.at_level(logging.ERROR):
+        await manager._process_notification(_make_event("restart"))
+
+    assert any(expected_log in r.message for r in caplog.records)
+
+
+@pytest.mark.parametrize(
+    ("service_factory", "expected_log"),
+    [
+        (_service_discord, "Failed to send Discord notification"),
+        (_service_slack, "Failed to send Slack notification"),
+        (_service_telegram, "Failed to send Telegram notification"),
+        (_service_ntfy, "Failed to send Ntfy notification"),
+        (_service_gotify, "Failed to send Gotify notification"),
+        (_service_pushover, "Failed to send Pushover notification"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_request_exception_is_caught_and_logged(
+    caplog, isolated_config_manager, manager, service_factory, expected_log
+):
+    """A raised connection error must be caught and logged per provider."""
+
+    class _RaisingSession:
+        def post(self, *args, **kwargs):
+            raise ConnectionError("network unreachable")
+
+    manager._session = _RaisingSession()
+    _configure_service(isolated_config_manager, service_factory())
+
+    with caplog.at_level(logging.ERROR):
+        await manager._process_notification(_make_event("restart"))
+
+    assert any(expected_log in r.message for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_send_webhook_includes_priority_and_custom_headers(isolated_config_manager, manager):
+    """Webhook is the only provider whose payload carries a raw priority value
+    and supports arbitrary custom headers; neither is exercised elsewhere."""
+    _configure_service(
+        isolated_config_manager,
+        NotificationService(
+            name="Webhook",
+            type="webhook",
+            enabled=True,
+            url="https://example.invalid/webhook",
+            headers={"X-Api-Key": "secret123"},
+        ),
+    )
+
+    await manager._process_notification(_make_event("quarantine"))
+
+    call = manager._session.calls[0]
+    assert call["json"]["priority"] == "high"
+    assert call["headers"]["X-Api-Key"] == "secret123"
+    assert call["headers"]["Content-Type"] == "application/json"
+
+
+class _StartBarrier:
+    """Releases every waiter only once `count` providers have started
+    sending. A sequential implementation would await one provider to
+    completion before starting the next, so the second provider would never
+    reach the barrier and every waiter would hang forever; only genuine
+    concurrent execution (e.g. via asyncio.gather) lets all of them arrive
+    and proceed."""
+
+    def __init__(self, count: int):
+        self._count = count
+        self._arrived = 0
+        self._event = asyncio.Event()
+
+    async def wait_for_all(self) -> None:
+        self._arrived += 1
+        if self._arrived >= self._count:
+            self._event.set()
+        await self._event.wait()
+
+
+class _BarrierResponse:
+    def __init__(self, barrier: _StartBarrier, *, fail: bool, status: int = 200):
+        self._barrier = barrier
+        self._fail = fail
+        self.status = status
+
+    async def text(self) -> str:
+        return ""
+
+    async def __aenter__(self):
+        await self._barrier.wait_for_all()
+        if self._fail:
+            raise ConnectionError("network unreachable")
+        return self
+
+    async def __aexit__(self, *exc_info):
+        return False
+
+
+class _PerUrlBarrierSession:
+    """Fake session where behaviour depends on the target URL, so one
+    provider can fail while another succeeds in the same notification run.
+    Each response only resolves once every provider has started sending,
+    which proves they run concurrently rather than one after another."""
+
+    def __init__(self, failing_url: str, barrier: _StartBarrier):
+        self._failing_url = failing_url
+        self._barrier = barrier
+        self.calls: list[dict] = []
+
+    def post(self, url, **kwargs):
+        self.calls.append({"url": url, **kwargs})
+        return _BarrierResponse(self._barrier, fail=(url == self._failing_url))
+
+
+@pytest.mark.asyncio
+async def test_one_provider_failure_does_not_block_other_notifications(
+    caplog, isolated_config_manager, manager
+):
+    """A single failing service must not stop sibling services in the same
+    notification batch (they run concurrently via asyncio.gather).
+
+    Both fake responses only resolve once both providers have started
+    sending (see `_StartBarrier`), so this test would hang and time out
+    under a sequential implementation that awaits one provider before
+    starting the next -- it only passes when the providers genuinely run
+    concurrently.
+    """
+    failing_url = "https://example.invalid/webhook"
+    working_url = "https://example.invalid/discord"
+    barrier = _StartBarrier(count=2)
+    manager._session = _PerUrlBarrierSession(failing_url=failing_url, barrier=barrier)
+
+    config = isolated_config_manager.get_config()
+    config.notifications.enabled = True
+    config.notifications.services = [
+        NotificationService(name="Webhook", type="webhook", enabled=True, url=failing_url),
+        NotificationService(name="Discord", type="discord", enabled=True, url=working_url),
+    ]
+    isolated_config_manager.update_config(config)
+
+    with caplog.at_level(logging.ERROR):
+        await asyncio.wait_for(manager._process_notification(_make_event("restart")), timeout=2)
+
+    called_urls = {call["url"] for call in manager._session.calls}
+    assert called_urls == {failing_url, working_url}
+    assert any("Failed to send webhook notification" in r.message for r in caplog.records)
