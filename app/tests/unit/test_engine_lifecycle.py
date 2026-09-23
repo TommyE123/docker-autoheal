@@ -165,6 +165,9 @@ class TestScanExistingContainers:
 
         assert config_manager.get_config().containers.selected == ["web"]
         assert [e.event_type for e in config_manager.get_events()] == ["auto_monitor"]
+        mock_notification_manager.send_event_notification.assert_awaited_once()
+        (notified_event,) = mock_notification_manager.send_event_notification.await_args.args
+        assert notified_event.event_type == "auto_monitor"
 
     async def test_already_selected_container_is_not_added_twice(
         self, engine, docker_client, update_config
@@ -369,6 +372,9 @@ class TestProcessContainerStartEvent:
 
         assert config_manager.get_config().containers.selected == ["web"]
         assert [e.event_type for e in config_manager.get_events()] == ["auto_monitor"]
+        mock_notification_manager.send_event_notification.assert_awaited_once()
+        (notified_event,) = mock_notification_manager.send_event_notification.await_args.args
+        assert notified_event.event_type == "auto_monitor"
 
 
 @pytest.mark.asyncio
