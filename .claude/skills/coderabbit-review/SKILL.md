@@ -2,7 +2,6 @@
 name: coderabbit-review
 
 description: Handle the repository's mandatory CodeRabbit review process for a substantive PR. Use after Sourcery has been addressed when a review is available, or proceed if no Sourcery review exists. The first CodeRabbit request must be a full review; subsequent requests must be targeted follow-ups covering changes made in response to the review.
-disable-model-invocation: true
 allowed-tools: Read, Grep, Glob, Edit, Bash
 ---
 
