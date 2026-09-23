@@ -6,9 +6,11 @@ daemon. They focus on the boundary behaviour the monitoring engine relies on:
 inspection results and graceful handling of Docker API failures.
 """
 
+import socket
+from unittest.mock import MagicMock, patch
+
 import docker
 import pytest
-from unittest.mock import MagicMock, patch
 
 from app.docker_client.docker_client_wrapper import DockerClientWrapper
 
@@ -243,6 +245,144 @@ class TestContainerActions:
         container = make_sdk_container()
 
         assert wrapper.get_docker_native_health(container) is None
+
+    def test_exec_health_check_fails_on_malformed_exec_result(self, wrapper):
+        # ``output`` is expected to be bytes (``.decode()`` is called on it);
+        # a malformed exec result without a usable ``output`` attribute makes
+        # ``execute_command`` raise, which ``check_exec_health`` must treat as
+        # a failed check rather than propagating the exception.
+        container = make_sdk_container()
+        container.exec_run.return_value = MagicMock(exit_code=0, output=None)
+
+        assert wrapper.check_exec_health(container, ["true"]) is False
+
+    def test_native_health_returns_unexpected_status_value(self, wrapper):
+        """Unrecognised health status strings are passed through as-is."""
+        container = make_sdk_container(
+            state={"Status": "running", "ExitCode": 0, "Health": {"Status": "weird_status"}}
+        )
+
+        assert wrapper.get_docker_native_health(container) == "weird_status"
+
+    def test_native_health_is_none_when_health_key_missing_from_info(self, wrapper):
+        container = make_sdk_container()
+        # No "Health" entry under State at all (not merely an empty dict).
+        assert "Health" not in container.attrs["State"]
+
+        assert wrapper.get_docker_native_health(container) is None
+
+    def test_native_health_is_none_when_container_disappears_during_inspection(self, wrapper):
+        container = make_sdk_container()
+        container.reload.side_effect = docker.errors.NotFound("no such container")
+
+        assert wrapper.get_docker_native_health(container) is None
+
+
+class TestTcpHealth:
+    """``check_tcp_health`` - mocked sockets only, no real network access."""
+
+    def test_tcp_health_check_succeeds(self, wrapper):
+        container = make_sdk_container()
+        mock_sock = MagicMock()
+        mock_sock.connect_ex.return_value = 0
+
+        with patch(
+            "app.docker_client.docker_client_wrapper.socket.socket",
+            return_value=mock_sock,
+        ) as mock_socket_cls:
+            assert wrapper.check_tcp_health(container, port=8080) is True
+
+        mock_socket_cls.assert_called_once_with(socket.AF_INET, socket.SOCK_STREAM)
+        mock_sock.settimeout.assert_called_once_with(5)
+        mock_sock.connect_ex.assert_called_once_with(("172.17.0.2", 8080))
+        mock_sock.close.assert_called_once()
+
+    def test_tcp_health_check_fails_when_connection_is_refused(self, wrapper):
+        container = make_sdk_container()
+        mock_sock = MagicMock()
+        mock_sock.connect_ex.side_effect = ConnectionRefusedError("connection refused")
+
+        with patch(
+            "app.docker_client.docker_client_wrapper.socket.socket",
+            return_value=mock_sock,
+        ):
+            assert wrapper.check_tcp_health(container, port=8080) is False
+
+    def test_tcp_health_check_fails_on_non_zero_connect_result(self, wrapper):
+        # connect_ex normally reports failure by returning a non-zero errno
+        # rather than raising.
+        container = make_sdk_container()
+        mock_sock = MagicMock()
+        mock_sock.connect_ex.return_value = 111  # ECONNREFUSED
+
+        with patch(
+            "app.docker_client.docker_client_wrapper.socket.socket",
+            return_value=mock_sock,
+        ):
+            assert wrapper.check_tcp_health(container, port=8080) is False
+        mock_sock.close.assert_called_once()
+
+    def test_tcp_health_check_fails_on_timeout(self, wrapper):
+        container = make_sdk_container()
+        mock_sock = MagicMock()
+        mock_sock.connect_ex.side_effect = socket.timeout("timed out")
+
+        with patch(
+            "app.docker_client.docker_client_wrapper.socket.socket",
+            return_value=mock_sock,
+        ):
+            assert wrapper.check_tcp_health(container, port=8080) is False
+
+    def test_tcp_health_check_fails_on_dns_resolution_failure(self, wrapper):
+        container = make_sdk_container()
+        mock_sock = MagicMock()
+        mock_sock.connect_ex.side_effect = socket.gaierror("name resolution failed")
+
+        with patch(
+            "app.docker_client.docker_client_wrapper.socket.socket",
+            return_value=mock_sock,
+        ):
+            assert wrapper.check_tcp_health(container, port=8080) is False
+
+    def test_tcp_health_check_fails_on_invalid_port(self, wrapper):
+        container = make_sdk_container()
+        mock_sock = MagicMock()
+        mock_sock.connect_ex.side_effect = OverflowError("port must be 0-65535")
+
+        with patch(
+            "app.docker_client.docker_client_wrapper.socket.socket",
+            return_value=mock_sock,
+        ):
+            assert wrapper.check_tcp_health(container, port=99999) is False
+
+    def test_tcp_health_check_fails_on_missing_port(self, wrapper):
+        container = make_sdk_container()
+        mock_sock = MagicMock()
+        mock_sock.connect_ex.side_effect = TypeError("an integer is required")
+
+        with patch(
+            "app.docker_client.docker_client_wrapper.socket.socket",
+            return_value=mock_sock,
+        ):
+            assert wrapper.check_tcp_health(container, port=None) is False
+
+    def test_tcp_health_check_fails_when_container_has_no_ip_address(self, wrapper):
+        container = make_sdk_container()
+        container.attrs["NetworkSettings"] = {"Networks": {"bridge": {"IPAddress": ""}}}
+
+        with patch("app.docker_client.docker_client_wrapper.socket.socket") as mock_socket_cls:
+            assert wrapper.check_tcp_health(container, port=8080) is False
+
+        mock_socket_cls.assert_not_called()
+
+    def test_tcp_health_check_fails_when_container_disappears_during_inspection(self, wrapper):
+        container = make_sdk_container()
+        container.reload.side_effect = docker.errors.NotFound("no such container")
+
+        with patch("app.docker_client.docker_client_wrapper.socket.socket") as mock_socket_cls:
+            assert wrapper.check_tcp_health(container, port=8080) is False
+
+        mock_socket_cls.assert_not_called()
 
 
 class TestEvents:
