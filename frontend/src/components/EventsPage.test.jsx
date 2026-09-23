@@ -133,7 +133,7 @@ describe("EventsPage", () => {
     expect(screen.getByText("web-app")).toBeInTheDocument();
   });
 
-  it("clears all events after confirming the clear action", async () => {
+  it("clears all events after confirming the clear action, refreshing the list from local state without refetching", async () => {
     const user = userEvent.setup();
     getEvents.mockResolvedValue({ data: sampleEvents });
     clearEvents.mockResolvedValue({});
@@ -141,15 +141,26 @@ describe("EventsPage", () => {
     render(<EventsPage />);
 
     await screen.findByText("web-app");
+    expect(getEvents).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole("button", { name: /clear all/i }));
     await user.click(screen.getByRole("button", { name: /clear all events/i }));
 
     await waitFor(() => expect(clearEvents).toHaveBeenCalledTimes(1));
+
+    // The component refreshes the list by clearing local state directly,
+    // not by calling getEvents() again.
+    expect(getEvents).toHaveBeenCalledTimes(1);
+
+    expect(screen.queryByText("web-app")).not.toBeInTheDocument();
     expect(screen.getByText(/no events recorded yet/i)).toBeInTheDocument();
     expect(
       await screen.findByText(/all events cleared successfully/i),
     ).toBeInTheDocument();
+
+    // Clear All is disabled once the list is empty, confirming the
+    // rendered state reflects the cleared events, not stale data.
+    expect(screen.getByRole("button", { name: /clear all/i })).toBeDisabled();
   });
 
   it("shows an alert and keeps the events when clearing fails", async () => {
