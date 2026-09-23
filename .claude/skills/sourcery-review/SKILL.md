@@ -176,7 +176,7 @@ After pushing fixes:
 1. Check the current CI status.
 2. If CI failed because of the changes, diagnose and fix the failure.
 3. Run the relevant validation.
-4. Push the fix.
+4. Push the fix only when the user's task explicitly authorises committing and pushing.
 5. Check CI again.
 6. If CI is still running or failing, do not reply or comment yet — wait and re-check rather than posting a reply against a red or pending build.
 7. Once CI is green on the commit with the fix, post the thread replies and documenting comment from "Documenting Resolution".
@@ -250,7 +250,7 @@ If an approved workflow exists and the owner requests it:
 2. Fix valid findings.
 3. Validate the changes.
 4. Ensure branch currency.
-5. Commit and push.
+5. Commit and push only when the user's task explicitly authorises committing and pushing.
 6. Document the resolution where appropriate.
 
 A Sourcery re-review does not replace or alter the mandatory CodeRabbit process.
