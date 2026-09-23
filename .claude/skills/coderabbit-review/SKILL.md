@@ -42,9 +42,9 @@ Sourcery review, if available
 → Claude requests `@coderabbitai full review`
 → assess findings
 → fix valid findings or ask user if disputed
-→ push PR fix
+→ push PR fix only when the user's task explicitly authorises committing and pushing
 → check CI
-→ if CI fails, fix and push
+→ if CI fails, fix and push (same authorisation condition applies)
 → once CI is green, Claude requests `@coderabbitai review` as a targeted follow-up
 → assess follow-up findings
 → repeat if necessary
@@ -157,7 +157,7 @@ After making fixes:
 4. Check the current CI status.
 5. If CI failed because of the changes, diagnose and fix the failure.
 6. Rerun relevant validation.
-7. Push the fix.
+7. Push the fix only when the user's task explicitly authorises committing and pushing.
 8. Check CI again.
 9. If CI is still running, report that status and stop.
 10. Resume when invoked again and current results are available.
