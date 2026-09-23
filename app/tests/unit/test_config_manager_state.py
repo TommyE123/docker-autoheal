@@ -93,19 +93,31 @@ def test_cleanup_restart_counts_is_a_no_op_that_preserves_all_entries(isolated_c
     assert isolated_config_manager.get_total_restart_count("gone") == 1
 
 
-def test_fresh_manager_reports_empty_state_for_every_tracked_area(isolated_config_manager):
+def test_fresh_manager_reports_empty_state_for_every_tracked_area(
+    isolated_config_manager, monkeypatch, tmp_path
+):
     """A manager that has never persisted anything must report the documented
-    empty/missing defaults for every stateful area this PR covers."""
-    assert isolated_config_manager.get_events() == []
-    assert isolated_config_manager.get_events(limit=10) == []
-    assert isolated_config_manager.get_restart_count("web", window_seconds=60) == 0
-    assert isolated_config_manager.get_total_restart_count("web") == 0
-    assert not isolated_config_manager.is_quarantined("web")
-    assert isolated_config_manager.get_quarantined_containers() == set()
-    assert not isolated_config_manager.is_maintenance_mode()
-    assert isolated_config_manager.get_maintenance_start_time() is None
-    assert isolated_config_manager.get_custom_health_check("web") is None
-    assert isolated_config_manager.get_all_custom_health_checks() == {}
+    empty/missing defaults for every stateful area this PR covers.
+
+    Uses a genuinely fresh ConfigManager() pointed at an empty directory
+    rather than the isolated_config_manager fixture's singleton directly:
+    the fixture pre-empties that singleton's in-memory state itself, so
+    asserting against it would pass even if a newly constructed
+    ConfigManager loaded incorrect defaults.
+    """
+    _redirect_manager_paths(monkeypatch, tmp_path)
+    fresh = ConfigManager()
+
+    assert fresh.get_events() == []
+    assert fresh.get_events(limit=10) == []
+    assert fresh.get_restart_count("web", window_seconds=60) == 0
+    assert fresh.get_total_restart_count("web") == 0
+    assert not fresh.is_quarantined("web")
+    assert fresh.get_quarantined_containers() == set()
+    assert not fresh.is_maintenance_mode()
+    assert fresh.get_maintenance_start_time() is None
+    assert fresh.get_custom_health_check("web") is None
+    assert fresh.get_all_custom_health_checks() == {}
 
 
 def test_quarantine_state_persists_and_can_be_removed(isolated_config_manager, monkeypatch):
@@ -202,9 +214,11 @@ def test_export_and_import_round_trip_reproduces_full_config_state(
     config.monitor.interval_seconds = 45
     config.containers.selected = ["web"]
     config.containers.excluded = ["db"]
+    config.restart.max_restarts = 7
     config.filters.whitelist_names = ["web-*"]
     config.ui.max_log_entries = 200
     config.alerts.webhook = "https://example.com/hook"
+    config.observability.log_level = "DEBUG"
     config.notifications.enabled = True
     config.notifications.services = [
         NotificationService(name="discord-alerts", type="discord", enabled=True)
@@ -242,9 +256,11 @@ def test_export_and_import_round_trip_reproduces_full_config_state(
     assert imported_config.monitor.interval_seconds == 45
     assert imported_config.containers.selected == ["web"]
     assert imported_config.containers.excluded == ["db"]
+    assert imported_config.restart.max_restarts == 7
     assert imported_config.filters.whitelist_names == ["web-*"]
     assert imported_config.ui.max_log_entries == 200
     assert imported_config.alerts.webhook == "https://example.com/hook"
+    assert imported_config.observability.log_level == "DEBUG"
     assert imported_config.notifications.enabled is True
     assert imported_config.notifications.services[0].name == "discord-alerts"
     assert imported_config.uptime_kuma.server_url == "http://kuma:3001"
