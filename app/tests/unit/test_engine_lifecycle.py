@@ -465,7 +465,7 @@ class TestEventListenerLoop:
         assert processed == [event]
 
     async def test_none_event_stream_is_retried_until_it_recovers(
-        self, engine, docker_client, monkeypatch
+        self, engine, docker_client, monkeypatch, caplog
     ):
         import threading
 
@@ -509,9 +509,10 @@ class TestEventListenerLoop:
         assert processed == [event]
         assert len(attempts) == 2
         assert sleep_calls == [10]
+        assert "Failed to get event stream, retrying in 10 seconds" in caplog.text
 
     async def test_mid_stream_exception_is_retried_until_it_recovers(
-        self, engine, docker_client, monkeypatch
+        self, engine, docker_client, monkeypatch, caplog
     ):
         import threading
 
@@ -561,6 +562,7 @@ class TestEventListenerLoop:
         assert processed == [first_event, second_event]
         assert len(attempts) == 2
         assert sleep_calls == [10]
+        assert "Error in event listener thread: stream disconnected" in caplog.text
 
     async def test_retry_loop_stops_once_shutdown_is_requested(
         self, engine, docker_client, monkeypatch
