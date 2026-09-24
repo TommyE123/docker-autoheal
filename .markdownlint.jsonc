@@ -16,9 +16,8 @@
   // common GFM convention.
   "MD060": false,
 
-  // CHANGELOG.md (maintained by Release Please) legitimately repeats section
-  // headings like "### Bug Fixes" under every version's "##" heading - that's
-  // the standard Keep a Changelog / Release Please structure, not a mistake.
-  // siblings_only only flags duplicates under the *same* parent heading.
+  // Docs in this repo legitimately repeat headings (e.g. the same subsection
+  // name) under different parent headings - siblings_only only flags
+  // duplicates under the *same* parent heading.
   "MD024": { "siblings_only": true }
 }
