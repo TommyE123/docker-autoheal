@@ -1,16 +1,17 @@
 -r requirements.txt
-# checkov is intentionally commented out: installing it alongside semgrep
-# hangs osv-scanner's pip transitive-dependency resolver indefinitely
-# (confirmed via bisection on PR #222 - each resolves fine alone in
-# ~12-13s, but together osv-scanner never returns, even with a 600s
-# timeout). Keeping semgrep and dropping checkov because checkov's actual
-# findings in this repo (Dockerfile non-root user, GH Actions permissions)
-# are already covered by Trivy and zizmor respectively, while semgrep
-# catches real app-level issues (e.g. a CORS wildcard finding in
-# app/api/api.py) that nothing else in this stack checks for. checkov
-# still runs in CI via MegaLinter's own bundled REPOSITORY_CHECKOV linter,
-# independent of this file, so CI coverage for it is unaffected - only the
-# local "Run Checkov" VS Code task needs this uncommented to work again.
+# checkov is intentionally not installed as a dev dependency here:
+# installing it alongside semgrep hangs osv-scanner's pip
+# transitive-dependency resolver indefinitely (confirmed via bisection on
+# PR #222 - each resolves fine alone in ~12-13s, but together osv-scanner
+# never returns, even with a 600s timeout). Keeping semgrep and dropping
+# checkov because checkov's actual findings in this repo (Dockerfile
+# non-root user, GH Actions permissions) are already covered by Trivy and
+# zizmor respectively, while semgrep catches real app-level issues (e.g. a
+# CORS wildcard finding in app/api/api.py) that nothing else in this stack
+# checks for. checkov still runs in CI via MegaLinter's own bundled
+# REPOSITORY_CHECKOV linter, independent of this file, so CI coverage for
+# it is unaffected. There is no local "Run Checkov" VS Code task to
+# uncomment - that task has been removed.
 # checkov==3.3.19
 djlint==1.46.2
 pyright==1.1.414

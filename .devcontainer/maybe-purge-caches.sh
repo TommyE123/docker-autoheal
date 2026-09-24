@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# The pip/npm cache directories are backed by named Docker volumes (see
+# The pip/npm/tools cache directories are backed by named Docker volumes (see
 # devcontainer.json's "mounts") so they persist across container rebuilds.
 # Docker creates a fresh volume mount as root-owned, so make sure the
 # container's non-root user can actually write to it before anything else
 # runs.
-sudo mkdir -p "${HOME}/.cache/pip" "${HOME}/.npm"
-sudo chown -R "$(id -u):$(id -g)" "${HOME}/.cache/pip" "${HOME}/.npm"
+sudo mkdir -p "${HOME}/.cache/pip" "${HOME}/.npm" "${HOME}/.cache/devcontainer-tools"
+sudo chown -R "$(id -u):$(id -g)" "${HOME}/.cache/pip" "${HOME}/.npm" "${HOME}/.cache/devcontainer-tools"
 
 # Lives inside the pip cache volume itself (already owned by this user,
 # unlike its parent ~/.cache, which Docker creates as root when the volume
@@ -25,8 +25,9 @@ if [[ -f "$marker" ]]; then
   fi
 fi
 
-echo "Cache is unpurged or older than ${max_age_days} days - purging pip/npm caches..."
+echo "Cache is unpurged or older than ${max_age_days} days - purging pip/npm/tools caches..."
 pip cache purge || true
 npm cache clean --force || true
+rm -rf "${HOME}/.cache/devcontainer-tools"/*
 
 touch "$marker"

@@ -3,7 +3,8 @@ set -euo pipefail
 
 manifest="$(dirname "${BASH_SOURCE[0]}")/tools.json"
 install_dir="${HOME}/.local/bin"
-mkdir -p "$install_dir"
+cache_dir="${HOME}/.cache/devcontainer-tools"
+mkdir -p "$install_dir" "$cache_dir"
 
 get_version() {
   python - "$manifest" "$1" <<'PY'
@@ -34,9 +35,6 @@ install_release() {
   trap 'rm -rf "$temporary_directory"' RETURN
 
   curl --fail --silent --show-error --location \
-    --output "${temporary_directory}/${asset}" \
-    "${release_url}/${asset}"
-  curl --fail --silent --show-error --location \
     --output "${temporary_directory}/checksums.txt" \
     "${release_url}/${checksum_asset}"
 
@@ -46,9 +44,24 @@ install_release() {
     echo "No valid checksum found for ${repository} ${asset}" >&2
     exit 1
   fi
-  printf '%s  %s\n' "$expected_checksum" "${temporary_directory}/${asset}" |
-    sha256sum --check --status -
 
+  # Cache key includes the repository and version because a couple of the
+  # release assets (e.g. hadolint, osv-scanner) don't encode the version in
+  # their filename, only the architecture.
+  local cached_asset="${cache_dir}/${repository//\//_}_${version}_${asset}"
+  if [[ -f "$cached_asset" ]] &&
+    printf '%s  %s\n' "$expected_checksum" "$cached_asset" | sha256sum --check --status -; then
+    cp "$cached_asset" "${temporary_directory}/${asset}"
+  else
+    curl --fail --silent --show-error --location \
+      --output "${temporary_directory}/${asset}" \
+      "${release_url}/${asset}"
+    printf '%s  %s\n' "$expected_checksum" "${temporary_directory}/${asset}" |
+      sha256sum --check --status -
+    cp "${temporary_directory}/${asset}" "$cached_asset"
+  fi
+
+  local install_source
   case "$asset" in
   *.tar.gz)
     tar -xzf "${temporary_directory}/${asset}" -C "$temporary_directory"
