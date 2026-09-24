@@ -87,3 +87,29 @@ def test_docker_publishing_targets_are_unchanged():
     assert "docker.io/${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal" in WORKFLOW
     assert "ghcr.io/${{ github.repository_owner }}/docker-autoheal" in WORKFLOW
     assert "linux/amd64,linux/arm64" in WORKFLOW
+
+
+def test_beta_cleanup_docker_hub_calls_fail_on_http_errors():
+    # curl's own -sS silences progress output but does not turn HTTP 4xx/5xx
+    # responses into a non-zero exit code - only -f/--fail does that. Without
+    # it, an auth or delete failure would be silently swallowed.
+    assert 'curl -sS -f -X POST "https://hub.docker.com/v2/users/login"' in WORKFLOW
+    assert 'curl -sS -f -H "Authorization: Bearer ${jwt}" "$url"' in WORKFLOW
+    assert "curl -sS -f -X DELETE" in WORKFLOW
+
+
+def test_beta_cleanup_validates_the_docker_hub_login_token():
+    assert 'if [ -z "$jwt" ] || [ "$jwt" = "null" ]; then' in WORKFLOW
+
+
+def test_beta_cleanup_ghcr_retention_accounts_for_the_protected_version():
+    # The current beta-build push always tags one GHCR package version with
+    # both `beta` and `beta-<sha>`. That version is (correctly) never a
+    # deletion candidate, but its beta-<sha> tag still occupies one slot of
+    # BETA_TAGS_TO_KEEP - so the deletable candidates must only keep
+    # (keep - protected_count), not the full keep count, or retention becomes
+    # one tag too generous.
+    assert "protected_count=$(echo \"$versions\" | jq '" in WORKFLOW
+    assert "effective_keep=$((keep - protected_count))" in WORKFLOW
+    assert '[ "$effective_keep" -lt 0 ] && effective_keep=0' in WORKFLOW
+    assert "--argjson keep \"$effective_keep\"" in WORKFLOW

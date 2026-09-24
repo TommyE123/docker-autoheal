@@ -224,7 +224,23 @@ jobs:
             page=$((page + 1))
           done
 
-          to_delete=$(echo "$versions" | jq -r --argjson keep "$keep" '
+          # A version whose tags mix a beta-<sha> tag with some other tag
+          # (typically the current `beta` + `beta-<sha>` version) is never a
+          # deletion candidate - deleting it would delete that other tag too.
+          # But its beta-<sha> tag still counts against the retention policy,
+          # since it survives regardless of what we do below. Without this
+          # adjustment, "keep" would apply only to the deletable candidates
+          # and the effective retention would be one tag too many.
+          protected_count=$(echo "$versions" | jq '
+            [.[] | select((.metadata.container.tags // []) as $t |
+              ($t | any(test("^beta-[0-9a-f]+$"))) and
+              ($t | any(test("^beta-[0-9a-f]+$") | not)))]
+            | length
+          ')
+          effective_keep=$((keep - protected_count))
+          [ "$effective_keep" -lt 0 ] && effective_keep=0
+
+          to_delete=$(echo "$versions" | jq -r --argjson keep "$effective_keep" '
             map(select((.metadata.container.tags // []) | length > 0
               and all(.[]; test("^beta-[0-9a-f]+$"))))
             | sort_by(.created_at) | reverse
@@ -248,15 +264,20 @@ jobs:
           repo="docker-autoheal"
           keep="${BETA_TAGS_TO_KEEP}"
 
-          jwt=$(curl -sS -X POST "https://hub.docker.com/v2/users/login" \
+          jwt=$(curl -sS -f -X POST "https://hub.docker.com/v2/users/login" \
             -H "Content-Type: application/json" \
             -d "{\"username\":\"${DOCKERHUB_USERNAME}\",\"password\":\"${DOCKERHUB_TOKEN}\"}" \
             | jq -r '.token')
 
+          if [ -z "$jwt" ] || [ "$jwt" = "null" ]; then
+            echo "::error::Docker Hub login did not return a token" >&2
+            exit 1
+          fi
+
           tags="[]"
           url="https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/${repo}/tags/?page_size=100&ordering=last_updated"
           while [ -n "$url" ] && [ "$url" != "null" ]; do
-            page=$(curl -sS -H "Authorization: Bearer ${jwt}" "$url")
+            page=$(curl -sS -f -H "Authorization: Bearer ${jwt}" "$url")
             tags=$(jq -s '.[0] + .[1].results' <(echo "$tags") <(echo "$page"))
             url=$(echo "$page" | jq -r '.next')
           done
@@ -269,6 +290,6 @@ jobs:
 
           for tag in $to_delete; do
             echo "Deleting Docker Hub tag ${tag}"
-            curl -sS -X DELETE -H "Authorization: Bearer ${jwt}" \
+            curl -sS -f -X DELETE -H "Authorization: Bearer ${jwt}" \
               "https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/${repo}/tags/${tag}/"
           done
