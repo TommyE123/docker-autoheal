@@ -22,7 +22,7 @@ services:
   # Example 1: Web server with auto-monitoring
   # Will be automatically monitored when it starts
   web:
-    image: nginx:alpine@sha256:62ff2089abf5a9ed33bd232895bef5e22f7bb4b200675cec49a5ebc48e3d4ac8
+    image: nginx:alpine@sha256:1ed1b0e1d7652937d6cbdaf4018c7b6fc009a7dd6c3047351e2eddda745de43f
     container_name: demo-web-server
     labels:
       - "autoheal=true"
@@ -111,7 +111,7 @@ services:
   # Example 5: Worker with auto-monitoring
   # Background worker that should be auto-restarted
   worker:
-    image: busybox:latest@sha256:dc2d74b28e4cf8984fa52af1f39bc7c3d9c73760b41a74d629f5d11b1ab28616
+    image: busybox:latest@sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e
     container_name: demo-worker
     labels:
       - "autoheal=true"
