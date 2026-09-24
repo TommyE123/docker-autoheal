@@ -53,6 +53,12 @@ jobs:
       # release-please's own "autorelease: pending" label, so this can never
       # merge an application or Renovate PR, and never re-processes a PR
       # that's already been merged (it's no longer open/pending).
+      # Enables GitHub's native auto-merge rather than checking
+      # mergeStateStatus and merging immediately: the step above may have
+      # just created/updated the Release PR, whose required checks are
+      # still pending at that point, and no later workflow run is
+      # guaranteed once they finish. Auto-merge defers the actual merge
+      # until checks pass, without needing another trigger.
       - name: Auto-merge the Release PR on the scheduled Friday run
         if: github.event_name == 'schedule'
         env:
@@ -68,16 +74,8 @@ jobs:
             exit 0
           fi
 
-          mergeable=$(gh pr view "$pr_number" --repo "$REPO" \
-            --json mergeStateStatus --jq '.mergeStateStatus')
-
-          if [ "$mergeable" != "CLEAN" ]; then
-            echo "Release PR #$pr_number is not ready to merge (mergeStateStatus=$mergeable); skipping."
-            exit 0
-          fi
-
-          echo "Merging Release PR #$pr_number"
-          gh pr merge "$pr_number" --repo "$REPO" --squash
+          echo "Enabling auto-merge for Release PR #$pr_number"
+          gh pr merge "$pr_number" --repo "$REPO" --auto --squash
 
   # Only runs when the release-please job actually created a release (i.e.
   # this push was the Release PR being merged) - never on an ordinary
