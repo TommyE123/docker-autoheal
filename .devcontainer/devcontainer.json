@@ -9,9 +9,20 @@
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
   },
 
-  "postCreateCommand": "python -m pip install --no-cache-dir -r requirements-dev.txt && npm ci --prefix frontend && npm ci --ignore-scripts --prefix .devcontainer && bash .devcontainer/install-tools.sh",
+  "mounts": [
+    "source=docker-autoheal-pip-cache,target=/home/vscode/.cache/pip,type=volume",
+    "source=docker-autoheal-npm-cache,target=/home/vscode/.npm,type=volume"
+  ],
 
-  "updateContentCommand": "python -m pip install --no-cache-dir -r requirements-dev.txt && npm ci --prefix frontend && npm ci --ignore-scripts --prefix .devcontainer && bash .devcontainer/install-tools.sh",
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "4gb",
+    "storage": "8gb"
+  },
+
+  "postCreateCommand": "bash .devcontainer/maybe-purge-caches.sh && python -m pip install -r requirements-dev.txt && npm ci --prefix frontend && npm ci --ignore-scripts --prefix .devcontainer && bash .devcontainer/install-tools.sh",
+
+  "updateContentCommand": "bash .devcontainer/maybe-purge-caches.sh && python -m pip install -r requirements-dev.txt && npm ci --prefix frontend && npm ci --ignore-scripts --prefix .devcontainer && bash .devcontainer/install-tools.sh",
 
   "forwardPorts": [3000, 3131, 9090],
 
