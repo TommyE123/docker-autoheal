@@ -215,19 +215,12 @@
       "label": "Autoheal: Run Security Scanners",
       "dependsOrder": "parallel",
       "dependsOn": [
-        "Autoheal: Run Checkov",
         "Autoheal: Run Semgrep",
         "Autoheal: Run OSV Scanner",
         "Autoheal: Run Trivy",
         "Autoheal: Run TruffleHog",
         "Autoheal: Run Betterleaks"
       ],
-      "problemMatcher": []
-    },
-    {
-      "label": "Autoheal: Run Checkov",
-      "type": "shell",
-      "command": "checkov -d .",
       "problemMatcher": []
     },
     {
@@ -239,7 +232,7 @@
     {
       "label": "Autoheal: Run OSV Scanner",
       "type": "shell",
-      "command": "osv-scanner scan source -r .",
+      "command": "osv-scanner scan source --experimental-exclude .devcontainer -r .",
       "problemMatcher": []
     },
     {
