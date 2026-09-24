@@ -38,6 +38,7 @@ jobs:
             pytest --version
             ruff --version
             pyright --version
+            semgrep --version
             zizmor --version
             yamllint --version
             djlint --version
