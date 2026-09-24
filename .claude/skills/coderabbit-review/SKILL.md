@@ -54,45 +54,25 @@ Sourcery review, if available
 → repeat if necessary
 → repository owner final review/merge
 
-If no Sourcery review exists at the time of assessment, proceed without waiting for one.
+The first CodeRabbit request must always be a full review. Subsequent requests must be targeted follow-ups. Never request another full review.
 
-Do not block the PR waiting for a Sourcery review.
+## Before Requesting A Review
 
-The first CodeRabbit request must always be a full review.
+A PR's CodeRabbit workflow often spans multiple sessions, interruptions, or restarts. Never assume this is the first interaction with CodeRabbit on a PR just because the current session has no memory of it — check the PR's existing comments for any prior `@coderabbitai full review` or `@coderabbitai review` request and CodeRabbit's response before acting.
 
-Subsequent CodeRabbit requests must be targeted follow-ups.
+For any review (initial or follow-up):
 
-Never request another full review.
+1. Determine whether the initial full review has actually completed — not just requested. Check that CodeRabbit's walkthrough (summary) comment reflects a real completed review (not silence, an error, or only a premature follow-up sent before any full review occurred).
+2. If no full-review request exists yet, the initial full review is still owed and must be requested regardless of session history, once the checklist below is satisfied. If a request already exists but has not completed, do not send another — check its current status and covered head commit, and wait for it to complete.
+3. Once a full review has completed, never request another — only a targeted follow-up is allowed from then on. Skip a follow-up if the head commit hasn't changed since that completed review; there's nothing new for CodeRabbit to review, and it will decline anyway.
 
-## Resuming Work On A PR
+Additionally, before the initial full review specifically:
 
-A PR's CodeRabbit workflow often spans multiple sessions, interruptions, or restarts. Never assume this is the first interaction with CodeRabbit on a PR just because the current session has no memory of it.
-
-Before requesting any CodeRabbit review (initial or follow-up):
-
-1. Check the PR's existing comments for any prior `@coderabbitai full review` or `@coderabbitai review` request and CodeRabbit's response.
-2. Determine whether the initial full review has actually completed — not just requested. Check that CodeRabbit's walkthrough (summary) comment reflects a real completed review (not silence, an error, or only a premature follow-up sent before any full review occurred). If no full-review request exists yet, request the initial full review. If a full-review request already exists but has not completed, do not send another full-review request — check its current status and covered head commit instead, and wait for it to complete before taking further action.
-3. Once a full review has completed, never request another full review — only a targeted follow-up is allowed from that point on.
-4. Identify the commit the most recently completed CodeRabbit review covered, and compare it to the PR's current head commit.
-5. If the head commit has not changed since that completed review, do not request another review — there is nothing new for CodeRabbit to review, and it will decline anyway.
-
-Only request a follow-up when a full review has already completed, the head commit has changed since that review, and relevant CI is green for that commit.
-
-## Before First CodeRabbit Review
-
-Before requesting the initial review:
-
-1. Confirm the PR targets `main`.
-2. Confirm it is substantive, or that the owner explicitly requested CodeRabbit.
-3. Check whether Sourcery has reviewed the PR.
-4. If a Sourcery review exists, assess it and address valid findings.
-5. If no Sourcery review exists, proceed without waiting.
-6. Check the branch against `.claude/rules/branch-currency.md`, and update it only if being behind `main` actually matters.
-7. If the branch was updated, rerun affected validation.
-8. Check the current CI status.
-9. Proceed only when the CI checks covering the PR's changes are green. If a check is failing for a reason unrelated to and pre-existing before the PR, do not try to fix it — report it and ask whether to proceed.
-10. Ensure there are no outstanding changes that have not been validated.
-11. Request the initial CodeRabbit full review.
+4. Confirm the PR targets `main` and is substantive (or the owner explicitly requested CodeRabbit).
+5. If a Sourcery review exists, assess it and address valid findings; if none exists yet, proceed without waiting — do not block the PR on it.
+6. Check the branch against `.claude/rules/branch-currency.md`, updating it only if being behind `main` actually matters, and rerun affected validation if it was updated.
+7. Check CI. Proceed only once checks covering the PR's changes are green — if a check fails for a reason unrelated to and pre-existing before the PR, report it and ask whether to proceed rather than fixing it.
+8. Ensure there are no outstanding, unvalidated changes.
 
 Do not request CodeRabbit before these prerequisites are satisfied.
 
@@ -114,7 +94,7 @@ Do not request a CodeRabbit follow-up while relevant CI is failing or still runn
 
 After valid findings have been addressed, changes have been pushed, and relevant CI is green, request a targeted follow-up review.
 
-Before sending it, confirm the PR's head commit differs from the commit covered by the last CodeRabbit request (see "Resuming Work On A PR" above). If it doesn't, the fix hasn't actually reached the PR yet — do not request a follow-up until it has.
+Before sending it, confirm the PR's head commit differs from the commit covered by the last CodeRabbit request (see "Before Requesting A Review" above). If it doesn't, the fix hasn't actually reached the PR yet — do not request a follow-up until it has.
 
 Use a message such as:
 
@@ -138,19 +118,15 @@ Do not request another full review.
 
 The follow-up should focus on the changes made in response to the previous review and directly affected code.
 
-CodeRabbit's short reply to a review command always includes a generic disclaimer about not re-reviewing already-reviewed commits — this text appears on both successful and unsuccessful runs and is not on its own evidence of a refusal. To confirm whether the follow-up actually ran, check whether CodeRabbit's walkthrough (summary) comment on the PR was updated after the follow-up request, covering a commit range that includes the new fix commit. If it was not updated and the reply gives no other indication of a completed review, treat the follow-up as not completed: re-check the head commit, wait briefly, and retry rather than silently moving on.
+CodeRabbit's short reply to a review command always includes a generic disclaimer about not re-reviewing already-reviewed commits — this appears on both successful and unsuccessful runs, so it isn't evidence of a refusal on its own. Confirm the follow-up actually ran by checking that the walkthrough comment was updated to cover the new commit; if not, wait briefly and retry rather than moving on.
 
-### Zero-actionable-finding outcomes
+A zero-actionable-finding follow-up doesn't use REVIEW.md's format — CodeRabbit posts its own fixed "No actionable comments" template plus a native Merge Risk badge instead of `🟢 GREEN — READY` / `✅ APPROVE`. This is expected CodeRabbit behaviour that `.coderabbit.yaml` can't override, not a broken review. Once confirmed against the current head commit as above, treat it as GREEN/APPROVE-equivalent only when the Merge Risk indicator is also low/minimal; assess further if it shows material risk.
 
-When CodeRabbit's follow-up genuinely runs and finds nothing to flag, it does not use REVIEW.md's format — it posts its own fixed template in the walkthrough comment (e.g. "No actionable comments were generated in the recent review. 🎉") alongside its own built-in Merge Risk badge, instead of REVIEW.md's `🟢 GREEN — READY` / `✅ APPROVE`. This is a CodeRabbit product behaviour that `.coderabbit.yaml` cannot override, not a broken or incomplete review. A "no actionable comments" result does not by itself guarantee a safe merge — CodeRabbit's Merge Risk indicator is a separate signal that can still show material risk. Once confirmed against the current head commit as above, treat "no actionable comments" as equivalent to a GREEN/APPROVE review only when the Merge Risk indicator also shows low/minimal risk; if it shows material risk, assess that risk before closing the review as GREEN/APPROVE. Do not request another review solely because the wording doesn't match REVIEW.md.
+## Confirming And Closing Findings
 
-## Subsequent Findings
+Apply the same shared workflow (assess, fix or escalate, validate, branch currency, CI) to follow-up findings as the initial review. Never request another full review — only another targeted follow-up. Continue until there are no unresolved actionable findings.
 
-For findings from a CodeRabbit follow-up, apply the same shared workflow (assess, fix or escalate, validate, branch currency, CI) as the initial review. Never request another full review — only another targeted follow-up. Continue until there are no unresolved actionable findings.
-
-CodeRabbit's initial review submission (the top-level "Actionable comments posted" summary and its inline findings) always uses CodeRabbit's own fixed template and never adopts REVIEW.md's status/verdict format, regardless of `tone_instructions` — this is expected, not a bug. A general PR-level follow-up comment (as in "Follow-Up Review" above) re-triggers that same fixed-template pipeline and will not produce REVIEW.md-formatted confirmation either.
-
-To get a REVIEW.md-formatted confirmation (`🟢 GREEN — READY` / `✅ APPROVE`) for a specific finding, reply directly inside that finding's own review-comment thread (not a general issue/PR comment) stating the fix and commit. This triggers CodeRabbit's chat auto-reply (`chat.auto_reply` in `.coderabbit.yaml`), which is a conversational path that does honor `tone_instructions`/`path_instructions` in full. Do this for each resolved finding thread in addition to the general follow-up request.
+CodeRabbit's review submissions (the top-level summary and inline findings) always use its own fixed template, never REVIEW.md's status/verdict format — expected, not a bug, and a general PR-level follow-up comment won't change that. To get a REVIEW.md-formatted confirmation (`🟢 GREEN — READY` / `✅ APPROVE`) for a specific finding, reply inside that finding's own review-comment thread stating the fix and commit — this triggers CodeRabbit's chat auto-reply (`chat.auto_reply` in `.coderabbit.yaml`), a conversational path that does honor `tone_instructions` in full. Do this per resolved thread alongside the general follow-up request.
 
 ## Review Scope
 
