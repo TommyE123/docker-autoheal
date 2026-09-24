@@ -1,11 +1,20 @@
 -r requirements.txt
-checkov==3.3.19
+# checkov and semgrep are intentionally commented out here: installed
+# together, their combined transitive dependency tree hangs osv-scanner's
+# pip resolver indefinitely (confirmed via bisection on PR #222 - each
+# resolves fine alone in ~12-13s, but together osv-scanner never returns,
+# even with a 600s timeout). Both still run in CI via MegaLinter's own
+# bundled REPOSITORY_CHECKOV/REPOSITORY_SEMGREP linters, independent of
+# this file, so CI security coverage is unaffected. If you need to run
+# either locally (e.g. the "Run Checkov"/"Run Semgrep" VS Code tasks),
+# uncomment the one you need and test - just don't install both at once.
+# checkov==3.3.19
+# semgrep==1.177.0
 djlint==1.46.2
 pyright==1.1.414
 pytest-asyncio==1.4.0
 pytest-cov==7.1.0
 pytest==9.1.1
 ruff==0.16.8
-semgrep==1.177.0
 zizmor==1.30.1
 yamllint==1.38.0

@@ -133,10 +133,3 @@ REPOSITORY_SEMGREP_RULESETS:
 REPOSITORY_OSV_SCANNER_ARGUMENTS:
   - "--experimental-exclude"
   - ".devcontainer"
-
-# requirements-dev.txt now pulls in checkov/semgrep, which appear to trigger
-# a slow/stalled pip transitive-dependency resolution against OSV's
-# deps.dev-backed resolver (default 300s timeout was being hit even with
-# .devcontainer excluded, at a package count close to previously-passing
-# runs). Raised pending further investigation into the root cause.
-REPOSITORY_OSV_SCANNER_TIMEOUT_SECONDS: 600
