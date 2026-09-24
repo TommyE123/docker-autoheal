@@ -64,6 +64,19 @@ Subsequent CodeRabbit requests must be targeted follow-ups.
 
 Never request another full review.
 
+## Resuming Work On A PR
+
+A PR's CodeRabbit workflow often spans multiple sessions, interruptions, or restarts. Never assume this is the first interaction with CodeRabbit on a PR just because the current session has no memory of it.
+
+Before requesting any CodeRabbit review (initial or follow-up):
+
+1. Check the PR's existing comments for any prior `@coderabbitai full review` or `@coderabbitai review` request and CodeRabbit's response.
+2. If a full review has already been requested for this PR (in this session or a prior one), never request another full review — only a targeted follow-up is allowed from this point on.
+3. Identify the commit the most recent CodeRabbit request covered, and compare it to the PR's current head commit.
+4. If the head commit has not changed since the last CodeRabbit request, do not request another review — there is nothing new for CodeRabbit to review, and it will decline anyway.
+
+Only request a follow-up when the head commit has changed since the last CodeRabbit request and relevant CI is green for that commit.
+
 ## Before First CodeRabbit Review
 
 Before requesting the initial review:
@@ -100,6 +113,8 @@ Do not request a CodeRabbit follow-up while relevant CI is failing or still runn
 
 After valid findings have been addressed, changes have been pushed, and relevant CI is green, request a targeted follow-up review.
 
+Before sending it, confirm the PR's head commit differs from the commit covered by the last CodeRabbit request (see "Resuming Work On A PR" above). If it doesn't, the fix hasn't actually reached the PR yet — do not request a follow-up until it has.
+
 Use a message such as:
 
 ```text
@@ -121,6 +136,12 @@ Please perform a follow-up review of these changes and any directly affected cod
 Do not request another full review.
 
 The follow-up should focus on the changes made in response to the previous review and directly affected code.
+
+CodeRabbit's short reply to a review command always includes a generic disclaimer about not re-reviewing already-reviewed commits — this text appears on both successful and unsuccessful runs and is not on its own evidence of a refusal. To confirm whether the follow-up actually ran, check whether CodeRabbit's walkthrough (summary) comment on the PR was updated after the follow-up request, covering a commit range that includes the new fix commit. If it was not updated and the reply gives no other indication of a completed review, treat the follow-up as not completed: re-check the head commit, wait briefly, and retry rather than silently moving on.
+
+### Zero-actionable-finding outcomes
+
+When CodeRabbit's follow-up genuinely runs and finds nothing to flag, it does not use REVIEW.md's format — it posts its own fixed template in the walkthrough comment (e.g. "No actionable comments were generated in the recent review. 🎉") alongside its own built-in Merge Risk badge, instead of REVIEW.md's `🟢 GREEN — READY` / `✅ APPROVE`. This is a CodeRabbit product behaviour that `.coderabbit.yaml` cannot override, not a broken or incomplete review. Treat this native "no actionable comments" outcome, once confirmed against the current head commit as above, as equivalent to a GREEN/APPROVE review — do not request another review solely because the wording doesn't match REVIEW.md.
 
 ## Subsequent Findings
 
