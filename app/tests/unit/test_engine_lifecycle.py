@@ -463,3 +463,123 @@ class TestEventListenerLoop:
             release.set()
 
         assert processed == [event]
+
+    async def test_none_event_stream_is_retried_until_it_recovers(
+        self, engine, docker_client, monkeypatch
+    ):
+        import threading
+
+        release = threading.Event()
+        event = start_event("b" * 64, "web")
+        sleep_calls = []
+
+        def fake_sleep(seconds):
+            sleep_calls.append(seconds)
+
+        monkeypatch.setattr("time.sleep", fake_sleep)
+
+        def working_stream():
+            yield event
+            release.wait(timeout=5)
+
+        attempts = []
+
+        def get_events_sequence():
+            attempts.append(1)
+            if len(attempts) == 1:
+                return None
+            return working_stream()
+
+        docker_client.events = get_events_sequence
+
+        processed = []
+
+        async def fake_process(received):
+            processed.append(received)
+            engine._running = False
+
+        monkeypatch.setattr(engine, "_process_container_start_event", fake_process)
+        engine._running = True
+
+        try:
+            await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
+        finally:
+            release.set()
+
+        assert processed == [event]
+        assert len(attempts) == 2
+        assert sleep_calls == [10]
+
+    async def test_mid_stream_exception_is_retried_until_it_recovers(
+        self, engine, docker_client, monkeypatch
+    ):
+        import threading
+
+        release = threading.Event()
+        first_event = start_event("c" * 64, "web-1")
+        second_event = start_event("d" * 64, "web-2")
+        sleep_calls = []
+
+        def fake_sleep(seconds):
+            sleep_calls.append(seconds)
+
+        monkeypatch.setattr("time.sleep", fake_sleep)
+
+        def broken_stream():
+            yield first_event
+            raise RuntimeError("stream disconnected")
+
+        def working_stream():
+            yield second_event
+            release.wait(timeout=5)
+
+        attempts = []
+
+        def get_events_sequence():
+            attempts.append(1)
+            if len(attempts) == 1:
+                return broken_stream()
+            return working_stream()
+
+        docker_client.events = get_events_sequence
+
+        processed = []
+
+        async def fake_process(received):
+            processed.append(received)
+            if received == second_event:
+                engine._running = False
+
+        monkeypatch.setattr(engine, "_process_container_start_event", fake_process)
+        engine._running = True
+
+        try:
+            await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
+        finally:
+            release.set()
+
+        assert processed == [first_event, second_event]
+        assert len(attempts) == 2
+        assert sleep_calls == [10]
+
+    async def test_retry_loop_stops_once_shutdown_is_requested(
+        self, engine, docker_client, monkeypatch
+    ):
+        attempts = []
+
+        def fake_sleep(seconds):
+            # Simulate a shutdown request arriving while the thread is
+            # waiting to retry, so it must not call get_events() again.
+            engine._running = False
+
+        monkeypatch.setattr("time.sleep", fake_sleep)
+
+        def get_events_sequence():
+            attempts.append(1)
+
+        docker_client.events = get_events_sequence
+        engine._running = True
+
+        await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
+
+        assert attempts == [1]
