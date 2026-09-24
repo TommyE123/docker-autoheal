@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { defineConfig, coverageConfigDefaults } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
@@ -29,6 +29,11 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov'],
       reportsDirectory: './coverage',
+      // globalSetup runs in the main process before worker pools start, so
+      // v8 coverage instrumentation never sees it execute; excluding it
+      // keeps coverage % from being diluted by a file that can never show
+      // as covered no matter how it's tested.
+      exclude: [...coverageConfigDefaults.exclude, 'src/test/globalSetup.js'],
     },
   },
 })
