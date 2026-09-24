@@ -51,14 +51,20 @@ jobs:
       # Only the scheduled Friday run may merge the Release PR - an ordinary
       # push never reaches this step. The PR to merge is identified from
       # this job's own "Run Release Please" step output (the PR it just
-      # created/updated), not by searching for any open PR carrying the
-      # "autorelease: pending" label - a label is just metadata that
-      # anything with permission to modify labels could apply to a
-      # different PR, which the label-search approach would then trust.
-      # The label is still checked as a defense-in-depth guard on top of
-      # that identity. Enables GitHub's native auto-merge rather than
-      # checking mergeStateStatus and merging immediately: the step above
-      # may have just created/updated the Release PR, whose required
+      # created/updated) when available, not by searching for any open PR
+      # carrying the "autorelease: pending" label - a label is just
+      # metadata that anything with permission to modify labels could
+      # apply to a different PR, which a label-search-only approach would
+      # then trust. Release Please only populates that output when it
+      # actually created/updated the PR in this run though: an existing
+      # Release PR left unchanged (no release-worthy commits landed since
+      # it was created) produces no output, so the fallback below looks up
+      # that PR by its release branch and base branch instead - still a
+      # fixed, known identity, not an arbitrary label search. The label is
+      # then checked as a defense-in-depth guard on top of whichever
+      # identity found the PR. Enables GitHub's native auto-merge rather
+      # than checking mergeStateStatus and merging immediately: the step
+      # above may have just created/updated the Release PR, whose required
       # checks are still pending at that point, and no later workflow run
       # is guaranteed once they finish. Auto-merge defers the actual merge
       # until checks pass, without needing another trigger.
@@ -69,15 +75,17 @@ jobs:
           REPO: ${{ github.repository }}
           RELEASE_PR_JSON: ${{ steps.release.outputs.pr }}
         run: |
-          if [ -z "$RELEASE_PR_JSON" ]; then
-            echo "No pending Release PR found; nothing to do."
-            exit 0
-          fi
-
           pr_number=$(echo "$RELEASE_PR_JSON" | jq -r '.number // empty')
 
           if [ -z "$pr_number" ]; then
-            echo "Release Please's PR output had no number; nothing to do."
+            echo "Release Please's own output had no pending PR; looking for an existing one on release-please--branches--main."
+            pr_number=$(gh pr list --repo "$REPO" \
+              --head "release-please--branches--main" --base main --state open \
+              --json number --jq '.[0].number // empty')
+          fi
+
+          if [ -z "$pr_number" ]; then
+            echo "No pending Release PR found; nothing to do."
             exit 0
           fi
 

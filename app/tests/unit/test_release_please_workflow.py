@@ -87,3 +87,32 @@ def test_docker_publishing_targets_are_unchanged():
     assert "docker.io/${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal" in WORKFLOW
     assert "ghcr.io/${{ github.repository_owner }}/docker-autoheal" in WORKFLOW
     assert "linux/amd64,linux/arm64" in WORKFLOW
+
+
+def test_release_please_runs_on_the_friday_schedule():
+    assert 'cron: "0 13 * * 5"' in WORKFLOW
+
+
+def test_auto_merge_step_only_runs_on_the_scheduled_event():
+    assert "if: github.event_name == 'schedule'" in WORKFLOW
+
+
+def test_auto_merge_falls_back_to_the_release_branch_when_release_please_output_is_empty():
+    # steps.release.outputs.pr is only populated when Release Please
+    # created/updated the PR in *this* run. An existing Release PR left
+    # unchanged (no release-worthy commits since it was opened) must still
+    # be found and merged on the scheduled run, not silently skipped.
+    assert (
+        'gh pr list --repo "$REPO" \\\n'
+        '              --head "release-please--branches--main" --base main --state open'
+        in WORKFLOW
+    )
+
+
+def test_auto_merge_checks_the_autorelease_pending_label_before_merging():
+    assert "--json labels --jq" in WORKFLOW
+    assert 'index("autorelease: pending")' in WORKFLOW
+
+
+def test_auto_merge_uses_native_github_auto_merge():
+    assert 'gh pr merge "$pr_number" --repo "$REPO" --auto --squash' in WORKFLOW
