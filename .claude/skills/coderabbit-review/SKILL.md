@@ -153,7 +153,7 @@ The CodeRabbit review process is complete when:
 1. Any available Sourcery review has been assessed and valid findings resolved.
 2. Branch currency has been checked against `.claude/rules/branch-currency.md`, and the branch updated if that was needed.
 3. Relevant CI is green before the initial CodeRabbit review.
-4. The initial full CodeRabbit review has been requested.
+4. The initial full CodeRabbit review has completed, with the walkthrough confirming the requested head commit was reviewed.
 5. Valid CodeRabbit findings have been resolved.
 6. Disputed findings have been escalated to the owner.
 7. Relevant validation has passed.
