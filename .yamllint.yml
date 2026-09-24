@@ -6,8 +6,14 @@ extends: default
 # GitHub Agentic Workflows CLI from a Markdown source and are not
 # hand-authored; `gh aw compile --yamllint` is the correct validation for
 # them instead.
+#
+# node_modules is only relevant locally (CI's MegaLinter run never installs
+# it), but the "Lint YAML" VS Code task runs `yamllint --strict .` against
+# the whole workspace, so it needs excluding here or it lints vendored
+# packages under frontend/node_modules and .devcontainer/node_modules.
 ignore: |
   .github/workflows/*.lock.yml
+  node_modules/
 
 rules:
   comments:

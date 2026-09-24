@@ -41,7 +41,7 @@ install_release() {
     "${release_url}/${checksum_asset}"
 
   local expected_checksum
-  expected_checksum="$(grep -E "(^|[[:space:]])${asset//./\\.}$" "${temporary_directory}/checksums.txt" | head -n 1 | awk '{print $1}')"
+  expected_checksum="$(grep -E "(^|[[:space:]])\*?${asset//./\\.}$" "${temporary_directory}/checksums.txt" | head -n 1 | awk '{print $1}')"
   if [[ ! "$expected_checksum" =~ ^[[:xdigit:]]{64}$ ]]; then
     echo "No valid checksum found for ${repository} ${asset}" >&2
     exit 1

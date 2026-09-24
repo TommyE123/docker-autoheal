@@ -97,7 +97,7 @@
     {
       "label": "Autoheal: Lint CSS",
       "type": "shell",
-      "command": "stylelint \"frontend/src/**/*.css\"",
+      "command": "stylelint --config-basedir .devcontainer/node_modules \"frontend/src/**/*.css\"",
       "problemMatcher": []
     },
     {
@@ -138,13 +138,13 @@
     {
       "label": "Autoheal: Lint Markdown",
       "type": "shell",
-      "command": "markdownlint-cli2 \"**/*.md\" \"#node_modules\" \"#frontend/node_modules\"",
+      "command": "markdownlint-cli2 $(git ls-files '*.md')",
       "problemMatcher": []
     },
     {
       "label": "Autoheal: Check Markdown Tables",
       "type": "shell",
-      "command": "markdown-table-formatter --check \"**/*.md\"",
+      "command": "markdown-table-formatter --check $(git ls-files '*.md')",
       "problemMatcher": []
     },
     {
@@ -251,13 +251,13 @@
     {
       "label": "Autoheal: Run TruffleHog",
       "type": "shell",
-      "command": "trufflehog filesystem --directory . --no-update",
+      "command": "trufflehog filesystem . --no-update --exclude-paths=.trufflehog-exclude.txt",
       "problemMatcher": []
     },
     {
       "label": "Autoheal: Run Betterleaks",
       "type": "shell",
-      "command": "betterleaks scan --path .",
+      "command": "betterleaks --redact --verbose dir .",
       "problemMatcher": []
     },
     {
