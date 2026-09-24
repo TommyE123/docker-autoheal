@@ -25,18 +25,18 @@ def test_config_bootstraps_from_the_last_real_release_commit():
     assert config["packages"]["."]["release-type"] == "simple"
 
     expected_sections = {
-        "feat": "Features",
-        "fix": "Bug Fixes",
-        "deps": "Dependencies",
-        "perf": "Performance Improvements",
-        "revert": "Reverts",
-        "chore": "Chores",
-        "docs": "Documentation",
-        "style": "Styles",
-        "refactor": "Refactors",
-        "test": "Tests",
-        "build": "Build System",
-        "ci": "Continuous Integration",
+        "feat": "✨ Features",
+        "fix": "🐛 Bug Fixes",
+        "deps": "📦 Dependencies",
+        "perf": "⚡ Performance Improvements",
+        "revert": "⏪ Reverts",
+        "chore": "🧹 Chores",
+        "docs": "📝 Documentation",
+        "style": "🎨 Styles",
+        "refactor": "♻️ Refactors",
+        "test": "✅ Tests",
+        "build": "🏗️ Build System",
+        "ci": "👷 Continuous Integration",
     }
 
     actual_sections = {
