@@ -9,10 +9,23 @@ output rather than recalculating anything.
 """
 
 import json
+import shutil
+import subprocess
 from pathlib import Path
+
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 WORKFLOW = (REPO_ROOT / ".github" / "workflows" / "release-please.yml").read_text(encoding="utf-8")
+
+
+def _extract_jq_program(after: str) -> str:
+    """Pull one of the GHCR cleanup job's jq programs out of WORKFLOW verbatim,
+    so a test that runs it can't drift from what the workflow actually executes.
+    """
+    start = WORKFLOW.index(after) + len(after)
+    end = WORKFLOW.index("\n          ')", start)
+    return WORKFLOW[start:end]
 
 
 def test_config_bootstraps_from_the_last_real_release_commit():
@@ -93,9 +106,20 @@ def test_beta_cleanup_docker_hub_calls_fail_on_http_errors():
     # curl's own -sS silences progress output but does not turn HTTP 4xx/5xx
     # responses into a non-zero exit code - only -f/--fail does that. Without
     # it, an auth or delete failure would be silently swallowed.
-    assert 'curl -sS -f -X POST "https://hub.docker.com/v2/users/login"' in WORKFLOW
+    assert 'curl -sS -f -X POST "https://hub.docker.com/v2/auth/token"' in WORKFLOW
     assert 'curl -sS -f -H "Authorization: Bearer ${jwt}" "$url"' in WORKFLOW
     assert "curl -sS -f -X DELETE" in WORKFLOW
+
+
+def test_beta_cleanup_uses_the_pat_compatible_docker_hub_token_route():
+    # /v2/users/login is deprecated, and a token it issues from a personal
+    # access token (rather than a real password) is rejected by other Hub
+    # APIs - including the tag list/delete calls this job depends on
+    # (docker/hub-feedback#2438, #2006). /v2/auth/token is the current,
+    # PAT-compatible route and returns `access_token` rather than `token`.
+    assert "'{identifier: $id, secret: $secret}'" in WORKFLOW
+    assert "| jq -r '.access_token')" in WORKFLOW
+    assert 'curl -sS -f -X POST "https://hub.docker.com/v2/users/login"' not in WORKFLOW
 
 
 def test_beta_cleanup_validates_the_docker_hub_login_token():
@@ -113,3 +137,57 @@ def test_beta_cleanup_ghcr_retention_accounts_for_the_protected_version():
     assert "effective_keep=$((keep - protected_count))" in WORKFLOW
     assert '[ "$effective_keep" -lt 0 ] && effective_keep=0' in WORKFLOW
     assert "--argjson keep \"$effective_keep\"" in WORKFLOW
+
+
+def test_beta_cleanup_ghcr_jq_filters_compute_the_right_deletions():
+    # The tests above only check that the retention logic's text is present -
+    # they can't catch a broken jq predicate or off-by-one in the actual
+    # filters. This executes the real programs (extracted from WORKFLOW, so
+    # they can't drift) against a fixture mirroring the GHCR versions API.
+    if shutil.which("jq") is None:
+        pytest.skip("jq is not installed")
+
+    protected_count_program = _extract_jq_program('protected_count=$(echo "$versions" | jq \'')
+    to_delete_program = _extract_jq_program(
+        'to_delete=$(echo "$versions" | jq -r --argjson keep "$effective_keep" \''
+    )
+
+    def version(version_id, tags, created_at):
+        return {"id": version_id, "created_at": created_at, "metadata": {"container": {"tags": tags}}}
+
+    # One version currently carries both `beta` and a `beta-<sha>` tag (the
+    # latest beta-build push) - protected. 25 older, beta-only versions.
+    # One real release version and one untagged (multi-arch child) version -
+    # both must never be touched regardless of age or count.
+    versions = [version(0, ["beta", "beta-aaaaaaa"], "2026-01-26T00:00:00Z")]
+    versions += [version(i, [f"beta-{i:07x}"], f"2026-01-{i + 1:02d}T00:00:00Z") for i in range(1, 26)]
+    versions.append(version(100, ["v1.2.3"], "2025-01-01T00:00:00Z"))
+    versions.append(version(101, [], "2025-01-01T00:00:00Z"))
+    versions_json = json.dumps(versions)
+
+    def run_jq(program, *args):
+        result = subprocess.run(
+            ["jq", *args, program],
+            input=versions_json,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout
+
+    protected_count = int(run_jq(protected_count_program).strip())
+    assert protected_count == 1
+
+    keep = 20
+    effective_keep = max(keep - protected_count, 0)
+    assert effective_keep == 19
+
+    to_delete_ids = {int(x) for x in run_jq(to_delete_program, "-r", "--argjson", "keep", str(effective_keep)).split()}
+    # The 6 oldest of the 25 beta-only versions (25 - effective_keep=19).
+    assert to_delete_ids == {1, 2, 3, 4, 5, 6}
+    assert 0 not in to_delete_ids  # protected beta + beta-<sha> version
+    assert 100 not in to_delete_ids  # release version
+    assert 101 not in to_delete_ids  # untagged version
+
+    all_beta_only_ids = {int(x) for x in run_jq(to_delete_program, "-r", "--argjson", "keep", "0").split()}
+    assert all_beta_only_ids == set(range(1, 26))

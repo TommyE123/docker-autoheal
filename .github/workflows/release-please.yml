@@ -264,10 +264,15 @@ jobs:
           repo="docker-autoheal"
           keep="${BETA_TAGS_TO_KEEP}"
 
-          jwt=$(curl -sS -f -X POST "https://hub.docker.com/v2/users/login" \
-            -H "Content-Type: application/json" \
-            -d "{\"username\":\"${DOCKERHUB_USERNAME}\",\"password\":\"${DOCKERHUB_TOKEN}\"}" \
-            | jq -r '.token')
+          # /v2/users/login is deprecated, and a PAT-issued token from it is
+          # rejected by other Hub APIs (docker/hub-feedback#2438, #2006) -
+          # /v2/auth/token is the current, PAT-compatible route.
+          jwt=$(jq -n --arg id "$DOCKERHUB_USERNAME" --arg secret "$DOCKERHUB_TOKEN" \
+              '{identifier: $id, secret: $secret}' \
+            | curl -sS -f -X POST "https://hub.docker.com/v2/auth/token" \
+                -H "Content-Type: application/json" --data @- \
+            | jq -r '.access_token')
+          echo "::add-mask::${jwt}"
 
           if [ -z "$jwt" ] || [ "$jwt" = "null" ]; then
             echo "::error::Docker Hub login did not return a token" >&2
