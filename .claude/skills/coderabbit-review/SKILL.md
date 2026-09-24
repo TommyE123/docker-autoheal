@@ -126,7 +126,7 @@ A zero-actionable-finding follow-up doesn't use REVIEW.md's format — CodeRabbi
 
 Apply the same shared workflow (assess, fix or escalate, validate, branch currency, CI) to follow-up findings as the initial review. Never request another full review — only another targeted follow-up. Continue until there are no unresolved actionable findings.
 
-CodeRabbit's review submissions (the top-level summary and inline findings) always use its own fixed template, never REVIEW.md's status/verdict format — expected, not a bug, and a general PR-level follow-up comment won't change that. To get a REVIEW.md-formatted confirmation (`🟢 GREEN — READY` / `✅ APPROVE`) for a specific finding, reply inside that finding's own review-comment thread stating the fix and commit — this triggers CodeRabbit's chat auto-reply (`chat.auto_reply` in `.coderabbit.yaml`), a conversational path that does honor `tone_instructions` in full. Do this per resolved thread alongside the general follow-up request.
+CodeRabbit's review submissions (the top-level summary and inline findings) use its own fixed template, never REVIEW.md's status/verdict format — expected, not a bug. To discuss or confirm a specific finding, post a PR comment containing `@coderabbitai` or reply inside that finding's own review-comment thread; with `chat.auto_reply: true` CodeRabbit may also respond without an explicit mention. This chat path isn't a review submission and isn't guaranteed to follow REVIEW.md's exact format — assess whatever it replies with against REVIEW.md rather than assuming automatic compliance, and don't treat it as required for every resolved finding.
 
 ## Review Scope
 
