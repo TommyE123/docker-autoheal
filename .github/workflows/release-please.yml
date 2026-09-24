@@ -183,3 +183,92 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=docker-autoheal
           cache-to: type=gha,mode=max,scope=docker-autoheal
+
+  # Prunes old beta-<shortsha> tags after each beta-build push, keeping the
+  # most recent BETA_TAGS_TO_KEEP in both registries. The mutable `beta` tag
+  # and versioned release tags are never touched - the delete filters only
+  # ever match tags shaped like `beta-<hex>`.
+  beta-cleanup:
+    name: Clean up old beta Docker image tags
+    needs: [release-please, beta-build]
+    if: needs.release-please.outputs.release_created != 'true'
+    runs-on: ubuntu-latest
+
+    env:
+      BETA_TAGS_TO_KEEP: 20
+
+    permissions:
+      packages: write
+
+    steps:
+      # GITHUB_TOKEN has admin rights on this package because this same
+      # repository's workflow is what publishes it, so no extra PAT is
+      # needed here (see GitHub's package-permissions docs).
+      - name: Delete old beta-<shortsha> tags from GHCR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          package="docker-autoheal"
+          keep="${BETA_TAGS_TO_KEEP}"
+
+          versions="[]"
+          page=1
+          while :; do
+            batch=$(gh api "/users/${GHCR_OWNER}/packages/container/${package}/versions?per_page=100&page=${page}")
+            count=$(echo "$batch" | jq 'length')
+            [ "$count" -eq 0 ] && break
+            versions=$(jq -s '.[0] + .[1]' <(echo "$versions") <(echo "$batch"))
+            [ "$count" -lt 100 ] && break
+            page=$((page + 1))
+          done
+
+          to_delete=$(echo "$versions" | jq -r --argjson keep "$keep" '
+            map(select((.metadata.container.tags // []) | length > 0
+              and all(.[]; test("^beta-[0-9a-f]+$"))))
+            | sort_by(.created_at) | reverse
+            | .[$keep:] | .[].id
+          ')
+
+          for id in $to_delete; do
+            echo "Deleting GHCR package version $id"
+            gh api --method DELETE "/users/${GHCR_OWNER}/packages/container/${package}/versions/${id}"
+          done
+
+      # Requires the DOCKERHUB_TOKEN secret to have "Read, Write, Delete"
+      # access permissions on Docker Hub; a read/write-only token will fail
+      # only the delete calls below, not the login/push steps above.
+      - name: Delete old beta-<shortsha> tags from Docker Hub
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          repo="docker-autoheal"
+          keep="${BETA_TAGS_TO_KEEP}"
+
+          jwt=$(curl -sS -X POST "https://hub.docker.com/v2/users/login" \
+            -H "Content-Type: application/json" \
+            -d "{\"username\":\"${DOCKERHUB_USERNAME}\",\"password\":\"${DOCKERHUB_TOKEN}\"}" \
+            | jq -r '.token')
+
+          tags="[]"
+          url="https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/${repo}/tags/?page_size=100&ordering=last_updated"
+          while [ -n "$url" ] && [ "$url" != "null" ]; do
+            page=$(curl -sS -H "Authorization: Bearer ${jwt}" "$url")
+            tags=$(jq -s '.[0] + .[1].results' <(echo "$tags") <(echo "$page"))
+            url=$(echo "$page" | jq -r '.next')
+          done
+
+          to_delete=$(echo "$tags" | jq -r --argjson keep "$keep" '
+            map(select(.name | test("^beta-[0-9a-f]+$")))
+            | sort_by(.last_updated) | reverse
+            | .[$keep:] | .[].name
+          ')
+
+          for tag in $to_delete; do
+            echo "Deleting Docker Hub tag ${tag}"
+            curl -sS -X DELETE -H "Authorization: Bearer ${jwt}" \
+              "https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/${repo}/tags/${tag}/"
+          done
