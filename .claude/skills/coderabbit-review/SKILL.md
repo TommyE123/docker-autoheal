@@ -71,11 +71,12 @@ A PR's CodeRabbit workflow often spans multiple sessions, interruptions, or rest
 Before requesting any CodeRabbit review (initial or follow-up):
 
 1. Check the PR's existing comments for any prior `@coderabbitai full review` or `@coderabbitai review` request and CodeRabbit's response.
-2. If a full review has already been requested for this PR (in this session or a prior one), never request another full review — only a targeted follow-up is allowed from this point on.
-3. Identify the commit the most recent CodeRabbit request covered, and compare it to the PR's current head commit.
-4. If the head commit has not changed since the last CodeRabbit request, do not request another review — there is nothing new for CodeRabbit to review, and it will decline anyway.
+2. Determine whether the initial full review has actually completed — not just been requested. Check that CodeRabbit's walkthrough (summary) comment reflects a real completed review (not silence, an error, or only a premature follow-up sent before any full review occurred). If no full review has completed yet, request the initial full review regardless of whether the head commit has changed — a targeted follow-up cannot substitute for a missing initial full review.
+3. Once a full review has completed, never request another full review — only a targeted follow-up is allowed from that point on.
+4. Identify the commit the most recently completed CodeRabbit review covered, and compare it to the PR's current head commit.
+5. If the head commit has not changed since that completed review, do not request another review — there is nothing new for CodeRabbit to review, and it will decline anyway.
 
-Only request a follow-up when the head commit has changed since the last CodeRabbit request and relevant CI is green for that commit.
+Only request a follow-up when a full review has already completed, the head commit has changed since that review, and relevant CI is green for that commit.
 
 ## Before First CodeRabbit Review
 
