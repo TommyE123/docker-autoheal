@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  schedule:
+    # The scheduled release point: Fridays at 13:00 UTC (see issue #164).
+    - cron: "0 13 * * 5"
 
 concurrency:
   group: release-please-main
@@ -32,12 +35,49 @@ jobs:
       tag_name: ${{ steps.release.outputs.tag_name }}
 
     steps:
+      # A PAT, not GITHUB_TOKEN, so the Release PR is authored by a real
+      # account: GITHUB_TOKEN-authored PRs/pushes don't trigger further
+      # workflow runs, which would otherwise stop required checks from ever
+      # running on the Release PR, and stop its eventual merge push from
+      # re-triggering this workflow to actually tag/publish the release.
       - name: Run Release Please
         id: release
         uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
         with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      # Only the scheduled Friday run may merge the Release PR - an ordinary
+      # push never reaches this step. Only ever targets the PR carrying
+      # release-please's own "autorelease: pending" label, so this can never
+      # merge an application or Renovate PR, and never re-processes a PR
+      # that's already been merged (it's no longer open/pending).
+      - name: Auto-merge the Release PR on the scheduled Friday run
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          pr_number=$(gh pr list --repo "$REPO" \
+            --state open --label "autorelease: pending" \
+            --json number --jq '.[0].number // empty')
+
+          if [ -z "$pr_number" ]; then
+            echo "No pending Release PR found; nothing to do."
+            exit 0
+          fi
+
+          mergeable=$(gh pr view "$pr_number" --repo "$REPO" \
+            --json mergeStateStatus --jq '.mergeStateStatus')
+
+          if [ "$mergeable" != "CLEAN" ]; then
+            echo "Release PR #$pr_number is not ready to merge (mergeStateStatus=$mergeable); skipping."
+            exit 0
+          fi
+
+          echo "Merging Release PR #$pr_number"
+          gh pr merge "$pr_number" --repo "$REPO" --squash
 
   # Only runs when the release-please job actually created a release (i.e.
   # this push was the Release PR being merged) - never on an ordinary
