@@ -46,20 +46,20 @@ or added.
 ## What's automated vs. manual
 
 | Step                                                              | Automated?                                                                |
-|--------------------------------------------------------------------|---------------------------------------------------------------------------|
+|-------------------------------------------------------------------|---------------------------------------------------------------------------|
 | Unit tests on every push/PR                                       | Yes (`tests.yml`)                                                         |
 | MegaLinter on every PR to `main`                                  | Yes (`mega-linter.yml`)                                                   |
-| Docker image build (verification only, no release) on every PR   | Yes (`docker-build.yml`)                                                  |
-| Production smoke test against the actual PR image                | Yes (`production-smoke-test.yml`, invoked from `docker-build.yml`)        |
-| Keeping the Release PR (title, release notes, version) up to date | Yes (`release-please.yml`)                                               |
+| Docker image build (verification only, no release) on every PR    | Yes (`docker-build.yml`)                                                  |
+| Production smoke test against the actual PR image                 | Yes (`production-smoke-test.yml`, invoked from `docker-build.yml`)        |
+| Keeping the Release PR (title, release notes, version) up to date | Yes (`release-please.yml`)                                                |
 | Choosing patch vs. minor vs. major                                | Yes — derived from Conventional Commit PR titles, never chosen by hand    |
 | Deciding *when* to actually release                               | No — a human merges the Release PR when ready                             |
 | Git tag + GitHub Release creation                                 | Yes, on Release PR merge (`release-please.yml`)                           |
 | Docker image build + push (Docker Hub + GHCR) + `latest`          | Yes, gated on an actual release (`release-please.yml`)                    |
-| Docker Hub description update                                    | Yes, only when a release was published (part of `release-please.yml`)     |
+| Docker Hub description update                                     | Yes, only when a release was published (part of `release-please.yml`)     |
 | Dependency updates                                                | Yes, via Renovate (see [Dependency Management](dependency-management.md)) |
-| Release notes                                                    | Yes — published to GitHub Releases, no committed changelog file           |
-| Version file                                                     | Yes — `version.txt`, maintained by Release Please                         |
+| Release notes                                                     | Yes — published to GitHub Releases, no committed changelog file           |
+| Version file                                                      | Yes — `version.txt`, maintained by Release Please                         |
 
 ## See also
 
