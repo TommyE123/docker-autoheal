@@ -63,8 +63,9 @@ A PR's CodeRabbit workflow often spans multiple sessions, interruptions, or rest
 For any review (initial or follow-up):
 
 1. Determine whether the initial full review has actually completed — not just requested. Check that CodeRabbit's walkthrough (summary) comment reflects a real completed review (not silence, an error, or only a premature follow-up sent before any full review occurred).
-2. If no full-review request exists yet, the initial full review is still owed and must be requested regardless of session history, once the checklist below is satisfied. If a request already exists but has not completed, do not send another — check its current status and covered head commit, and wait for it to complete.
+2. If no full-review request exists yet, the initial full review is still owed and must be requested regardless of session history, once the checklist below is satisfied. If a request already exists but has not completed, do not send another — check its current status and covered head commit, and wait for it to complete. A "Review rate limited" / "Action not completed" reply is a failed request, not a pending one — it does not count as "not yet completed" under this step, so don't wait on it; the review is still owed and must be re-requested once the rate limit clears (see step 4).
 3. Once a full review has completed, never request another — only a targeted follow-up is allowed from then on. Skip a follow-up if the head commit hasn't changed since that completed review; there's nothing new for CodeRabbit to review, and it will decline anyway.
+4. The plan allows 1 included review per hour. After a "Review rate limited" reply, wait until an hour has passed since the last included (non-rate-limited) review, then retry once. If the rate-limited request was the initial full review, that full review is still owed.
 
 Additionally, before the initial full review specifically:
 
@@ -118,7 +119,7 @@ Do not request another full review.
 
 The follow-up should focus on the changes made in response to the previous review and directly affected code.
 
-CodeRabbit's short reply to a review command always includes a generic disclaimer about not re-reviewing already-reviewed commits — this appears on both successful and unsuccessful runs, so it isn't evidence of a refusal on its own. Confirm the follow-up actually ran by checking that the walkthrough comment was updated to cover the new commit; if not, wait briefly and retry rather than moving on.
+CodeRabbit's short reply to a review command always includes a generic disclaimer about not re-reviewing already-reviewed commits — this appears on both successful and unsuccessful runs, so it isn't evidence of a refusal on its own. Confirm the follow-up actually ran by checking that the walkthrough comment was updated to cover the new commit; if not (including a "Review rate limited" reply), retry at most once per rate-limit window rather than moving on.
 
 A zero-actionable-finding follow-up doesn't use REVIEW.md's format — CodeRabbit posts its own fixed "No actionable comments" template plus a native Merge Risk badge instead of `🟢 GREEN — READY` / `✅ APPROVE`. This is expected CodeRabbit behaviour that `.coderabbit.yaml` can't override, not a broken review. Once confirmed against the current head commit as above, treat it as GREEN/APPROVE-equivalent only when the Merge Risk indicator is also low/minimal; assess further if it shows material risk.
 
