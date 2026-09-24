@@ -408,14 +408,17 @@ class TestConfigurationEndpoints:
 @pytest.mark.asyncio
 class TestObservabilityConfig:
     @pytest.fixture(autouse=True)
-    def restore_root_logger_level(self):
-        # The endpoint mutates the root logger's level as a side effect;
-        # restore it so these tests don't leak state into the rest of the suite.
-        original_level = logging.getLogger().level
+    def restore_logger_levels(self):
+        # The endpoint mutates the root, uvicorn, uvicorn.access, and
+        # uvicorn.error logger levels as a side effect; restore them so these
+        # tests don't leak state into the rest of the suite.
+        logger_names = (None, "uvicorn", "uvicorn.access", "uvicorn.error")
+        original_levels = {name: logging.getLogger(name).level for name in logger_names}
         try:
             yield
         finally:
-            logging.getLogger().setLevel(original_level)
+            for name, level in original_levels.items():
+                logging.getLogger(name).setLevel(level)
 
     async def test_update_observability_config_updates_log_level(self):
         result = await update_observability_config({"log_level": "DEBUG"})
