@@ -148,6 +148,10 @@ When CodeRabbit's follow-up genuinely runs and finds nothing to flag, it does no
 
 For findings from a CodeRabbit follow-up, apply the same shared workflow (assess, fix or escalate, validate, branch currency, CI) as the initial review. Never request another full review — only another targeted follow-up. Continue until there are no unresolved actionable findings.
 
+CodeRabbit's initial review submission (the top-level "Actionable comments posted" summary and its inline findings) always uses CodeRabbit's own fixed template and never adopts REVIEW.md's status/verdict format, regardless of `tone_instructions` — this is expected, not a bug. A general PR-level follow-up comment (as in "Follow-Up Review" above) re-triggers that same fixed-template pipeline and will not produce REVIEW.md-formatted confirmation either.
+
+To get a REVIEW.md-formatted confirmation (`🟢 GREEN — READY` / `✅ APPROVE`) for a specific finding, reply directly inside that finding's own review-comment thread (not a general issue/PR comment) stating the fix and commit. This triggers CodeRabbit's chat auto-reply (`chat.auto_reply` in `.coderabbit.yaml`), which is a conversational path that does honor `tone_instructions`/`path_instructions` in full. Do this for each resolved finding thread in addition to the general follow-up request.
+
 ## Review Scope
 
 CodeRabbit reviews the PR state available when the review is requested.
