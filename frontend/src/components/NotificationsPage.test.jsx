@@ -131,6 +131,7 @@ describe("NotificationsPage", () => {
     expect(
       await screen.findByText(/notification service added successfully/i),
     ).toBeInTheDocument();
+    expect(await screen.findByText("New Webhook")).toBeInTheDocument();
   });
 
   it("disables the add button while required fields are missing", async () => {
@@ -177,6 +178,10 @@ describe("NotificationsPage", () => {
     ).toBeInTheDocument();
   });
 
+  // This characterizes a known validation defect (issue #264: the Save
+  // button lives outside the <Form>, so the type-specific `required`
+  // attributes never gate submission) rather than desired behavior. Expect
+  // this test to need updating once #264 is fixed.
   it("submits a service missing its type-specific required field, since only the name is validated client-side", async () => {
     const user = userEvent.setup();
     getNotificationsConfig.mockResolvedValue({ data: config });
@@ -213,7 +218,17 @@ describe("NotificationsPage", () => {
 
   it("edits an existing service successfully", async () => {
     const user = userEvent.setup();
-    getNotificationsConfig.mockResolvedValue({ data: configWithServices });
+    const configAfterEdit = {
+      ...configWithServices,
+      services: configWithServices.services.map((service) =>
+        service.name === "My Webhook"
+          ? { ...service, url: "https://example.com/updated" }
+          : service,
+      ),
+    };
+    getNotificationsConfig
+      .mockResolvedValueOnce({ data: configWithServices })
+      .mockResolvedValueOnce({ data: configAfterEdit });
     updateNotificationService.mockResolvedValue({});
 
     render(<NotificationsPage />);
@@ -236,6 +251,14 @@ describe("NotificationsPage", () => {
     );
     expect(
       await screen.findByText(/notification service updated successfully/i),
+    ).toBeInTheDocument();
+
+    // The service list only shows name/type/status, so reopen the edit
+    // modal to prove the refetched config actually carries the new URL
+    // rather than the save handler having silently no-opped.
+    await user.click(screen.getAllByRole("button", { name: /^edit$/i })[0]);
+    expect(
+      await screen.findByDisplayValue("https://example.com/updated"),
     ).toBeInTheDocument();
   });
 
@@ -260,7 +283,15 @@ describe("NotificationsPage", () => {
 
   it("enables a disabled service", async () => {
     const user = userEvent.setup();
-    getNotificationsConfig.mockResolvedValue({ data: configWithServices });
+    const configAfterEnable = {
+      ...configWithServices,
+      services: configWithServices.services.map((service) =>
+        service.name === "Disabled Slack" ? { ...service, enabled: true } : service,
+      ),
+    };
+    getNotificationsConfig
+      .mockResolvedValueOnce({ data: configWithServices })
+      .mockResolvedValueOnce({ data: configAfterEnable });
     updateNotificationService.mockResolvedValue({});
 
     render(<NotificationsPage />);
@@ -278,6 +309,11 @@ describe("NotificationsPage", () => {
         "Disabled Slack",
         expect.objectContaining({ enabled: true }),
       ),
+    );
+
+    const row = screen.getByText("Disabled Slack").closest("tr");
+    await waitFor(() =>
+      expect(within(row).getByText("Enabled")).toBeInTheDocument(),
     );
   });
 
