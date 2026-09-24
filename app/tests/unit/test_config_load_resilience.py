@@ -11,6 +11,7 @@ ui, alerts, observability, uptime_kuma, uptime_kuma_mappings, notifications.
 """
 
 import json
+from unittest.mock import patch
 
 from app.config.config_manager import AutoHealConfig, ConfigManager
 
@@ -190,6 +191,23 @@ def test_unparseable_json_falls_back_to_full_defaults_without_raising(isolated_c
     assert config == AutoHealConfig()
     assert "not valid JSON" in caplog.text
     assert str(isolated_config_manager.CONFIG_FILE) in caplog.text
+
+
+def test_config_file_open_failure_falls_back_to_full_defaults_without_raising(
+    isolated_config_manager, caplog
+):
+    """_load_config() catches OSError as well as JSON/decode errors, so an
+    I/O-level failure opening an otherwise-valid config.json (e.g. a
+    permission error) must be handled the same way as malformed content:
+    fall back to defaults rather than raising."""
+    _write_config(isolated_config_manager, _valid_config_dict())
+
+    with patch("pathlib.Path.open", side_effect=OSError("permission denied")):
+        config = isolated_config_manager._load_config()
+
+    assert config == AutoHealConfig()
+    assert "is not valid JSON" in caplog.text
+    assert "permission denied" in caplog.text
 
 
 def test_invalid_utf8_config_file_falls_back_to_full_defaults_without_raising(

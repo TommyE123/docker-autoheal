@@ -223,6 +223,8 @@ class FakeDockerClient:
         return self.native_health.get(container.name)
 
     def get_events(self, decode=True, filters=None):
+        if callable(self.events):
+            return self.events()
         return self.events
 
 
