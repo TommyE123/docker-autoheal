@@ -198,7 +198,7 @@ jobs:
       BETA_TAGS_TO_KEEP: 20
 
     permissions:
-      packages: write
+      packages: write # write (not read-only) is required to delete package versions
 
     steps:
       # GITHUB_TOKEN has admin rights on this package because this same
