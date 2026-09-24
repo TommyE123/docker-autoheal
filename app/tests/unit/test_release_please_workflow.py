@@ -24,6 +24,9 @@ def test_config_bootstraps_from_the_last_real_release_commit():
     assert config["bootstrap-sha"] == "437dd523de66735bedf72d1e90d325fde88fff46"
     assert config["packages"]["."]["release-type"] == "simple"
 
+    # Release notes live on GitHub Releases, not a committed CHANGELOG.md.
+    assert config["skip-changelog"] is True
+
     expected_sections = {
         "feat": "Features",
         "fix": "Bug Fixes",
@@ -59,12 +62,6 @@ def test_version_file_matches_the_manifest():
     # it must exist and agree with the manifest, or release-please's next
     # bump would be calculated from the wrong starting point.
     assert (REPO_ROOT / "version.txt").read_text(encoding="utf-8").strip() == "2.0.16"
-
-
-def test_changelog_exists_for_release_please_to_maintain():
-    # release-please appends to this file as part of every Release PR - it
-    # must already exist so that process has something to extend.
-    assert (REPO_ROOT / "CHANGELOG.md").exists()
 
 
 def test_docker_job_only_runs_when_a_release_was_actually_created():
