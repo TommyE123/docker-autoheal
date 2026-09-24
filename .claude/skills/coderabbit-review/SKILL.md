@@ -68,11 +68,11 @@ For any review (initial or follow-up):
 
 Additionally, before the initial full review specifically:
 
-4. Confirm the PR targets `main` and is substantive (or the owner explicitly requested CodeRabbit).
-5. If a Sourcery review exists, assess it and address valid findings; if none exists yet, proceed without waiting — do not block the PR on it.
-6. Check the branch against `.claude/rules/branch-currency.md`, updating it only if being behind `main` actually matters, and rerun affected validation if it was updated.
-7. Check CI. Proceed only once checks covering the PR's changes are green — if a check fails for a reason unrelated to and pre-existing before the PR, report it and ask whether to proceed rather than fixing it.
-8. Ensure there are no outstanding, unvalidated changes.
+1. Confirm the PR targets `main` and is substantive (or the owner explicitly requested CodeRabbit).
+2. If a Sourcery review exists, assess it and address valid findings; if none exists yet, proceed without waiting — do not block the PR on it.
+3. Check the branch against `.claude/rules/branch-currency.md`, updating it only if being behind `main` actually matters, and rerun affected validation if it was updated.
+4. Check CI. Proceed only once checks covering the PR's changes are green — if a check fails for a reason unrelated to and pre-existing before the PR, report it and ask whether to proceed rather than fixing it.
+5. Ensure there are no outstanding, unvalidated changes.
 
 Do not request CodeRabbit before these prerequisites are satisfied.
 
