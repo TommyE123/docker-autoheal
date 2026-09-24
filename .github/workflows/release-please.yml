@@ -49,29 +49,44 @@ jobs:
           manifest-file: .release-please-manifest.json
 
       # Only the scheduled Friday run may merge the Release PR - an ordinary
-      # push never reaches this step. Only ever targets the PR carrying
-      # release-please's own "autorelease: pending" label, so this can never
-      # merge an application or Renovate PR, and never re-processes a PR
-      # that's already been merged (it's no longer open/pending).
-      # Enables GitHub's native auto-merge rather than checking
-      # mergeStateStatus and merging immediately: the step above may have
-      # just created/updated the Release PR, whose required checks are
-      # still pending at that point, and no later workflow run is
-      # guaranteed once they finish. Auto-merge defers the actual merge
+      # push never reaches this step. The PR to merge is identified from
+      # this job's own "Run Release Please" step output (the PR it just
+      # created/updated), not by searching for any open PR carrying the
+      # "autorelease: pending" label - a label is just metadata that
+      # anything with permission to modify labels could apply to a
+      # different PR, which the label-search approach would then trust.
+      # The label is still checked as a defense-in-depth guard on top of
+      # that identity. Enables GitHub's native auto-merge rather than
+      # checking mergeStateStatus and merging immediately: the step above
+      # may have just created/updated the Release PR, whose required
+      # checks are still pending at that point, and no later workflow run
+      # is guaranteed once they finish. Auto-merge defers the actual merge
       # until checks pass, without needing another trigger.
       - name: Auto-merge the Release PR on the scheduled Friday run
         if: github.event_name == 'schedule'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           REPO: ${{ github.repository }}
+          RELEASE_PR_JSON: ${{ steps.release.outputs.pr }}
         run: |
-          pr_number=$(gh pr list --repo "$REPO" \
-            --state open --label "autorelease: pending" \
-            --json number --jq '.[0].number // empty')
-
-          if [ -z "$pr_number" ]; then
+          if [ -z "$RELEASE_PR_JSON" ]; then
             echo "No pending Release PR found; nothing to do."
             exit 0
+          fi
+
+          pr_number=$(echo "$RELEASE_PR_JSON" | jq -r '.number // empty')
+
+          if [ -z "$pr_number" ]; then
+            echo "Release Please's PR output had no number; nothing to do."
+            exit 0
+          fi
+
+          has_label=$(gh pr view "$pr_number" --repo "$REPO" \
+            --json labels --jq '[.labels[].name] | index("autorelease: pending") != null')
+
+          if [ "$has_label" != "true" ]; then
+            echo "PR #$pr_number (from release-please's own output) is missing the autorelease: pending label; refusing to auto-merge."
+            exit 1
           fi
 
           echo "Enabling auto-merge for Release PR #$pr_number"
