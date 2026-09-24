@@ -46,17 +46,17 @@ install_release() {
     echo "No valid checksum found for ${repository} ${asset}" >&2
     exit 1
   fi
-  printf '%s  %s\n' "$expected_checksum" "${temporary_directory}/${asset}" \
-    | sha256sum --check --status -
+  printf '%s  %s\n' "$expected_checksum" "${temporary_directory}/${asset}" |
+    sha256sum --check --status -
 
   case "$asset" in
-    *.tar.gz)
-      tar -xzf "${temporary_directory}/${asset}" -C "$temporary_directory"
-      install_source="$(find "$temporary_directory" -maxdepth 2 -type f -name "$binary" -print -quit)"
-      ;;
-    *)
-      install_source="${temporary_directory}/${asset}"
-      ;;
+  *.tar.gz)
+    tar -xzf "${temporary_directory}/${asset}" -C "$temporary_directory"
+    install_source="$(find "$temporary_directory" -maxdepth 2 -type f -name "$binary" -print -quit)"
+    ;;
+  *)
+    install_source="${temporary_directory}/${asset}"
+    ;;
   esac
 
   if [[ -z "${install_source:-}" || ! -f "$install_source" ]]; then
@@ -68,9 +68,12 @@ install_release() {
 
 architecture="$(uname -m)"
 case "$architecture" in
-  x86_64) architecture_suffix="amd64" ;;
-  aarch64|arm64) architecture_suffix="arm64" ;;
-  *) echo "Unsupported architecture: ${architecture}" >&2; exit 1 ;;
+x86_64) architecture_suffix="amd64" ;;
+aarch64 | arm64) architecture_suffix="arm64" ;;
+*)
+  echo "Unsupported architecture: ${architecture}" >&2
+  exit 1
+  ;;
 esac
 
 actionlint_version="$(get_version rhysd/actionlint)"
@@ -106,6 +109,6 @@ install_release betterleaks/betterleaks "$betterleaks_version" \
   checksums.txt
 
 case ":${PATH}:" in
-  *":${install_dir}:"*) ;;
-  *) echo "Add ${install_dir} to PATH to use the installed tools." >&2 ;;
+*":${install_dir}:"*) ;;
+*) echo "Add ${install_dir} to PATH to use the installed tools." >&2 ;;
 esac
