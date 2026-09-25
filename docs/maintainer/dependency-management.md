@@ -32,7 +32,7 @@ build time.
 * **Python**: exact versions (`==`) are used throughout both `requirements.txt` and
   `requirements-dev.txt`.
 
-  The three packages that previously used `~=` (`pydantic`, `aiohttp`, `pillow`) were switched
+  The packages that previously used `~=` (`pydantic`, `aiohttp`) were switched
   to `==` at their already-installed versions rather than being upgraded. Every subsequent
   version change therefore becomes a visible, reviewable Renovate PR instead of silently
   floating to a newer patch release at build time.
