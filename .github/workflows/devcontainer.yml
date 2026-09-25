@@ -10,6 +10,7 @@ jobs:
   devcontainer:
     name: Build and test Dev Container
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -73,3 +74,22 @@ jobs:
 
             echo "== Docker access =="
             docker run --rm hello-world
+
+            echo "== Docker Compose stack =="
+            docker compose -f docker-compose.test.yml up -d --build autoheal
+            healthy=false
+            for _ in $(seq 1 30); do
+              if [ "$(docker inspect -f '{{.State.Health.Status}}' docker-autoheal 2>/dev/null)" = "healthy" ]; then
+                healthy=true
+                break
+              fi
+              sleep 2
+            done
+            if [ "$healthy" != "true" ]; then
+              echo "::error::docker compose stack did not become healthy"
+              docker compose -f docker-compose.test.yml logs
+              docker compose -f docker-compose.test.yml down
+              exit 1
+            fi
+            echo "docker compose stack is healthy"
+            docker compose -f docker-compose.test.yml down

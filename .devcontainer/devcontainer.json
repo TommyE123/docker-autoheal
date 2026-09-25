@@ -23,7 +23,7 @@
     "storage": "8gb"
   },
 
-  "postCreateCommand": "bash .devcontainer/maybe-purge-caches.sh && python -m pip install -r requirements-dev.txt && npm ci --prefix frontend && npm ci --ignore-scripts --prefix .devcontainer && bash .devcontainer/install-tools.sh && (gh extension upgrade gh-aw || gh extension install github/gh-aw || true)",
+  "postCreateCommand": "bash .devcontainer/maybe-purge-caches.sh && python -m pip install -r requirements-dev.txt && npm ci --prefix frontend && npm ci --ignore-scripts --prefix .devcontainer && bash .devcontainer/install-tools.sh && (gh extension upgrade gh-aw || gh extension install github/gh-aw || echo 'Warning: gh-aw extension install failed (expected without a GITHUB_TOKEN outside Codespaces)')",
 
   "waitFor": "postCreateCommand",
 

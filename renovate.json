@@ -14,6 +14,8 @@
   "forkProcessing": "enabled",
   "platformAutomerge": false,
   "rebaseWhen": "behind-base-branch",
+  "minimumReleaseAge": "3 days",
+  "internalChecksFilter": "strict",
   "semanticCommits": "enabled",
   "semanticCommitType": "chore",
   "prConcurrentLimit": 15,
