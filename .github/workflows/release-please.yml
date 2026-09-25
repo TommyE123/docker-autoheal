@@ -15,7 +15,8 @@ permissions:
 jobs:
   # Maintains a standing "Release PR" that accumulates Conventional Commit
   # changes since the last release. Merging an ordinary PR to main only
-  # updates that Release PR - it never publishes anything by itself.
+  # updates that Release PR; the workflow publishes a beta image but no
+  # versioned or latest image for that commit.
   # Merging the Release PR itself is a push to main like any other, which
   # is what this job recognises and turns into the tag + GitHub Release.
   release-please:
