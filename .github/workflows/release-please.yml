@@ -208,15 +208,26 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_OWNER: ${{ github.repository_owner }}
+          GHCR_OWNER_TYPE: ${{ github.repository_owner_type }}
         run: |
           set -euo pipefail
           package="docker-autoheal"
           keep="${BETA_TAGS_TO_KEEP}"
 
+          # The package-versions API has separate routes for a user-owned vs.
+          # an organization-owned package - github.repository_owner_type says
+          # which this repository is, so the correct route is picked instead
+          # of assuming user-owned.
+          if [ "$GHCR_OWNER_TYPE" = "Organization" ]; then
+            base="/orgs/${GHCR_OWNER}/packages/container/${package}"
+          else
+            base="/users/${GHCR_OWNER}/packages/container/${package}"
+          fi
+
           versions="[]"
           page=1
           while :; do
-            batch=$(gh api "/users/${GHCR_OWNER}/packages/container/${package}/versions?per_page=100&page=${page}")
+            batch=$(gh api "${base}/versions?per_page=100&page=${page}")
             count=$(echo "$batch" | jq 'length')
             [ "$count" -eq 0 ] && break
             versions=$(jq -s '.[0] + .[1]' <(echo "$versions") <(echo "$batch"))
@@ -249,7 +260,8 @@ jobs:
 
           for id in $to_delete; do
             echo "Deleting GHCR package version $id"
-            gh api --method DELETE "/users/${GHCR_OWNER}/packages/container/${package}/versions/${id}"
+            gh api --method DELETE "${base}/versions/${id}" \
+              || echo "::warning::failed to delete GHCR version ${id}, will retry next run"
           done
 
       # Requires the DOCKERHUB_TOKEN secret to have "Read, Write, Delete"
@@ -296,5 +308,6 @@ jobs:
           for tag in $to_delete; do
             echo "Deleting Docker Hub tag ${tag}"
             curl -sS -f -X DELETE -H "Authorization: Bearer ${jwt}" \
-              "https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/${repo}/tags/${tag}/"
+              "https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/${repo}/tags/${tag}/" \
+              || echo "::warning::failed to delete Docker Hub tag ${tag}, will retry next run"
           done

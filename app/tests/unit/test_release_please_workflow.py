@@ -126,6 +126,36 @@ def test_beta_cleanup_validates_the_docker_hub_login_token():
     assert 'if [ -z "$jwt" ] || [ "$jwt" = "null" ]; then' in WORKFLOW
 
 
+def test_beta_cleanup_ghcr_uses_the_correct_route_for_org_owned_packages():
+    # The GHCR package-versions API has separate routes for a user-owned vs.
+    # an organization-owned package. Hardcoding the /users/ route would 404
+    # on an org-owned repository - github.repository_owner_type says which
+    # this repository is, so the workflow must branch on it.
+    assert 'GHCR_OWNER_TYPE: ${{ github.repository_owner_type }}' in WORKFLOW
+    assert 'if [ "$GHCR_OWNER_TYPE" = "Organization" ]; then' in WORKFLOW
+    assert 'base="/orgs/${GHCR_OWNER}/packages/container/${package}"' in WORKFLOW
+    assert 'base="/users/${GHCR_OWNER}/packages/container/${package}"' in WORKFLOW
+    assert '"${base}/versions?per_page=100&page=${page}"' in WORKFLOW
+    assert '"${base}/versions/${id}"' in WORKFLOW
+
+
+def test_beta_cleanup_delete_loops_tolerate_individual_failures():
+    # Both loops run under `set -euo pipefail` - without an explicit `||`,
+    # one 404 (already-deleted version/tag from a concurrent run) or
+    # transient 5xx would abort the loop and leave later, still-valid
+    # deletions undone.
+    assert (
+        'gh api --method DELETE "${base}/versions/${id}" \\\n'
+        '              || echo "::warning::failed to delete GHCR version ${id}, will retry next run"'
+        in WORKFLOW
+    )
+    assert (
+        '"https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/${repo}/tags/${tag}/" \\\n'
+        '              || echo "::warning::failed to delete Docker Hub tag ${tag}, will retry next run"'
+        in WORKFLOW
+    )
+
+
 def test_beta_cleanup_ghcr_retention_accounts_for_the_protected_version():
     # The current beta-build push always tags one GHCR package version with
     # both `beta` and `beta-<sha>`. That version is (correctly) never a
@@ -191,3 +221,41 @@ def test_beta_cleanup_ghcr_jq_filters_compute_the_right_deletions():
 
     all_beta_only_ids = {int(x) for x in run_jq(to_delete_program, "-r", "--argjson", "keep", "0").split()}
     assert all_beta_only_ids == set(range(1, 26))
+
+
+def test_beta_cleanup_docker_hub_jq_filter_computes_the_right_deletions():
+    # Same rationale as the GHCR test above: this executes the real Docker
+    # Hub retention filter (extracted from WORKFLOW) against a fixture
+    # mirroring the Hub tags API, rather than only asserting the text exists.
+    if shutil.which("jq") is None:
+        pytest.skip("jq is not installed")
+
+    to_delete_program = _extract_jq_program(
+        'to_delete=$(echo "$tags" | jq -r --argjson keep "$keep" \''
+    )
+
+    def tag(name, last_updated):
+        return {"name": name, "last_updated": last_updated}
+
+    # 25 beta-<sha> tags plus the mutable `beta` tag and a release tag, which
+    # must never be touched regardless of age.
+    tags = [tag(f"beta-{i:07x}", f"2026-01-{i + 1:02d}T00:00:00Z") for i in range(25)]
+    tags.append(tag("beta", "2026-01-26T00:00:00Z"))
+    tags.append(tag("v1.2.3", "2025-01-01T00:00:00Z"))
+    tags_json = json.dumps(tags)
+
+    def run_jq(program, *args):
+        result = subprocess.run(
+            ["jq", *args, program],
+            input=tags_json,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout
+
+    to_delete_names = set(run_jq(to_delete_program, "-r", "--argjson", "keep", "20").split())
+    # The 5 oldest of the 25 beta-<sha> tags (25 - keep=20).
+    assert to_delete_names == {f"beta-{i:07x}" for i in range(5)}
+    assert "beta" not in to_delete_names
+    assert "v1.2.3" not in to_delete_names
