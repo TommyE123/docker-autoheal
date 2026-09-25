@@ -7,13 +7,11 @@ name: Weekly Release Please auto-merge
 # which does the actual release/tag/Docker-publish work.
 on:
   schedule:
-    # GitHub Actions cron is UTC-only, but the UK alternates between GMT
-    # (UTC+0) and BST (UTC+1). Firing at both 14:00 and 15:00 UTC every
-    # Friday and then checking the real Europe/London wall-clock time in
-    # the "Guard" step below is simpler and more robust than hand-tracking
-    # the DST changeover dates here.
-    - cron: "0 14 * * 5"
+    # The timezone field makes GitHub evaluate this cron as Europe/London
+    # wall-clock time, so it stays 15:00 UK local across the GMT/BST
+    # changeover without a separate runtime guard.
     - cron: "0 15 * * 5"
+      timezone: "Europe/London"
   workflow_dispatch:
 
 concurrency:
@@ -38,28 +36,6 @@ jobs:
       REPO: ${{ github.repository }}
 
     steps:
-      # Scheduled runs fire twice (once per possible UTC offset) so that one
-      # of them lands on 15:00 UK local time whichever way the clocks are
-      # set. Only the run that actually matches proceeds; the other is a
-      # deliberate, successful no-op. A manual dispatch always proceeds.
-      - name: Guard - only proceed at 15:00 UK local time
-        id: guard
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "Manual run - proceeding."
-            echo "proceed=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          uk_hour=$(TZ=Europe/London date +%H)
-          if [ "$uk_hour" = "15" ]; then
-            echo "It's 15:00 in Europe/London - proceeding."
-            echo "proceed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "It's ${uk_hour}:00 in Europe/London, not 15:00 - skipping this run."
-            echo "proceed=false" >> "$GITHUB_OUTPUT"
-          fi
-
       # Match the Release Please PR by repository-specific characteristics
       # rather than its title/version, which changes on every release.
       #
@@ -71,7 +47,6 @@ jobs:
       # only release-please itself can produce that shape.
       - name: Find the Release Please PR
         id: find
-        if: steps.guard.outputs.proceed == 'true'
         run: |
           matches=$(gh pr list --repo "$REPO" \
             --base main --state open --label "autorelease: pending" \
@@ -99,7 +74,7 @@ jobs:
           fi
 
       - name: Enable auto-merge on the Release PR
-        if: steps.guard.outputs.proceed == 'true' && steps.find.outputs.count == '1'
+        if: steps.find.outputs.count == '1'
         env:
           PR_NUMBER: ${{ steps.find.outputs.pr_number }}
         run: |
