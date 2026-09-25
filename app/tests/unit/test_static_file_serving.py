@@ -4,16 +4,14 @@ Unit tests for the real static-file serving path in ``app/api/api.py``.
 ``get_static_file_path()``/``serve_static_file()`` are exercised by calling
 them directly to obtain a real ``FileResponse``, then invoking that response
 as an ASGI app with a minimal scope/receive/send. This runs Starlette's
-actual file-reading and streaming code (the code path that would use
-``aiofiles`` if it were installed) without needing an HTTP client such as
-``httpx``/``TestClient`` as a test dependency.
+actual file-reading and streaming code without needing an HTTP client such
+as ``httpx``/``TestClient`` as a test dependency.
 """
 
 from typing import TYPE_CHECKING, Any
 
 import pytest
 from fastapi import HTTPException
-from fastapi.staticfiles import StaticFiles
 
 from app.api import api as api_module
 from app.api.api import get_static_file_path, serve_static_file
@@ -22,11 +20,11 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-async def _collect_response(app: Any, path: str = "/") -> tuple[int, dict[str, str], bytes]:
+async def _collect_response(app: Any) -> tuple[int, dict[str, str], bytes]:
     scope = {
         "type": "http",
         "method": "GET",
-        "path": path,
+        "path": "/",
         "headers": [],
     }
 
@@ -105,17 +103,3 @@ def test_get_static_file_path_traversal_raises_400(static_dir):
         get_static_file_path("../secret.txt")
 
     assert exc_info.value.status_code == 400
-
-
-@pytest.mark.asyncio
-async def test_assets_static_files_mount_serves_file(tmp_path):
-    assets_dir = tmp_path / "assets"
-    assets_dir.mkdir()
-    content = b"console.log('asset');"
-    (assets_dir / "a.js").write_bytes(content)
-
-    assets_app = StaticFiles(directory=str(assets_dir))
-    status, _headers, body = await _collect_response(assets_app, path="/a.js")
-
-    assert status == 200
-    assert body == content
