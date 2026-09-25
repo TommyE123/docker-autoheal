@@ -1,19 +1,19 @@
 name: Weekly Release Please auto-merge
 
 # Enables GitHub's native auto-merge on the standing Release Please PR every
-# Friday at 14:00 UK local time. It never merges anything itself - GitHub
+# Friday at 15:00 UK local time. It never merges anything itself - GitHub
 # handles required checks, approvals and the eventual merge. That merge is
 # an ordinary push to main and is picked up unchanged by release-please.yml,
 # which does the actual release/tag/Docker-publish work.
 on:
   schedule:
     # GitHub Actions cron is UTC-only, but the UK alternates between GMT
-    # (UTC+0) and BST (UTC+1). Firing at both 13:00 and 14:00 UTC every
+    # (UTC+0) and BST (UTC+1). Firing at both 14:00 and 15:00 UTC every
     # Friday and then checking the real Europe/London wall-clock time in
     # the "Guard" step below is simpler and more robust than hand-tracking
     # the DST changeover dates here.
-    - cron: "0 13 * * 5"
     - cron: "0 14 * * 5"
+    - cron: "0 15 * * 5"
   workflow_dispatch:
 
 concurrency:
@@ -34,10 +34,10 @@ jobs:
 
     steps:
       # Scheduled runs fire twice (once per possible UTC offset) so that one
-      # of them lands on 14:00 UK local time whichever way the clocks are
+      # of them lands on 15:00 UK local time whichever way the clocks are
       # set. Only the run that actually matches proceeds; the other is a
       # deliberate, successful no-op. A manual dispatch always proceeds.
-      - name: Guard - only proceed at 14:00 UK local time
+      - name: Guard - only proceed at 15:00 UK local time
         id: guard
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -47,11 +47,11 @@ jobs:
           fi
 
           uk_hour=$(TZ=Europe/London date +%H)
-          if [ "$uk_hour" = "14" ]; then
-            echo "It's 14:00 in Europe/London - proceeding."
+          if [ "$uk_hour" = "15" ]; then
+            echo "It's 15:00 in Europe/London - proceeding."
             echo "proceed=true" >> "$GITHUB_OUTPUT"
           else
-            echo "It's ${uk_hour}:00 in Europe/London, not 14:00 - skipping this run."
+            echo "It's ${uk_hour}:00 in Europe/London, not 15:00 - skipping this run."
             echo "proceed=false" >> "$GITHUB_OUTPUT"
           fi
 
