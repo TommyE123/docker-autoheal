@@ -13,7 +13,8 @@
   "mounts": [
     "source=docker-autoheal-pip-cache,target=/home/vscode/.cache/pip,type=volume",
     "source=docker-autoheal-npm-cache,target=/home/vscode/.npm,type=volume",
-    "source=docker-autoheal-tools-cache,target=/home/vscode/.cache/devcontainer-tools,type=volume"
+    "source=docker-autoheal-tools-cache,target=/home/vscode/.cache/devcontainer-tools,type=volume",
+    "source=docker-autoheal-gh-cache,target=/home/vscode/.local/share/gh,type=volume"
   ],
 
   "hostRequirements": {
@@ -22,9 +23,9 @@
     "storage": "8gb"
   },
 
-  "postCreateCommand": "bash .devcontainer/maybe-purge-caches.sh && python -m pip install -r requirements-dev.txt && npm ci --prefix frontend && npm ci --ignore-scripts --prefix .devcontainer && bash .devcontainer/install-tools.sh && (gh extension install github/gh-aw || true)",
+  "postCreateCommand": "bash .devcontainer/maybe-purge-caches.sh && python -m pip install -r requirements-dev.txt && npm ci --prefix frontend && npm ci --ignore-scripts --prefix .devcontainer && bash .devcontainer/install-tools.sh && (gh extension upgrade gh-aw || gh extension install github/gh-aw || true)",
 
-  "updateContentCommand": "bash .devcontainer/maybe-purge-caches.sh && python -m pip install -r requirements-dev.txt && npm ci --prefix frontend && npm ci --ignore-scripts --prefix .devcontainer && bash .devcontainer/install-tools.sh && (gh extension install github/gh-aw || true)",
+  "updateContentCommand": "bash .devcontainer/maybe-purge-caches.sh && python -m pip install -r requirements-dev.txt && npm ci --prefix frontend && npm ci --ignore-scripts --prefix .devcontainer && bash .devcontainer/install-tools.sh && (gh extension upgrade gh-aw || gh extension install github/gh-aw || true)",
 
   "forwardPorts": [3000, 3131, 9090],
 
