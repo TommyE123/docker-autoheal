@@ -6,7 +6,8 @@
     "ghcr.io/devcontainers/features/node:2": {
       "version": "24"
     },
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
   },
 
   "mounts": [
@@ -21,9 +22,9 @@
     "storage": "8gb"
   },
 
-  "postCreateCommand": "bash .devcontainer/maybe-purge-caches.sh && python -m pip install -r requirements-dev.txt && npm ci --prefix frontend && npm ci --ignore-scripts --prefix .devcontainer && bash .devcontainer/install-tools.sh",
+  "postCreateCommand": "bash .devcontainer/maybe-purge-caches.sh && python -m pip install -r requirements-dev.txt && npm ci --prefix frontend && npm ci --ignore-scripts --prefix .devcontainer && bash .devcontainer/install-tools.sh && (gh extension install github/gh-aw || true)",
 
-  "updateContentCommand": "bash .devcontainer/maybe-purge-caches.sh && python -m pip install -r requirements-dev.txt && npm ci --prefix frontend && npm ci --ignore-scripts --prefix .devcontainer && bash .devcontainer/install-tools.sh",
+  "updateContentCommand": "bash .devcontainer/maybe-purge-caches.sh && python -m pip install -r requirements-dev.txt && npm ci --prefix frontend && npm ci --ignore-scripts --prefix .devcontainer && bash .devcontainer/install-tools.sh && (gh extension install github/gh-aw || true)",
 
   "forwardPorts": [3000, 3131, 9090],
 
