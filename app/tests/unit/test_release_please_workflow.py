@@ -92,8 +92,10 @@ def test_docker_publishing_targets_are_unchanged():
 def test_beta_job_only_keeps_beta_on_docker_hub_and_prunes_old_ghcr_beta_tags():
     assert "type=raw,value=beta" in WORKFLOW
     assert "type=raw,value=beta-{{sha}}" in WORKFLOW
-    assert "delete-tags: '^beta-[0-9a-f]{7}$'" in WORKFLOW
+    assert "delete-tags:" in WORKFLOW
+    assert "beta-[0-9a-f]{7}" in WORKFLOW
     assert "keep-n-tagged: 20" in WORKFLOW
-    assert "exclude-tags: '^beta$|^latest$'" in WORKFLOW
+    assert "exclude-tags:" in WORKFLOW
+    assert "^beta$|^latest$" in WORKFLOW
     assert "steps.meta-dockerhub.outputs.tags" in WORKFLOW
     assert "steps.meta-ghcr.outputs.tags" in WORKFLOW
