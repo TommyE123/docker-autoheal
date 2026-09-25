@@ -32,10 +32,17 @@ jobs:
       tag_name: ${{ steps.release.outputs.tag_name }}
 
     steps:
+      # The default GITHUB_TOKEN is deliberately prevented by GitHub from
+      # triggering other workflow runs, so a Release PR authored with it
+      # never gets its required checks (validate-title, unit-tests, ...)
+      # run automatically and can never satisfy the Protect Main ruleset.
+      # A PAT sidesteps that restriction and lets the Release PR behave
+      # like any other PR.
       - name: Run Release Please
         id: release
         uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
         with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
