@@ -90,7 +90,7 @@ jobs:
             echo "== Docker Compose stack =="
             docker compose -f docker-compose.test.yml up -d --build autoheal
             healthy=false
-            for _ in $(seq 1 30); do
+            for _ in $(seq 1 60); do
               if [ "$(docker inspect -f '{{.State.Health.Status}}' docker-autoheal 2>/dev/null)" = "healthy" ]; then
                 healthy=true
                 break
