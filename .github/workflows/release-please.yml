@@ -60,7 +60,13 @@ jobs:
       # Release PR left unchanged (no release-worthy commits landed since
       # it was created) produces no output, so the fallback below looks up
       # that PR by its release branch and base branch instead - still a
-      # fixed, known identity, not an arbitrary label search. The label is
+      # fixed, known identity, not an arbitrary label search. That lookup
+      # also pins the head repository to this repo (not just the branch
+      # name): `gh pr list --head` matches on branch name alone across
+      # every fork, and `--head owner:branch` isn't supported by the CLI,
+      # so a same-named fork PR could otherwise outrank the real Release PR
+      # (gh pr list returns the most recently created match first) and
+      # block the label check below from ever reaching it. The label is
       # then checked as a defense-in-depth guard on top of whichever
       # identity found the PR. Enables GitHub's native auto-merge rather
       # than checking mergeStateStatus and merging immediately: the step
@@ -81,7 +87,9 @@ jobs:
             echo "Release Please's own output had no pending PR; looking for an existing one on release-please--branches--main."
             pr_number=$(gh pr list --repo "$REPO" \
               --head "release-please--branches--main" --base main --state open \
-              --json number --jq '.[0].number // empty')
+              --json number,headRepositoryOwner,headRepository |
+              jq -r --arg repo "$REPO" --arg owner "${REPO%%/*}" \
+                'map(select(.headRepositoryOwner.login == $owner and .headRepository.nameWithOwner == $repo)) | .[0].number // empty')
           fi
 
           if [ -z "$pr_number" ]; then

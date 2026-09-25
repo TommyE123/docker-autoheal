@@ -109,6 +109,16 @@ def test_auto_merge_falls_back_to_the_release_branch_when_release_please_output_
     )
 
 
+def test_auto_merge_fallback_lookup_excludes_fork_prs():
+    # `gh pr list --head <branch>` matches on branch name alone across every
+    # fork, and `--head owner:branch` isn't supported by the CLI - so a
+    # same-named fork PR (gh pr list returns the most recently created match
+    # first) could otherwise outrank the real Release PR and be picked
+    # instead. The fallback must also pin the head repository to this repo.
+    assert "headRepositoryOwner,headRepository" in WORKFLOW
+    assert '.headRepositoryOwner.login == $owner and .headRepository.nameWithOwner == $repo' in WORKFLOW
+
+
 def test_auto_merge_checks_the_autorelease_pending_label_before_merging():
     assert "--json labels --jq" in WORKFLOW
     assert 'index("autorelease: pending")' in WORKFLOW
