@@ -84,12 +84,6 @@ frontend/
 - **Axios** — HTTP client (`src/services/api.js`)
 - **date-fns** — date formatting
 
-`vite-plugin-pwa` is listed as a devDependency but is **not** currently registered as a
-Vite plugin in `vite.config.js` — it has no effect on the current build. If you wire it up,
-note that its `workbox-build` dependency declares `engines.node >= 20`, while the
-project's Docker build stage uses Node 18 — see
-[Dependency Management](../maintainer/dependency-management.md) for the details.
-
 ## Linting and formatting
 
 - `npm run lint` — ESLint (`frontend/eslint.config.js`), covering JS/JSX code quality
