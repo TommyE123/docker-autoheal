@@ -148,12 +148,30 @@ def test_beta_cleanup_delete_loops_tolerate_individual_failures():
     # deletions undone.
     assert (
         'gh api --method DELETE "${base}/versions/${id}" \\\n'
-        '              || echo "::warning::failed to delete GHCR version ${id}, will retry next run"'
+        '              || { echo "::warning::failed to delete GHCR version ${id}, will retry next run"; failed=$((failed + 1)); }'
         in WORKFLOW
     )
     assert (
         '"https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/${repo}/tags/${tag}/" \\\n'
-        '              || echo "::warning::failed to delete Docker Hub tag ${tag}, will retry next run"'
+        '              || { echo "::warning::failed to delete Docker Hub tag ${tag}, will retry next run"; failed=$((failed + 1)); }'
+        in WORKFLOW
+    )
+
+
+def test_beta_cleanup_delete_loops_fail_the_step_after_systematic_failures():
+    # Tolerating individual failures (above) must not let a *systematic*
+    # one - every delete failing, e.g. a token missing Delete scope - go
+    # unnoticed forever with the step still reporting success.
+    assert WORKFLOW.count("failed=0") == 2
+    assert WORKFLOW.count('if [ "$failed" -gt 0 ]; then') == 2
+    assert (
+        'echo "::error::${failed} GHCR version deletion(s) failed" >&2\n'
+        '            exit 1'
+        in WORKFLOW
+    )
+    assert (
+        'echo "::error::${failed} Docker Hub tag deletion(s) failed" >&2\n'
+        '            exit 1'
         in WORKFLOW
     )
 

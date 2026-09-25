@@ -260,11 +260,23 @@ jobs:
             | .[$keep:] | .[].id
           ')
 
+          failed=0
           for id in $to_delete; do
             echo "Deleting GHCR package version $id"
             gh api --method DELETE "${base}/versions/${id}" \
-              || echo "::warning::failed to delete GHCR version ${id}, will retry next run"
+              || { echo "::warning::failed to delete GHCR version ${id}, will retry next run"; failed=$((failed + 1)); }
           done
+
+          # An occasional single failure (a 404 from a concurrent run) is
+          # tolerated above so it doesn't abort still-valid deletions - but a
+          # systematic one (wrong token scope, missing package admin access)
+          # would silently fail every delete forever while this step keeps
+          # reporting success. Failing the step once all attempts are done
+          # keeps that visible without sacrificing the per-item tolerance.
+          if [ "$failed" -gt 0 ]; then
+            echo "::error::${failed} GHCR version deletion(s) failed" >&2
+            exit 1
+          fi
 
       # Requires the DOCKERHUB_TOKEN secret to have "Read, Write, Delete"
       # access permissions on Docker Hub; a read/write-only token will fail
@@ -307,9 +319,18 @@ jobs:
             | .[$keep:] | .[].name
           ')
 
+          failed=0
           for tag in $to_delete; do
             echo "Deleting Docker Hub tag ${tag}"
             curl -sS -f -X DELETE -H "Authorization: Bearer ${jwt}" \
               "https://hub.docker.com/v2/repositories/${DOCKERHUB_USERNAME}/${repo}/tags/${tag}/" \
-              || echo "::warning::failed to delete Docker Hub tag ${tag}, will retry next run"
+              || { echo "::warning::failed to delete Docker Hub tag ${tag}, will retry next run"; failed=$((failed + 1)); }
           done
+
+          # Same reasoning as the GHCR loop above: tolerate an occasional
+          # single failure, but don't let a systematic one (missing Delete
+          # scope on DOCKERHUB_TOKEN) go unnoticed forever.
+          if [ "$failed" -gt 0 ]; then
+            echo "::error::${failed} Docker Hub tag deletion(s) failed" >&2
+            exit 1
+          fi
