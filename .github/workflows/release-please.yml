@@ -32,10 +32,17 @@ jobs:
       tag_name: ${{ steps.release.outputs.tag_name }}
 
     steps:
+      # The default GITHUB_TOKEN is deliberately prevented by GitHub from
+      # triggering other workflow runs, so a Release PR authored with it
+      # never gets its required checks (validate-title, unit-tests, ...)
+      # run automatically and can never satisfy the Protect Main ruleset.
+      # A PAT sidesteps that restriction and lets the Release PR behave
+      # like any other PR.
       - name: Run Release Please
         id: release
-        uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
@@ -161,13 +168,21 @@ jobs:
 
       # `beta` is mutable (always the current main); `beta-<shortsha>` is an
       # immutable tag for traceability, since a later push can overwrite `beta`.
-      - name: Extract metadata
-        id: meta
+      # Docker Hub intentionally keeps only the mutable beta tag to avoid
+      # accumulating historical beta SHA tags in a second registry.
+      - name: Extract Docker Hub metadata
+        id: meta-dockerhub
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
-          images: |
-            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal
-            ghcr.io/${{ github.repository_owner }}/docker-autoheal
+          images: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal
+          tags: |
+            type=raw,value=beta
+
+      - name: Extract GHCR metadata
+        id: meta-ghcr
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/docker-autoheal
           tags: |
             type=raw,value=beta
             type=raw,value=beta-{{sha}}
@@ -179,7 +194,18 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ${{ steps.meta-dockerhub.outputs.tags }}
+            ${{ steps.meta-ghcr.outputs.tags }}
+          labels: ${{ steps.meta-ghcr.outputs.labels }}
           cache-from: type=gha,scope=docker-autoheal
           cache-to: type=gha,mode=max,scope=docker-autoheal
+
+      - name: Clean up old GHCR beta tags
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          delete-tags: "^beta-[0-9a-f]{7}$"
+          use-regex: true
+          keep-n-tagged: 20
+          exclude-tags: "^beta$|^latest$"
