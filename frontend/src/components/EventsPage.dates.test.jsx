@@ -1,5 +1,5 @@
 import { Component } from "react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { format } from "date-fns";
 
@@ -61,6 +61,10 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("EventsPage timestamp formatting (date-fns v4 upgrade guard)", () => {
   it("runs with the timezone pinned to UTC", () => {
     expect(new Date().getTimezoneOffset()).toBe(0);
@@ -89,9 +93,7 @@ describe("EventsPage timestamp formatting (date-fns v4 upgrade guard)", () => {
     ])(
       "throws a RangeError when timestamp is %s",
       async (_label, timestamp) => {
-        const consoleErrorSpy = vi
-          .spyOn(console, "error")
-          .mockImplementation(() => {});
+        vi.spyOn(console, "error").mockImplementation(() => {});
         getEvents.mockResolvedValue({
           data: [{ ...baseEvent, timestamp }],
         });
@@ -107,8 +109,6 @@ describe("EventsPage timestamp formatting (date-fns v4 upgrade guard)", () => {
         const caughtError = onError.mock.calls[0][0];
         expect(caughtError).toBeInstanceOf(RangeError);
         expect(caughtError.message).toBe("Invalid time value");
-
-        consoleErrorSpy.mockRestore();
       },
     );
 
