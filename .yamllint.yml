@@ -23,5 +23,6 @@ rules:
       .github/workflows/mega-linter.yml
       .github/workflows/production-smoke-test.yml
       .github/workflows/release-please.yml
+      .github/workflows/release-please-auto-merge.yml
       .github/workflows/semantic-pr-title.yml
       .github/workflows/tests.yml
