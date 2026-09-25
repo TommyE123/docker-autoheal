@@ -9,6 +9,7 @@ output rather than recalculating anything.
 """
 
 import json
+import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -56,15 +57,20 @@ def test_config_bootstraps_from_the_last_real_release_commit():
 def test_manifest_starts_from_the_actual_last_released_version():
     manifest = json.loads((REPO_ROOT / ".release-please-manifest.json").read_text())
 
-    # Must never look like a fresh repo starting at 0.0.0/0.1.0.
-    assert manifest["."] == "2.0.16"
+    # release-please bumps this on every Release PR, so pin the shape (a
+    # real SemVer, not a fresh-repo default) rather than a specific version -
+    # a literal here would fail on every open Release PR by design.
+    version = manifest["."]
+    assert version not in ("0.0.0", "0.1.0")
+    assert re.fullmatch(r"\d+\.\d+\.\d+", version)
 
 
 def test_version_file_matches_the_manifest():
     # The "simple" release-type maintains version.txt as its version file -
     # it must exist and agree with the manifest, or release-please's next
     # bump would be calculated from the wrong starting point.
-    assert (REPO_ROOT / "version.txt").read_text(encoding="utf-8").strip() == "2.0.16"
+    manifest = json.loads((REPO_ROOT / ".release-please-manifest.json").read_text())
+    assert (REPO_ROOT / "version.txt").read_text(encoding="utf-8").strip() == manifest["."]
 
 
 def test_docker_job_only_runs_when_a_release_was_actually_created():
