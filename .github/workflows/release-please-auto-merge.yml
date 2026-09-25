@@ -57,16 +57,22 @@ jobs:
 
       # Match the Release Please PR by repository-specific characteristics
       # rather than its title/version, which changes on every release.
+      #
+      # Author is deliberately not part of the match: release-please.yml
+      # authenticates with a PAT (RELEASE_PLEASE_TOKEN), so the PR it opens
+      # is authored by that PAT's account, not github-actions[bot]. The
+      # remaining combination (open, base main, this exact release-please
+      # label and head branch, head repo == this repo) is still unique -
+      # only release-please itself can produce that shape.
       - name: Find the Release Please PR
         id: find
         if: steps.guard.outputs.proceed == 'true'
         run: |
           matches=$(gh pr list --repo "$REPO" \
             --base main --state open --label "autorelease: pending" \
-            --json number,author,headRefName,headRepository,headRepositoryOwner |
+            --json number,headRefName,headRepository,headRepositoryOwner |
             jq -c --arg owner "${REPO%%/*}" --arg repo "${REPO#*/}" '
               map(select(
-                .author.login == "github-actions[bot]" and
                 .headRefName == "release-please--branches--main" and
                 .headRepositoryOwner.login == $owner and
                 .headRepository.name == $repo

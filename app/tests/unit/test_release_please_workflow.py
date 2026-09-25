@@ -134,10 +134,18 @@ def test_weekly_workflow_matches_the_release_pr_by_repository_specific_character
     # Title/version is explicitly excluded as the selector since it changes
     # every release; match on the PR's stable, repository-specific shape.
     assert '--base main --state open --label "autorelease: pending"' in AUTO_MERGE_WORKFLOW
-    assert '.author.login == "github-actions[bot]"' in AUTO_MERGE_WORKFLOW
     assert '.headRefName == "release-please--branches--main"' in AUTO_MERGE_WORKFLOW
     assert ".headRepositoryOwner.login == $owner" in AUTO_MERGE_WORKFLOW
     assert ".headRepository.name == $repo" in AUTO_MERGE_WORKFLOW
+
+
+def test_weekly_workflow_does_not_match_on_author():
+    # release-please.yml authenticates with a PAT (RELEASE_PLEASE_TOKEN), so
+    # the Release PR is authored by that PAT's account, not
+    # github-actions[bot]. Matching on author would silently stop finding
+    # the PR the moment that token started being used.
+    assert ".author.login" not in AUTO_MERGE_WORKFLOW
+    assert "number,author," not in AUTO_MERGE_WORKFLOW
 
 
 def test_weekly_workflow_fails_safely_on_multiple_matches_without_merging():
