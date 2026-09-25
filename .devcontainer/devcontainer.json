@@ -25,7 +25,7 @@
 
   "postCreateCommand": "bash .devcontainer/maybe-purge-caches.sh && python -m pip install -r requirements-dev.txt && npm ci --prefix frontend && npm ci --ignore-scripts --prefix .devcontainer && bash .devcontainer/install-tools.sh && (gh extension upgrade gh-aw || gh extension install github/gh-aw || true)",
 
-  "updateContentCommand": "bash .devcontainer/maybe-purge-caches.sh && python -m pip install -r requirements-dev.txt && npm ci --prefix frontend && npm ci --ignore-scripts --prefix .devcontainer && bash .devcontainer/install-tools.sh && (gh extension upgrade gh-aw || gh extension install github/gh-aw || true)",
+  "waitFor": "postCreateCommand",
 
   "forwardPorts": [3000, 3131, 9090],
 
