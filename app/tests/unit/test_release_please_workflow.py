@@ -112,16 +112,16 @@ def test_release_please_uses_a_non_default_token_so_its_pr_gets_normal_checks():
 
 
 def test_weekly_workflow_schedules_for_friday_and_supports_manual_dispatch():
-    assert '- cron: "0 12 * * 5"' in AUTO_MERGE_WORKFLOW
     assert '- cron: "0 13 * * 5"' in AUTO_MERGE_WORKFLOW
+    assert '- cron: "0 14 * * 5"' in AUTO_MERGE_WORKFLOW
     assert "workflow_dispatch:" in AUTO_MERGE_WORKFLOW
 
 
 def test_weekly_workflow_guards_scheduled_runs_to_actual_uk_local_time():
     # Two UTC crons cover both possible offsets; only the run that actually
-    # lands at 13:00 Europe/London should proceed - the other is a no-op.
+    # lands at 14:00 Europe/London should proceed - the other is a no-op.
     assert "TZ=Europe/London date +%H" in AUTO_MERGE_WORKFLOW
-    assert 'uk_hour" = "13"' in AUTO_MERGE_WORKFLOW
+    assert 'uk_hour" = "14"' in AUTO_MERGE_WORKFLOW
     assert "workflow_dispatch" in AUTO_MERGE_WORKFLOW
 
 
