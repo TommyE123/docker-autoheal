@@ -77,6 +77,15 @@ def test_docker_job_only_runs_when_a_release_was_actually_created():
     assert "needs.release-please.outputs.release_created == 'true'" in WORKFLOW
 
 
+def test_beta_job_runs_after_release_please_regardless_of_release_creation():
+    beta_job = re.search(
+        r"(?ms)^  beta-build:\n(.*?)(?=^  [\w-]+:\n|\Z)", WORKFLOW
+    ).group(1)
+
+    assert re.search(r"^    needs: release-please$", beta_job, re.MULTILINE)
+    assert "release_created" not in beta_job
+
+
 def test_docker_job_consumes_the_release_please_tag_not_its_own_calculation():
     assert "type=raw,value=${{ needs.release-please.outputs.tag_name }}" in WORKFLOW
     assert "type=raw,value=latest" in WORKFLOW
