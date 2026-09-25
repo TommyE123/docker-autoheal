@@ -1,0 +1,90 @@
+name: Weekly Release Please auto-merge
+
+# Enables GitHub's native auto-merge on the standing Release Please PR every
+# Friday at 15:00 UK local time. It never merges anything itself - GitHub
+# handles required checks, approvals and the eventual merge. That merge is
+# an ordinary push to main and is picked up unchanged by release-please.yml,
+# which does the actual release/tag/Docker-publish work.
+on:
+  schedule:
+    # The timezone field makes GitHub evaluate this cron as Europe/London
+    # wall-clock time, so it stays 15:00 UK local across the GMT/BST
+    # changeover without a separate runtime guard.
+    - cron: "0 15 * * 5"
+      timezone: "Europe/London"
+  workflow_dispatch:
+
+concurrency:
+  group: release-please-auto-merge
+  cancel-in-progress: false
+
+jobs:
+  auto-merge-release-pr:
+    name: Auto-merge the Release PR
+    runs-on: ubuntu-latest
+
+    permissions:
+      pull-requests: write
+
+    env:
+      # The default GITHUB_TOKEN is deliberately not used here: GitHub can
+      # suppress the push produced when this auto-merge actually completes
+      # from triggering release-please.yml's own push trigger, for the same
+      # reason release-please.yml itself had to stop using GITHUB_TOKEN (see
+      # that workflow's comments). Reuse the same already-provisioned PAT.
+      GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+      REPO: ${{ github.repository }}
+
+    steps:
+      # Match the Release Please PR by repository-specific characteristics
+      # rather than its title/version, which changes on every release.
+      #
+      # Author is deliberately not part of the match: release-please.yml
+      # authenticates with a PAT (RELEASE_PLEASE_TOKEN), so the PR it opens
+      # is authored by that PAT's account, not github-actions[bot]. The
+      # remaining combination (open, base main, this exact release-please
+      # label and head branch, head repo == this repo) is still unique -
+      # only release-please itself can produce that shape.
+      - name: Find the Release Please PR
+        id: find
+        run: |
+          matches=$(gh pr list --repo "$REPO" \
+            --base main --state open --label "autorelease: pending" \
+            --json number,headRefName,headRepository,headRepositoryOwner |
+            jq -c --arg owner "${REPO%%/*}" --arg repo "${REPO#*/}" '
+              map(select(
+                .headRefName == "release-please--branches--main" and
+                .headRepositoryOwner.login == $owner and
+                .headRepository.name == $repo
+              ))
+            ')
+
+          count=$(echo "$matches" | jq 'length')
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+
+          if [ "$count" -eq 0 ]; then
+            echo "No matching Release PR found - nothing to do."
+          elif [ "$count" -eq 1 ]; then
+            pr_number=$(echo "$matches" | jq -r '.[0].number')
+            echo "pr_number=$pr_number" >> "$GITHUB_OUTPUT"
+            echo "Found Release PR #$pr_number."
+          else
+            echo "::error::Found $count open PRs matching the Release Please PR criteria - expected at most 1. Not enabling auto-merge on any of them." >&2
+            exit 1
+          fi
+
+      - name: Enable auto-merge on the Release PR
+        if: steps.find.outputs.count == '1'
+        env:
+          PR_NUMBER: ${{ steps.find.outputs.pr_number }}
+        run: |
+          pr_number="$PR_NUMBER"
+
+          already_enabled=$(gh pr view "$pr_number" --repo "$REPO" --json autoMergeRequest --jq '.autoMergeRequest != null')
+          if [ "$already_enabled" = "true" ]; then
+            echo "Auto-merge is already enabled on PR #$pr_number - nothing to do."
+            exit 0
+          fi
+
+          echo "Enabling auto-merge (squash) on PR #$pr_number."
+          gh pr merge "$pr_number" --repo "$REPO" --auto --squash
