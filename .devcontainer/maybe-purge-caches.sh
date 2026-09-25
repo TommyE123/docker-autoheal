@@ -7,13 +7,17 @@ set -euo pipefail
 # the container's non-root user can actually write to it before anything
 # else runs.
 #
-# The chown target is the whole ~/.local tree, not just .local/share/gh:
-# Dev Container features run as root during image build, and can leave
-# ~/.local root-owned even though it's created under the vscode user's home.
-# That breaks pip's user-site fallback (~/.local/lib/...) and
-# install-tools.sh's install target (~/.local/bin), not just the gh cache.
+# The chown targets are the whole ~/.cache and ~/.local trees, not just the
+# specific pip/tools/gh subdirectories: Dev Container features run as root
+# during image build, and can leave these parent directories root-owned even
+# though they're created under the vscode user's home. That breaks anything
+# writing a new file directly under them - pip's user-site fallback
+# (~/.local/lib/...), install-tools.sh's install target (~/.local/bin), and
+# arbitrary per-tool cache files tools create on first run (e.g. semgrep's
+# own ~/.cache/semgrep_version) - not just the specific cache subdirectories
+# below.
 sudo mkdir -p "${HOME}/.cache/pip" "${HOME}/.npm" "${HOME}/.cache/devcontainer-tools" "${HOME}/.local/share/gh"
-sudo chown -R "$(id -u):$(id -g)" "${HOME}/.cache/pip" "${HOME}/.npm" "${HOME}/.cache/devcontainer-tools" "${HOME}/.local"
+sudo chown -R "$(id -u):$(id -g)" "${HOME}/.cache" "${HOME}/.npm" "${HOME}/.local"
 
 # Lives in the gh cache volume, but outside the "extensions" subdirectory
 # purged below - unlike the pip/npm/tools caches, which get wiped wholesale
