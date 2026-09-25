@@ -128,12 +128,11 @@ jobs:
           readme-filepath: ./DOCKER_HUB_README.md
 
   # Publishes a continuously-updated "beta" image reflecting the current
-  # state of main between releases. Skipped on the release-merge commit
-  # itself, since docker-release already publishes an image for that commit.
+  # state of main after every successful Release Please run, including
+  # release merges.
   beta-build:
     name: Build and publish beta Docker image
     needs: release-please
-    if: needs.release-please.outputs.release_created != 'true'
     runs-on: ubuntu-latest
 
     permissions:
