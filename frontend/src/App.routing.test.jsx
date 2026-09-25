@@ -74,8 +74,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  // replaceState, not pushState, so the jsdom history stack does not grow
-  // across tests and affect the back-navigation assertions.
+  // replaceState (not pushState) so this reset doesn't itself add a history
+  // entry, since the BrowserRouter test asserts on back-navigation.
   window.history.replaceState({}, "", "/");
 });
 
@@ -104,24 +104,28 @@ describe("App routing", () => {
     expectOnlyStubsVisible(expectedStubs);
   });
 
+  const NAV_LINKS = [
+    { label: "Containers", linkName: /containers/i },
+    { label: "Events", linkName: /events/i },
+    { label: "Notifications", linkName: /notifications/i },
+    { label: "Configuration", linkName: /configuration/i },
+  ];
+
   it.each([
+    { label: "Containers", path: "/containers", stub: "ContainersPage stub" },
+    { label: "Events", path: "/events", stub: "EventsPage stub" },
     {
-      linkName: /containers/i,
-      path: "/containers",
-      stub: "ContainersPage stub",
-    },
-    { linkName: /events/i, path: "/events", stub: "EventsPage stub" },
-    {
-      linkName: /notifications/i,
+      label: "Notifications",
       path: "/notifications",
       stub: "NotificationsPage stub",
     },
-    { linkName: /configuration/i, path: "/config", stub: "ConfigPage stub" },
+    { label: "Configuration", path: "/config", stub: "ConfigPage stub" },
   ])(
-    "clicking the $linkName nav link navigates to $path and marks it active",
-    async ({ linkName, path, stub }) => {
+    "clicking the $label nav link navigates to $path and marks it active",
+    async ({ label, path, stub }) => {
       const user = userEvent.setup();
       const startPath = path === "/containers" ? "/events" : "/containers";
+      const { linkName } = NAV_LINKS.find((link) => link.label === label);
 
       render(
         <MemoryRouter initialEntries={[startPath]}>
@@ -136,13 +140,8 @@ describe("App routing", () => {
         "active",
       );
 
-      const otherLinkNames = [
-        /containers/i,
-        /events/i,
-        /notifications/i,
-        /configuration/i,
-      ].filter((name) => name.toString() !== linkName.toString());
-      for (const otherName of otherLinkNames) {
+      const otherLinks = NAV_LINKS.filter((link) => link.label !== label);
+      for (const { linkName: otherName } of otherLinks) {
         expect(screen.getByRole("link", { name: otherName })).not.toHaveClass(
           "active",
         );
