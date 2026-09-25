@@ -74,7 +74,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  window.history.pushState({}, "", "/");
+  // replaceState, not pushState, so the jsdom history stack does not grow
+  // across tests and affect the back-navigation assertions.
+  window.history.replaceState({}, "", "/");
 });
 
 describe("App routing", () => {
@@ -91,11 +93,15 @@ describe("App routing", () => {
     );
 
     expect(await screen.findByText(stub)).toBeInTheDocument();
-    expectOnlyStubsVisible(
+
+    const expectedStubs =
       path === "/containers"
         ? ["Dashboard stub", "ContainersPage stub"]
-        : [stub],
-    );
+        : [stub];
+    for (const expected of expectedStubs) {
+      await screen.findByText(expected);
+    }
+    expectOnlyStubsVisible(expectedStubs);
   });
 
   it.each([
