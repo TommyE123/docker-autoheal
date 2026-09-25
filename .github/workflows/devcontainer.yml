@@ -30,6 +30,12 @@ jobs:
           runCmd: |
             set -e
 
+            # devcontainer.json's remoteEnv.PATH (which adds ~/.local/bin,
+            # where install-tools.sh and pip's user-site fallback both put
+            # their binaries) isn't honoured by devcontainers/ci's headless
+            # exec, so set it explicitly here too.
+            export PATH="${HOME}/.local/bin:${PATH}"
+
             echo "== Versions =="
             python --version
             node --version
