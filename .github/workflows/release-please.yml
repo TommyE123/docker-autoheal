@@ -161,13 +161,21 @@ jobs:
 
       # `beta` is mutable (always the current main); `beta-<shortsha>` is an
       # immutable tag for traceability, since a later push can overwrite `beta`.
-      - name: Extract metadata
-        id: meta
+      # Docker Hub intentionally keeps only the mutable beta tag to avoid
+      # accumulating historical beta SHA tags in a second registry.
+      - name: Extract Docker Hub metadata
+        id: meta-dockerhub
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
-          images: |
-            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal
-            ghcr.io/${{ github.repository_owner }}/docker-autoheal
+          images: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal
+          tags: |
+            type=raw,value=beta
+
+      - name: Extract GHCR metadata
+        id: meta-ghcr
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/docker-autoheal
           tags: |
             type=raw,value=beta
             type=raw,value=beta-{{sha}}
@@ -179,7 +187,18 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ${{ steps.meta-dockerhub.outputs.tags }}
+            ${{ steps.meta-ghcr.outputs.tags }}
+          labels: ${{ steps.meta-ghcr.outputs.labels }}
           cache-from: type=gha,scope=docker-autoheal
           cache-to: type=gha,mode=max,scope=docker-autoheal
+
+      - name: Clean up old GHCR beta tags
+        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          delete-tags: "^beta-[0-9a-f]{7}$"
+          use-regex: true
+          keep-n-tagged: 20
+          exclude-tags: "^beta$|^latest$"
