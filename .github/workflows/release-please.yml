@@ -198,7 +198,7 @@ jobs:
         uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          delete-tags: '^beta-[0-9a-f]{7}$'
+          delete-tags: "^beta-[0-9a-f]{7}$"
           use-regex: true
           keep-n-tagged: 20
-          exclude-tags: '^beta$|^latest$'
+          exclude-tags: "^beta$|^latest$"
