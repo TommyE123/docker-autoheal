@@ -42,6 +42,15 @@ This builds the frontend and backend into a single image (see
 [Architecture](architecture.md)) and runs it the same way an end user would, on port
 `3131`.
 
+**Inside the Dev Container**, `docker compose` talks to the Docker daemon through the
+`docker-outside-of-docker` feature - the daemon is the host's, not the container's. Relative
+bind mounts in `docker-compose.yml`/`docker-compose.test.yml` (e.g. `./data:/data`) are
+resolved by the Compose client to the container's path and handed to the host daemon as-is,
+which has no such path and silently creates an empty directory there instead of binding your
+checkout. The stack still starts and passes its health check, but persisted data (config,
+events, logs) won't be visible in your working copy - use `docker compose logs`/`docker exec`
+to inspect it instead.
+
 ## Running tests
 
 ```bash

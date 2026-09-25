@@ -60,7 +60,7 @@ VALIDATE_ALL_CODEBASE: true
 PYTHON_DEFAULT_STYLE: ruff
 
 PYTHON_PYRIGHT_PRE_COMMANDS:
-  - command: pip install --no-cache-dir -r requirements.txt
+  - command: pip install --no-cache-dir -r requirements-dev.txt
 
 # ---------------------------------------------------------------------------
 # JavaScript / JSX
