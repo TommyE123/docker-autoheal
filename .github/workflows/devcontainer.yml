@@ -1,6 +1,12 @@
 name: Dev Container
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".devcontainer/**"
+      - ".github/workflows/devcontainer.yml"
   workflow_dispatch:
 
 permissions:
