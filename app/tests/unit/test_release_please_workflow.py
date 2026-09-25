@@ -13,6 +13,9 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 WORKFLOW = (REPO_ROOT / ".github" / "workflows" / "release-please.yml").read_text(encoding="utf-8")
+AUTO_MERGE_WORKFLOW = (
+    REPO_ROOT / ".github" / "workflows" / "release-please-auto-merge.yml"
+).read_text(encoding="utf-8")
 
 
 def test_config_bootstraps_from_the_last_real_release_commit():
@@ -99,3 +102,65 @@ def test_beta_job_only_keeps_beta_on_docker_hub_and_prunes_old_ghcr_beta_tags():
     assert "^beta$|^latest$" in WORKFLOW
     assert "steps.meta-dockerhub.outputs.tags" in WORKFLOW
     assert "steps.meta-ghcr.outputs.tags" in WORKFLOW
+
+
+def test_release_please_uses_a_non_default_token_so_its_pr_gets_normal_checks():
+    # The default GITHUB_TOKEN is deliberately prevented by GitHub from
+    # triggering other workflow runs, so a Release PR authored with it never
+    # gets validate-title/unit-tests run and can never satisfy Protect Main.
+    assert "token: ${{ secrets.RELEASE_PLEASE_TOKEN }}" in WORKFLOW
+
+
+def test_weekly_workflow_schedules_for_friday_and_supports_manual_dispatch():
+    assert '- cron: "0 12 * * 5"' in AUTO_MERGE_WORKFLOW
+    assert '- cron: "0 13 * * 5"' in AUTO_MERGE_WORKFLOW
+    assert "workflow_dispatch:" in AUTO_MERGE_WORKFLOW
+
+
+def test_weekly_workflow_guards_scheduled_runs_to_actual_uk_local_time():
+    # Two UTC crons cover both possible offsets; only the run that actually
+    # lands at 13:00 Europe/London should proceed - the other is a no-op.
+    assert "TZ=Europe/London date +%H" in AUTO_MERGE_WORKFLOW
+    assert 'uk_hour" = "13"' in AUTO_MERGE_WORKFLOW
+    assert "workflow_dispatch" in AUTO_MERGE_WORKFLOW
+
+
+def test_weekly_workflow_has_a_race_safe_concurrency_group():
+    assert "group: release-please-auto-merge" in AUTO_MERGE_WORKFLOW
+    assert "cancel-in-progress: false" in AUTO_MERGE_WORKFLOW
+
+
+def test_weekly_workflow_matches_the_release_pr_by_repository_specific_characteristics():
+    # Title/version is explicitly excluded as the selector since it changes
+    # every release; match on the PR's stable, repository-specific shape.
+    assert '--base main --state open --label "autorelease: pending"' in AUTO_MERGE_WORKFLOW
+    assert '.author.login == "github-actions[bot]"' in AUTO_MERGE_WORKFLOW
+    assert '.headRefName == "release-please--branches--main"' in AUTO_MERGE_WORKFLOW
+    assert ".headRepositoryOwner.login == $owner" in AUTO_MERGE_WORKFLOW
+    assert ".headRepository.name == $repo" in AUTO_MERGE_WORKFLOW
+
+
+def test_weekly_workflow_fails_safely_on_multiple_matches_without_merging():
+    assert 'count" -eq 1' in AUTO_MERGE_WORKFLOW
+    assert "exit 1" in AUTO_MERGE_WORKFLOW
+    assert "expected at most 1" in AUTO_MERGE_WORKFLOW
+
+
+def test_weekly_workflow_is_idempotent_when_auto_merge_already_enabled():
+    assert "autoMergeRequest != null" in AUTO_MERGE_WORKFLOW
+    assert "already_enabled" in AUTO_MERGE_WORKFLOW
+
+
+def test_weekly_workflow_delegates_to_native_auto_merge_only():
+    # Must enable native auto-merge and get out of the way - no polling,
+    # no manual merge, no re-implementation of check/approval logic.
+    assert "gh pr merge" in AUTO_MERGE_WORKFLOW
+    assert "--auto" in AUTO_MERGE_WORKFLOW
+    assert "--squash" in AUTO_MERGE_WORKFLOW
+    assert "sleep" not in AUTO_MERGE_WORKFLOW
+    assert "while" not in AUTO_MERGE_WORKFLOW
+
+
+def test_weekly_workflow_uses_least_privilege_permissions():
+    assert "pull-requests: write" in AUTO_MERGE_WORKFLOW
+    assert "contents: write" not in AUTO_MERGE_WORKFLOW
