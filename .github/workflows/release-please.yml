@@ -15,7 +15,8 @@ permissions:
 jobs:
   # Maintains a standing "Release PR" that accumulates Conventional Commit
   # changes since the last release. Merging an ordinary PR to main only
-  # updates that Release PR - it never publishes anything by itself.
+  # updates that Release PR; the workflow publishes a beta image but no
+  # versioned or latest image for that commit.
   # Merging the Release PR itself is a push to main like any other, which
   # is what this job recognises and turns into the tag + GitHub Release.
   release-please:
@@ -128,12 +129,11 @@ jobs:
           readme-filepath: ./DOCKER_HUB_README.md
 
   # Publishes a continuously-updated "beta" image reflecting the current
-  # state of main between releases. Skipped on the release-merge commit
-  # itself, since docker-release already publishes an image for that commit.
+  # state of main after every successful Release Please run, including
+  # release merges.
   beta-build:
     name: Build and publish beta Docker image
     needs: release-please
-    if: needs.release-please.outputs.release_created != 'true'
     runs-on: ubuntu-latest
 
     permissions:
