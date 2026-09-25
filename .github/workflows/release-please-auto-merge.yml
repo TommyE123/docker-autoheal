@@ -29,7 +29,12 @@ jobs:
       pull-requests: write
 
     env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # The default GITHUB_TOKEN is deliberately not used here: GitHub can
+      # suppress the push produced when this auto-merge actually completes
+      # from triggering release-please.yml's own push trigger, for the same
+      # reason release-please.yml itself had to stop using GITHUB_TOKEN (see
+      # that workflow's comments). Reuse the same already-provisioned PAT.
+      GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
       REPO: ${{ github.repository }}
 
     steps:

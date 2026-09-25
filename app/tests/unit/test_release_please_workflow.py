@@ -172,3 +172,12 @@ def test_weekly_workflow_delegates_to_native_auto_merge_only():
 def test_weekly_workflow_uses_least_privilege_permissions():
     assert "pull-requests: write" in AUTO_MERGE_WORKFLOW
     assert "contents: write" not in AUTO_MERGE_WORKFLOW
+
+
+def test_weekly_workflow_enables_auto_merge_with_the_non_default_token():
+    # gh pr merge --auto authenticates via GH_TOKEN. The default
+    # GITHUB_TOKEN can have its resulting merge-completion push suppressed
+    # from triggering release-please.yml's own push trigger - the same
+    # class of problem release-please.yml itself was fixed for.
+    assert "GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}" in AUTO_MERGE_WORKFLOW
+    assert "GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}" not in AUTO_MERGE_WORKFLOW
