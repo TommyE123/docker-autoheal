@@ -9,11 +9,12 @@ set -euo pipefail
 sudo mkdir -p "${HOME}/.cache/pip" "${HOME}/.npm" "${HOME}/.cache/devcontainer-tools" "${HOME}/.local/share/gh"
 sudo chown -R "$(id -u):$(id -g)" "${HOME}/.cache/pip" "${HOME}/.npm" "${HOME}/.cache/devcontainer-tools" "${HOME}/.local/share/gh"
 
-# Lives inside the pip cache volume itself (already owned by this user,
-# unlike its parent ~/.cache, which Docker creates as root when the volume
-# mount point doesn't exist yet) so it persists exactly as long as the cache
-# it's tracking does.
-marker="${HOME}/.cache/pip/.devcontainer-cache-purge-marker"
+# Lives in the gh cache volume, but outside the "extensions" subdirectory
+# purged below - unlike the pip/npm/tools caches, which get wiped wholesale
+# by their own purge commands (pip cache purge, npm cache clean, rm -rf),
+# this spot in the gh volume is never touched by the purge itself, so the
+# marker survives its own purge instead of being deleted along with it.
+marker="${HOME}/.local/share/gh/.devcontainer-cache-purge-marker"
 max_age_days=7
 
 if [[ -f "$marker" ]]; then

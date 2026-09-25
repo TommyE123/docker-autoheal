@@ -232,7 +232,7 @@
     {
       "label": "Autoheal: Run OSV Scanner",
       "type": "shell",
-      "command": "osv-scanner scan source --experimental-exclude .devcontainer -r .",
+      "command": "osv-scanner scan source -r .",
       "problemMatcher": []
     },
     {
