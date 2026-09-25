@@ -87,3 +87,15 @@ def test_docker_publishing_targets_are_unchanged():
     assert "docker.io/${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal" in WORKFLOW
     assert "ghcr.io/${{ github.repository_owner }}/docker-autoheal" in WORKFLOW
     assert "linux/amd64,linux/arm64" in WORKFLOW
+
+
+def test_beta_job_only_keeps_beta_on_docker_hub_and_prunes_old_ghcr_beta_tags():
+    assert "type=raw,value=beta" in WORKFLOW
+    assert "type=raw,value=beta-{{sha}}" in WORKFLOW
+    assert "delete-tags:" in WORKFLOW
+    assert "beta-[0-9a-f]{7}" in WORKFLOW
+    assert "keep-n-tagged: 20" in WORKFLOW
+    assert "exclude-tags:" in WORKFLOW
+    assert "^beta$|^latest$" in WORKFLOW
+    assert "steps.meta-dockerhub.outputs.tags" in WORKFLOW
+    assert "steps.meta-ghcr.outputs.tags" in WORKFLOW
