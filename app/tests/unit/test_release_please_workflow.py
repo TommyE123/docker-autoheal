@@ -129,10 +129,12 @@ def test_beta_cleanup_validates_the_docker_hub_login_token():
 def test_beta_cleanup_ghcr_uses_the_correct_route_for_org_owned_packages():
     # The GHCR package-versions API has separate routes for a user-owned vs.
     # an organization-owned package. Hardcoding the /users/ route would 404
-    # on an org-owned repository - github.repository_owner_type says which
-    # this repository is, so the workflow must branch on it.
-    assert 'GHCR_OWNER_TYPE: ${{ github.repository_owner_type }}' in WORKFLOW
-    assert 'if [ "$GHCR_OWNER_TYPE" = "Organization" ]; then' in WORKFLOW
+    # on an org-owned repository. There's no github.* context value for
+    # this (github.repository_owner_type doesn't exist - actionlint rejects
+    # it), so the workflow must ask the REST API directly instead.
+    assert 'github.repository_owner_type' not in WORKFLOW
+    assert 'owner_type=$(gh api "users/${GHCR_OWNER}" --jq \'.type\')' in WORKFLOW
+    assert 'if [ "$owner_type" = "Organization" ]; then' in WORKFLOW
     assert 'base="/orgs/${GHCR_OWNER}/packages/container/${package}"' in WORKFLOW
     assert 'base="/users/${GHCR_OWNER}/packages/container/${package}"' in WORKFLOW
     assert '"${base}/versions?per_page=100&page=${page}"' in WORKFLOW

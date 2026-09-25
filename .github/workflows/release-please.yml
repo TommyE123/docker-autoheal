@@ -208,17 +208,19 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_OWNER: ${{ github.repository_owner }}
-          GHCR_OWNER_TYPE: ${{ github.repository_owner_type }}
         run: |
           set -euo pipefail
           package="docker-autoheal"
           keep="${BETA_TAGS_TO_KEEP}"
 
           # The package-versions API has separate routes for a user-owned vs.
-          # an organization-owned package - github.repository_owner_type says
-          # which this repository is, so the correct route is picked instead
-          # of assuming user-owned.
-          if [ "$GHCR_OWNER_TYPE" = "Organization" ]; then
+          # an organization-owned package. There's no github.* context value
+          # for this (repository_owner_type doesn't exist, despite some
+          # examples suggesting otherwise), so ask the REST API directly -
+          # GET /users/{username} works for both account kinds and reports
+          # which one this is via its `type` field.
+          owner_type=$(gh api "users/${GHCR_OWNER}" --jq '.type')
+          if [ "$owner_type" = "Organization" ]; then
             base="/orgs/${GHCR_OWNER}/packages/container/${package}"
           else
             base="/users/${GHCR_OWNER}/packages/container/${package}"
