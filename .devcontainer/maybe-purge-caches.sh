@@ -6,8 +6,14 @@ set -euo pipefail
 # rebuilds. Docker creates a fresh volume mount as root-owned, so make sure
 # the container's non-root user can actually write to it before anything
 # else runs.
+#
+# The chown target is the whole ~/.local tree, not just .local/share/gh:
+# Dev Container features run as root during image build, and can leave
+# ~/.local root-owned even though it's created under the vscode user's home.
+# That breaks pip's user-site fallback (~/.local/lib/...) and
+# install-tools.sh's install target (~/.local/bin), not just the gh cache.
 sudo mkdir -p "${HOME}/.cache/pip" "${HOME}/.npm" "${HOME}/.cache/devcontainer-tools" "${HOME}/.local/share/gh"
-sudo chown -R "$(id -u):$(id -g)" "${HOME}/.cache/pip" "${HOME}/.npm" "${HOME}/.cache/devcontainer-tools" "${HOME}/.local/share/gh"
+sudo chown -R "$(id -u):$(id -g)" "${HOME}/.cache/pip" "${HOME}/.npm" "${HOME}/.cache/devcontainer-tools" "${HOME}/.local"
 
 # Lives in the gh cache volume, but outside the "extensions" subdirectory
 # purged below - unlike the pip/npm/tools caches, which get wiped wholesale
