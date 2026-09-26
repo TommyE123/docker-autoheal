@@ -34,7 +34,9 @@ env.bak/
 venv.bak/
 
 # IDEs
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
 .idea/
 *.sublime-workspace
 *.sublime-project

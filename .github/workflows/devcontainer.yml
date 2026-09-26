@@ -1,0 +1,138 @@
+name: Dev Container
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".devcontainer/**"
+      - ".github/workflows/devcontainer.yml"
+      - "requirements-dev.txt"
+      - "frontend/package.json"
+      - "frontend/package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  devcontainer:
+    name: Build and test Dev Container
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      # The path filter above only decides whether this workflow runs at
+      # all; within that, most .devcontainer/** changes (VS Code settings,
+      # docs, lint configs) can't actually break container creation. Only
+      # run the full build+test for the files that can - tool/feature/image
+      # pins, the install/purge scripts, the npm lockfile, this workflow
+      # itself, and the dependency files postCreateCommand installs from
+      # (requirements-dev.txt, frontend's package.json/package-lock.json) -
+      # so e.g. a Renovate bump to tools.json still gets tested, but a
+      # settings.json tweak doesn't burn ~3 minutes of CI for nothing.
+      - name: Check whether devcontainer-critical files changed
+        id: changed
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          pattern='^(\.devcontainer/(tools\.json|install-tools\.sh|devcontainer\.json'
+          pattern+='|devcontainer-lock\.json|maybe-purge-caches\.sh|package\.json'
+          pattern+='|package-lock\.json)|\.github/workflows/devcontainer\.yml'
+          pattern+='|requirements-dev\.txt|frontend/package\.json|frontend/package-lock\.json)$'
+          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -qE "$pattern"; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and test Dev Container
+        if: github.event_name == 'workflow_dispatch' || steps.changed.outputs.run == 'true'
+        uses: devcontainers/ci@513af61f4de4f75d37e4438f184ba4358f0fc1ca # v0.3.1900000450
+        with:
+          runCmd: |
+            set -e
+
+            # devcontainer.json's remoteEnv.PATH (which adds ~/.local/bin,
+            # where install-tools.sh and pip's user-site fallback both put
+            # their binaries) isn't honoured by devcontainers/ci's headless
+            # exec, so set it explicitly here too.
+            export PATH="${HOME}/.local/bin:${PATH}"
+
+            echo "== Versions =="
+            python --version
+            node --version
+            npm --version
+            docker --version
+            docker compose version
+            gh --version
+            actionlint --version
+            hadolint --version
+            osv-scanner --version
+            trivy --version
+            trufflehog --version
+            betterleaks --version
+
+            echo "== Development tools =="
+            pytest --version
+            ruff --version
+            pyright --version
+            semgrep --version
+            zizmor --version
+            yamllint --version
+            djlint --version
+            editorconfig-checker --version
+            htmlhint --version
+            jsonlint --help
+            markdownlint-cli2 --version
+            markdown-table-formatter --version
+            secretlint --version
+            stylelint --version
+            v8r --version
+            ls-lint --version
+
+            echo "== Frontend development tools =="
+            npm exec eslint --version
+            npm exec prettier --version
+
+            echo "== Backend import =="
+            python -c "import app.main"
+
+            echo "== Python tests =="
+            python -m pytest
+
+            echo "== Integration tests =="
+            python -m pytest app/tests/integration
+
+            echo "== Frontend build =="
+            npm run build --prefix frontend
+
+            echo "== Docker access =="
+            docker run --rm hello-world
+
+            echo "== Docker Compose stack =="
+            docker compose -f docker-compose.test.yml up -d --build autoheal
+            healthy=false
+            for _ in $(seq 1 60); do
+              if [ "$(docker inspect -f '{{.State.Health.Status}}' docker-autoheal 2>/dev/null)" = "healthy" ]; then
+                healthy=true
+                break
+              fi
+              sleep 2
+            done
+            if [ "$healthy" != "true" ]; then
+              echo "::error::docker compose stack did not become healthy"
+              docker compose -f docker-compose.test.yml logs
+              docker compose -f docker-compose.test.yml down
+              exit 1
+            fi
+            echo "docker compose stack is healthy"
+            docker compose -f docker-compose.test.yml down

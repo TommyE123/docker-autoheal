@@ -1,0 +1,28 @@
+{
+  "tools": [
+    {
+      "repository": "rhysd/actionlint",
+      "version": "1.7.12"
+    },
+    {
+      "repository": "hadolint/hadolint",
+      "version": "2.15.1"
+    },
+    {
+      "repository": "google/osv-scanner",
+      "version": "2.6.0"
+    },
+    {
+      "repository": "aquasecurity/trivy",
+      "version": "0.74.0"
+    },
+    {
+      "repository": "trufflesecurity/trufflehog",
+      "version": "3.97.6"
+    },
+    {
+      "repository": "betterleaks/betterleaks",
+      "version": "1.8.1"
+    }
+  ]
+}

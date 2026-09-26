@@ -29,6 +29,7 @@ ignore:
   - .git
   - node_modules
   - frontend/node_modules
+  - .devcontainer/node_modules
   - frontend/dist
   - coverage
   - htmlcov
