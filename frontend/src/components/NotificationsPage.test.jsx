@@ -178,11 +178,9 @@ describe("NotificationsPage", () => {
     ).toBeInTheDocument();
   });
 
-  // This characterizes a known validation defect (issue #264: the Save
-  // button lives outside the <Form>, so the type-specific `required`
-  // attributes never gate submission) rather than desired behavior. Expect
-  // this test to need updating once #264 is fixed.
-  it("submits a service missing its type-specific required field, since only the name is validated client-side", async () => {
+  // Issue #264 fix: the Add/Update button is now also gated on the selected
+  // service type's own required field(s), not just the name.
+  it("keeps the add button disabled until the type-specific required field is filled in", async () => {
     const user = userEvent.setup();
     getNotificationsConfig.mockResolvedValue({ data: config });
     addNotificationService.mockResolvedValue({});
@@ -193,27 +191,55 @@ describe("NotificationsPage", () => {
 
     await user.click(screen.getByRole("button", { name: /add service/i }));
 
-    // Webhook URL is marked required in the form, but only the name field
-    // gates the Add Service button, so this is submittable without it.
     await user.type(screen.getByPlaceholderText(/my discord server/i), "Incomplete Webhook");
 
     const addButton = screen.getByRole("button", { name: /^add service$/i });
+    // Name is filled in, but the webhook type's required URL is still empty.
+    expect(addButton).toBeDisabled();
+
+    await user.type(
+      screen.getByPlaceholderText(/https:\/\/example\.com\/webhook/i),
+      "https://example.com/hook",
+    );
+
     expect(addButton).toBeEnabled();
 
     await user.click(addButton);
 
-    await waitFor(() => expect(addNotificationService).toHaveBeenCalledTimes(1));
-    const submittedPayload = addNotificationService.mock.calls[0][0];
-    expect(submittedPayload).toEqual({
-      name: "Incomplete Webhook",
-      type: "webhook",
-      enabled: true,
-    });
-    expect(submittedPayload).not.toHaveProperty("url");
-
+    await waitFor(() =>
+      expect(addNotificationService).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Incomplete Webhook",
+          type: "webhook",
+          url: "https://example.com/hook",
+        }),
+      ),
+    );
     expect(
       await screen.findByText(/notification service added successfully/i),
     ).toBeInTheDocument();
+  });
+
+  it("keeps the add button disabled for a telegram service missing bot_token/chat_id", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({ data: config });
+
+    render(<NotificationsPage />);
+
+    await screen.findByText(/notifications are disabled/i);
+
+    await user.click(screen.getByRole("button", { name: /add service/i }));
+    await user.type(screen.getByPlaceholderText(/my discord server/i), "Incomplete Telegram");
+    await user.selectOptions(screen.getByRole("combobox"), "telegram");
+
+    const addButton = screen.getByRole("button", { name: /^add service$/i });
+    expect(addButton).toBeDisabled();
+
+    await user.type(screen.getByPlaceholderText(/123456789:abcdefghijklmnopqrstuvwxyz/i), "123:abc");
+    expect(addButton).toBeDisabled();
+
+    await user.type(screen.getByPlaceholderText(/-1001234567890/i), "456");
+    expect(addButton).toBeEnabled();
   });
 
   it("edits an existing service successfully", async () => {
