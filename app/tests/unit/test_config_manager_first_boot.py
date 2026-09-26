@@ -79,6 +79,12 @@ def test_first_boot_survives_config_json_missing_a_field(monkeypatch, tmp_path):
     tmp_path.mkdir(parents=True, exist_ok=True)
     old_config = get_default_config()
     assert "notifications" not in old_config
+    # A non-default value here is essential to the test: monitor.interval_seconds
+    # defaults to 30 in both get_default_config() and AutoHealConfig() itself, so
+    # asserting against that shared value would pass even if loading silently
+    # reset every section (including monitor) rather than genuinely preserving
+    # what was on disk and only defaulting the missing one.
+    old_config["monitor"]["interval_seconds"] = 999
     (tmp_path / "config.json").write_text(json.dumps(old_config))
 
     manager = ConfigManager()
@@ -86,4 +92,4 @@ def test_first_boot_survives_config_json_missing_a_field(monkeypatch, tmp_path):
     # Booted successfully, and the missing section fell back to its own
     # documented default rather than the whole config resetting or raising.
     assert manager.get_config().notifications == AutoHealConfig().notifications
-    assert manager.get_config().monitor.interval_seconds == old_config["monitor"]["interval_seconds"]
+    assert manager.get_config().monitor.interval_seconds == 999
