@@ -122,6 +122,20 @@ class TestMatchUptimeKumaMonitors:
 
         assert result == []
 
+    def test_ambiguous_match_across_two_monitors_sharing_identical_friendly_name(self):
+        """Two distinct Uptime-Kuma monitor objects can legitimately share the
+        exact same friendly_name text. A naive implementation that tracks
+        candidates by name string (rather than by monitor identity) would
+        collapse these into a single candidate and treat the match as
+        unambiguous - breaking the safety contract that a mapping is only
+        ever created when exactly one monitor is a candidate."""
+        containers = [_container("web", "web")]
+        monitors = [_monitor("web"), _monitor("web")]
+
+        result = match_uptime_kuma_monitors(containers, monitors)
+
+        assert result == []
+
     def test_multiple_containers_and_monitors_do_not_cross_match(self):
         containers = [
             _container("web", "web"),

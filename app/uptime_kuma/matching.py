@@ -75,10 +75,13 @@ def match_uptime_kuma_monitors(
     containers = list(containers)
     monitors = list(monitors)
 
-    monitor_names_by_norm: Dict[str, set] = {}
-    for monitor in monitors:
-        friendly_name = monitor["friendly_name"]
-        monitor_names_by_norm.setdefault(normalize_name(friendly_name), set()).add(friendly_name)
+    # Indexed by monitor position, not by friendly_name text, so two distinct
+    # monitor objects that happen to share an identical friendly_name are
+    # never collapsed into a single candidate - each still counts as its own
+    # ambiguous alternative rather than a single unambiguous match.
+    monitor_indices_by_norm: Dict[str, List[int]] = {}
+    for index, monitor in enumerate(monitors):
+        monitor_indices_by_norm.setdefault(normalize_name(monitor["friendly_name"]), []).append(index)
 
     container_matches: List[set] = []
     for container in containers:
@@ -87,27 +90,27 @@ def match_uptime_kuma_monitors(
         if compose_service:
             candidates.add(compose_service)
 
-        matched_names: set = set()
+        matched_indices: set = set()
         for candidate in candidates:
-            matched_names |= monitor_names_by_norm.get(normalize_name(candidate), set())
-        container_matches.append(matched_names)
+            matched_indices.update(monitor_indices_by_norm.get(normalize_name(candidate), []))
+        container_matches.append(matched_indices)
 
-    monitor_match_counts: Dict[str, int] = {}
-    for matched_names in container_matches:
-        for name in matched_names:
-            monitor_match_counts[name] = monitor_match_counts.get(name, 0) + 1
+    monitor_match_counts: Dict[int, int] = {}
+    for matched_indices in container_matches:
+        for index in matched_indices:
+            monitor_match_counts[index] = monitor_match_counts.get(index, 0) + 1
 
     results: List[UptimeKumaMatch] = []
-    for container, matched_names in zip(containers, container_matches):
-        if len(matched_names) != 1:
+    for container, matched_indices in zip(containers, container_matches):
+        if len(matched_indices) != 1:
             continue
-        (monitor_friendly_name,) = matched_names
-        if monitor_match_counts[monitor_friendly_name] != 1:
+        (monitor_index,) = matched_indices
+        if monitor_match_counts[monitor_index] != 1:
             continue
         results.append(
             {
                 "container_id": container["stable_id"],
-                "monitor_friendly_name": monitor_friendly_name,
+                "monitor_friendly_name": monitors[monitor_index]["friendly_name"],
             }
         )
     return results
