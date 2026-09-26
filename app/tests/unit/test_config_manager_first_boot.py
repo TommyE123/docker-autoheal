@@ -166,3 +166,23 @@ def test_first_boot_survives_config_json_missing_a_field(monkeypatch, tmp_path):
     # documented default rather than the whole config resetting or raising.
     assert manager.get_config().notifications == AutoHealConfig().notifications
     assert manager.get_config().monitor.interval_seconds == 999
+
+
+def test_first_boot_ignores_an_unknown_extra_top_level_section(monkeypatch, tmp_path):
+    """The reverse of the missing-section case above: an on-disk config.json
+    with a stray top-level section AutoHealConfig doesn't define (e.g. left
+    over from a removed feature, or hand-edited) must be silently ignored
+    rather than raising - _build_config_from_sections() only ever reads keys
+    it recognizes out of the raw data, so an unrecognized key is never
+    passed to any model constructor in the first place."""
+    _redirect_manager_paths(monkeypatch, tmp_path)
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    new_config = get_default_config()
+    new_config["totally_unknown_section"] = {"foo": "bar"}
+    new_config["monitor"]["interval_seconds"] = 999
+    (tmp_path / "config.json").write_text(json.dumps(new_config))
+
+    manager = ConfigManager()
+
+    assert manager.get_config().monitor.interval_seconds == 999
+    assert not hasattr(manager.get_config(), "totally_unknown_section")
