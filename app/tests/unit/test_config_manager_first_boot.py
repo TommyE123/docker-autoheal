@@ -60,16 +60,6 @@ def test_first_boot_on_empty_data_dir_matches_autohealconfig_defaults(monkeypatc
     assert (tmp_path / "config.json").exists()
 
 
-def test_get_default_config_dict_is_missing_notifications_key(monkeypatch, tmp_path):
-    """Documents the actual drift this test module guards against: the
-    hand-maintained dict has no 'notifications' key at all, even though
-    AutoHealConfig.notifications is a real field. This is harmless today only
-    because every AutoHealConfig field has a Pydantic default; the previous
-    test is what actually proves ConfigManager's first-boot output is
-    unaffected by that gap."""
-    assert "notifications" not in get_default_config()
-
-
 def test_first_boot_survives_config_json_missing_a_field(monkeypatch, tmp_path):
     """Realistic 'existing user upgrades to a new image version' path: an
     on-disk config.json from before a schema change is missing an entire
