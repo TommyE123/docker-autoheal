@@ -93,10 +93,20 @@ def test_get_default_config_keys_match_autohealconfig_schema():
     so that test would still pass even though the defaults dict no longer
     matches the real schema. custom_health_checks is deliberately excluded -
     it's popped and parsed separately before AutoHealConfig is ever
-    constructed, not a field of AutoHealConfig itself."""
+    constructed, not a field of AutoHealConfig itself.
+
+    The top-level section set is checked for exact equality, not just
+    "every present key is valid": get_default_config() previously omitted
+    `notifications` entirely even though AutoHealConfig defines it as a real
+    field, and a subset-only check can't catch a *missing* top-level
+    section, only an extra/misspelled one."""
     default_config = get_default_config()
     top_level = {key: value for key, value in default_config.items() if key != "custom_health_checks"}
 
+    assert set(top_level.keys()) == set(AutoHealConfig.model_fields.keys()), (
+        "get_default_config()'s top-level sections must exactly match AutoHealConfig's "
+        "fields (aside from the separately-managed custom_health_checks)"
+    )
     _assert_keys_match_model_fields(top_level, AutoHealConfig, "get_default_config()")
 
 
@@ -113,6 +123,20 @@ def test_schema_parity_helper_detects_an_unknown_key():
         )
 
 
+def test_schema_parity_top_level_check_detects_a_missing_section():
+    """Proves the exact-match top-level check would have caught the actual
+    bug this issue fixes: get_default_config() silently omitting an entire
+    top-level section (notifications) that AutoHealConfig defines."""
+    default_config = get_default_config()
+    incomplete = {
+        key: value
+        for key, value in default_config.items()
+        if key not in ("custom_health_checks", "notifications")
+    }
+
+    assert set(incomplete.keys()) != set(AutoHealConfig.model_fields.keys())
+
+
 def test_first_boot_survives_config_json_missing_a_field(monkeypatch, tmp_path):
     """Realistic 'existing user upgrades to a new image version' path: an
     on-disk config.json from before a schema change is missing an entire
@@ -121,7 +145,13 @@ def test_first_boot_survives_config_json_missing_a_field(monkeypatch, tmp_path):
     _redirect_manager_paths(monkeypatch, tmp_path)
     tmp_path.mkdir(parents=True, exist_ok=True)
     old_config = get_default_config()
-    assert "notifications" not in old_config
+    # Simulates an on-disk config.json predating a schema change - not
+    # get_default_config()'s own current output, which (as of this fix) has
+    # no such gap. AutoHealConfig().notifications is the section's real
+    # documented default, so removing it here (rather than adding some other
+    # field) exercises the exact fallback the earlier schema-drift bug
+    # relied on this test to protect against.
+    del old_config["notifications"]
     # A non-default value here is essential to the test: monitor.interval_seconds
     # defaults to 30 in both get_default_config() and AutoHealConfig() itself, so
     # asserting against that shared value would pass even if loading silently
