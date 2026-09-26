@@ -27,24 +27,43 @@ from app.config.init_defaults import get_default_config
 
 
 def _assert_keys_match_model_fields(data: dict, model: Type[BaseModel], path: str) -> None:
-    """Recursively assert every key in data is a real field of model.
+    """Recursively assert data's keys exactly match model's fields, at every level.
 
-    Pydantic v2's default `extra` behaviour is to silently ignore unknown
-    fields rather than raise, so AutoHealConfig(**sections) would quietly
-    drop a typo'd, renamed, or stray key in get_default_config() instead of
-    failing - the empty-dir equality test above only catches a *missing*
-    key (a real field with no default), not this opposite direction of
-    drift. Recurses into a nested dict whose corresponding field is itself
-    a BaseModel (e.g. restart.backoff), so misspellings at that level are
-    caught too.
+    Pydantic v2's default `extra` behaviour is to silently ignore an unknown
+    field, and a field that's simply absent falls back to its own default -
+    neither raises. So AutoHealConfig(**sections) would quietly drop a
+    typo'd/renamed/stray key in get_default_config(), or quietly paper over
+    an omitted one, without the empty-dir equality test above necessarily
+    catching it (it only compares the fully-constructed objects, so it
+    can't distinguish "correctly defaulted" from "silently defaulted
+    because the hand-maintained dict forgot this field"). Checking for
+    exact key-set equality - not just "every present key is valid" - at
+    every level, not only the top, is what makes this catch a missing or
+    unknown *nested* field (e.g. notifications.enabled) too, not only a
+    top-level section. Recurses into a nested dict whose corresponding
+    field is itself a BaseModel (e.g. restart.backoff).
     """
     fields = model.model_fields
+    data_keys = set(data.keys())
+    field_keys = set(fields.keys())
+    assert data_keys == field_keys, (
+        f"{path} does not exactly match {model.__name__}'s fields - "
+        f"missing: {sorted(field_keys - data_keys)}, unknown: {sorted(data_keys - field_keys)}"
+    )
     for key, value in data.items():
-        assert key in fields, f"{path}.{key} is not a field of {model.__name__}"
         if isinstance(value, dict):
             field_type = fields[key].annotation
             if isinstance(field_type, type) and issubclass(field_type, BaseModel):
                 _assert_keys_match_model_fields(value, field_type, f"{path}.{key}")
+
+
+def _valid_top_level_config() -> dict:
+    """get_default_config()'s current output, minus custom_health_checks
+    (which is popped and parsed separately, never a field of AutoHealConfig
+    itself) - a known-good baseline the meta-tests below deliberately
+    corrupt in one specific way each, so each failure is isolated to the
+    thing it's meant to prove the helper catches."""
+    return {key: value for key, value in get_default_config().items() if key != "custom_health_checks"}
 
 
 def _redirect_manager_paths(monkeypatch, data_dir: Path) -> None:
@@ -87,54 +106,61 @@ def test_first_boot_on_empty_data_dir_matches_autohealconfig_defaults(monkeypatc
 
 def test_get_default_config_keys_match_autohealconfig_schema():
     """Direct schema-parity check, catching drift in the direction the
-    empty-dir equality test above cannot: a future typo, renamed key, or
-    stray extra key in get_default_config() would be silently discarded by
-    AutoHealConfig(**sections) (Pydantic ignores unknown fields by default),
-    so that test would still pass even though the defaults dict no longer
-    matches the real schema. custom_health_checks is deliberately excluded -
-    it's popped and parsed separately before AutoHealConfig is ever
-    constructed, not a field of AutoHealConfig itself.
-
-    The top-level section set is checked for exact equality, not just
-    "every present key is valid": get_default_config() previously omitted
-    `notifications` entirely even though AutoHealConfig defines it as a real
-    field, and a subset-only check can't catch a *missing* top-level
-    section, only an extra/misspelled one."""
-    default_config = get_default_config()
-    top_level = {key: value for key, value in default_config.items() if key != "custom_health_checks"}
-
-    assert set(top_level.keys()) == set(AutoHealConfig.model_fields.keys()), (
-        "get_default_config()'s top-level sections must exactly match AutoHealConfig's "
-        "fields (aside from the separately-managed custom_health_checks)"
-    )
-    _assert_keys_match_model_fields(top_level, AutoHealConfig, "get_default_config()")
+    empty-dir equality test above cannot: a future typo, renamed key, stray
+    extra key, or silently-omitted key in get_default_config() - at the top
+    level or nested inside a section - would be silently papered over by
+    AutoHealConfig(**sections) (Pydantic ignores unknown fields and defaults
+    missing ones, neither raises), so that test would still pass even
+    though the defaults dict no longer matches the real schema.
+    custom_health_checks is deliberately excluded - it's popped and parsed
+    separately before AutoHealConfig is ever constructed, not a field of
+    AutoHealConfig itself."""
+    _assert_keys_match_model_fields(_valid_top_level_config(), AutoHealConfig, "get_default_config()")
 
 
-def test_schema_parity_helper_detects_an_unknown_key():
+def test_schema_parity_helper_detects_an_unknown_top_level_key():
     """Proves the guard above actually fires on drift, rather than
-    vacuously passing: a misspelled top-level key and a misspelled nested
-    section key must each be rejected."""
-    with pytest.raises(AssertionError, match="monitorr"):
-        _assert_keys_match_model_fields({"monitorr": {}}, AutoHealConfig, "root")
+    vacuously passing: an extra, unrecognized top-level key must be
+    rejected."""
+    data = _valid_top_level_config()
+    data["monitorrr"] = {}
+
+    with pytest.raises(AssertionError, match="monitorrr"):
+        _assert_keys_match_model_fields(data, AutoHealConfig, "root")
+
+
+def test_schema_parity_helper_detects_a_missing_top_level_key():
+    """Proves the guard would have caught the actual bug this issue fixes:
+    get_default_config() silently omitting an entire top-level section
+    (notifications) that AutoHealConfig defines."""
+    data = _valid_top_level_config()
+    del data["notifications"]
+
+    with pytest.raises(AssertionError, match="notifications"):
+        _assert_keys_match_model_fields(data, AutoHealConfig, "root")
+
+
+def test_schema_parity_helper_detects_an_unknown_nested_key():
+    """A misspelled/extra key nested inside a section (not just at the top
+    level) must also be rejected."""
+    data = _valid_top_level_config()
+    data["monitor"] = {**data["monitor"], "interval_secondz": 30}
 
     with pytest.raises(AssertionError, match="interval_secondz"):
-        _assert_keys_match_model_fields(
-            {"monitor": {"interval_secondz": 30}}, AutoHealConfig, "root"
-        )
+        _assert_keys_match_model_fields(data, AutoHealConfig, "root")
 
 
-def test_schema_parity_top_level_check_detects_a_missing_section():
-    """Proves the exact-match top-level check would have caught the actual
-    bug this issue fixes: get_default_config() silently omitting an entire
-    top-level section (notifications) that AutoHealConfig defines."""
-    default_config = get_default_config()
-    incomplete = {
-        key: value
-        for key, value in default_config.items()
-        if key not in ("custom_health_checks", "notifications")
-    }
+def test_schema_parity_helper_detects_a_missing_nested_key():
+    """The nested counterpart to the missing-top-level-key test above: a
+    section present but missing one of its own fields (e.g.
+    notifications.enabled) must be rejected too - the original version of
+    this helper only checked that *present* nested keys were valid, which
+    would have missed this direction of drift entirely."""
+    data = _valid_top_level_config()
+    data["notifications"] = {key: value for key, value in data["notifications"].items() if key != "enabled"}
 
-    assert set(incomplete.keys()) != set(AutoHealConfig.model_fields.keys())
+    with pytest.raises(AssertionError, match="enabled"):
+        _assert_keys_match_model_fields(data, AutoHealConfig, "root")
 
 
 def test_first_boot_survives_config_json_missing_a_field(monkeypatch, tmp_path):
