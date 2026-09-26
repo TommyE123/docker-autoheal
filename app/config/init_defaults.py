@@ -70,6 +70,11 @@ def get_default_config() -> Dict[str, Any]:
             "auto_restart_on_down": True
         },
         "uptime_kuma_mappings": [],
+        "notifications": {
+            "enabled": False,
+            "services": [],
+            "event_filters": ["restart", "quarantine", "health_check_failed", "auto_unquarantine"]
+        },
         "custom_health_checks": {}
     }
 
