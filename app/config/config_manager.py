@@ -5,6 +5,7 @@ Handles in-memory configuration state with JSON export/import support
 
 import json
 import logging
+import os
 import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -219,6 +220,16 @@ class LegacyAutoHealEvent(BaseModel):
 StoredAutoHealEvent = Union[AutoHealEvent, LegacyAutoHealEvent]
 
 
+def _resolve_data_dir() -> Path:
+    """Resolve the base data directory, honoring AUTOHEAL_DATA_DIR when set.
+
+    Read once (at class-definition time), before any file I/O against the
+    data directory happens, so the override takes effect before
+    ConfigManager.__init__ ever calls _ensure_data_directory().
+    """
+    return Path(os.environ.get("AUTOHEAL_DATA_DIR") or "/data")
+
+
 # Top-level AutoHealConfig sections that are themselves a single model and can
 # be validated independently of one another. uptime_kuma_mappings is handled
 # separately below since it is a list rather than a single model.
@@ -241,8 +252,8 @@ class ConfigManager:
     All data is automatically saved to /data directory
     """
 
-    # Data directory paths
-    DATA_DIR = Path("/data")
+    # Data directory paths. Overridable via AUTOHEAL_DATA_DIR.
+    DATA_DIR = _resolve_data_dir()
     CONFIG_FILE = DATA_DIR / "config.json"
     EVENTS_FILE = DATA_DIR / "events.json"
     RESTART_COUNTS_FILE = DATA_DIR / "restart_counts.json"
@@ -268,7 +279,7 @@ class ConfigManager:
         self._maintenance_start_time: Optional[datetime] = None
         self._load_maintenance_mode()
 
-        logger.info("ConfigManager initialized with persistent storage at /data")
+        logger.info(f"ConfigManager initialized with persistent storage at {self.DATA_DIR}")
 
     def _ensure_data_directory(self) -> None:
         """Create data directory and subdirectories if they don't exist"""
