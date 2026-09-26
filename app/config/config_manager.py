@@ -452,10 +452,12 @@ class ConfigManager:
             if self.MAINTENANCE_FILE.exists():
                 with self.MAINTENANCE_FILE.open('r') as f:
                     data = json.load(f)
-                    self._maintenance_mode = data.get('enabled', False)
+                    enabled = data.get('enabled', False)
                     start_time = data.get('start_time')
-                    if start_time:
-                        self._maintenance_start_time = datetime.fromisoformat(start_time)
+                    parsed_start_time = datetime.fromisoformat(start_time) if start_time else None
+
+                    self._maintenance_mode = enabled
+                    self._maintenance_start_time = parsed_start_time
                     logger.info(f"Loaded maintenance mode state: {self._maintenance_mode}")
         except Exception as e:
             logger.warning(f"Failed to load maintenance mode from disk: {e}")
