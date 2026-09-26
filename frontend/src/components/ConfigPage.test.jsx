@@ -94,6 +94,16 @@ describe("ConfigPage", () => {
     expect(screen.getByText("Restart Policy")).toBeInTheDocument();
   });
 
+  it("does not show the misleading 'stored in memory' persistence note (issue #133)", async () => {
+    getConfig.mockResolvedValue({ data: config });
+
+    render(<ConfigPage />);
+
+    await screen.findByText("Monitor Settings");
+
+    expect(screen.queryByText(/stored in memory/i)).not.toBeInTheDocument();
+  });
+
   it("shows a validation modal instead of saving when the restart window is too small", async () => {
     const user = userEvent.setup();
     const invalidConfig = {
