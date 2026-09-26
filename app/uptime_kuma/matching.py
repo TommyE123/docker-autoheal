@@ -8,8 +8,11 @@ each other after normalization - no fuzzy/string-distance matching, and no
 "closest match" fallback. See issue #141.
 """
 
+import logging
 import re
 from typing import Dict, Iterable, List, Optional, TypedDict
+
+logger = logging.getLogger(__name__)
 
 
 class ContainerNameInfo(TypedDict, total=False):
@@ -103,9 +106,24 @@ def match_uptime_kuma_monitors(
     results: List[UptimeKumaMatch] = []
     for container, matched_indices in zip(containers, container_matches):
         if len(matched_indices) != 1:
+            if len(matched_indices) > 1:
+                candidate_names = sorted(monitors[i]["friendly_name"] for i in matched_indices)
+                logger.debug(
+                    "Uptime-Kuma auto-mapping: leaving %s unmapped, matched %d monitors "
+                    "(%s) - ambiguous",
+                    container["stable_id"],
+                    len(matched_indices),
+                    ", ".join(candidate_names),
+                )
             continue
         (monitor_index,) = matched_indices
         if monitor_match_counts[monitor_index] != 1:
+            logger.debug(
+                "Uptime-Kuma auto-mapping: leaving %s unmapped, monitor %r also matches "
+                "another container - ambiguous",
+                container["stable_id"],
+                monitors[monitor_index]["friendly_name"],
+            )
             continue
         results.append(
             {

@@ -99,7 +99,7 @@ class TestMatchUptimeKumaMonitors:
 
         assert result == []
 
-    def test_ambiguous_match_across_two_containers_is_left_unmapped(self):
+    def test_ambiguous_match_across_two_containers_is_left_unmapped(self, caplog):
         """Two containers that both normalize to the same monitor name must
         not have either one arbitrarily selected."""
         containers = [
@@ -108,19 +108,30 @@ class TestMatchUptimeKumaMonitors:
         ]
         monitors = [_monitor("Steam-Headless")]
 
-        result = match_uptime_kuma_monitors(containers, monitors)
+        with caplog.at_level("DEBUG", logger="app.uptime_kuma.matching"):
+            result = match_uptime_kuma_monitors(containers, monitors)
 
         assert result == []
+        # A monitor matching >1 container is only detectable once every
+        # container's candidates are known, so this is logged from the
+        # monitor side (len(matched_indices) == 1 for each container
+        # individually) rather than the "matched several monitors" branch.
+        assert "steam-headless" in caplog.text
+        assert "ambiguous" in caplog.text
 
-    def test_ambiguous_match_across_two_monitors_is_left_unmapped(self):
+    def test_ambiguous_match_across_two_monitors_is_left_unmapped(self, caplog):
         """A container whose name normalizes to two distinct monitor names
         must not have either one arbitrarily selected."""
         containers = [_container("web", "web")]
         monitors = [_monitor("Web"), _monitor("web")]
 
-        result = match_uptime_kuma_monitors(containers, monitors)
+        with caplog.at_level("DEBUG", logger="app.uptime_kuma.matching"):
+            result = match_uptime_kuma_monitors(containers, monitors)
 
         assert result == []
+        assert "web" in caplog.text
+        assert "matched 2 monitors" in caplog.text
+        assert "ambiguous" in caplog.text
 
     def test_ambiguous_match_across_two_monitors_sharing_identical_friendly_name(self):
         """Two distinct Uptime-Kuma monitor objects can legitimately share the
