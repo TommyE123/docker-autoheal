@@ -17,9 +17,34 @@ deployment's first boot.
 
 import json
 from pathlib import Path
+from typing import Type
+
+import pytest
+from pydantic import BaseModel
 
 from app.config.config_manager import AutoHealConfig, ConfigManager
 from app.config.init_defaults import get_default_config
+
+
+def _assert_keys_match_model_fields(data: dict, model: Type[BaseModel], path: str) -> None:
+    """Recursively assert every key in data is a real field of model.
+
+    Pydantic v2's default `extra` behaviour is to silently ignore unknown
+    fields rather than raise, so AutoHealConfig(**sections) would quietly
+    drop a typo'd, renamed, or stray key in get_default_config() instead of
+    failing - the empty-dir equality test above only catches a *missing*
+    key (a real field with no default), not this opposite direction of
+    drift. Recurses into a nested dict whose corresponding field is itself
+    a BaseModel (e.g. restart.backoff), so misspellings at that level are
+    caught too.
+    """
+    fields = model.model_fields
+    for key, value in data.items():
+        assert key in fields, f"{path}.{key} is not a field of {model.__name__}"
+        if isinstance(value, dict):
+            field_type = fields[key].annotation
+            if isinstance(field_type, type) and issubclass(field_type, BaseModel):
+                _assert_keys_match_model_fields(value, field_type, f"{path}.{key}")
 
 
 def _redirect_manager_paths(monkeypatch, data_dir: Path) -> None:
@@ -58,6 +83,34 @@ def test_first_boot_on_empty_data_dir_matches_autohealconfig_defaults(monkeypatc
     # initialize_defaults() wrote this file as a real side effect of
     # __init__, not something the test set up itself - confirm it exists.
     assert (tmp_path / "config.json").exists()
+
+
+def test_get_default_config_keys_match_autohealconfig_schema():
+    """Direct schema-parity check, catching drift in the direction the
+    empty-dir equality test above cannot: a future typo, renamed key, or
+    stray extra key in get_default_config() would be silently discarded by
+    AutoHealConfig(**sections) (Pydantic ignores unknown fields by default),
+    so that test would still pass even though the defaults dict no longer
+    matches the real schema. custom_health_checks is deliberately excluded -
+    it's popped and parsed separately before AutoHealConfig is ever
+    constructed, not a field of AutoHealConfig itself."""
+    default_config = get_default_config()
+    top_level = {key: value for key, value in default_config.items() if key != "custom_health_checks"}
+
+    _assert_keys_match_model_fields(top_level, AutoHealConfig, "get_default_config()")
+
+
+def test_schema_parity_helper_detects_an_unknown_key():
+    """Proves the guard above actually fires on drift, rather than
+    vacuously passing: a misspelled top-level key and a misspelled nested
+    section key must each be rejected."""
+    with pytest.raises(AssertionError, match="monitorr"):
+        _assert_keys_match_model_fields({"monitorr": {}}, AutoHealConfig, "root")
+
+    with pytest.raises(AssertionError, match="interval_secondz"):
+        _assert_keys_match_model_fields(
+            {"monitor": {"interval_secondz": 30}}, AutoHealConfig, "root"
+        )
 
 
 def test_first_boot_survives_config_json_missing_a_field(monkeypatch, tmp_path):
