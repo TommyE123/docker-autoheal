@@ -7,6 +7,9 @@ on:
     paths:
       - ".devcontainer/**"
       - ".github/workflows/devcontainer.yml"
+      - "requirements-dev.txt"
+      - "frontend/package.json"
+      - "frontend/package-lock.json"
   workflow_dispatch:
 
 permissions:
@@ -29,9 +32,11 @@ jobs:
       # all; within that, most .devcontainer/** changes (VS Code settings,
       # docs, lint configs) can't actually break container creation. Only
       # run the full build+test for the files that can - tool/feature/image
-      # pins, the install/purge scripts, the npm lockfile, and this workflow
-      # itself - so e.g. a Renovate bump to tools.json still gets tested,
-      # but a settings.json tweak doesn't burn ~3 minutes of CI for nothing.
+      # pins, the install/purge scripts, the npm lockfile, this workflow
+      # itself, and the dependency files postCreateCommand installs from
+      # (requirements-dev.txt, frontend's package.json/package-lock.json) -
+      # so e.g. a Renovate bump to tools.json still gets tested, but a
+      # settings.json tweak doesn't burn ~3 minutes of CI for nothing.
       - name: Check whether devcontainer-critical files changed
         id: changed
         if: github.event_name == 'pull_request'
@@ -41,7 +46,8 @@ jobs:
         run: |
           pattern='^(\.devcontainer/(tools\.json|install-tools\.sh|devcontainer\.json'
           pattern+='|devcontainer-lock\.json|maybe-purge-caches\.sh|package\.json'
-          pattern+='|package-lock\.json)|\.github/workflows/devcontainer\.yml)$'
+          pattern+='|package-lock\.json)|\.github/workflows/devcontainer\.yml'
+          pattern+='|requirements-dev\.txt|frontend/package\.json|frontend/package-lock\.json)$'
           if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -qE "$pattern"; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
