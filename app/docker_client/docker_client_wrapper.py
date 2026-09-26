@@ -292,10 +292,9 @@ class DockerClientWrapper:
                 logger.warning(f"Cannot get IP address for container {container.name}")
                 return False
 
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(timeout)
-            result = sock.connect_ex((ip_address, port))
-            sock.close()
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.settimeout(timeout)
+                result = sock.connect_ex((ip_address, port))
 
             return result == 0
         except Exception as e:

@@ -284,6 +284,7 @@ class TestTcpHealth:
     def test_tcp_health_check_succeeds(self, wrapper):
         container = make_sdk_container()
         mock_sock = MagicMock()
+        mock_sock.__enter__.return_value = mock_sock
         mock_sock.connect_ex.return_value = 0
 
         with patch(
@@ -295,11 +296,12 @@ class TestTcpHealth:
         mock_socket_cls.assert_called_once_with(socket.AF_INET, socket.SOCK_STREAM)
         mock_sock.settimeout.assert_called_once_with(5)
         mock_sock.connect_ex.assert_called_once_with(("172.17.0.2", 8080))
-        mock_sock.close.assert_called_once()
+        mock_sock.__exit__.assert_called_once()
 
     def test_tcp_health_check_fails_when_connection_is_refused(self, wrapper):
         container = make_sdk_container()
         mock_sock = MagicMock()
+        mock_sock.__enter__.return_value = mock_sock
         mock_sock.connect_ex.side_effect = ConnectionRefusedError("connection refused")
 
         with patch(
@@ -310,12 +312,15 @@ class TestTcpHealth:
         # Proves the health check actually attempted a connection rather than
         # returning False before ever calling connect_ex.
         mock_sock.connect_ex.assert_called_once_with(("172.17.0.2", 8080))
+        # Proves the socket is still closed when connect_ex raises.
+        mock_sock.__exit__.assert_called_once()
 
     def test_tcp_health_check_fails_on_non_zero_connect_result(self, wrapper):
         # connect_ex normally reports failure by returning a non-zero errno
         # rather than raising.
         container = make_sdk_container()
         mock_sock = MagicMock()
+        mock_sock.__enter__.return_value = mock_sock
         mock_sock.connect_ex.return_value = 111  # ECONNREFUSED
 
         with patch(
@@ -323,11 +328,12 @@ class TestTcpHealth:
             return_value=mock_sock,
         ):
             assert wrapper.check_tcp_health(container, port=8080) is False
-        mock_sock.close.assert_called_once()
+        mock_sock.__exit__.assert_called_once()
 
     def test_tcp_health_check_fails_on_timeout(self, wrapper):
         container = make_sdk_container()
         mock_sock = MagicMock()
+        mock_sock.__enter__.return_value = mock_sock
         mock_sock.connect_ex.side_effect = socket.timeout("timed out")
 
         with patch(
@@ -338,10 +344,13 @@ class TestTcpHealth:
         # Proves the health check actually attempted a connection rather than
         # returning False before ever calling connect_ex.
         mock_sock.connect_ex.assert_called_once_with(("172.17.0.2", 8080))
+        # Proves the socket is still closed when connect_ex raises.
+        mock_sock.__exit__.assert_called_once()
 
     def test_tcp_health_check_fails_on_dns_resolution_failure(self, wrapper):
         container = make_sdk_container()
         mock_sock = MagicMock()
+        mock_sock.__enter__.return_value = mock_sock
         mock_sock.connect_ex.side_effect = socket.gaierror("name resolution failed")
 
         with patch(
@@ -352,10 +361,13 @@ class TestTcpHealth:
         # Proves the health check actually attempted a connection rather than
         # returning False before ever calling connect_ex.
         mock_sock.connect_ex.assert_called_once_with(("172.17.0.2", 8080))
+        # Proves the socket is still closed when connect_ex raises.
+        mock_sock.__exit__.assert_called_once()
 
     def test_tcp_health_check_fails_on_invalid_port(self, wrapper):
         container = make_sdk_container()
         mock_sock = MagicMock()
+        mock_sock.__enter__.return_value = mock_sock
         mock_sock.connect_ex.side_effect = OverflowError("port must be 0-65535")
 
         with patch(
@@ -366,10 +378,13 @@ class TestTcpHealth:
         # Proves the caller-supplied invalid port reached connect_ex
         # unmodified, rather than being normalized or ignored.
         mock_sock.connect_ex.assert_called_once_with(("172.17.0.2", 99999))
+        # Proves the socket is still closed when connect_ex raises.
+        mock_sock.__exit__.assert_called_once()
 
     def test_tcp_health_check_fails_on_missing_port(self, wrapper):
         container = make_sdk_container()
         mock_sock = MagicMock()
+        mock_sock.__enter__.return_value = mock_sock
         mock_sock.connect_ex.side_effect = TypeError("an integer is required")
 
         with patch(
@@ -378,6 +393,8 @@ class TestTcpHealth:
         ):
             assert wrapper.check_tcp_health(container, port=None) is False
         mock_sock.connect_ex.assert_called_once_with(("172.17.0.2", None))
+        # Proves the socket is still closed when connect_ex raises.
+        mock_sock.__exit__.assert_called_once()
 
     def test_tcp_health_check_fails_when_container_has_no_ip_address(self, wrapper):
         container = make_sdk_container()
