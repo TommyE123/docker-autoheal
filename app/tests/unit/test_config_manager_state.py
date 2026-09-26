@@ -317,6 +317,26 @@ def test_corrupt_auxiliary_state_falls_back_to_safe_defaults(
     assert "Failed to load maintenance mode from disk" in caplog.text
 
 
+def test_maintenance_mode_with_corrupt_start_time_falls_back_to_safe_defaults(
+    isolated_config_manager, monkeypatch, caplog
+):
+    """Distinct from the syntactically-invalid-JSON case above: this content
+    is valid JSON with enabled=True, but start_time is not a parseable ISO
+    datetime, so datetime.fromisoformat() raises inside the same try/except.
+    The whole load must fall back to the safe False/None defaults rather than
+    leaving _maintenance_mode set to the partially-read enabled value."""
+    isolated_config_manager.MAINTENANCE_FILE.write_text(
+        json.dumps({"enabled": True, "start_time": "not-a-real-date"})
+    )
+
+    _redirect_manager_paths(monkeypatch, isolated_config_manager.DATA_DIR)
+    reloaded = ConfigManager()
+
+    assert not reloaded.is_maintenance_mode()
+    assert reloaded.get_maintenance_start_time() is None
+    assert "Failed to load maintenance mode from disk" in caplog.text
+
+
 def test_quarantine_file_with_non_iterable_json_falls_back_to_empty_set(
     isolated_config_manager, monkeypatch, caplog
 ):
