@@ -35,9 +35,14 @@ jobs:
       - name: Check whether devcontainer-critical files changed
         id: changed
         if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
-          if git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}" \
-              | grep -qE '^(\.devcontainer/(tools\.json|install-tools\.sh|devcontainer\.json|devcontainer-lock\.json|maybe-purge-caches\.sh|package\.json|package-lock\.json)|\.github/workflows/devcontainer\.yml)$'; then
+          pattern='^(\.devcontainer/(tools\.json|install-tools\.sh|devcontainer\.json'
+          pattern+='|devcontainer-lock\.json|maybe-purge-caches\.sh|package\.json'
+          pattern+='|package-lock\.json)|\.github/workflows/devcontainer\.yml)$'
+          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -qE "$pattern"; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
