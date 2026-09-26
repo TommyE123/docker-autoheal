@@ -23,8 +23,28 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+
+      # The path filter above only decides whether this workflow runs at
+      # all; within that, most .devcontainer/** changes (VS Code settings,
+      # docs, lint configs) can't actually break container creation. Only
+      # run the full build+test for the files that can - tool/feature/image
+      # pins, the install/purge scripts, the npm lockfile, and this workflow
+      # itself - so e.g. a Renovate bump to tools.json still gets tested,
+      # but a settings.json tweak doesn't burn ~3 minutes of CI for nothing.
+      - name: Check whether devcontainer-critical files changed
+        id: changed
+        if: github.event_name == 'pull_request'
+        run: |
+          if git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}" \
+              | grep -qE '^(\.devcontainer/(tools\.json|install-tools\.sh|devcontainer\.json|devcontainer-lock\.json|maybe-purge-caches\.sh|package\.json|package-lock\.json)|\.github/workflows/devcontainer\.yml)$'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build and test Dev Container
+        if: github.event_name == 'workflow_dispatch' || steps.changed.outputs.run == 'true'
         uses: devcontainers/ci@513af61f4de4f75d37e4438f184ba4358f0fc1ca # v0.3.1900000450
         with:
           runCmd: |
