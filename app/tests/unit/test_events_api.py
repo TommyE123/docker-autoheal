@@ -11,7 +11,7 @@ import asyncio
 import json
 from datetime import datetime, timezone
 
-from app.api.api import clear_events, get_events
+from app.api.routes.events import clear_events, get_events
 from app.config.config_manager import AutoHealEvent
 
 

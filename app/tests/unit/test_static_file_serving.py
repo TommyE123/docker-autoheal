@@ -1,5 +1,5 @@
 """
-Unit tests for the real static-file serving path in ``app/api/api.py``.
+Unit tests for the real static-file serving path in ``app/api/routes/ui.py``.
 
 ``get_static_file_path()``/``serve_static_file()`` are exercised by calling
 them directly to obtain a real ``FileResponse``, then invoking that response
@@ -13,8 +13,8 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from fastapi import HTTPException
 
-from app.api import api as api_module
-from app.api.api import get_static_file_path, serve_static_file
+from app.api.routes import ui as api_module
+from app.api.routes.ui import get_static_file_path, serve_static_file
 
 if TYPE_CHECKING:
     from pathlib import Path

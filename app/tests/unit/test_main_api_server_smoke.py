@@ -82,8 +82,8 @@ class TestRunApiServerRealUvicornSmoke:
 
         with (
             patch("app.main.uvicorn.Server", _RecordingServer),
-            patch("app.api.api.docker_client", None),
-            patch("app.api.api.monitoring_engine", None),
+            patch("app.api.state.docker_client", None),
+            patch("app.api.state.monitoring_engine", None),
             patch("asyncio.sleep", _real_asyncio_sleep),
         ):
             server_task = asyncio.create_task(main_module.run_api_server())
