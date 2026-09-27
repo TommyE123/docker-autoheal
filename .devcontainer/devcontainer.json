@@ -63,7 +63,7 @@
   },
 
   "remoteEnv": {
-    "PATH": "${containerWorkspaceFolder}/.devcontainer/node_modules/.bin:${containerEnv:HOME}/.local/bin:${containerEnv:PATH}",
+    "PATH": "${containerWorkspaceFolder}/.devcontainer/node_modules/.bin:/home/vscode/.local/bin:${containerEnv:PATH}",
     "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
   },
 
