@@ -275,6 +275,50 @@ describe("NotificationsPage", () => {
     }
   });
 
+  it("keeps the update button disabled for an existing service whose required field is null", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({
+      data: {
+        ...configWithServices,
+        services: [{ name: "Legacy Webhook", type: "webhook", enabled: true, url: null }],
+      },
+    });
+
+    render(<NotificationsPage />);
+
+    await screen.findByText("Legacy Webhook");
+
+    await user.click(screen.getByRole("button", { name: /^edit$/i }));
+
+    const updateButton = screen.getByRole("button", { name: /update service/i });
+    expect(updateButton).toBeDisabled();
+
+    await user.type(
+      screen.getByPlaceholderText(/https:\/\/example\.com\/webhook/i),
+      "https://example.com/hook",
+    );
+
+    expect(updateButton).toBeEnabled();
+  });
+
+  it("falls back to name-only validation for a service of an unrecognised type", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({
+      data: {
+        ...configWithServices,
+        services: [{ name: "Future Service", type: "carrier-pigeon", enabled: true }],
+      },
+    });
+
+    render(<NotificationsPage />);
+
+    await screen.findByText("Future Service");
+
+    await user.click(screen.getByRole("button", { name: /^edit$/i }));
+
+    expect(screen.getByRole("button", { name: /update service/i })).toBeEnabled();
+  });
+
   it("edits an existing service successfully", async () => {
     const user = userEvent.setup();
     const configAfterEdit = {
