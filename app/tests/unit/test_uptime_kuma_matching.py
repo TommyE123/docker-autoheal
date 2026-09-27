@@ -212,6 +212,22 @@ class TestMatchUptimeKumaMonitors:
         assert "stack-b_redis" in caplog.text
         assert "ambiguous" in caplog.text
 
+    def test_plain_container_has_no_service_name_to_fall_back_on(self, caplog):
+        """On a mixed host a Compose container forces a second precedence pass.
+        A plain container that matched nothing has no further name to try, and
+        must not be re-matched against whatever is left at that level."""
+        containers = [
+            _container("standalone", "standalone"),
+            _container("myapp_web", "myapp-web-1", compose_service="web"),
+        ]
+        monitors = [_monitor("Web")]
+
+        with caplog.at_level("INFO", logger="app.uptime_kuma.matching"):
+            result = match_uptime_kuma_monitors(containers, monitors)
+
+        assert result == [{"container_id": "myapp_web", "monitor_friendly_name": "Web"}]
+        assert "standalone" not in caplog.text
+
     def test_replicas_sharing_a_stable_id_claiming_different_monitors_are_dropped(
         self, caplog
     ):
