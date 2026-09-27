@@ -531,6 +531,49 @@ class TestUptimeKumaIntegration:
         assert result["auto_mappings"][0]["monitor_friendly_name"] == "web"
         assert config_manager.get_config().uptime_kuma.enabled is True
 
+    async def test_enable_auto_maps_compose_containers_by_service_name(
+        self, wired_api, monkeypatch
+    ):
+        """Auto-mapping must match on the Docker Compose service name (via
+        the stable-ID metadata the Docker client already exposes), not
+        require the monitor's friendly name to equal the full stable ID."""
+        docker_client, _engine = wired_api
+        container, info = make_container(
+            name="vpn-apps-trawl-1",
+            container_id="b" * 64,
+            labels={
+                "autoheal": "true",
+                "com.docker.compose.project": "vpn-apps",
+                "com.docker.compose.service": "trawl",
+            },
+        )
+        docker_client.add_container(container, info)
+        assert info["stable_id"] == "vpn-apps_trawl"
+
+        fake_client = FakeUptimeKumaClient(monitors=[{"friendly_name": "Trawl"}])
+        monkeypatch.setattr(
+            "app.uptime_kuma.uptime_kuma_client.UptimeKumaClient",
+            lambda *a, **k: fake_client,
+        )
+
+        result = await enable_uptime_kuma_integration(
+            {"server_url": "http://kuma.example", "api_token": "token"}
+        )
+
+        assert result["success"] is True
+        assert result["auto_mappings"] == [
+            {
+                "container_id": "vpn-apps_trawl",
+                "monitor_friendly_name": "Trawl",
+                "auto_mapped": True,
+            }
+        ]
+        persisted = config_manager.get_config().uptime_kuma_mappings
+        assert len(persisted) == 1
+        assert persisted[0].container_id == "vpn-apps_trawl"
+        assert persisted[0].monitor_friendly_name == "Trawl"
+        assert persisted[0].auto_mapped is True
+
     async def test_get_monitors_when_integration_disabled_returns_400(self):
         with pytest.raises(HTTPException) as exc_info:
             await get_uptime_kuma_monitors()
