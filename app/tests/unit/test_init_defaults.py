@@ -74,6 +74,7 @@ class TestInitDefaults:
         assert "alerts" in config
         assert "observability" in config
         assert "uptime_kuma" in config
+        assert "notifications" in config
 
         # Check monitor settings
         assert config["monitor"]["interval_seconds"] == 30
