@@ -22,7 +22,12 @@ from typing import Type, get_args, get_origin
 import pytest
 from pydantic import BaseModel
 
-from app.config.config_manager import AutoHealConfig, ConfigManager, NotificationService
+from app.config.config_manager import (
+    AutoHealConfig,
+    ConfigManager,
+    NotificationService,
+    _CONFIG_SECTION_MODELS,
+)
 from app.config.init_defaults import get_default_config
 
 
@@ -103,6 +108,7 @@ def test_first_boot_on_empty_data_dir_matches_autohealconfig_defaults(monkeypatc
 
     manager = ConfigManager()
 
+    assert json.loads((tmp_path / "config.json").read_text()) == get_default_config()
     assert manager.get_config() == AutoHealConfig()
     # initialize_defaults() wrote this file as a real side effect of
     # __init__, not something the test set up itself - confirm it exists.
@@ -121,6 +127,10 @@ def test_get_default_config_keys_match_autohealconfig_schema():
     separately before AutoHealConfig is ever constructed, not a field of
     AutoHealConfig itself."""
     _assert_keys_match_model_fields(_valid_top_level_config(), AutoHealConfig, "get_default_config()")
+
+
+def test_config_loader_registry_matches_autohealconfig_sections():
+    assert set(AutoHealConfig.model_fields) == set(_CONFIG_SECTION_MODELS) | {"uptime_kuma_mappings"}
 
 
 def test_schema_parity_helper_detects_an_unknown_top_level_key():
