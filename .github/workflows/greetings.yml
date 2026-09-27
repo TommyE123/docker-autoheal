@@ -27,6 +27,7 @@ jobs:
             maintainer will review it soon. If you're reporting a bug,
             please include relevant logs, configuration, Docker version,
             and steps to reproduce.
+          pr_message: "Unused placeholder for this issue-only job."
 
   greet-pr:
     name: Greet first-time PR authors
