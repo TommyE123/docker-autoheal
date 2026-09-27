@@ -98,6 +98,11 @@ Renovate is responsible for **detecting and proposing** dependency updates. It m
 * maintain GitHub Actions digest pins
 * maintain other configured version and digest pins
 
+For regular dependency updates, Renovate waits at least three days after a release before
+proposing it. `internalChecksFilter: "strict"` makes Renovate skip releases that have not
+cleared this window instead of selecting a newer, still-pending release. Security updates
+bypass the minimum release age so that vulnerability fixes are not delayed.
+
 Renovate does **not** automatically merge dependency updates.
 
 All dependency-update pull requests require manual review and merge.
