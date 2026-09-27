@@ -1,12 +1,13 @@
 """UI serving: the React app shell, PWA static files, and the React Router catch-all."""
 
+import logging
 from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 
-from app.api import state
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -97,13 +98,13 @@ async def serve_static_file(filename: str, media_type: Optional[str] = None) -> 
         if media_type is None:
             media_type = get_media_type(filename)
 
-        state.logger.debug(f"Serving static file: {filename} ({media_type})")
+        logger.debug(f"Serving static file: {filename} ({media_type})")
         return FileResponse(file_path, media_type=media_type)
 
     except HTTPException:
         raise
     except Exception as e:
-        state.logger.error(f"Error serving static file {filename}: {e}")
+        logger.error(f"Error serving static file {filename}: {e}")
         raise HTTPException(status_code=500, detail=f"Error serving file: {e!s}")
 
 
@@ -111,7 +112,7 @@ async def serve_static_file(filename: str, media_type: Optional[str] = None) -> 
 @router.get("/manifest.json")
 async def serve_manifest():
     """Serve PWA manifest at root"""
-    state.logger.info("PWA manifest route hit!")
+    logger.info("PWA manifest route hit!")
     return await serve_static_file("manifest.json", "application/manifest+json")
 
 
@@ -242,7 +243,7 @@ async def serve_ui_catchall(full_path: str):
     This allows client-side routing to work properly.
     """
     if should_serve_react_app(full_path):
-        state.logger.debug(f"Serving React app for path: {full_path}")
+        logger.debug(f"Serving React app for path: {full_path}")
         return serve_react_app()
-    state.logger.debug(f"Returning 404 for excluded path: {full_path}")
+    logger.debug(f"Returning 404 for excluded path: {full_path}")
     raise HTTPException(status_code=404, detail="Not Found")

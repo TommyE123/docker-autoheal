@@ -1,9 +1,12 @@
 """Event log endpoints."""
 
+import logging
+
 from fastapi import APIRouter, HTTPException
 
-from app.api import state
 from app.config.config_manager import AutoHealEvent, config_manager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -30,7 +33,7 @@ async def get_events(limit: int = 100):
             for event in events
         ]
     except Exception as e:
-        state.logger.error(f"Error getting events: {e}")
+        logger.error(f"Error getting events: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -41,5 +44,5 @@ async def clear_events():
         config_manager.clear_events()
         return {"status": "success", "message": "All events cleared"}
     except Exception as e:
-        state.logger.error(f"Error clearing events: {e}")
+        logger.error(f"Error clearing events: {e}")
         raise HTTPException(status_code=500, detail=str(e))

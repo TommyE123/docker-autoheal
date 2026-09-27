@@ -1,5 +1,6 @@
 """Health & status endpoints."""
 
+import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
@@ -8,6 +9,8 @@ from fastapi.responses import FileResponse
 from app.api import state
 from app.api.models import SystemStatus
 from app.config.config_manager import config_manager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -60,5 +63,5 @@ async def get_system_status():
             config=config
         )
     except Exception as e:
-        state.logger.error(f"Error getting system status: {e}")
+        logger.error(f"Error getting system status: {e}")
         raise HTTPException(status_code=500, detail=str(e))

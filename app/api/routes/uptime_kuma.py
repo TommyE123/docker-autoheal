@@ -1,9 +1,13 @@
 """Uptime-Kuma integration endpoints."""
 
+import logging
+
 from fastapi import APIRouter, HTTPException
 
 from app.api import state
 from app.config.config_manager import UptimeKumaMapping, config_manager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -37,7 +41,7 @@ async def test_uptime_kuma_connection(config_data: dict):
             "message": "Connection failed - check URL and credentials"
         }
     except Exception as e:
-        state.logger.error(f"Uptime-Kuma connection test failed: {e}")
+        logger.error(f"Uptime-Kuma connection test failed: {e}")
         return {
             "success": False,
             "message": f"Connection error: {e!s}"
@@ -103,7 +107,7 @@ async def enable_uptime_kuma_integration(integration_config: dict):
             await monitoring_engine.uptime_kuma_monitor.stop()
             await monitoring_engine.uptime_kuma_monitor.start()
 
-        state.logger.info(
+        logger.info(
             f"Uptime-Kuma integration enabled with {len(auto_mappings)} auto-mappings "
             f"using monitoring interval: {config.monitor.interval_seconds}s"
         )
@@ -115,7 +119,7 @@ async def enable_uptime_kuma_integration(integration_config: dict):
         }
 
     except Exception as e:
-        state.logger.error(f"Failed to enable Uptime-Kuma: {e}")
+        logger.error(f"Failed to enable Uptime-Kuma: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -138,7 +142,7 @@ async def get_uptime_kuma_monitors():
         monitors = await client.get_all_monitors()
         return {"monitors": monitors}
     except Exception as e:
-        state.logger.error(f"Failed to fetch Uptime-Kuma monitors: {e}")
+        logger.error(f"Failed to fetch Uptime-Kuma monitors: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -174,13 +178,13 @@ async def create_uptime_kuma_mapping(mapping: dict):
         config.uptime_kuma_mappings.append(new_mapping)
         config_manager.update_config(config)
 
-        state.logger.info(
+        logger.info(
             f"Created Uptime-Kuma mapping: {mapping['container_id']} -> {mapping['monitor_friendly_name']}"
         )
 
         return {"success": True, "mapping": new_mapping.model_dump()}
     except Exception as e:
-        state.logger.error(f"Failed to create Uptime-Kuma mapping: {e}")
+        logger.error(f"Failed to create Uptime-Kuma mapping: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -194,11 +198,11 @@ async def delete_uptime_kuma_mapping(container_id: str):
         ]
         config_manager.update_config(config)
 
-        state.logger.info(f"Deleted Uptime-Kuma mapping for stable_id: {container_id}")
+        logger.info(f"Deleted Uptime-Kuma mapping for stable_id: {container_id}")
 
         return {"success": True}
     except Exception as e:
-        state.logger.error(f"Failed to delete Uptime-Kuma mapping: {e}")
+        logger.error(f"Failed to delete Uptime-Kuma mapping: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -215,9 +219,9 @@ async def disable_uptime_kuma_integration():
         if hasattr(monitoring_engine, 'uptime_kuma_monitor'):
             await monitoring_engine.uptime_kuma_monitor.stop()
 
-        state.logger.info("Uptime-Kuma integration disabled")
+        logger.info("Uptime-Kuma integration disabled")
 
         return {"success": True}
     except Exception as e:
-        state.logger.error(f"Failed to disable Uptime-Kuma: {e}")
+        logger.error(f"Failed to disable Uptime-Kuma: {e}")
         raise HTTPException(status_code=500, detail=str(e))

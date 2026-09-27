@@ -1,5 +1,6 @@
 """Container management endpoints."""
 
+import logging
 from datetime import datetime, timezone
 from typing import List
 
@@ -8,6 +9,8 @@ from fastapi import APIRouter, HTTPException
 from app.api import state
 from app.api.models import ContainerInfo, ContainerSelectionRequest
 from app.config.config_manager import AutoHealEvent, config_manager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -90,7 +93,7 @@ async def list_containers(include_stopped: bool = False):
 
         return result
     except Exception as e:
-        state.logger.error(f"Error listing containers: {e}")
+        logger.error(f"Error listing containers: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -150,7 +153,7 @@ async def get_container_details(container_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        state.logger.error(f"Error getting container details: {e}")
+        logger.error(f"Error getting container details: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -158,7 +161,7 @@ async def get_container_details(container_id: str):
 async def update_container_selection(request: ContainerSelectionRequest):
     """Enable or disable auto-heal for specific containers"""
     try:
-        state.logger.debug(
+        logger.debug(
             f"Container selection request: containers={request.container_ids}, enabled={request.enabled}"
         )
         config = config_manager.get_config()
@@ -188,7 +191,7 @@ async def update_container_selection(request: ContainerSelectionRequest):
                     # Store by stable_id for persistence across recreations
                     if stable_id not in config.containers.selected:
                         config.containers.selected.append(stable_id)
-                        state.logger.debug(
+                        logger.debug(
                             f"Added container '{container_name}' with stable_id '{stable_id}' to selected list (ID: {cid})"
                         )
 
@@ -196,12 +199,12 @@ async def update_container_selection(request: ContainerSelectionRequest):
                     for identifier in [stable_id, container_name, cid]:
                         if identifier in config.containers.excluded:
                             config.containers.excluded.remove(identifier)
-                            state.logger.debug(f"Removed '{identifier}' from excluded list")
+                            logger.debug(f"Removed '{identifier}' from excluded list")
                 else:
                     # Fallback: store the identifier as-is
                     if cid not in config.containers.selected:
                         config.containers.selected.append(cid)
-                        state.logger.debug(f"Added container {cid} to selected list (container not resolved)")
+                        logger.debug(f"Added container {cid} to selected list (container not resolved)")
                     if cid in config.containers.excluded:
                         config.containers.excluded.remove(cid)
         else:
@@ -229,7 +232,7 @@ async def update_container_selection(request: ContainerSelectionRequest):
                     # Store by stable_id for persistence across recreations
                     if stable_id not in config.containers.excluded:
                         config.containers.excluded.append(stable_id)
-                        state.logger.debug(
+                        logger.debug(
                             f"Added container '{container_name}' with stable_id '{stable_id}' to excluded list (ID: {cid})"
                         )
 
@@ -237,25 +240,25 @@ async def update_container_selection(request: ContainerSelectionRequest):
                     for identifier in [stable_id, container_name, cid]:
                         if identifier in config.containers.selected:
                             config.containers.selected.remove(identifier)
-                            state.logger.debug(f"Removed '{identifier}' from selected list")
+                            logger.debug(f"Removed '{identifier}' from selected list")
                 else:
                     # Fallback: store the identifier as-is
                     if cid not in config.containers.excluded:
                         config.containers.excluded.append(cid)
-                        state.logger.debug(f"Added container {cid} to excluded list (container not resolved)")
+                        logger.debug(f"Added container {cid} to excluded list (container not resolved)")
                     if cid in config.containers.selected:
                         config.containers.selected.remove(cid)
 
         config_manager.update_config(config)
 
-        state.logger.info(
+        logger.info(
             f"Container selection updated: {len(request.container_ids)} container(s) "
             f"{'enabled' if request.enabled else 'disabled'}"
         )
 
         return {"status": "success", "message": f"Updated {len(request.container_ids)} containers"}
     except Exception as e:
-        state.logger.error(f"Error updating container selection: {e}", exc_info=True)
+        logger.error(f"Error updating container selection: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -279,7 +282,7 @@ async def restart_container_manual(container_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        state.logger.error(f"Error restarting container: {e}")
+        logger.error(f"Error restarting container: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -324,5 +327,5 @@ async def unquarantine_container(container_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        state.logger.error(f"Error unquarantining container: {e}")
+        logger.error(f"Error unquarantining container: {e}")
         raise HTTPException(status_code=500, detail=str(e))

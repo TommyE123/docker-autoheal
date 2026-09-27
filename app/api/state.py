@@ -15,14 +15,11 @@ modules can import this shared state without creating a circular import with
 ``api.py`` (which imports the route modules to register them).
 """
 
-import logging
 from typing import Optional
 
 from app.docker_client.docker_client_wrapper import DockerClientWrapper
 from app.monitor.monitoring_engine import MonitoringEngine
 from app.notifications.notification_manager import notification_manager  # noqa: F401
-
-logger = logging.getLogger("app.api.api")
 
 docker_client: Optional[DockerClientWrapper] = None
 monitoring_engine: Optional[MonitoringEngine] = None

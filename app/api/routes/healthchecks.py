@@ -1,9 +1,13 @@
 """Custom health check management endpoints."""
 
+import logging
+
 from fastapi import APIRouter, HTTPException
 
 from app.api import state
 from app.config.config_manager import HealthCheckConfig, config_manager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -40,7 +44,7 @@ async def add_health_check(health_check: HealthCheckConfig):
     except HTTPException:
         raise
     except Exception as e:
-        state.logger.error(f"Error adding health check: {e}")
+        logger.error(f"Error adding health check: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -77,7 +81,7 @@ async def get_health_check(container_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        state.logger.error(f"Error getting health check: {e}")
+        logger.error(f"Error getting health check: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -114,7 +118,7 @@ async def delete_health_check(container_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        state.logger.error(f"Error deleting health check: {e}")
+        logger.error(f"Error deleting health check: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

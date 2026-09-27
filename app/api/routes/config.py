@@ -14,8 +14,9 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
-from app.api import state
 from app.config.config_manager import AutoHealConfig, MonitorConfig, RestartConfig, config_manager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -33,7 +34,7 @@ async def update_config(config: AutoHealConfig):
         config_manager.update_config(config)
         return {"status": "success", "message": "Configuration updated"}
     except Exception as e:
-        state.logger.error(f"Error updating config: {e}")
+        logger.error(f"Error updating config: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -46,7 +47,7 @@ async def update_monitor_config(monitor_config: MonitorConfig):
         config_manager.update_config(config)
         return {"status": "success", "message": "Monitor configuration updated"}
     except Exception as e:
-        state.logger.error(f"Error updating monitor config: {e}")
+        logger.error(f"Error updating monitor config: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -59,7 +60,7 @@ async def update_restart_config(restart_config: RestartConfig):
         config_manager.update_config(config)
         return {"status": "success", "message": "Restart configuration updated"}
     except Exception as e:
-        state.logger.error(f"Error updating restart config: {e}")
+        logger.error(f"Error updating restart config: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -77,7 +78,7 @@ async def export_config():
             }
         )
     except Exception as e:
-        state.logger.error(f"Error exporting config: {e}")
+        logger.error(f"Error exporting config: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -92,7 +93,7 @@ async def import_config(file: UploadFile = File(...)):
 
         return {"status": "success", "message": "Configuration imported successfully"}
     except Exception as e:
-        state.logger.error(f"Error importing config: {e}")
+        logger.error(f"Error importing config: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -125,7 +126,7 @@ async def update_observability_config(observability_config: dict):
             logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
             logging.getLogger("uvicorn").setLevel(logging.WARNING)
 
-            state.logger.info(f"Log level changed to: {level_name}")
+            logger.info(f"Log level changed to: {level_name}")
 
         if "prometheus_enabled" in observability_config:
             config.observability.prometheus_enabled = observability_config["prometheus_enabled"]
@@ -137,5 +138,5 @@ async def update_observability_config(observability_config: dict):
 
         return {"status": "success", "message": "Observability configuration updated"}
     except Exception as e:
-        state.logger.error(f"Error updating observability config: {e}", exc_info=True)
+        logger.error(f"Error updating observability config: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

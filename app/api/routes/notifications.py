@@ -1,9 +1,13 @@
 """Notification configuration and service management endpoints."""
 
+import logging
+
 from fastapi import APIRouter, HTTPException
 
 from app.api import state
 from app.config.config_manager import NotificationService, config_manager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -19,7 +23,7 @@ async def get_notifications_config():
             "event_filters": config.notifications.event_filters
         }
     except Exception as e:
-        state.logger.error(f"Error getting notifications config: {e}")
+        logger.error(f"Error getting notifications config: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -55,7 +59,7 @@ async def update_notifications_config(notifications_config: dict):
             }
         }
     except Exception as e:
-        state.logger.error(f"Error updating notifications config: {e}")
+        logger.error(f"Error updating notifications config: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -84,7 +88,7 @@ async def add_notification_service(service: dict):
     except HTTPException:
         raise
     except Exception as e:
-        state.logger.error(f"Error adding notification service: {e}")
+        logger.error(f"Error adding notification service: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -120,7 +124,7 @@ async def update_notification_service(service_name: str, service: dict):
     except HTTPException:
         raise
     except Exception as e:
-        state.logger.error(f"Error updating notification service: {e}")
+        logger.error(f"Error updating notification service: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -148,7 +152,7 @@ async def delete_notification_service(service_name: str):
     except HTTPException:
         raise
     except Exception as e:
-        state.logger.error(f"Error deleting notification service: {e}")
+        logger.error(f"Error deleting notification service: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -168,5 +172,5 @@ async def test_notification_service(service_name: str):
     except HTTPException:
         raise
     except Exception as e:
-        state.logger.error(f"Error testing notification: {e}")
+        logger.error(f"Error testing notification: {e}")
         raise HTTPException(status_code=500, detail=str(e))

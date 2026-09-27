@@ -1,9 +1,12 @@
 """Maintenance mode endpoints."""
 
+import logging
+
 from fastapi import APIRouter, HTTPException
 
-from app.api import state
 from app.config.config_manager import config_manager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -13,7 +16,7 @@ async def enable_maintenance_mode():
     """Enable maintenance mode - stops all auto-healing"""
     try:
         config_manager.enable_maintenance_mode()
-        state.logger.info("Maintenance mode enabled")
+        logger.info("Maintenance mode enabled")
         return {
             "status": "success",
             "message": "Maintenance mode enabled",
@@ -21,7 +24,7 @@ async def enable_maintenance_mode():
             "maintenance_start_time": config_manager.get_maintenance_start_time().isoformat()
         }
     except Exception as e:
-        state.logger.error(f"Error enabling maintenance mode: {e}")
+        logger.error(f"Error enabling maintenance mode: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -30,14 +33,14 @@ async def disable_maintenance_mode():
     """Disable maintenance mode - resumes auto-healing"""
     try:
         config_manager.disable_maintenance_mode()
-        state.logger.info("Maintenance mode disabled")
+        logger.info("Maintenance mode disabled")
         return {
             "status": "success",
             "message": "Maintenance mode disabled",
             "maintenance_mode": False
         }
     except Exception as e:
-        state.logger.error(f"Error disabling maintenance mode: {e}")
+        logger.error(f"Error disabling maintenance mode: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -51,5 +54,5 @@ async def get_maintenance_status():
             "maintenance_start_time": maintenance_start.isoformat() if maintenance_start else None
         }
     except Exception as e:
-        state.logger.error(f"Error getting maintenance status: {e}")
+        logger.error(f"Error getting maintenance status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
