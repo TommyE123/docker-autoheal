@@ -235,11 +235,44 @@ describe("NotificationsPage", () => {
     const addButton = screen.getByRole("button", { name: /^add service$/i });
     expect(addButton).toBeDisabled();
 
-    await user.type(screen.getByPlaceholderText(/123456789:abcdefghijklmnopqrstuvwxyz/i), "123:abc");
+    const botTokenInput = screen.getByPlaceholderText(/123456789:abcdefghijklmnopqrstuvwxyz/i);
+    await user.type(botTokenInput, "   ");
+    expect(addButton).toBeDisabled();
+
+    await user.clear(botTokenInput);
+    await user.type(botTokenInput, "123:abc");
     expect(addButton).toBeDisabled();
 
     await user.type(screen.getByPlaceholderText(/-1001234567890/i), "456");
     expect(addButton).toBeEnabled();
+  });
+
+  // Guards against a new entry in the service type dropdown being added without a
+  // matching REQUIRED_FIELDS_BY_TYPE entry, which would silently fall back to
+  // validating the name only.
+  it("keeps the add button disabled for every service type when only the name is filled in", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({ data: config });
+
+    render(<NotificationsPage />);
+
+    await screen.findByText(/notifications are disabled/i);
+
+    await user.click(screen.getByRole("button", { name: /add service/i }));
+    await user.type(screen.getByPlaceholderText(/my discord server/i), "Name Only");
+
+    const typeSelect = screen.getByRole("combobox");
+    const serviceTypes = Array.from(typeSelect.options, (option) => option.value);
+    expect(serviceTypes.length).toBeGreaterThan(0);
+
+    const addButton = screen.getByRole("button", { name: /^add service$/i });
+    for (const serviceType of serviceTypes) {
+      await user.selectOptions(typeSelect, serviceType);
+      expect(
+        addButton,
+        `service type "${serviceType}" has no required-field validation`,
+      ).toBeDisabled();
+    }
   });
 
   it("edits an existing service successfully", async () => {

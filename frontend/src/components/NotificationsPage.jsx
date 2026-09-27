@@ -1,22 +1,4 @@
 import { useState, useEffect } from 'react';
-
-// Fields required for each service type, beyond the always-required name.
-// Mirrors the "*"-marked fields rendered by renderServiceFields() below.
-const REQUIRED_FIELDS_BY_TYPE = {
-  webhook: ['url'],
-  discord: ['url'],
-  slack: ['url'],
-  telegram: ['bot_token', 'chat_id'],
-  ntfy: ['topic'],
-  gotify: ['server_url', 'app_token'],
-  pushover: ['user_key', 'api_token']
-};
-
-function isServiceFormValid(formData) {
-  if (!formData.name) return false;
-  const requiredFields = REQUIRED_FIELDS_BY_TYPE[formData.type] || [];
-  return requiredFields.every((field) => !!formData[field]);
-}
 import {
   Container,
   Row,
@@ -38,6 +20,24 @@ import {
   deleteNotificationService,
   testNotificationService
 } from '../services/api';
+
+// Fields required for each service type, beyond the always-required name.
+// Mirrors the "*"-marked fields rendered by renderServiceFields() below.
+const REQUIRED_FIELDS_BY_TYPE = {
+  webhook: ['url'],
+  discord: ['url'],
+  slack: ['url'],
+  telegram: ['bot_token', 'chat_id'],
+  ntfy: ['topic'],
+  gotify: ['server_url', 'app_token'],
+  pushover: ['user_key', 'api_token']
+};
+
+function isServiceFormValid(formData) {
+  const hasValue = (field) => String(formData[field] ?? '').trim() !== '';
+  if (!hasValue('name')) return false;
+  return (REQUIRED_FIELDS_BY_TYPE[formData.type] || []).every(hasValue);
+}
 
 function NotificationsPage() {
   const [config, setConfig] = useState(null);
