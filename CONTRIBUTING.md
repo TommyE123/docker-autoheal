@@ -19,8 +19,12 @@ You'll need:
 - Node.js 18+ and npm (only if you're working on the web UI)
 - Docker (to run the service the way users do, and for integration testing)
 
-Full setup instructions — installing dependencies, running the backend and frontend dev
-servers, and building a local Docker image — are in
+Alternatively, the repository ships a Dev Container that provides all of the above plus
+every linter and security scanner CI runs — open the repository in VS Code and choose
+**Dev Containers: Reopen in Container**, or start a GitHub Codespace.
+
+Full setup instructions — installing dependencies, using the Dev Container, running the
+backend and frontend dev servers, and building a local Docker image — are in
 [docs/developer/development-setup.md](docs/developer/development-setup.md).
 
 ## Before opening a pull request

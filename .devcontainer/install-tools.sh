@@ -34,6 +34,7 @@ install_release() {
   temporary_directory="$(mktemp -d)"
   trap 'rm -rf "$temporary_directory"' RETURN
 
+  # Same-release checksum: verifies integrity, not provenance.
   curl --fail --silent --show-error --location \
     --output "${temporary_directory}/checksums.txt" \
     "${release_url}/${checksum_asset}"
@@ -42,12 +43,11 @@ install_release() {
   expected_checksum="$(grep -E "(^|[[:space:]])\*?${asset//./\\.}$" "${temporary_directory}/checksums.txt" | head -n 1 | awk '{print $1}')"
   if [[ ! "$expected_checksum" =~ ^[[:xdigit:]]{64}$ ]]; then
     echo "No valid checksum found for ${repository} ${asset}" >&2
-    exit 1
+    return 1
   fi
 
-  # Cache key includes the repository and version because a couple of the
-  # release assets (e.g. hadolint, osv-scanner) don't encode the version in
-  # their filename, only the architecture.
+  # Some assets (hadolint, osv-scanner) encode only the architecture in their
+  # filename, so the cache key needs the repository and version too.
   local cached_asset="${cache_dir}/${repository//\//_}_${version}_${asset}"
   if [[ -f "$cached_asset" ]] &&
     printf '%s  %s\n' "$expected_checksum" "$cached_asset" | sha256sum --check --status -; then
@@ -74,7 +74,7 @@ install_release() {
 
   if [[ -z "${install_source:-}" || ! -f "$install_source" ]]; then
     echo "Binary ${binary} was not found in ${asset}" >&2
-    exit 1
+    return 1
   fi
   install -m 0755 "$install_source" "${install_dir}/${binary}"
 }

@@ -41,8 +41,17 @@ docker-autoheal/
 │   ├── maintainer/               # Repository maintenance documentation
 │   └── historical/                # Superseded documents, kept for context
 │
+├── .devcontainer/                # Dev Container definition (see docs/developer/development-setup.md)
+│   ├── devcontainer.json         # Image, features, mounts, ports, VS Code customisations
+│   ├── post-create.sh            # Installs dependencies and tooling on container creation
+│   ├── install-tools.sh          # Checksum-verified install of the pinned release tools
+│   ├── prepare-caches.sh         # Makes the cache volumes writable, then purges them weekly
+│   ├── tools.json                # Pinned GitHub release versions for the above
+│   ├── package.json              # Pinned npm-based linters used by the local tasks
+│   └── requirements-tools.txt    # Pinned Python linters/scanners used by the local tasks
+│
 ├── requirements.txt              # Runtime Python dependencies
-├── requirements-dev.txt          # Test dependencies (pytest, coverage, etc.)
+├── requirements-dev.txt          # Test dependencies (pytest, coverage)
 ├── pytest.ini / .coveragerc
 ├── run.py                        # Convenience entry point (`python run.py`)
 ├── Dockerfile                    # Multi-stage build: Node (frontend) → Python (backend)

@@ -8,6 +8,69 @@
 - Node.js 18+ and npm (only needed if you're touching the frontend)
 - Docker and Docker Compose
 
+Everything below can be installed by hand, or you can use the Dev Container, which
+provides all of it pre-configured.
+
+## Dev Container (recommended)
+
+`.devcontainer/` defines a reproducible development environment. In VS Code with the
+[Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+extension installed, open the repository and choose **Dev Containers: Reopen in
+Container**. It also works as a GitHub Codespace.
+
+The container provides:
+
+- Python (matching the pinned base image in `.devcontainer/devcontainer.json`) and Node.js 24
+- Access to the host's Docker daemon, via the `docker-outside-of-docker` feature
+- The GitHub CLI (`gh`) plus the `github/gh-aw` extension, for working on this
+  repository's agentic GitHub Actions workflows locally. That extension needs a token, so
+  its installation is best-effort and never fails container setup
+- Every linter and security scanner CI runs, installed from pinned, checksum-verified
+  GitHub releases (`.devcontainer/tools.json`, `.devcontainer/install-tools.sh`) and
+  pinned npm/pip manifests (`.devcontainer/package.json`,
+  `.devcontainer/requirements-tools.txt`)
+- Shared VS Code settings, a shared set of installed VS Code extensions, and forwarded
+  ports for the frontend (3000), API (3131) and metrics (9090)
+
+Application services are **not** started automatically — use the tasks below.
+
+`postCreateCommand` runs `.devcontainer/post-create.sh`, which installs the dependencies
+and tooling. pip, npm, tool binaries and `gh` extensions live in named Docker volumes so
+rebuilds don't re-download everything; `.devcontainer/prepare-caches.sh` makes those
+volumes writable by the container user and purges them when they're more than seven days
+old.
+
+### Tasks
+
+`.vscode/tasks.json` wires the common workflows up to **Terminal → Run Task** (every
+label is prefixed `Autoheal:`): running the backend and the frontend dev server, the unit
+and integration suites, the frontend build, `docker compose up --build`, and each linter
+and security scanner individually. The aggregate entry points are **Run Local Linters**,
+**Lint Python**, **Lint Frontend**, **Lint Shell Scripts**, **Lint Workflows**, **Lint
+Markup and Data**, **Check Repository Conventions** and **Run Security Scanners**.
+
+The tasks that need shell globbing run under `bash`, so outside the Dev Container they
+need `bash` on `PATH` (Git Bash or WSL on Windows).
+
+**Autoheal: Run Megalinter Cupcake** runs the same pinned MegaLinter image CI uses. It
+mounts `$LOCAL_WORKSPACE_FOLDER` — set by `devcontainer.json` to the *host* path of your
+checkout — rather than the container path, because the Docker daemon is the host's (see
+below). Without that it would mount an empty directory, lint nothing, and pass.
+
+### Docker Compose inside the Dev Container
+
+`docker compose` talks to the Docker daemon through the `docker-outside-of-docker`
+feature — the daemon is the host's, not the container's. Relative bind mounts in
+`docker-compose.yml`/`docker-compose.test.yml` (e.g. `./data:/data`) are resolved by the
+Compose client to the container's path and handed to the host daemon as-is, which has no
+such path and silently creates an empty directory there instead of binding your checkout.
+The stack still starts and passes its health check, but persisted data (config, events,
+logs) won't be visible in your working copy — use `docker compose logs`/`docker exec` to
+inspect it instead.
+
+`.github/workflows/devcontainer.yml` builds the container and checks its tooling on pull
+requests that touch it, and can also be run manually from the Actions tab.
+
 ## Backend
 
 ```bash
@@ -42,14 +105,8 @@ This builds the frontend and backend into a single image (see
 [Architecture](architecture.md)) and runs it the same way an end user would, on port
 `3131`.
 
-**Inside the Dev Container**, `docker compose` talks to the Docker daemon through the
-`docker-outside-of-docker` feature - the daemon is the host's, not the container's. Relative
-bind mounts in `docker-compose.yml`/`docker-compose.test.yml` (e.g. `./data:/data`) are
-resolved by the Compose client to the container's path and handed to the host daemon as-is,
-which has no such path and silently creates an empty directory there instead of binding your
-checkout. The stack still starts and passes its health check, but persisted data (config,
-events, logs) won't be visible in your working copy - use `docker compose logs`/`docker exec`
-to inspect it instead.
+Inside the Dev Container this comes with a caveat — see
+[Docker Compose inside the Dev Container](#docker-compose-inside-the-dev-container).
 
 ## Running tests
 
@@ -83,12 +140,52 @@ style — everything else is at markdownlint's defaults. Run both locally before
 docs changes:
 
 ```bash
-npx markdownlint-cli2 "**/*.md" "#node_modules" "#frontend/node_modules"
+npx markdownlint-cli2 "**/*.md" "#node_modules" "#frontend/node_modules" "#.devcontainer/node_modules"
 npx markdown-table-formatter --check "**/*.md"   # drop --check to auto-fix
 ```
 
+In the Dev Container these are the **Autoheal: Lint Markdown** and **Autoheal: Check
+Markdown Tables** tasks, which lint tracked files only.
+
 The frontend has `npm run lint` (ESLint) and `npm run format:check` (Prettier) scripts —
 see [Frontend Development](frontend.md#linting-and-formatting).
+
+Linter configuration lives at the repository root (`.markdownlint.jsonc`,
+`.stylelintrc.json`, `.secretlintrc.json`, `.secretlintignore`, `.trufflehog-exclude.txt`,
+`.yamllint.yml`, `.ls-lint.yml`) and is shared: the Dev Container tasks and MegaLinter
+both read it, so a rule change applies in both places.
+
+### What lints what
+
+MegaLinter runs a different set of tools per file type, and only some of those tools are
+formatters. `.vscode/settings.json` sets each language's `editor.defaultFormatter` to the
+formatter CI actually enforces — and turns format-on-save off for the types where CI has
+no formatter, so nothing rewrites files in a way CI neither requires nor validates.
+
+| File type         | Linters (CI)                           | Formatter (CI)           | Fails the build? |
+|-------------------|----------------------------------------|--------------------------|------------------|
+| `.py`, `.pyi`     | pyright, ruff                          | ruff-format              | No, report-only  |
+| `.js`, `.jsx`     | eslint                                 | prettier                 | No, report-only  |
+| `.css`            | stylelint                              | none                     | No, report-only  |
+| `.json`           | jsonlint, v8r                          | prettier                 | Yes              |
+| `.yml`, `.yaml`   | yamllint, v8r, actionlint              | prettier                 | Yes              |
+| `.md`             | markdownlint                           | markdown-table-formatter | Yes              |
+| `.html`, `.htm`   | djlint, htmlhint                       | none                     | Yes              |
+| `.sh`             | shellcheck, bash-exec                  | shfmt                    | Yes              |
+| `Dockerfile*`     | hadolint                               | none                     | Yes              |
+| Every file        | editorconfig-checker                   | —                        | Yes              |
+
+Workflow files are additionally scanned by zizmor, which is report-only. Repository-wide
+scanners (checkov, semgrep, osv-scanner, trivy, trufflehog, betterleaks, secretlint,
+ls-lint, git_diff) run against the project rather than a file type. The report-only
+linters are the ones listed in `.mega-linter.yml`'s `DISABLE_ERRORS_LINTERS`.
+
+The Dev Container installs an equivalent of each of these, so every row above has a
+matching `Autoheal:` task. Most come from `.devcontainer/tools.json` (pinned GitHub
+releases, checksum-verified) or `.devcontainer/package.json` (npm); shellcheck and shfmt
+ship as GitHub releases without checksum files, so they come from the `shellcheck-py` and
+`shfmt-py` binary wrappers in `.devcontainer/requirements-tools.txt` instead. shfmt reads
+indentation from `.editorconfig`, which is why the shell scripts use two spaces.
 
 ## Data directory when developing locally
 

@@ -23,7 +23,7 @@
     "storage": "8gb"
   },
 
-  "postCreateCommand": "bash .devcontainer/maybe-purge-caches.sh && python -m pip install -r requirements-dev.txt && npm ci --prefix frontend && npm ci --ignore-scripts --prefix .devcontainer && bash .devcontainer/install-tools.sh && (gh extension upgrade gh-aw || gh extension install github/gh-aw || echo 'Warning: gh-aw extension install failed (expected without a GITHUB_TOKEN outside Codespaces)')",
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
 
   "waitFor": "postCreateCommand",
 
@@ -48,11 +48,13 @@
         "dbaeumer.vscode-eslint",
         "editorconfig.editorconfig",
         "esbenp.prettier-vscode",
+        "foxundermoon.shell-format",
         "github.vscode-github-actions",
         "ms-azuretools.vscode-docker",
         "ms-python.python",
         "redhat.vscode-xml",
         "redhat.vscode-yaml",
+        "timonwong.shellcheck",
         "DavidAnson.vscode-markdownlint",
         "stylelint.vscode-stylelint",
         "yzhang.markdown-all-in-one"
@@ -61,7 +63,8 @@
   },
 
   "remoteEnv": {
-    "PATH": "${containerWorkspaceFolder}/.devcontainer/node_modules/.bin:${containerEnv:HOME}/.local/bin:${containerEnv:PATH}"
+    "PATH": "${containerWorkspaceFolder}/.devcontainer/node_modules/.bin:${containerEnv:HOME}/.local/bin:${containerEnv:PATH}",
+    "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
   },
 
   "remoteUser": "vscode",

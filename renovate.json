@@ -14,8 +14,6 @@
   "forkProcessing": "enabled",
   "platformAutomerge": false,
   "rebaseWhen": "behind-base-branch",
-  "minimumReleaseAge": "3 days",
-  "internalChecksFilter": "strict",
   "semanticCommits": "enabled",
   "semanticCommitType": "chore",
   "prConcurrentLimit": 15,
@@ -61,8 +59,8 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Update devcontainer release tools",
-      "managerFilePatterns": ["/.devcontainer\\/tools\\.json$/"],
+      "description": "Update the pinned GitHub release versions in .devcontainer/tools.json",
+      "managerFilePatterns": ["/^\\.devcontainer\\/tools\\.json$/"],
       "matchStrings": [
         "\\\"repository\\\":\\s*\\\"(?<depName>[^\\\"]+)\\\",\\s*\\\"version\\\":\\s*\\\"v?(?<currentValue>[^\\\"]+)\\\""
       ],

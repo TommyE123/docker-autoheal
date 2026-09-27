@@ -2,15 +2,10 @@
 # Documentation: https://yamllint.readthedocs.io/en/stable/configuration.html
 extends: default
 
-# *.lock.yml files under .github/workflows/ are compiled by the `gh aw`
-# GitHub Agentic Workflows CLI from a Markdown source and are not
-# hand-authored; `gh aw compile --yamllint` is the correct validation for
-# them instead.
-#
-# node_modules is only relevant locally (CI's MegaLinter run never installs
-# it), but the "Lint YAML" VS Code task runs `yamllint --strict .` against
-# the whole workspace, so it needs excluding here or it lints vendored
-# packages under frontend/node_modules and .devcontainer/node_modules.
+# *.lock.yml is compiled by the `gh aw` CLI, not hand-authored;
+# `gh aw compile --yamllint` validates it instead.
+# node_modules: the "Lint YAML" task scans the whole workspace, and
+# MegaLinter's eslint pre-command creates frontend/node_modules mid-run.
 ignore: |
   .github/workflows/*.lock.yml
   node_modules/

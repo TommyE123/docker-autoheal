@@ -9,7 +9,6 @@
     },
     {
       "label": "Autoheal: Run React Frontend",
-
       "type": "shell",
       "command": "npm run dev -- --host 0.0.0.0",
       "options": {
@@ -51,8 +50,20 @@
     {
       "label": "Autoheal: Lint Python with Ruff",
       "type": "shell",
-      "command": "ruff check app",
-      "problemMatcher": []
+      "command": "ruff check --output-format concise app",
+      "problemMatcher": {
+        "owner": "ruff",
+        "source": "ruff",
+        "fileLocation": ["relative", "${workspaceFolder}"],
+        "pattern": {
+          "regexp": "^(.+?):(\\d+):(\\d+):\\s+(\\S+)\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "code": 4,
+          "message": 5
+        }
+      }
     },
     {
       "label": "Autoheal: Check Python Formatting",
@@ -83,7 +94,7 @@
       "options": {
         "cwd": "${workspaceFolder}/frontend"
       },
-      "problemMatcher": []
+      "problemMatcher": "$eslint-stylish"
     },
     {
       "label": "Autoheal: Check JavaScript Formatting",
@@ -98,6 +109,39 @@
       "label": "Autoheal: Lint CSS",
       "type": "shell",
       "command": "stylelint --config-basedir .devcontainer/node_modules \"frontend/src/**/*.css\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Lint Shell Scripts",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "Autoheal: Check Shell Scripts with ShellCheck",
+        "Autoheal: Check Shell Formatting"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Shell Scripts with ShellCheck",
+      "type": "shell",
+      "command": "shellcheck $(git ls-files '*.sh')",
+      "options": {
+        "shell": {
+          "executable": "bash",
+          "args": ["-c"]
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Shell Formatting",
+      "type": "shell",
+      "command": "shfmt --diff $(git ls-files '*.sh')",
+      "options": {
+        "shell": {
+          "executable": "bash",
+          "args": ["-c"]
+        }
+      },
       "problemMatcher": []
     },
     {
@@ -118,7 +162,13 @@
     {
       "label": "Autoheal: Lint Workflow Security",
       "type": "shell",
-      "command": "zizmor .github/workflows",
+      "command": "zizmor $(git ls-files '.github/workflows/*.yml' | grep -v '\\.lock\\.yml$')",
+      "options": {
+        "shell": {
+          "executable": "bash",
+          "args": ["-c"]
+        }
+      },
       "problemMatcher": []
     },
     {
@@ -139,12 +189,24 @@
       "label": "Autoheal: Lint Markdown",
       "type": "shell",
       "command": "markdownlint-cli2 $(git ls-files '*.md')",
+      "options": {
+        "shell": {
+          "executable": "bash",
+          "args": ["-c"]
+        }
+      },
       "problemMatcher": []
     },
     {
       "label": "Autoheal: Check Markdown Tables",
       "type": "shell",
       "command": "markdown-table-formatter --check $(git ls-files '*.md')",
+      "options": {
+        "shell": {
+          "executable": "bash",
+          "args": ["-c"]
+        }
+      },
       "problemMatcher": []
     },
     {
@@ -162,7 +224,13 @@
     {
       "label": "Autoheal: Check JSON",
       "type": "shell",
-      "command": "jsonlint .devcontainer/devcontainer.json && jsonlint .devcontainer/tools.json",
+      "command": "for file in $(git ls-files '*.json' | grep -v -e 'package-lock\\.json$' -e '^\\.vscode/'); do jsonlint --quiet \"$file\" || exit 1; done",
+      "options": {
+        "shell": {
+          "executable": "bash",
+          "args": ["-c"]
+        }
+      },
       "problemMatcher": []
     },
     {
@@ -174,7 +242,13 @@
     {
       "label": "Autoheal: Validate JSON and YAML",
       "type": "shell",
-      "command": "v8r .",
+      "command": "v8r $(git ls-files '*.json' '*.yml' '*.yaml' | grep -v -e 'package-lock\\.json$' -e '\\.lock\\.yml$' -e '^\\.vscode/')",
+      "options": {
+        "shell": {
+          "executable": "bash",
+          "args": ["-c"]
+        }
+      },
       "problemMatcher": []
     },
     {
@@ -238,7 +312,7 @@
     {
       "label": "Autoheal: Run Trivy",
       "type": "shell",
-      "command": "trivy fs --scanners vuln,misconfig,secret .",
+      "command": "trivy fs --scanners vuln,misconfig,secret --skip-dirs '**/node_modules' .",
       "problemMatcher": []
     },
     {
@@ -259,6 +333,7 @@
       "dependsOn": [
         "Autoheal: Lint Python",
         "Autoheal: Lint Frontend",
+        "Autoheal: Lint Shell Scripts",
         "Autoheal: Lint Workflows",
         "Autoheal: Lint Markup and Data",
         "Autoheal: Lint Dockerfiles",
@@ -270,13 +345,17 @@
     {
       "label": "Autoheal: Run Megalinter Cupcake",
       "type": "shell",
-      "command": "docker run --rm -v \"${workspaceFolder}:/tmp/lint\" ghcr.io/oxsecurity/megalinter-cupcake:v10.1.0@sha256:7cce5b9d46564149d451a9752c5c266982f10c231be7df79996f46e3e171d2fc",
-      "problemMatcher": []
-    },
-    {
-      "label": "Autoheal: Run Megalinter Cupcake (Beta)",
-      "type": "shell",
-      "command": "docker run --rm -v \"${workspaceFolder}:/tmp/lint\" ghcr.io/oxsecurity/megalinter-cupcake:beta",
+      // Mount the host path, not the container path: the daemon is the host's
+      // under docker-outside-of-docker, and would otherwise mount an empty
+      // directory and lint nothing. LOCAL_WORKSPACE_FOLDER is set by
+      // devcontainer.json; $PWD is the fallback when running on the host.
+      "command": "docker run --rm -v \"${LOCAL_WORKSPACE_FOLDER:-$PWD}:/tmp/lint\" ghcr.io/oxsecurity/megalinter-cupcake:v10.1.0@sha256:7cce5b9d46564149d451a9752c5c266982f10c231be7df79996f46e3e171d2fc",
+      "options": {
+        "shell": {
+          "executable": "bash",
+          "args": ["-c"]
+        }
+      },
       "problemMatcher": []
     },
     {
