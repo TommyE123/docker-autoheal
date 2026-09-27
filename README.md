@@ -1,7 +1,11 @@
 # Docker Auto-Heal Service
 
 [![Unit Tests](https://github.com/TommyE123/docker-autoheal/actions/workflows/tests.yml/badge.svg)](https://github.com/TommyE123/docker-autoheal/actions/workflows/tests.yml)
-[![Docker Pulls](https://img.shields.io/docker/pulls/tommye123/docker-autoheal)](https://hub.docker.com/r/tommye123/docker-autoheal)
+[![Test Coverage](https://img.shields.io/codecov/c/github/TommyE123/docker-autoheal?branch=main&label=Test%20Coverage)](https://codecov.io/gh/TommyE123/docker-autoheal)
+[![Docker Hub Pulls](https://img.shields.io/docker/pulls/tommye123/docker-autoheal?label=Docker%20Hub%20Pulls)](https://hub.docker.com/r/tommye123/docker-autoheal)
+[![GHCR Pulls](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fghcr-badge.elias.eu.org%2Fapi%2FTommyE123%2Fdocker-autoheal&query=downloadCount&label=GHCR%20Pulls)](https://github.com/users/TommyE123/packages/container/package/docker-autoheal)
+[![Docker Image Size](https://img.shields.io/docker/image-size/tommye123/docker-autoheal/latest?label=Docker%20Image%20Size)](https://hub.docker.com/r/tommye123/docker-autoheal)
+[![GitHub Release](https://img.shields.io/github/v/release/TommyE123/docker-autoheal?sort=semver&label=GitHub%20Release)](https://github.com/TommyE123/docker-autoheal/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Docker Auto-Heal watches your Docker containers and restarts the ones that fail or go
