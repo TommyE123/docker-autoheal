@@ -258,6 +258,12 @@
       "problemMatcher": []
     },
     {
+      "label": "Autoheal: Check Dockerfile Formatting",
+      "type": "shell",
+      "command": "dockerfmt -c Dockerfile Dockerfile.simple",
+      "problemMatcher": []
+    },
+    {
       "label": "Autoheal: Check Repository Conventions",
       "dependsOrder": "parallel",
       "dependsOn": [
@@ -337,6 +343,7 @@
         "Autoheal: Lint Workflows",
         "Autoheal: Lint Markup and Data",
         "Autoheal: Lint Dockerfiles",
+        "Autoheal: Check Dockerfile Formatting",
         "Autoheal: Check Repository Conventions",
         "Autoheal: Run Security Scanners"
       ],

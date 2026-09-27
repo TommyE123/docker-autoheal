@@ -55,6 +55,7 @@ jobs:
             trivy --version
             trufflehog --version
             betterleaks --version
+            dockerfmt --version
 
             echo "== Development tools =="
             pytest --version
