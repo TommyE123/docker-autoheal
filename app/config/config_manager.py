@@ -510,13 +510,16 @@ class ConfigManager:
             # Extract and store custom health checks separately
             custom_hc = config_dict.pop('custom_health_checks', {})
 
-            # Update main config
-            self._config = AutoHealConfig(**config_dict)
-
-            # Restore custom health checks
-            self._custom_health_checks = {
+            # Validate the full payload before assigning anything, so a
+            # failure anywhere leaves the live config and custom health
+            # checks completely untouched.
+            new_config = AutoHealConfig(**config_dict)
+            new_custom_health_checks = {
                 cid: HealthCheckConfig(**hc) for cid, hc in custom_hc.items()
             }
+
+            self._config = new_config
+            self._custom_health_checks = new_custom_health_checks
 
             # Persist to disk
             self._save_config()
