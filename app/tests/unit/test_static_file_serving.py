@@ -103,3 +103,99 @@ def test_get_static_file_path_traversal_raises_400(static_dir):
         get_static_file_path("../secret.txt")
 
     assert exc_info.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_serve_static_file_unexpected_error_becomes_500(static_dir, monkeypatch):
+    def explode(_filename):
+        raise OSError("filesystem went away")
+
+    monkeypatch.setattr(api_module, "get_static_file_path", explode)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await serve_static_file("sw.js")
+
+    assert exc_info.value.status_code == 500
+    assert "filesystem went away" in str(exc_info.value.detail)
+
+
+# ---------------------------------------------------------------------------
+# PWA root endpoints
+#
+# Each of these is a thin wrapper whose whole job is the filename and media
+# type it pins - the pair a browser needs exactly right to install the PWA.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("endpoint", "args", "filename", "media_type"),
+    [
+        (api_module.serve_manifest, (), "manifest.json", "application/manifest+json"),
+        (api_module.serve_service_worker, (), "sw.js", "application/javascript"),
+        (api_module.serve_register_sw, (), "registerSW.js", "application/javascript"),
+        (api_module.serve_favicon, (), "favicon.svg", "image/svg+xml"),
+        (api_module.serve_screenshot_narrow, (), "screenshot-narrow.png", "image/png"),
+        (api_module.serve_screenshot_wide, (), "screenshot-wide.png", "image/png"),
+        (api_module.serve_workbox, ("abc123",), "workbox-abc123.js", "application/javascript"),
+        (api_module.serve_pwa_icon, ("192x192",), "pwa-192x192.png", "image/png"),
+        (
+            api_module.serve_maskable_icon,
+            ("512x512",),
+            "maskable-icon-512x512.png",
+            "image/png",
+        ),
+    ],
+)
+async def test_pwa_root_endpoint_serves_expected_file(
+    static_dir, endpoint, args, filename, media_type
+):
+    content = f"contents of {filename}".encode()
+    (static_dir / filename).write_bytes(content)
+
+    response = await endpoint(*args)
+    status, headers, body = await _collect_response(response)
+
+    assert status == 200
+    assert headers["content-type"] == media_type
+    assert body == content
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "endpoint", [api_module.serve_pwa_icon, api_module.serve_maskable_icon]
+)
+@pytest.mark.parametrize("size", ["../../etc/passwd", "192x192/../..", "abc"])
+async def test_icon_endpoints_reject_non_numeric_sizes(static_dir, endpoint, size):
+    with pytest.raises(HTTPException) as exc_info:
+        await endpoint(size)
+
+    assert exc_info.value.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# React app shell
+# ---------------------------------------------------------------------------
+
+
+def test_serve_react_app_returns_built_index_html(tmp_path, monkeypatch):
+    (tmp_path / "static").mkdir()
+    (tmp_path / "static" / "index.html").write_text(
+        "<!doctype html><title>built app</title>", encoding="utf-8"
+    )
+    monkeypatch.chdir(tmp_path)
+
+    response = api_module.serve_react_app()
+
+    assert response.status_code == 200
+    assert b"built app" in response.body
+
+
+def test_serve_react_app_falls_back_when_frontend_is_not_built(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)  # no static/index.html here
+
+    response = api_module.serve_react_app()
+
+    assert response.status_code == 200
+    assert b"React UI not found" in response.body
+    assert b"npm run build" in response.body
