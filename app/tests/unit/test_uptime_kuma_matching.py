@@ -106,7 +106,7 @@ class TestMatchUptimeKumaMonitors:
         ]
         monitors = [_monitor("Steam-Headless")]
 
-        with caplog.at_level("DEBUG", logger="app.uptime_kuma.matching"):
+        with caplog.at_level("INFO", logger="app.uptime_kuma.matching"):
             result = match_uptime_kuma_monitors(containers, monitors)
 
         assert result == []
@@ -123,13 +123,16 @@ class TestMatchUptimeKumaMonitors:
         containers = [_container("web", "web")]
         monitors = [_monitor("Web"), _monitor("web")]
 
-        with caplog.at_level("DEBUG", logger="app.uptime_kuma.matching"):
+        with caplog.at_level("INFO", logger="app.uptime_kuma.matching"):
             result = match_uptime_kuma_monitors(containers, monitors)
 
         assert result == []
         assert "web" in caplog.text
         assert "matched 2 monitors" in caplog.text
         assert "ambiguous" in caplog.text
+        # Operators must not have to enable DEBUG to find out why a container
+        # dropped out of Uptime-Kuma-driven restart.
+        assert [record.levelname for record in caplog.records] == ["INFO"]
 
     def test_ambiguous_match_across_two_monitors_sharing_identical_friendly_name(self):
         """Two distinct Uptime-Kuma monitor objects can legitimately share the
@@ -198,14 +201,3 @@ class TestMatchUptimeKumaMonitors:
         assert "stack-a_redis" in caplog.text
         assert "stack-b_redis" in caplog.text
         assert "ambiguous" in caplog.text
-
-    def test_unmapped_rejections_are_logged_at_info(self, caplog):
-        """An operator must be able to see why a container was left unmapped
-        without first enabling DEBUG logging."""
-        containers = [_container("web", "web")]
-        monitors = [_monitor("Web"), _monitor("web")]
-
-        with caplog.at_level("INFO", logger="app.uptime_kuma.matching"):
-            match_uptime_kuma_monitors(containers, monitors)
-
-        assert [record.levelname for record in caplog.records] == ["INFO"]

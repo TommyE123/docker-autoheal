@@ -11,7 +11,7 @@ Compose service name. See issue #141.
 
 import logging
 import re
-from typing import Callable, Dict, Iterable, List, NotRequired, Optional, Set, TypedDict
+from typing import Dict, Iterable, List, NotRequired, Optional, Set, TypedDict
 
 logger = logging.getLogger(__name__)
 
@@ -45,37 +45,13 @@ def normalize_name(name: str) -> str:
     return re.sub(r"[-_\s]+", "-", name.strip().lower()).strip("-")
 
 
-def _docker_name(container: ContainerNameInfo) -> List[str]:
-    return [container["name"]]
-
-
-def _compose_service_name(container: ContainerNameInfo) -> List[str]:
+def _candidate_names(container: ContainerNameInfo) -> List[str]:
+    """Names to match this container by, highest precedence first."""
+    names = [container["name"]]
     compose_service = container.get("compose_service")
-    return [compose_service] if compose_service else []
-
-
-# Docker container names are unique per host, so resolving them before Compose
-# service names stops an unrelated stack's service from invalidating a match the
-# container name alone already identified unambiguously.
-_NAME_SOURCES: List[Callable[[ContainerNameInfo], List[str]]] = [
-    _docker_name,
-    _compose_service_name,
-]
-
-
-def _monitor_candidates(
-    names: List[str],
-    monitor_indices_by_norm: Dict[str, List[int]],
-    available: Set[int],
-) -> Set[int]:
-    candidates: Set[int] = set()
-    for name in names:
-        candidates.update(
-            index
-            for index in monitor_indices_by_norm.get(normalize_name(name), [])
-            if index in available
-        )
-    return candidates
+    if compose_service:
+        names.append(compose_service)
+    return names
 
 
 def match_uptime_kuma_monitors(
@@ -96,8 +72,9 @@ def match_uptime_kuma_monitors(
     monitors, or a monitor matching several containers - is left unmapped
     rather than guessed, since a wrong auto-mapping could cause AutoHeal to
     act on the wrong container. A monitor considered at one precedence level
-    is never offered to a lower one, so an ambiguous match cannot be quietly
-    resolved further down.
+    is never offered to a lower one, and a container whose higher-precedence
+    name already matched something - even ambiguously - is not retried at a
+    lower one, so an ambiguous match cannot be quietly resolved further down.
 
     Args:
         containers: Container name info, keyed by ``stable_id``/``name`` and
@@ -127,13 +104,23 @@ def match_uptime_kuma_monitors(
     unresolved: List[int] = list(range(len(containers)))
     matched_by_container: Dict[int, UptimeKumaMatch] = {}
 
-    for names_of in _NAME_SOURCES:
-        candidates = {
-            position: _monitor_candidates(
-                names_of(containers[position]), monitor_indices_by_norm, available
-            )
-            for position in unresolved
-        }
+    # Every container resolves its Docker name before any container falls back
+    # to its Compose service name, so an unrelated stack's service can't
+    # invalidate a match the container name alone already identified.
+    names_by_container = [_candidate_names(container) for container in containers]
+    tier_count = max((len(names) for names in names_by_container), default=0)
+
+    for tier in range(tier_count):
+        candidates: Dict[int, Set[int]] = {}
+        for position in unresolved:
+            names = names_by_container[position]
+            indices: Set[int] = set()
+            if tier < len(names):
+                norm = normalize_name(names[tier])
+                indices = {
+                    index for index in monitor_indices_by_norm.get(norm, []) if index in available
+                }
+            candidates[position] = indices
 
         counts: Dict[int, int] = {}
         for indices in candidates.values():
@@ -173,6 +160,8 @@ def match_uptime_kuma_monitors(
                 "monitor_friendly_name": monitors[monitor_index]["friendly_name"],
             }
 
+        # Consumed either way: a monitor that was ambiguous here must not
+        # become someone's unambiguous match at a lower precedence level.
         available -= set(counts)
 
     return [matched_by_container[position] for position in sorted(matched_by_container)]
