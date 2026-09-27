@@ -35,7 +35,6 @@ import DeleteMappingModal from './config/DeleteMappingModal';
 function ConfigPage() {
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showInfoAlert, setShowInfoAlert] = useState(true);
   const [validationModal, setValidationModal] = useState({
     show: false,
     title: '',
@@ -315,39 +314,6 @@ function ConfigPage() {
 
   return (
     <>
-      {/* Info Banner */}
-      {showInfoAlert && (
-        <div
-          className="d-flex align-items-center justify-content-between px-3 py-2 text-white mb-4"
-          style={{
-            backgroundColor: '#dc3545',
-            fontSize: '0.875rem',
-            borderRadius: '0.375rem'
-          }}
-        >
-          <div className="d-flex align-items-center">
-            <i className="bi bi-info-circle-fill me-2"></i>
-            <span><strong>Note:</strong> Configuration is stored in memory. Export regularly to backup your settings.</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowInfoAlert(false)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'white',
-              cursor: 'pointer',
-              fontSize: '1.2rem',
-              padding: '0 0.5rem',
-              lineHeight: '1'
-            }}
-            aria-label="Close"
-          >
-            ×
-          </button>
-        </div>
-      )}
-
       {/* Alert */}
       {alert && (
         <Alert

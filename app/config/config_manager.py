@@ -452,10 +452,12 @@ class ConfigManager:
             if self.MAINTENANCE_FILE.exists():
                 with self.MAINTENANCE_FILE.open('r') as f:
                     data = json.load(f)
-                    self._maintenance_mode = data.get('enabled', False)
+                    enabled = data.get('enabled', False)
                     start_time = data.get('start_time')
-                    if start_time:
-                        self._maintenance_start_time = datetime.fromisoformat(start_time)
+                    parsed_start_time = datetime.fromisoformat(start_time) if start_time else None
+
+                    self._maintenance_mode = enabled
+                    self._maintenance_start_time = parsed_start_time
                     logger.info(f"Loaded maintenance mode state: {self._maintenance_mode}")
         except Exception as e:
             logger.warning(f"Failed to load maintenance mode from disk: {e}")
@@ -510,13 +512,16 @@ class ConfigManager:
             # Extract and store custom health checks separately
             custom_hc = config_dict.pop('custom_health_checks', {})
 
-            # Update main config
-            self._config = AutoHealConfig(**config_dict)
-
-            # Restore custom health checks
-            self._custom_health_checks = {
+            # Validate the full payload before assigning anything, so a
+            # failure anywhere leaves the live config and custom health
+            # checks completely untouched.
+            new_config = AutoHealConfig(**config_dict)
+            new_custom_health_checks = {
                 cid: HealthCheckConfig(**hc) for cid, hc in custom_hc.items()
             }
+
+            self._config = new_config
+            self._custom_health_checks = new_custom_health_checks
 
             # Persist to disk
             self._save_config()
