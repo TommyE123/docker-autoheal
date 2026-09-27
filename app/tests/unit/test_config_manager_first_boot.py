@@ -17,12 +17,12 @@ deployment's first boot.
 
 import json
 from pathlib import Path
-from typing import Type
+from typing import Type, get_args, get_origin
 
 import pytest
 from pydantic import BaseModel
 
-from app.config.config_manager import AutoHealConfig, ConfigManager
+from app.config.config_manager import AutoHealConfig, ConfigManager, NotificationService
 from app.config.init_defaults import get_default_config
 
 
@@ -51,10 +51,15 @@ def _assert_keys_match_model_fields(data: dict, model: Type[BaseModel], path: st
         f"missing: {sorted(field_keys - data_keys)}, unknown: {sorted(data_keys - field_keys)}"
     )
     for key, value in data.items():
+        field_type = fields[key].annotation
         if isinstance(value, dict):
-            field_type = fields[key].annotation
             if isinstance(field_type, type) and issubclass(field_type, BaseModel):
                 _assert_keys_match_model_fields(value, field_type, f"{path}.{key}")
+        elif isinstance(value, list) and get_origin(field_type) is list:
+            item_types = get_args(field_type)
+            if len(item_types) == 1 and isinstance(item_types[0], type) and issubclass(item_types[0], BaseModel):
+                for index, item in enumerate(value):
+                    _assert_keys_match_model_fields(item, item_types[0], f"{path}.{key}[{index}]")
 
 
 def _valid_top_level_config() -> dict:
@@ -160,6 +165,17 @@ def test_schema_parity_helper_detects_a_missing_nested_key():
     data["notifications"] = {key: value for key, value in data["notifications"].items() if key != "enabled"}
 
     with pytest.raises(AssertionError, match="enabled"):
+        _assert_keys_match_model_fields(data, AutoHealConfig, "root")
+
+
+def test_schema_parity_helper_detects_a_missing_list_model_key():
+    """A model nested inside a list must be checked just like a direct model field."""
+    data = _valid_top_level_config()
+    service = NotificationService(name="test", type="webhook").model_dump()
+    del service["url"]
+    data["notifications"]["services"] = [service]
+
+    with pytest.raises(AssertionError, match="url"):
         _assert_keys_match_model_fields(data, AutoHealConfig, "root")
 
 
