@@ -173,7 +173,7 @@ formatter that CI neither requires nor validates.
 | `.md`           | markdownlint              | markdown-table-formatter | Yes              |
 | `.html`, `.htm` | djlint, htmlhint          | none                     | Yes              |
 | `.sh`           | shellcheck, bash-exec     | shfmt                    | Yes              |
-| `Dockerfile*`   | hadolint                  | none                     | Yes              |
+| `Dockerfile*`   | hadolint                  | dockerfmt                | Yes              |
 | Every file      | editorconfig-checker      | —                        | Yes              |
 
 Workflow files are additionally scanned by zizmor, which is report-only. Repository-wide
@@ -187,6 +187,12 @@ releases, checksum-verified) or `.devcontainer/package.json` (npm); shellcheck a
 ship as GitHub releases without checksum files, so they come from the `shellcheck-py` and
 `shfmt-py` binary wrappers in `.devcontainer/requirements-tools.txt` instead. shfmt reads
 indentation from `.editorconfig`, which is why the shell scripts use two spaces.
+
+The repository includes a local Dockerfile formatter: the Dev Container's
+`.devcontainer/package.json` installs `@reteps/dockerfmt` and the VS Code task
+`Autoheal: Check Dockerfile Formatting` runs `dockerfmt -c Dockerfile Dockerfile.simple`
+to validate Dockerfile formatting locally. Hadolint remains the CI Dockerfile linter;
+MegaLinter configuration is unchanged and does not run `dockerfmt`.
 
 ## Data directory when developing locally
 
