@@ -1,5 +1,6 @@
 {
   "editor.formatOnSave": true,
+  "dev.containers.mountWaylandSocket": false,
 
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",

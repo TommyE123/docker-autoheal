@@ -43,42 +43,41 @@ jobs:
             export PATH="${HOME}/.local/bin:${PATH}"
 
             echo "== Versions =="
-            python --version
-            node --version
-            npm --version
+            actionlint --version
+            betterleaks --version
             docker --version
             docker compose version
+            dockerfmt version
             gh --version
-            actionlint --version
             hadolint --version
+            node --version
+            npm --version
             osv-scanner --version
+            python --version
             trivy --version
             trufflehog --version
-            betterleaks --version
-            dockerfmt --version
 
             echo "== Development tools =="
-            pytest --version
-            ruff --version
-            pyright --version
-            semgrep --version
-            shellcheck --version
-            shfmt --version
-            zizmor --version
-            yamllint --version
             djlint --version
             editorconfig-checker --version
             htmlhint --version
-            jsonlint --help
-            markdownlint-cli2 --version
+            jsonlint --version
+            ls-lint --version
             markdown-table-formatter --version
+            markdownlint-cli2 --version
+            pyright --version
+            pytest --version
+            ruff --version
             secretlint --version
+            semgrep --version
+            shellcheck --version
+            shfmt --version
             stylelint --version
             v8r --version
-            ls-lint --version
+            yamllint --version
+            zizmor --version
 
             echo "== Frontend development tools =="
-            # Run from frontend/ so npm exec resolves local node_modules.
             (cd frontend && npm exec -- eslint --version)
             (cd frontend && npm exec -- prettier --version)
             (cd frontend && npm exec -- vite --version)
