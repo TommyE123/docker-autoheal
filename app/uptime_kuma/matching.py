@@ -54,6 +54,63 @@ def _candidate_names(container: ContainerNameInfo) -> List[str]:
     return names
 
 
+def _log_monitors_taken_by_higher_precedence(
+    containers: List[ContainerNameInfo],
+    names_by_container: List[List[str]],
+    monitor_indices_by_norm: Dict[str, List[int]],
+    monitors: List[MonitorInfo],
+    unresolved: Iterable[int],
+) -> None:
+    """Explain containers left unmapped because their monitor was already taken.
+
+    A container that simply has no monitor of its name is self-explanatory and
+    stays silent; one whose name did match a monitor that a higher-precedence
+    container consumed is the hard case for an operator to work out.
+    """
+    for position in unresolved:
+        norms = {normalize_name(name) for name in names_by_container[position]}
+        claimed = sorted(
+            monitors[index]["friendly_name"]
+            for norm in norms
+            for index in monitor_indices_by_norm.get(norm, [])
+        )
+        if claimed:
+            logger.info(
+                "Uptime-Kuma auto-mapping: leaving %s unmapped, monitor(s) %s match its "
+                "name but were already taken by a higher-precedence container",
+                containers[position]["stable_id"],
+                ", ".join(claimed),
+            )
+
+
+def _drop_stable_id_collisions(
+    matched_by_container: Dict[int, UptimeKumaMatch],
+) -> List[UptimeKumaMatch]:
+    """Discard matches whose ``stable_id`` was claimed by more than one container.
+
+    Compose replicas of one service share a stable_id, and matching is per
+    container, so they can each claim a different monitor. One persisted
+    mapping cannot mean two monitors at once.
+    """
+    matches_per_stable_id: Dict[str, int] = {}
+    for match in matched_by_container.values():
+        container_id = match["container_id"]
+        matches_per_stable_id[container_id] = matches_per_stable_id.get(container_id, 0) + 1
+
+    results: List[UptimeKumaMatch] = []
+    for position in sorted(matched_by_container):
+        match = matched_by_container[position]
+        if matches_per_stable_id[match["container_id"]] > 1:
+            logger.info(
+                "Uptime-Kuma auto-mapping: leaving %s unmapped, several containers share "
+                "that stable ID and matched different monitors - ambiguous",
+                match["container_id"],
+            )
+            continue
+        results.append(match)
+    return results
+
+
 def match_uptime_kuma_monitors(
     containers: Iterable[ContainerNameInfo],
     monitors: Iterable[MonitorInfo],
@@ -75,6 +132,12 @@ def match_uptime_kuma_monitors(
     is never offered to a lower one, and a container whose higher-precedence
     name already matched something - even ambiguously - is not retried at a
     lower one, so an ambiguous match cannot be quietly resolved further down.
+
+    Uniqueness is finally re-checked at the ``stable_id``, because that is the
+    key the mapping is persisted under and Compose replicas of one service all
+    share it. If two containers resolve to the same ``stable_id`` and each
+    claimed a different monitor, both are dropped rather than persisted as two
+    conflicting mappings for one key.
 
     Args:
         containers: Container name info, keyed by ``stable_id``/``name`` and
@@ -164,4 +227,7 @@ def match_uptime_kuma_monitors(
         # become someone's unambiguous match at a lower precedence level.
         available -= set(counts)
 
-    return [matched_by_container[position] for position in sorted(matched_by_container)]
+    _log_monitors_taken_by_higher_precedence(
+        containers, names_by_container, monitor_indices_by_norm, monitors, unresolved
+    )
+    return _drop_stable_id_collisions(matched_by_container)

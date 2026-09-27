@@ -73,7 +73,10 @@ class UptimeKumaClient:
 
     def _parse_monitors_from_metrics(self, metrics_text: str) -> List[Dict]:
         """Parse monitor data from Prometheus metrics format"""
-        monitors = {}
+        # Uptime-Kuma allows two monitors to share a friendly name. Keeping both
+        # lets the auto-mapper see the ambiguity and refuse to guess; collapsing
+        # them here would silently bind a container to whichever one came last.
+        monitors = []
 
         # Parse monitor_status lines
         # Uptime-Kuma emits monitor_id (and any custom tags) before monitor_name, e.g.:
@@ -90,13 +93,13 @@ class UptimeKumaClient:
             # Generate a simple ID based on the name (since metrics don't provide IDs)
             monitor_id = abs(hash(monitor_name)) % (10 ** 8)
 
-            monitors[monitor_name] = {
+            monitors.append({
                 'id': monitor_id,
                 'friendly_name': monitor_name,
                 'status': status  # 0=down, 1=up, 2=pending, 3=maintenance
-            }
+            })
 
-        return list(monitors.values())
+        return monitors
 
     async def get_monitor_status(self, monitor_id: int) -> Optional[int]:
         """Get status of a specific monitor by ID"""

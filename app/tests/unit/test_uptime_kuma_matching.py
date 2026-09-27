@@ -7,6 +7,7 @@ the wrong container.
 """
 
 from app.uptime_kuma.matching import match_uptime_kuma_monitors, normalize_name
+from app.uptime_kuma.uptime_kuma_client import UptimeKumaClient
 
 
 def _container(stable_id, name, compose_service=None):
@@ -89,13 +90,17 @@ class TestMatchUptimeKumaMonitors:
             ("qbittorrent", "qBittorrent"),
         }
 
-    def test_no_match_leaves_monitor_and_container_unmapped(self):
+    def test_no_match_leaves_monitor_and_container_unmapped(self, caplog):
         containers = [_container("web", "web")]
         monitors = [_monitor("completely-unrelated")]
 
-        result = match_uptime_kuma_monitors(containers, monitors)
+        with caplog.at_level("INFO", logger="app.uptime_kuma.matching"):
+            result = match_uptime_kuma_monitors(containers, monitors)
 
         assert result == []
+        # Nothing collided, so there is nothing to explain - a container nobody
+        # monitors must not log on every enable.
+        assert caplog.records == []
 
     def test_ambiguous_match_across_two_containers_is_left_unmapped(self, caplog):
         """Two containers that both normalize to the same monitor name must
@@ -186,6 +191,11 @@ class TestMatchUptimeKumaMonitors:
 
         assert result == [{"container_id": "trawl", "monitor_friendly_name": "Trawl"}]
         assert "ambiguous" not in caplog.text
+        # The losing Compose container must not drop out silently: its service
+        # name did match, and "no mapping, no log" is the hardest case for an
+        # operator to diagnose.
+        assert "vpn-apps_trawl" in caplog.text
+        assert "already taken by a higher-precedence container" in caplog.text
 
     def test_two_compose_services_sharing_a_monitor_name_are_left_unmapped(self, caplog):
         containers = [
@@ -201,3 +211,58 @@ class TestMatchUptimeKumaMonitors:
         assert "stack-a_redis" in caplog.text
         assert "stack-b_redis" in caplog.text
         assert "ambiguous" in caplog.text
+
+    def test_replicas_sharing_a_stable_id_claiming_different_monitors_are_dropped(
+        self, caplog
+    ):
+        """Compose replicas of one service share a stable_id, and the mapping is
+        persisted under that stable_id. If the replicas match different monitors
+        (one by container name, one by service name), persisting both would mean
+        one key claiming two monitors - and a DOWN on either would restart both
+        replicas."""
+        containers = [
+            _container("myapp_web", "myapp-web-1", compose_service="web"),
+            _container("myapp_web", "myapp-web-2", compose_service="web"),
+        ]
+        monitors = [_monitor("myapp-web-1"), _monitor("Web")]
+
+        with caplog.at_level("INFO", logger="app.uptime_kuma.matching"):
+            result = match_uptime_kuma_monitors(containers, monitors)
+
+        assert result == []
+        assert "myapp_web" in caplog.text
+        assert "share that stable ID" in caplog.text
+
+    def test_single_container_per_stable_id_is_still_mapped(self):
+        """The stable-ID guard must only fire on a genuine collision."""
+        containers = [
+            _container("myapp_web", "myapp-web-1", compose_service="web"),
+            _container("myapp_db", "myapp-db-1", compose_service="db"),
+        ]
+        monitors = [_monitor("Web"), _monitor("DB")]
+
+        result = match_uptime_kuma_monitors(containers, monitors)
+
+        assert result == [
+            {"container_id": "myapp_web", "monitor_friendly_name": "Web"},
+            {"container_id": "myapp_db", "monitor_friendly_name": "DB"},
+        ]
+
+
+class TestParsedMonitorsReachTheMatcher:
+    """The matcher's ambiguity protection is only real if the client actually
+    hands it the duplicates - it used to key parsed monitors by name, which
+    collapsed them before the matcher could ever see them."""
+
+    def test_duplicate_monitor_names_survive_parsing_and_are_left_unmapped(self):
+        client = UptimeKumaClient("http://kuma.example", "token")
+        metrics = (
+            'monitor_status{monitor_id="1",monitor_name="Web"} 1\n'
+            'monitor_status{monitor_id="2",monitor_name="Web"} 0\n'
+        )
+
+        monitors = client._parse_monitors_from_metrics(metrics)
+        result = match_uptime_kuma_monitors([_container("web", "web")], monitors)
+
+        assert len(monitors) == 2
+        assert result == []

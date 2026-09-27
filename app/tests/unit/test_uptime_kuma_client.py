@@ -227,7 +227,10 @@ class TestParseMonitorsFromMetrics:
         second_web = next(m for m in second if m["friendly_name"] == "Web")
         assert first_web["id"] == second_web["id"]
 
-    def test_duplicate_monitor_names_collapse_to_one_entry(self):
+    def test_duplicate_monitor_names_are_both_preserved(self):
+        """Uptime-Kuma allows two monitors to share a friendly name. Both must
+        survive parsing so the auto-mapper can see the ambiguity and refuse to
+        guess; keying entries by name would silently keep only the last."""
         client = UptimeKumaClient("http://kuma.example", "token")
         text = (
             'monitor_status{monitor_name="Web"} 1\n'
@@ -236,9 +239,8 @@ class TestParseMonitorsFromMetrics:
 
         monitors = client._parse_monitors_from_metrics(text)
 
-        assert len(monitors) == 1
-        # Later occurrence wins since entries are keyed by name in a dict.
-        assert monitors[0]["status"] == 0
+        assert [m["friendly_name"] for m in monitors] == ["Web", "Web"]
+        assert [m["status"] for m in monitors] == [1, 0]
 
     def test_monitor_id_label_before_monitor_name_is_parsed(self):
         """Regression test for #26: real Uptime-Kuma output puts monitor_id

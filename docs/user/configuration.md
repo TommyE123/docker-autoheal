@@ -130,7 +130,13 @@ containers, the Compose service name — so `vpn-apps-trawl-1` matches a monitor
 equivalent, and the container name takes precedence over the Compose service name. Names
 are never matched approximately: if a monitor could belong to more than one container, or
 a container to more than one monitor, it is left unmapped and the reason is logged — map
-it manually instead.
+it manually instead. The same applies to a scaled Compose service, whose replicas all share
+one stable identifier: if they match different monitors, none of them is mapped.
+
+Review the auto-mappings after enabling the integration. A short, generic Compose service
+name such as `web` or `db` can coincidentally match a monitor for an entirely unrelated
+target, and `auto_restart_on_down` is on by default — so an unrelated monitor going DOWN
+would restart your container. Remove any mapping you didn't expect.
 
 ## Container selection and restart counts
 
