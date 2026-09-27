@@ -4,6 +4,9 @@ import json
 from datetime import datetime, timezone
 from unittest.mock import patch
 
+import pytest
+from pydantic import ValidationError
+
 from app.config.config_manager import (
     AutoHealEvent,
     ConfigManager,
@@ -271,6 +274,38 @@ def test_export_and_import_round_trip_reproduces_full_config_state(
     assert imported.get_total_restart_count("web") == 2
 
 
+def test_import_config_with_invalid_custom_health_check_leaves_state_unchanged(
+    isolated_config_manager,
+):
+    """A valid main config paired with an invalid custom_health_checks entry
+    (missing the required container_id) must leave both the live config and
+    the custom health checks completely untouched, and nothing persisted to
+    disk - mirroring the already-covered invalid-main-config case."""
+    isolated_config_manager.get_config().monitor.interval_seconds = 30
+    original_interval = isolated_config_manager.get_config().monitor.interval_seconds
+    http_check = HealthCheckConfig(container_id="web", check_type="http", http_endpoint="/healthz")
+    isolated_config_manager.add_custom_health_check(http_check)
+    original_custom_checks = isolated_config_manager.get_all_custom_health_checks()
+
+    valid_config_dict = isolated_config_manager.get_config().model_dump()
+    valid_config_dict["monitor"]["interval_seconds"] = 999
+    payload = json.dumps(
+        {
+            **valid_config_dict,
+            "custom_health_checks": {"bad": {"check_type": "http"}},
+        },
+        default=str,
+    )
+
+    with pytest.raises(ValidationError):
+        isolated_config_manager.import_config(payload)
+
+    assert isolated_config_manager.get_config().monitor.interval_seconds == original_interval
+    assert isolated_config_manager.get_all_custom_health_checks() == original_custom_checks
+    saved = json.loads(isolated_config_manager.CONFIG_FILE.read_text())
+    assert saved["monitor"]["interval_seconds"] == original_interval
+
+
 def test_config_write_failure_is_logged_and_does_not_escape(isolated_config_manager, caplog):
     with patch("pathlib.Path.open", side_effect=OSError("disk full")):
         isolated_config_manager.update_config(isolated_config_manager.get_config())
@@ -314,6 +349,26 @@ def test_corrupt_auxiliary_state_falls_back_to_safe_defaults(
     assert not reloaded.is_maintenance_mode()
     assert reloaded.get_maintenance_start_time() is None
     assert "Failed to load quarantine list from disk" in caplog.text
+    assert "Failed to load maintenance mode from disk" in caplog.text
+
+
+def test_maintenance_mode_with_corrupt_start_time_falls_back_to_safe_defaults(
+    isolated_config_manager, monkeypatch, caplog
+):
+    """Distinct from the syntactically-invalid-JSON case above: this content
+    is valid JSON with enabled=True, but start_time is not a parseable ISO
+    datetime, so datetime.fromisoformat() raises inside the same try/except.
+    The whole load must fall back to the safe False/None defaults rather than
+    leaving _maintenance_mode set to the partially-read enabled value."""
+    isolated_config_manager.MAINTENANCE_FILE.write_text(
+        json.dumps({"enabled": True, "start_time": "not-a-real-date"})
+    )
+
+    _redirect_manager_paths(monkeypatch, isolated_config_manager.DATA_DIR)
+    reloaded = ConfigManager()
+
+    assert not reloaded.is_maintenance_mode()
+    assert reloaded.get_maintenance_start_time() is None
     assert "Failed to load maintenance mode from disk" in caplog.text
 
 
