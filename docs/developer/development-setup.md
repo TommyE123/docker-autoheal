@@ -25,10 +25,10 @@ The container provides:
 - The GitHub CLI (`gh`) plus the `github/gh-aw` extension, for working on this
   repository's agentic GitHub Actions workflows locally. That extension needs a token, so
   its installation is best-effort and never fails container setup
-- Every linter and security scanner CI runs, installed from pinned, checksum-verified
-  GitHub releases (`.devcontainer/tools.json`, `.devcontainer/install-tools.sh`) and
-  pinned npm/pip manifests (`.devcontainer/package.json`,
-  `.devcontainer/requirements-tools.txt`)
+- The linter and security-scanning tools used by the Dev Container tasks are installed
+  from pinned, checksum-verified GitHub releases (`.devcontainer/tools.json`,
+  `.devcontainer/install-tools.sh`) and pinned npm/pip manifests
+  (`.devcontainer/package.json`, `.devcontainer/requirements-tools.txt`)
 - Shared VS Code settings, a shared set of installed VS Code extensions, and forwarded
   ports for the frontend (3000), API (3131) and metrics (9090)
 
