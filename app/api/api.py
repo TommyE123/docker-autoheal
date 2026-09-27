@@ -815,6 +815,7 @@ async def test_uptime_kuma_connection(config_data: dict):
 async def enable_uptime_kuma_integration(integration_config: dict):
     """Enable Uptime-Kuma integration and fetch monitors"""
     from app.uptime_kuma.uptime_kuma_client import UptimeKumaClient
+    from app.uptime_kuma.matching import match_uptime_kuma_monitors
     from app.config.config_manager import UptimeKumaMapping
 
     try:
@@ -836,29 +837,22 @@ async def enable_uptime_kuma_integration(integration_config: dict):
 
         # Perform auto-mapping
         containers = docker_client.list_containers(all_containers=False)
-        auto_mappings = []
-
+        container_infos = []
         for container in containers:
-            container_name = container.name
-            # Get container info to extract stable_id
             info = docker_client.get_container_info(container)
-            if not info:
+            if not info or not info.get("stable_id"):
                 continue
+            container_infos.append(info)
 
-            stable_id = info.get("stable_id")
-            if not stable_id:
-                continue
-
-            # Check if any monitor friendly name matches container name
-            for monitor in monitors:
-                if monitor['friendly_name'].lower() == container_name.lower():
-                    mapping = UptimeKumaMapping(
-                        container_id=stable_id,  # Use stable_id instead of short container ID
-                        monitor_friendly_name=monitor['friendly_name'],
-                        auto_mapped=True
-                    )
-                    auto_mappings.append(mapping)
-                    break
+        matches = match_uptime_kuma_monitors(container_infos, monitors)
+        auto_mappings = [
+            UptimeKumaMapping(
+                container_id=match["container_id"],
+                monitor_friendly_name=match["monitor_friendly_name"],
+                auto_mapped=True,
+            )
+            for match in matches
+        ]
 
         # Add auto-mappings to config
         config.uptime_kuma_mappings = auto_mappings
