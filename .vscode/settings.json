@@ -1,10 +1,6 @@
 {
-  // Each formatter below is the one MegaLinter enforces for that file type;
-  // format-on-save is off where CI has no formatter. See
-  // docs/developer/development-setup.md#what-lints-what.
   "editor.formatOnSave": true,
 
-  // CI: pyright + ruff (lint), ruff-format (format).
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.codeActionsOnSave": {
@@ -13,7 +9,6 @@
     }
   },
 
-  // CI: eslint (lint), prettier (format).
   "[javascript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.codeActionsOnSave": {
@@ -28,7 +23,6 @@
     }
   },
 
-  // CI: stylelint only - prettier does not run on CSS.
   "[css]": {
     "editor.defaultFormatter": "stylelint.vscode-stylelint",
     "editor.codeActionsOnSave": {
@@ -36,23 +30,18 @@
     }
   },
 
-  // CI: jsonlint + v8r (lint), prettier (format).
   "[json]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
 
-  // Not linted in CI (the JSON descriptor matches .json only).
   "[jsonc]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
 
-  // CI: yamllint, v8r, actionlint, zizmor (lint), prettier (format).
   "[yaml]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
 
-  // CI: markdownlint (lint), markdown-table-formatter (format). Prettier
-  // does not run on Markdown and fights both.
   "[markdown]": {
     "editor.defaultFormatter": "DavidAnson.vscode-markdownlint",
     "editor.codeActionsOnSave": {
@@ -60,32 +49,26 @@
     }
   },
 
-  // CI: shellcheck + bash-exec (lint), shfmt (format). Point the extension at
-  // the pinned shfmt and at .editorconfig, as MegaLinter's shfmt does.
   "[shellscript]": {
     "editor.defaultFormatter": "foxundermoon.shell-format"
   },
   "shellformat.path": "shfmt",
   "shellformat.useEditorConfig": true,
 
-  // CI: djlint + htmlhint, neither of which is a formatter.
   "[html]": {
     "editor.formatOnSave": false
   },
 
-  // CI: hadolint only, which is not a formatter.
   "[dockerfile]": {
     "editor.formatOnSave": false
   },
 
   "python.testing.pytestEnabled": true,
   "python.testing.unittestEnabled": false,
-  // Mirrors pytest.ini's testpaths - the integration suite needs live services.
   "python.testing.pytestArgs": ["app/tests/unit"],
 
   "editorconfig.enable": true,
 
-  // stylelint is installed under .devcontainer, not at the repo root.
   "stylelint.stylelintPath": "${workspaceFolder}/.devcontainer/node_modules/stylelint",
   "stylelint.configBasedir": "${workspaceFolder}/.devcontainer/node_modules",
 

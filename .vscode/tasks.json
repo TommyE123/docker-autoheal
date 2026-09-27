@@ -236,7 +236,7 @@
     {
       "label": "Autoheal: Check JSON and YAML Formatting",
       "type": "shell",
-      "command": "prettier --check \"**/*.json\" \"**/*.{yml,yaml}\" --ignore-path .gitignore",
+      "command": "prettier --check \"**/*.json\" \"**/*.{yml,yaml}\" \"!**/*.lock.yml\" --ignore-path .gitignore",
       "problemMatcher": []
     },
     {
@@ -345,10 +345,6 @@
     {
       "label": "Autoheal: Run Megalinter Cupcake",
       "type": "shell",
-      // Mount the host path, not the container path: the daemon is the host's
-      // under docker-outside-of-docker, and would otherwise mount an empty
-      // directory and lint nothing. LOCAL_WORKSPACE_FOLDER is set by
-      // devcontainer.json; $PWD is the fallback when running on the host.
       "command": "docker run --rm -v \"${LOCAL_WORKSPACE_FOLDER:-$PWD}:/tmp/lint\" ghcr.io/oxsecurity/megalinter-cupcake:v10.1.0@sha256:7cce5b9d46564149d451a9752c5c266982f10c231be7df79996f46e3e171d2fc",
       "options": {
         "shell": {

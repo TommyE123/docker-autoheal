@@ -162,18 +162,18 @@ formatters. `.vscode/settings.json` sets each language's `editor.defaultFormatte
 formatter CI actually enforces — and turns format-on-save off for the types where CI has
 no formatter, so nothing rewrites files in a way CI neither requires nor validates.
 
-| File type         | Linters (CI)                           | Formatter (CI)           | Fails the build? |
-|-------------------|----------------------------------------|--------------------------|------------------|
-| `.py`, `.pyi`     | pyright, ruff                          | ruff-format              | No, report-only  |
-| `.js`, `.jsx`     | eslint                                 | prettier                 | No, report-only  |
-| `.css`            | stylelint                              | none                     | No, report-only  |
-| `.json`           | jsonlint, v8r                          | prettier                 | Yes              |
-| `.yml`, `.yaml`   | yamllint, v8r, actionlint              | prettier                 | Yes              |
-| `.md`             | markdownlint                           | markdown-table-formatter | Yes              |
-| `.html`, `.htm`   | djlint, htmlhint                       | none                     | Yes              |
-| `.sh`             | shellcheck, bash-exec                  | shfmt                    | Yes              |
-| `Dockerfile*`     | hadolint                               | none                     | Yes              |
-| Every file        | editorconfig-checker                   | —                        | Yes              |
+| File type       | Linters (CI)              | Formatter (CI)           | Fails the build? |
+|-----------------|---------------------------|--------------------------|------------------|
+| `.py`, `.pyi`   | pyright, ruff             | ruff-format              | No, report-only  |
+| `.js`, `.jsx`   | eslint                    | prettier                 | No, report-only  |
+| `.css`          | stylelint                 | none                     | No, report-only  |
+| `.json`         | jsonlint, v8r             | prettier                 | Yes              |
+| `.yml`, `.yaml` | yamllint, v8r, actionlint | prettier                 | Yes              |
+| `.md`           | markdownlint              | markdown-table-formatter | Yes              |
+| `.html`, `.htm` | djlint, htmlhint          | none                     | Yes              |
+| `.sh`           | shellcheck, bash-exec     | shfmt                    | Yes              |
+| `Dockerfile*`   | hadolint                  | none                     | Yes              |
+| Every file      | editorconfig-checker      | —                        | Yes              |
 
 Workflow files are additionally scanned by zizmor, which is report-only. Repository-wide
 scanners (checkov, semgrep, osv-scanner, trivy, trufflehog, betterleaks, secretlint,
