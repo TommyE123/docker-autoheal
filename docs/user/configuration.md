@@ -121,8 +121,16 @@ Uptime Kuma** in the UI, or via `/api/uptime-kuma/*`:
 | `username` / `api_token` | *(none)* | Credentials (API key or username/password)                             |
 | `auto_restart_on_down`   | `true`   | Restart the mapped container when its Uptime Kuma monitor reports DOWN |
 
-Containers are mapped to Uptime Kuma monitors by matching name, or manually via
-**Configuration → Uptime Kuma → Mappings**.
+Containers are mapped to Uptime Kuma monitors automatically when you enable the
+integration, or manually via **Configuration → Uptime Kuma → Mappings**.
+
+Auto-mapping compares a monitor's name against the container name and, for Docker Compose
+containers, the Compose service name — so `vpn-apps-trawl-1` matches a monitor named
+`Trawl`. The comparison ignores case and treats hyphens, underscores and spaces as
+equivalent, and the container name takes precedence over the Compose service name. Names
+are never matched approximately: if a monitor could belong to more than one container, or
+a container to more than one monitor, it is left unmapped and the reason is logged — map
+it manually instead.
 
 ## Container selection and restart counts
 

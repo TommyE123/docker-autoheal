@@ -73,9 +73,7 @@ class TestMatchUptimeKumaMonitors:
 
         result = match_uptime_kuma_monitors(containers, monitors)
 
-        assert result == [
-            {"container_id": "vpn-apps_trawl", "monitor_friendly_name": "Trawl"}
-        ]
+        assert result == [{"container_id": "vpn-apps_trawl", "monitor_friendly_name": "Trawl"}]
 
     def test_sabnzbd_and_qbittorrent_style_capitalisation(self):
         containers = [
@@ -170,3 +168,44 @@ class TestMatchUptimeKumaMonitors:
         result = match_uptime_kuma_monitors(containers, monitors)
 
         assert result == []
+
+    def test_exact_container_name_wins_over_colliding_compose_service(self, caplog):
+        """Adding a Compose stack whose service name collides with a monitor
+        must not revoke an exact container-name match that already resolved."""
+        containers = [
+            _container("trawl", "trawl"),
+            _container("vpn-apps_trawl", "vpn-apps-trawl-1", compose_service="trawl"),
+        ]
+        monitors = [_monitor("Trawl")]
+
+        with caplog.at_level("INFO", logger="app.uptime_kuma.matching"):
+            result = match_uptime_kuma_monitors(containers, monitors)
+
+        assert result == [{"container_id": "trawl", "monitor_friendly_name": "Trawl"}]
+        assert "ambiguous" not in caplog.text
+
+    def test_two_compose_services_sharing_a_monitor_name_are_left_unmapped(self, caplog):
+        containers = [
+            _container("stack-a_redis", "stack-a-redis-1", compose_service="redis"),
+            _container("stack-b_redis", "stack-b-redis-1", compose_service="redis"),
+        ]
+        monitors = [_monitor("Redis")]
+
+        with caplog.at_level("INFO", logger="app.uptime_kuma.matching"):
+            result = match_uptime_kuma_monitors(containers, monitors)
+
+        assert result == []
+        assert "stack-a_redis" in caplog.text
+        assert "stack-b_redis" in caplog.text
+        assert "ambiguous" in caplog.text
+
+    def test_unmapped_rejections_are_logged_at_info(self, caplog):
+        """An operator must be able to see why a container was left unmapped
+        without first enabling DEBUG logging."""
+        containers = [_container("web", "web")]
+        monitors = [_monitor("Web"), _monitor("web")]
+
+        with caplog.at_level("INFO", logger="app.uptime_kuma.matching"):
+            match_uptime_kuma_monitors(containers, monitors)
+
+        assert [record.levelname for record in caplog.records] == ["INFO"]

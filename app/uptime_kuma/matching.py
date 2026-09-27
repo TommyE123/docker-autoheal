@@ -4,25 +4,26 @@ Safety-critical: AutoHeal uses this mapping to decide which container an
 Uptime-Kuma monitor's status applies to. A false positive here could
 therefore associate a monitor with the wrong container. The matcher only
 ever produces a mapping when a container and a monitor uniquely identify
-each other after normalization - no fuzzy/string-distance matching, and no
-"closest match" fallback. See issue #141.
+each other after normalization - no fuzzy/string-distance matching, no
+"closest match" fallback, and a Docker container name always outranks a
+Compose service name. See issue #141.
 """
 
 import logging
 import re
-from typing import Dict, Iterable, List, Optional, TypedDict
+from typing import Callable, Dict, Iterable, List, NotRequired, Optional, Set, TypedDict
 
 logger = logging.getLogger(__name__)
 
 
-class ContainerNameInfo(TypedDict, total=False):
+class ContainerNameInfo(TypedDict):
     """The subset of ``DockerClientWrapper.get_container_info()``'s output
-    the matcher needs. ``compose_service`` is optional (absent/None for
-    containers not managed by Docker Compose)."""
+    the matcher needs. ``compose_service`` is absent/None for containers not
+    managed by Docker Compose."""
 
     stable_id: str
     name: str
-    compose_service: Optional[str]
+    compose_service: NotRequired[Optional[str]]
 
 
 class MonitorInfo(TypedDict):
@@ -44,24 +45,59 @@ def normalize_name(name: str) -> str:
     return re.sub(r"[-_\s]+", "-", name.strip().lower()).strip("-")
 
 
+def _docker_name(container: ContainerNameInfo) -> List[str]:
+    return [container["name"]]
+
+
+def _compose_service_name(container: ContainerNameInfo) -> List[str]:
+    compose_service = container.get("compose_service")
+    return [compose_service] if compose_service else []
+
+
+# Docker container names are unique per host, so resolving them before Compose
+# service names stops an unrelated stack's service from invalidating a match the
+# container name alone already identified unambiguously.
+_NAME_SOURCES: List[Callable[[ContainerNameInfo], List[str]]] = [
+    _docker_name,
+    _compose_service_name,
+]
+
+
+def _monitor_candidates(
+    names: List[str],
+    monitor_indices_by_norm: Dict[str, List[int]],
+    available: Set[int],
+) -> Set[int]:
+    candidates: Set[int] = set()
+    for name in names:
+        candidates.update(
+            index
+            for index in monitor_indices_by_norm.get(normalize_name(name), [])
+            if index in available
+        )
+    return candidates
+
+
 def match_uptime_kuma_monitors(
     containers: Iterable[ContainerNameInfo],
     monitors: Iterable[MonitorInfo],
 ) -> List[UptimeKumaMatch]:
     """Match Docker containers to Uptime-Kuma monitors by name, deterministically.
 
-    For each container, the candidate names considered are its Docker
-    container name and, when available, its Docker Compose service name.
-    Monitor names are matched against those candidates using the same
-    normalization (case-insensitive, hyphen/underscore/space-insensitive).
+    Name sources are tried in precedence order: the Docker container name
+    first, then the Docker Compose service name for any container still
+    unmatched. Monitor names are compared using the same normalization
+    (case-insensitive, hyphen/underscore/space-insensitive).
 
-    A container is only mapped to a monitor when the match is completely
-    unambiguous in both directions: exactly one monitor matches the
-    container's candidate names, and that monitor in turn matches exactly
-    that one container. Anything else - no match, a container matching
-    several monitors, or a monitor matching several containers - is left
-    unmapped rather than guessed, since a wrong auto-mapping could cause
-    AutoHeal to act on the wrong container.
+    Within a precedence level, a container is only mapped to a monitor when
+    the match is unambiguous in both directions: exactly one monitor matches
+    the container, and that monitor in turn matches exactly that one
+    container. Anything else - no match, a container matching several
+    monitors, or a monitor matching several containers - is left unmapped
+    rather than guessed, since a wrong auto-mapping could cause AutoHeal to
+    act on the wrong container. A monitor considered at one precedence level
+    is never offered to a lower one, so an ambiguous match cannot be quietly
+    resolved further down.
 
     Args:
         containers: Container name info, keyed by ``stable_id``/``name`` and
@@ -71,9 +107,9 @@ def match_uptime_kuma_monitors(
 
     Returns:
         A list of ``{"container_id": ..., "monitor_friendly_name": ...}``
-        dicts, one per unambiguous match. ``container_id`` is always the
-        container's ``stable_id``, never a raw name, so persisted mappings
-        continue to use stable identifiers.
+        dicts in container order, one per unambiguous match.
+        ``container_id`` is always the container's ``stable_id``, never a raw
+        name, so persisted mappings continue to use stable identifiers.
     """
     containers = list(containers)
     monitors = list(monitors)
@@ -84,51 +120,59 @@ def match_uptime_kuma_monitors(
     # ambiguous alternative rather than a single unambiguous match.
     monitor_indices_by_norm: Dict[str, List[int]] = {}
     for index, monitor in enumerate(monitors):
-        monitor_indices_by_norm.setdefault(normalize_name(monitor["friendly_name"]), []).append(index)
+        norm = normalize_name(monitor["friendly_name"])
+        monitor_indices_by_norm.setdefault(norm, []).append(index)
 
-    container_matches: List[set] = []
-    for container in containers:
-        candidates = {container["name"]}
-        compose_service = container.get("compose_service")
-        if compose_service:
-            candidates.add(compose_service)
+    available: Set[int] = set(range(len(monitors)))
+    unresolved: List[int] = list(range(len(containers)))
+    matched_by_container: Dict[int, UptimeKumaMatch] = {}
 
-        matched_indices: set = set()
-        for candidate in candidates:
-            matched_indices.update(monitor_indices_by_norm.get(normalize_name(candidate), []))
-        container_matches.append(matched_indices)
+    for names_of in _NAME_SOURCES:
+        candidates = {
+            position: _monitor_candidates(
+                names_of(containers[position]), monitor_indices_by_norm, available
+            )
+            for position in unresolved
+        }
 
-    monitor_match_counts: Dict[int, int] = {}
-    for matched_indices in container_matches:
-        for index in matched_indices:
-            monitor_match_counts[index] = monitor_match_counts.get(index, 0) + 1
+        counts: Dict[int, int] = {}
+        for indices in candidates.values():
+            for index in indices:
+                counts[index] = counts.get(index, 0) + 1
 
-    results: List[UptimeKumaMatch] = []
-    for container, matched_indices in zip(containers, container_matches):
-        if len(matched_indices) != 1:
-            if len(matched_indices) > 1:
-                candidate_names = sorted(monitors[i]["friendly_name"] for i in matched_indices)
-                logger.debug(
+        unresolved = []
+        for position, indices in candidates.items():
+            if not indices:
+                unresolved.append(position)
+                continue
+
+            stable_id = containers[position]["stable_id"]
+            if len(indices) > 1:
+                candidate_names = sorted(monitors[i]["friendly_name"] for i in indices)
+                logger.info(
                     "Uptime-Kuma auto-mapping: leaving %s unmapped, matched %d monitors "
                     "(%s) - ambiguous",
-                    container["stable_id"],
-                    len(matched_indices),
+                    stable_id,
+                    len(indices),
                     ", ".join(candidate_names),
                 )
-            continue
-        (monitor_index,) = matched_indices
-        if monitor_match_counts[monitor_index] != 1:
-            logger.debug(
-                "Uptime-Kuma auto-mapping: leaving %s unmapped, monitor %r also matches "
-                "another container - ambiguous",
-                container["stable_id"],
-                monitors[monitor_index]["friendly_name"],
-            )
-            continue
-        results.append(
-            {
-                "container_id": container["stable_id"],
+                continue
+
+            (monitor_index,) = indices
+            if counts[monitor_index] != 1:
+                logger.info(
+                    "Uptime-Kuma auto-mapping: leaving %s unmapped, monitor %r also matches "
+                    "another container - ambiguous",
+                    stable_id,
+                    monitors[monitor_index]["friendly_name"],
+                )
+                continue
+
+            matched_by_container[position] = {
+                "container_id": stable_id,
                 "monitor_friendly_name": monitors[monitor_index]["friendly_name"],
             }
-        )
-    return results
+
+        available -= set(counts)
+
+    return [matched_by_container[position] for position in sorted(matched_by_container)]
