@@ -345,7 +345,7 @@
     {
       "label": "Autoheal: Run Megalinter Cupcake",
       "type": "shell",
-      "command": "docker run --rm -v \"${LOCAL_WORKSPACE_FOLDER:-$PWD}:/tmp/lint\" ghcr.io/oxsecurity/megalinter-cupcake:v10.1.0@sha256:7cce5b9d46564149d451a9752c5c266982f10c231be7df79996f46e3e171d2fc",
+      "command": "docker run --rm -v \"$(printenv LOCAL_WORKSPACE_FOLDER 2>/dev/null || pwd):/tmp/lint\" ghcr.io/oxsecurity/megalinter-cupcake:v10.1.0@sha256:7cce5b9d46564149d451a9752c5c266982f10c231be7df79996f46e3e171d2fc",
       "options": {
         "shell": {
           "executable": "bash",

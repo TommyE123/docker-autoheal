@@ -66,6 +66,7 @@
       "matchStrings": [
         "\\\"repository\\\":\\s*\\\"(?<depName>[^\\\"]+)\\\",\\s*\\\"version\\\":\\s*\\\"v?(?<currentValue>[^\\\"]+)\\\""
       ],
+      "extractVersionTemplate": "^v?(?<version>.*)$",
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "semver"
     }

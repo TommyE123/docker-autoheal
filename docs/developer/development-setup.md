@@ -158,9 +158,10 @@ both read it, so a rule change applies in both places.
 ### What lints what
 
 MegaLinter runs a different set of tools per file type, and only some of those tools are
-formatters. `.vscode/settings.json` sets each language's `editor.defaultFormatter` to the
-formatter CI actually enforces — and turns format-on-save off for the types where CI has
-no formatter, so nothing rewrites files in a way CI neither requires nor validates.
+formatters. `.vscode/settings.json` uses the repository's corresponding linting and
+formatting tools for editor formatting and save-time fixes. Format-on-save is disabled
+for the types where CI has no formatter, so the editor does not apply an unrelated
+formatter that CI neither requires nor validates.
 
 | File type       | Linters (CI)              | Formatter (CI)           | Fails the build? |
 |-----------------|---------------------------|--------------------------|------------------|
