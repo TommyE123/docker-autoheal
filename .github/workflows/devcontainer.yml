@@ -9,6 +9,7 @@ on:
     paths:
       - ".devcontainer/**"
       - ".github/workflows/devcontainer.yml"
+      - "requirements.txt"
       - "requirements-dev.txt"
       - "frontend/package.json"
       - "frontend/package-lock.json"

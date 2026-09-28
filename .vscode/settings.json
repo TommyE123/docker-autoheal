@@ -44,7 +44,7 @@
   },
 
   "[markdown]": {
-    "editor.defaultFormatter": "DavidAnson.vscode-markdownlint",
+    "editor.formatOnSave": false,
     "editor.codeActionsOnSave": {
       "source.fixAll.markdownlint": "explicit"
     }
