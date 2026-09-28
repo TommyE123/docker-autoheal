@@ -5,7 +5,10 @@ docker-autoheal/
 ├── app/                          # Python application package
 │   ├── main.py                   # Entry point: wires everything together, starts the API + monitoring loop
 │   ├── api/
-│   │   └── api.py                # FastAPI app: all /api/* routes + static/React serving
+│   │   ├── api.py                # FastAPI setup and router registration (UI catch-all last)
+│   │   ├── state.py              # Shared Docker/monitoring/notification state + init_api()
+│   │   ├── models.py             # Shared Pydantic request/response models
+│   │   └── routes/               # Per-domain API routers
 │   ├── config/
 │   │   ├── config_manager.py     # Pydantic config models + thread-safe JSON persistence
 │   │   └── init_defaults.py      # Writes default config.json/events.json/etc. on first run
