@@ -224,12 +224,17 @@ class TestUpdateContainerSelection:
     async def test_unresolvable_container_falls_back_to_raw_identifier(self, wired_api):
         # No container registered with this id, so docker_client.get_container()
         # returns None and the endpoint must fall back to storing the raw id.
+        config = config_manager.get_config()
+        config.containers.excluded = ["ghost-container"]
+        config_manager.update_config(config)
+
         await update_container_selection(
             ContainerSelectionRequest(container_ids=["ghost-container"], enabled=True)
         )
 
         updated = config_manager.get_config()
         assert "ghost-container" in updated.containers.selected
+        assert "ghost-container" not in updated.containers.excluded
 
     @pytest.mark.parametrize(
         ("labels", "expected_id"),
@@ -262,11 +267,52 @@ class TestUpdateContainerSelection:
     async def test_disabling_unresolved_container_falls_back_to_identifier(
         self, wired_api
     ):
+        config = config_manager.get_config()
+        config.containers.selected = ["ghost-container"]
+        config_manager.update_config(config)
+
         await update_container_selection(
             ContainerSelectionRequest(container_ids=["ghost-container"], enabled=False)
         )
 
-        assert "ghost-container" in config_manager.get_config().containers.excluded
+        updated = config_manager.get_config()
+        assert "ghost-container" in updated.containers.excluded
+        assert "ghost-container" not in updated.containers.selected
+
+    @pytest.mark.parametrize(
+        ("labels", "stable_id"),
+        [
+            (
+                {
+                    "com.docker.compose.project": "project",
+                    "com.docker.compose.service": "api",
+                },
+                "project_api",
+            ),
+            ({"monitoring.id": "custom-id"}, "custom-id"),
+        ],
+    )
+    async def test_disabling_labeled_container_clears_selected_stable_id_and_aliases(
+        self, wired_api, labels, stable_id
+    ):
+        docker_client, _engine = wired_api
+        container, info = make_container(
+            name="api-1",
+            container_id="a" * 64,
+            labels=labels,
+        )
+        docker_client.add_container(container, info)
+        config = config_manager.get_config()
+        config.containers.selected = [stable_id, "api-1", "a" * 64]
+        config_manager.update_config(config)
+
+        await update_container_selection(
+            ContainerSelectionRequest(container_ids=["a" * 64], enabled=False)
+        )
+
+        updated = config_manager.get_config()
+        assert updated.containers.excluded == [stable_id]
+        assert updated.containers.selected == []
 
     async def test_selection_persistence_error_returns_500(self, monkeypatch):
         monkeypatch.setattr(
@@ -359,6 +405,12 @@ class TestUnquarantineContainer:
             await unquarantine_container("does-not-exist")
 
         assert exc_info.value.status_code == 404
+
+    async def test_uninitialized_docker_client_returns_500(self, uninitialized_api):
+        with pytest.raises(HTTPException) as exc_info:
+            await unquarantine_container("anything")
+
+        assert exc_info.value.status_code == 500
 
     async def test_notification_error_returns_500(self, wired_api, monkeypatch):
         docker_client, _engine = wired_api
