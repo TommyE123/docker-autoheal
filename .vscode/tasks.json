@@ -322,6 +322,70 @@
       "problemMatcher": []
     },
     {
+      "label": "TEMP: Trivy 01 - Current baseline",
+      "type": "shell",
+      "command": "time trivy fs --scanners vuln,misconfig,secret --skip-dirs '**/node_modules' .",
+      "options": { "shell": { "executable": "bash", "args": ["-c"] } },
+      "detail": "Temporary full-root benchmark: current scanners and node_modules exclusion.",
+      "problemMatcher": []
+    },
+    {
+      "label": "TEMP: Trivy 02 - CI scanners",
+      "type": "shell",
+      "command": "time trivy fs --scanners vuln,misconfig --skip-dirs '**/node_modules' .",
+      "options": { "shell": { "executable": "bash", "args": ["-c"] } },
+      "detail": "Temporary full-root benchmark: CI scanner set, node_modules excluded.",
+      "problemMatcher": []
+    },
+    {
+      "label": "TEMP: Trivy 03 - Secrets only",
+      "type": "shell",
+      "command": "time trivy fs --scanners secret --skip-dirs '**/node_modules' .",
+      "options": { "shell": { "executable": "bash", "args": ["-c"] } },
+      "detail": "Temporary full-root benchmark: isolate the secret scanner.",
+      "problemMatcher": []
+    },
+    {
+      "label": "TEMP: Trivy 04 - Vulnerabilities only",
+      "type": "shell",
+      "command": "time trivy fs --scanners vuln --skip-dirs '**/node_modules' .",
+      "options": { "shell": { "executable": "bash", "args": ["-c"] } },
+      "detail": "Temporary full-root benchmark: isolate vulnerability scanning.",
+      "problemMatcher": []
+    },
+    {
+      "label": "TEMP: Trivy 05 - Misconfigurations only",
+      "type": "shell",
+      "command": "time trivy fs --scanners misconfig --skip-dirs '**/node_modules' .",
+      "options": { "shell": { "executable": "bash", "args": ["-c"] } },
+      "detail": "Temporary full-root benchmark: isolate misconfiguration scanning.",
+      "problemMatcher": []
+    },
+    {
+      "label": "TEMP: Trivy 06 - Generated directories excluded",
+      "type": "shell",
+      "command": "time trivy fs --scanners vuln,misconfig,secret --skip-dirs '**/node_modules' --skip-dirs '**/.git' --skip-dirs static --skip-dirs '**/coverage' --skip-dirs '**/dist' --skip-dirs '**/.pytest_cache' --skip-dirs '**/.ruff_cache' .",
+      "options": { "shell": { "executable": "bash", "args": ["-c"] } },
+      "detail": "Temporary full-root benchmark: same scanners, exclude generated/cache directories only.",
+      "problemMatcher": []
+    },
+    {
+      "label": "TEMP: Trivy 07 - All files, all scanners",
+      "type": "shell",
+      "command": "time trivy fs --scanners vuln,misconfig,secret .",
+      "options": { "shell": { "executable": "bash", "args": ["-c"] } },
+      "detail": "Long-running temporary benchmark: scans the entire root including node_modules. Run manually.",
+      "problemMatcher": []
+    },
+    {
+      "label": "TEMP: Trivy 08 - CI scanners, all files",
+      "type": "shell",
+      "command": "time trivy fs --scanners vuln,misconfig .",
+      "options": { "shell": { "executable": "bash", "args": ["-c"] } },
+      "detail": "Temporary full-root benchmark: CI scanner set without directory exclusions.",
+      "problemMatcher": []
+    },
+    {
       "label": "Autoheal: Run TruffleHog",
       "type": "shell",
       "command": "trufflehog filesystem . --no-update --exclude-paths=.trufflehog-exclude.txt",
@@ -359,6 +423,22 @@
           "args": ["-c"]
         }
       },
+      "problemMatcher": []
+    },
+    {
+      "label": "TEMP: MegaLinter 09 - Trivy full root",
+      "type": "shell",
+      "command": "time docker run --rm --user \"$(id -u):$(id -g)\" -e \"HOME=/tmp\" -e \"CONSOLE_REPORTER=true\" -e \"CONSOLE_REPORTER_SECTIONS=true\" -e \"OUTPUT_DETAIL=detailed\" -e \"ENABLE_LINTERS=REPOSITORY_TRIVY\" -e \"REPOSITORY_TRIVY_CLI_LINT_MODE=project\" -v \"$(printenv LOCAL_WORKSPACE_FOLDER 2>/dev/null || pwd):/tmp/lint\" ghcr.io/oxsecurity/megalinter-cupcake:v10.1.0@sha256:7cce5b9d46564149d451a9752c5c266982f10c231be7df79996f46e3e171d2fc",
+      "options": { "shell": { "executable": "bash", "args": ["-c"] } },
+      "detail": "Temporary MegaLinter comparison: Trivy only, project/root mode, no file include filter.",
+      "problemMatcher": []
+    },
+    {
+      "label": "TEMP: MegaLinter 10 - Trivy full root plus secrets",
+      "type": "shell",
+      "command": "time docker run --rm --user \"$(id -u):$(id -g)\" -e \"HOME=/tmp\" -e \"CONSOLE_REPORTER=true\" -e \"CONSOLE_REPORTER_SECTIONS=true\" -e \"OUTPUT_DETAIL=detailed\" -e \"ENABLE_LINTERS=REPOSITORY_TRIVY\" -e \"REPOSITORY_TRIVY_CLI_LINT_MODE=project\" -e \"REPOSITORY_TRIVY_ARGUMENTS=--scanners vuln,misconfig,secret\" -v \"$(printenv LOCAL_WORKSPACE_FOLDER 2>/dev/null || pwd):/tmp/lint\" ghcr.io/oxsecurity/megalinter-cupcake:v10.1.0@sha256:7cce5b9d46564149d451a9752c5c266982f10c231be7df79996f46e3e171d2fc",
+      "options": { "shell": { "executable": "bash", "args": ["-c"] } },
+      "detail": "Temporary MegaLinter comparison: same root scan with secret scanning added.",
       "problemMatcher": []
     },
     {
