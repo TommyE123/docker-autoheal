@@ -62,7 +62,7 @@ jobs:
             djlint --version
             editorconfig-checker --version
             htmlhint --version
-            jsonlint --version
+            printf '{}' | jsonlint --quiet
             ls-lint --version
             markdown-table-formatter --version
             markdownlint-cli2 --version
