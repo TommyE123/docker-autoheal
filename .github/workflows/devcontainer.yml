@@ -4,11 +4,14 @@ on:
   pull_request:
     branches:
       - main
-    # Only the environment definition - tests.yml already resolves the
-    # dependency files, on the same Python and Node versions.
+    # Run for the environment definition and dependency inputs installed by
+    # post-create.sh. tests.yml separately validates application behavior.
     paths:
       - ".devcontainer/**"
       - ".github/workflows/devcontainer.yml"
+      - "requirements-dev.txt"
+      - "frontend/package.json"
+      - "frontend/package-lock.json"
   workflow_dispatch:
 
 permissions:
