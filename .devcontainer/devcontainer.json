@@ -27,6 +27,10 @@
 
   "waitFor": "postCreateCommand",
 
+  "containerEnv": {
+    "EC_VERSION": "v3.11.2"
+  },
+
   "forwardPorts": [3000, 3131, 9090],
 
   "portsAttributes": {
