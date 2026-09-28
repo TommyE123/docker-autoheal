@@ -178,11 +178,9 @@ describe("NotificationsPage", () => {
     ).toBeInTheDocument();
   });
 
-  // This characterizes a known validation defect (issue #264: the Save
-  // button lives outside the <Form>, so the type-specific `required`
-  // attributes never gate submission) rather than desired behavior. Expect
-  // this test to need updating once #264 is fixed.
-  it("submits a service missing its type-specific required field, since only the name is validated client-side", async () => {
+  // Issue #264 fix: the Add/Update button is now also gated on the selected
+  // service type's own required field(s), not just the name.
+  it("keeps the add button disabled until the type-specific required field is filled in", async () => {
     const user = userEvent.setup();
     getNotificationsConfig.mockResolvedValue({ data: config });
     addNotificationService.mockResolvedValue({});
@@ -193,27 +191,132 @@ describe("NotificationsPage", () => {
 
     await user.click(screen.getByRole("button", { name: /add service/i }));
 
-    // Webhook URL is marked required in the form, but only the name field
-    // gates the Add Service button, so this is submittable without it.
     await user.type(screen.getByPlaceholderText(/my discord server/i), "Incomplete Webhook");
 
     const addButton = screen.getByRole("button", { name: /^add service$/i });
+    // Name is filled in, but the webhook type's required URL is still empty.
+    expect(addButton).toBeDisabled();
+
+    await user.type(
+      screen.getByPlaceholderText(/https:\/\/example\.com\/webhook/i),
+      "https://example.com/hook",
+    );
+
     expect(addButton).toBeEnabled();
 
     await user.click(addButton);
 
-    await waitFor(() => expect(addNotificationService).toHaveBeenCalledTimes(1));
-    const submittedPayload = addNotificationService.mock.calls[0][0];
-    expect(submittedPayload).toEqual({
-      name: "Incomplete Webhook",
-      type: "webhook",
-      enabled: true,
-    });
-    expect(submittedPayload).not.toHaveProperty("url");
-
+    await waitFor(() =>
+      expect(addNotificationService).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Incomplete Webhook",
+          type: "webhook",
+          url: "https://example.com/hook",
+        }),
+      ),
+    );
     expect(
       await screen.findByText(/notification service added successfully/i),
     ).toBeInTheDocument();
+  });
+
+  it("keeps the add button disabled for a telegram service missing bot_token/chat_id", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({ data: config });
+
+    render(<NotificationsPage />);
+
+    await screen.findByText(/notifications are disabled/i);
+
+    await user.click(screen.getByRole("button", { name: /add service/i }));
+    await user.type(screen.getByPlaceholderText(/my discord server/i), "Incomplete Telegram");
+    await user.selectOptions(screen.getByRole("combobox"), "telegram");
+
+    const addButton = screen.getByRole("button", { name: /^add service$/i });
+    expect(addButton).toBeDisabled();
+
+    const botTokenInput = screen.getByPlaceholderText(/123456789:abcdefghijklmnopqrstuvwxyz/i);
+    await user.type(botTokenInput, "   ");
+    expect(addButton).toBeDisabled();
+
+    await user.clear(botTokenInput);
+    await user.type(botTokenInput, "123:abc");
+    expect(addButton).toBeDisabled();
+
+    await user.type(screen.getByPlaceholderText(/-1001234567890/i), "456");
+    expect(addButton).toBeEnabled();
+  });
+
+  // Guards against a new entry in the service type dropdown being added without a
+  // matching REQUIRED_FIELDS_BY_TYPE entry, which would silently fall back to
+  // validating the name only.
+  it("keeps the add button disabled for every service type when only the name is filled in", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({ data: config });
+
+    render(<NotificationsPage />);
+
+    await screen.findByText(/notifications are disabled/i);
+
+    await user.click(screen.getByRole("button", { name: /add service/i }));
+    await user.type(screen.getByPlaceholderText(/my discord server/i), "Name Only");
+
+    const typeSelect = screen.getByRole("combobox");
+    const serviceTypes = Array.from(typeSelect.options, (option) => option.value);
+    expect(serviceTypes.length).toBeGreaterThan(0);
+
+    const addButton = screen.getByRole("button", { name: /^add service$/i });
+    for (const serviceType of serviceTypes) {
+      await user.selectOptions(typeSelect, serviceType);
+      expect(
+        addButton,
+        `service type "${serviceType}" has no required-field validation`,
+      ).toBeDisabled();
+    }
+  });
+
+  it("keeps the update button disabled for an existing service whose required field is null", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({
+      data: {
+        ...configWithServices,
+        services: [{ name: "Legacy Webhook", type: "webhook", enabled: true, url: null }],
+      },
+    });
+
+    render(<NotificationsPage />);
+
+    await screen.findByText("Legacy Webhook");
+
+    await user.click(screen.getByRole("button", { name: /^edit$/i }));
+
+    const updateButton = screen.getByRole("button", { name: /update service/i });
+    expect(updateButton).toBeDisabled();
+
+    await user.type(
+      screen.getByPlaceholderText(/https:\/\/example\.com\/webhook/i),
+      "https://example.com/hook",
+    );
+
+    expect(updateButton).toBeEnabled();
+  });
+
+  it("falls back to name-only validation for a service of an unrecognised type", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({
+      data: {
+        ...configWithServices,
+        services: [{ name: "Future Service", type: "carrier-pigeon", enabled: true }],
+      },
+    });
+
+    render(<NotificationsPage />);
+
+    await screen.findByText("Future Service");
+
+    await user.click(screen.getByRole("button", { name: /^edit$/i }));
+
+    expect(screen.getByRole("button", { name: /update service/i })).toBeEnabled();
   });
 
   it("edits an existing service successfully", async () => {
