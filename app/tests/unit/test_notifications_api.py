@@ -7,7 +7,7 @@ rather than through an HTTP client - ``config_manager`` is isolated per test
 (see ``conftest.py``).
 """
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import HTTPException
@@ -80,6 +80,32 @@ class TestNotificationsConfig:
 
         assert exc_info.value.status_code == 500
 
+    async def test_get_notifications_config_error_returns_500(self, monkeypatch):
+        monkeypatch.setattr(
+            config_manager,
+            "get_config",
+            MagicMock(side_effect=RuntimeError("config unavailable")),
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_notifications_config()
+
+        assert exc_info.value.status_code == 500
+
+    async def test_update_notifications_config_persistence_error_returns_500(
+        self, monkeypatch
+    ):
+        monkeypatch.setattr(
+            config_manager,
+            "update_config",
+            MagicMock(side_effect=RuntimeError("disk error")),
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await update_notifications_config({"enabled": True})
+
+        assert exc_info.value.status_code == 500
+
 
 @pytest.mark.asyncio
 class TestNotificationServiceCrud:
@@ -141,6 +167,26 @@ class TestNotificationServiceCrud:
         assert result["service"]["url"] == "https://example.invalid/updated"
         stored = config_manager.get_config().notifications.services[0]
         assert stored.url == "https://example.invalid/updated"
+
+    async def test_update_notification_service_uses_provided_name(self):
+        await add_notification_service(
+            {
+                "name": "Webhook",
+                "type": "webhook",
+                "url": "https://example.invalid/hook",
+            }
+        )
+
+        result = await update_notification_service(
+            "Webhook",
+            {
+                "name": "Renamed webhook",
+                "type": "webhook",
+                "url": "https://example.invalid/updated",
+            },
+        )
+
+        assert result["service"]["name"] == "Renamed webhook"
 
     async def test_update_notification_service_unknown_name_returns_404(self):
         with pytest.raises(HTTPException) as exc_info:
@@ -205,3 +251,14 @@ class TestNotificationServiceTest:
 
         assert exc_info.value.status_code == 400
         assert exc_info.value.detail == "Service 'Webhook' not found"
+
+    async def test_manager_error_returns_500(self, monkeypatch):
+        monkeypatch.setattr(
+            "app.api.state.notification_manager.test_notification",
+            AsyncMock(side_effect=RuntimeError("manager unavailable")),
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await api_test_notification_service("Webhook")
+
+        assert exc_info.value.status_code == 500

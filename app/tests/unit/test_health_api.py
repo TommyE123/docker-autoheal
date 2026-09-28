@@ -13,6 +13,7 @@ ever touched.
 import pytest
 from fastapi import HTTPException
 
+from app.api import state
 from app.api.routes.health import get_system_status, health_check
 from app.config.config_manager import config_manager
 from app.tests.unit.conftest import make_container
@@ -53,6 +54,17 @@ class TestHealthCheck:
         assert result["docker_connected"] is True
         assert result["monitoring_active"] is True
 
+    async def test_init_api_updates_shared_state(
+        self, monkeypatch, docker_client, engine
+    ):
+        monkeypatch.setattr(state, "docker_client", None)
+        monkeypatch.setattr(state, "monitoring_engine", None)
+
+        state.init_api(docker_client, engine)
+
+        assert state.docker_client is docker_client
+        assert state.monitoring_engine is engine
+
 
 @pytest.mark.asyncio
 class TestSystemStatus:
@@ -81,3 +93,13 @@ class TestSystemStatus:
             await get_system_status()
 
         assert exc_info.value.status_code == 500
+
+    async def test_uninspectable_container_is_not_counted_as_monitored(self, wired_api):
+        docker_client, _engine = wired_api
+        container, _info = make_container(name="vanished")
+        docker_client._containers.append(container)
+
+        status = await get_system_status()
+
+        assert status.total_containers == 1
+        assert status.monitored_containers == 0

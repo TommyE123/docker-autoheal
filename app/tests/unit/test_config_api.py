@@ -65,6 +65,30 @@ class TestConfigurationEndpoints:
         assert updated.restart.max_restarts == 7
         assert updated.monitor.interval_seconds == original_interval
 
+    @pytest.mark.parametrize(
+        ("endpoint", "payload"),
+        [
+            (api_update_config, None),
+            (update_monitor_config, MonitorConfig(interval_seconds=15)),
+            (update_restart_config, RestartConfig(mode="both", max_restarts=7)),
+        ],
+    )
+    async def test_configuration_update_errors_return_500(
+        self, monkeypatch, endpoint, payload
+    ):
+        monkeypatch.setattr(
+            config_manager,
+            "update_config",
+            MagicMock(side_effect=RuntimeError("disk error")),
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await endpoint(payload) if payload is not None else await endpoint(
+                config_manager.get_config()
+            )
+
+        assert exc_info.value.status_code == 500
+
 
 @pytest.mark.asyncio
 class TestObservabilityConfig:

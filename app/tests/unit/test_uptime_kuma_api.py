@@ -8,6 +8,8 @@ rather than through an HTTP client - ``config_manager`` is isolated per test
 Uptime-Kuma client so no outbound HTTP request is ever attempted.
 """
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 from fastapi import HTTPException
 
@@ -64,6 +66,19 @@ class TestUptimeKumaConnection:
         )
 
         assert result["success"] is False
+
+    async def test_client_error_reports_connection_error(self, monkeypatch):
+        monkeypatch.setattr(
+            "app.uptime_kuma.uptime_kuma_client.UptimeKumaClient",
+            MagicMock(side_effect=RuntimeError("connection exploded")),
+        )
+
+        result = await api_test_uptime_kuma_connection(
+            {"server_url": "http://kuma.example"}
+        )
+
+        assert result["success"] is False
+        assert result["message"] == "Connection error: connection exploded"
 
 
 @pytest.mark.asyncio
@@ -136,6 +151,41 @@ class TestUptimeKumaIntegration:
 
         assert exc_info.value.status_code == 400
 
+    async def test_get_monitors_client_error_returns_500(self, monkeypatch):
+        config = config_manager.get_config()
+        config.uptime_kuma.enabled = True
+        config_manager.update_config(config)
+        fake_client = MagicMock()
+        fake_client.get_all_monitors = AsyncMock(
+            side_effect=RuntimeError("server unavailable")
+        )
+        monkeypatch.setattr(
+            "app.uptime_kuma.uptime_kuma_client.UptimeKumaClient",
+            lambda *a, **k: fake_client,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_uptime_kuma_monitors()
+
+        assert exc_info.value.status_code == 500
+
+    async def test_enable_client_error_returns_500(self, wired_api, monkeypatch):
+        fake_client = MagicMock()
+        fake_client.get_all_monitors = AsyncMock(
+            side_effect=RuntimeError("server unavailable")
+        )
+        monkeypatch.setattr(
+            "app.uptime_kuma.uptime_kuma_client.UptimeKumaClient",
+            lambda *a, **k: fake_client,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await enable_uptime_kuma_integration(
+                {"server_url": "http://kuma.example", "api_token": "token"}
+            )
+
+        assert exc_info.value.status_code == 500
+
     async def test_create_and_list_and_delete_mapping(self, wired_api):
         docker_client, _engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
@@ -153,6 +203,29 @@ class TestUptimeKumaIntegration:
         assert deleted["success"] is True
         assert (await get_uptime_kuma_mappings())["mappings"] == []
 
+    async def test_create_mapping_for_unknown_container_returns_500(self, wired_api):
+        with pytest.raises(HTTPException) as exc_info:
+            await create_uptime_kuma_mapping(
+                {
+                    "container_id": "missing",
+                    "monitor_friendly_name": "Monitor",
+                }
+            )
+
+        assert exc_info.value.status_code == 500
+
+    async def test_delete_mapping_persistence_error_returns_500(self, monkeypatch):
+        monkeypatch.setattr(
+            config_manager,
+            "update_config",
+            MagicMock(side_effect=RuntimeError("disk error")),
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_uptime_kuma_mapping("web")
+
+        assert exc_info.value.status_code == 500
+
     async def test_disable_turns_off_integration_flag(self):
         config = config_manager.get_config()
         config.uptime_kuma.enabled = True
@@ -162,3 +235,15 @@ class TestUptimeKumaIntegration:
 
         assert result["success"] is True
         assert config_manager.get_config().uptime_kuma.enabled is False
+
+    async def test_disable_stops_initialized_monitor(self, wired_api):
+        _docker_client, engine = wired_api
+        config = config_manager.get_config()
+        config.uptime_kuma.enabled = True
+        config_manager.update_config(config)
+        engine.uptime_kuma_monitor = MagicMock()
+        engine.uptime_kuma_monitor.stop = AsyncMock()
+
+        await disable_uptime_kuma_integration()
+
+        engine.uptime_kuma_monitor.stop.assert_awaited_once_with()

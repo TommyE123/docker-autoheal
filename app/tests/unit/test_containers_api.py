@@ -12,7 +12,7 @@ ever touched.
 """
 
 from datetime import timedelta
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import HTTPException
@@ -97,6 +97,23 @@ class TestListContainers:
         assert result[0].uptime_kuma_status == 4
         assert result[0].uptime_kuma_monitor_name is None
 
+    async def test_reports_unmapped_status_when_uptime_kuma_monitor_has_no_mapping(
+        self, wired_api
+    ):
+        docker_client, engine = wired_api
+        container, info = make_container(name="web")
+        docker_client.add_container(container, info)
+        config = config_manager.get_config()
+        config.uptime_kuma.enabled = True
+        config_manager.update_config(config)
+        engine.uptime_kuma_monitor = MagicMock()
+        engine.uptime_kuma_monitor.is_container_mapped.return_value = False
+
+        result = await list_containers()
+
+        assert result[0].uptime_kuma_status is None
+        assert result[0].uptime_kuma_monitor_name is None
+
     async def test_skips_containers_docker_could_not_inspect(self, wired_api):
         docker_client, _engine = wired_api
         # Registered with the client but with no info recorded, mirroring a
@@ -109,6 +126,19 @@ class TestListContainers:
         assert result == []
 
     async def test_uninitialized_docker_client_returns_500(self, uninitialized_api):
+        with pytest.raises(HTTPException) as exc_info:
+            await list_containers()
+
+        assert exc_info.value.status_code == 500
+
+    async def test_docker_listing_error_returns_500(self, wired_api, monkeypatch):
+        docker_client, _engine = wired_api
+        monkeypatch.setattr(
+            docker_client,
+            "list_containers",
+            MagicMock(side_effect=RuntimeError("daemon unavailable")),
+        )
+
         with pytest.raises(HTTPException) as exc_info:
             await list_containers()
 
@@ -138,6 +168,21 @@ class TestGetContainerDetails:
     async def test_uninitialized_docker_client_returns_500(self, uninitialized_api):
         with pytest.raises(HTTPException) as exc_info:
             await get_container_details("anything")
+
+        assert exc_info.value.status_code == 500
+
+    async def test_docker_inspection_error_returns_500(self, wired_api, monkeypatch):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+        monkeypatch.setattr(
+            docker_client,
+            "get_container_info",
+            MagicMock(side_effect=RuntimeError("inspection failed")),
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_container_details("a" * 64)
 
         assert exc_info.value.status_code == 500
 
@@ -186,6 +231,57 @@ class TestUpdateContainerSelection:
         updated = config_manager.get_config()
         assert "ghost-container" in updated.containers.selected
 
+    @pytest.mark.parametrize(
+        ("labels", "expected_id"),
+        [
+            ({"monitoring.id": "custom-id"}, "custom-id"),
+            (
+                {
+                    "com.docker.compose.project": "project",
+                    "com.docker.compose.service": "api",
+                },
+                "project_api",
+            ),
+        ],
+    )
+    async def test_enabling_uses_label_based_stable_id(
+        self, wired_api, labels, expected_id
+    ):
+        docker_client, _engine = wired_api
+        container, info = make_container(
+            name="api-1", container_id="a" * 64, labels=labels
+        )
+        docker_client.add_container(container, info)
+
+        await update_container_selection(
+            ContainerSelectionRequest(container_ids=["a" * 64], enabled=True)
+        )
+
+        assert expected_id in config_manager.get_config().containers.selected
+
+    async def test_disabling_unresolved_container_falls_back_to_identifier(
+        self, wired_api
+    ):
+        await update_container_selection(
+            ContainerSelectionRequest(container_ids=["ghost-container"], enabled=False)
+        )
+
+        assert "ghost-container" in config_manager.get_config().containers.excluded
+
+    async def test_selection_persistence_error_returns_500(self, monkeypatch):
+        monkeypatch.setattr(
+            config_manager,
+            "update_config",
+            MagicMock(side_effect=RuntimeError("disk error")),
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await update_container_selection(
+                ContainerSelectionRequest(container_ids=[], enabled=True)
+            )
+
+        assert exc_info.value.status_code == 500
+
 
 @pytest.mark.asyncio
 class TestRestartContainerManual:
@@ -222,6 +318,21 @@ class TestRestartContainerManual:
 
         assert exc_info.value.status_code == 500
 
+    async def test_docker_restart_exception_returns_500(self, wired_api, monkeypatch):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+        monkeypatch.setattr(
+            docker_client,
+            "restart_container",
+            MagicMock(side_effect=RuntimeError("restart failed")),
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await restart_container_manual("a" * 64)
+
+        assert exc_info.value.status_code == 500
+
 
 @pytest.mark.asyncio
 class TestUnquarantineContainer:
@@ -248,3 +359,17 @@ class TestUnquarantineContainer:
             await unquarantine_container("does-not-exist")
 
         assert exc_info.value.status_code == 404
+
+    async def test_notification_error_returns_500(self, wired_api, monkeypatch):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+        monkeypatch.setattr(
+            "app.api.state.notification_manager.send_event_notification",
+            AsyncMock(side_effect=RuntimeError("notification failed")),
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await unquarantine_container("a" * 64)
+
+        assert exc_info.value.status_code == 500

@@ -105,6 +105,19 @@ def test_get_static_file_path_traversal_raises_400(static_dir):
     assert exc_info.value.status_code == 400
 
 
+def test_get_static_file_path_resolution_error_raises_400(static_dir, monkeypatch):
+    monkeypatch.setattr(
+        api_module.Path,
+        "resolve",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("resolve failed")),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        get_static_file_path("manifest.json")
+
+    assert exc_info.value.status_code == 400
+
+
 @pytest.mark.asyncio
 async def test_serve_static_file_unexpected_error_becomes_500(static_dir, monkeypatch):
     def explode(_filename):
@@ -171,6 +184,51 @@ async def test_icon_endpoints_reject_non_numeric_sizes(static_dir, endpoint, siz
         await endpoint(size)
 
     assert exc_info.value.status_code == 400
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["manifest.json", "pwa-192x192.png", "bundle.js"])
+async def test_ui_catchall_rejects_static_paths(path):
+    with pytest.raises(HTTPException) as exc_info:
+        await api_module.serve_ui_catchall(path)
+
+    assert exc_info.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_ui_root_serves_react_app(monkeypatch):
+    monkeypatch.setattr(
+        api_module,
+        "serve_react_app",
+        lambda: api_module.HTMLResponse(content="app shell"),
+    )
+
+    response = await api_module.serve_ui_root()
+
+    assert response.status_code == 200
+    assert response.body == b"app shell"
+
+
+@pytest.mark.asyncio
+async def test_ui_catchall_serves_react_for_client_side_route(monkeypatch):
+    monkeypatch.setattr(
+        api_module,
+        "serve_react_app",
+        lambda: api_module.HTMLResponse(content="app shell"),
+    )
+
+    response = await api_module.serve_ui_catchall("containers")
+
+    assert response.status_code == 200
+    assert response.body == b"app shell"
+
+
+@pytest.mark.asyncio
+async def test_ui_catchall_rejects_api_path():
+    with pytest.raises(HTTPException) as exc_info:
+        await api_module.serve_ui_catchall("api/status")
+
+    assert exc_info.value.status_code == 404
 
 
 # ---------------------------------------------------------------------------
