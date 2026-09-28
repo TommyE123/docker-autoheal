@@ -16,7 +16,7 @@ Docker itself faked via ``FakeDockerClient``/``make_container``.
 
 import pytest
 
-from app.api.api import add_health_check, delete_health_check
+from app.api.routes.healthchecks import add_health_check, delete_health_check
 from app.config.config_manager import HealthCheckConfig, config_manager
 from app.tests.unit.conftest import make_container
 
@@ -24,8 +24,8 @@ from app.tests.unit.conftest import make_container
 @pytest.fixture
 def wired_api(monkeypatch, docker_client, engine):
     """Point the API module's globals at the fake Docker client/engine."""
-    monkeypatch.setattr("app.api.api.docker_client", docker_client)
-    monkeypatch.setattr("app.api.api.monitoring_engine", engine)
+    monkeypatch.setattr("app.api.state.docker_client", docker_client)
+    monkeypatch.setattr("app.api.state.monitoring_engine", engine)
     return docker_client, engine
 
 

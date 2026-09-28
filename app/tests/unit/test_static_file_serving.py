@@ -1,5 +1,5 @@
 """
-Unit tests for the real static-file serving path in ``app/api/api.py``.
+Unit tests for the real static-file serving path in ``app/api/routes/ui.py``.
 
 ``get_static_file_path()``/``serve_static_file()`` are exercised by calling
 them directly to obtain a real ``FileResponse``, then invoking that response
@@ -13,8 +13,8 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from fastapi import HTTPException
 
-from app.api import api as api_module
-from app.api.api import get_static_file_path, serve_static_file
+from app.api.routes import ui as api_module
+from app.api.routes.ui import get_static_file_path, serve_static_file
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -103,3 +103,157 @@ def test_get_static_file_path_traversal_raises_400(static_dir):
         get_static_file_path("../secret.txt")
 
     assert exc_info.value.status_code == 400
+
+
+def test_get_static_file_path_resolution_error_raises_400(static_dir, monkeypatch):
+    monkeypatch.setattr(
+        api_module.Path,
+        "resolve",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("resolve failed")),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        get_static_file_path("manifest.json")
+
+    assert exc_info.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_serve_static_file_unexpected_error_becomes_500(static_dir, monkeypatch):
+    def explode(_filename):
+        raise OSError("filesystem went away")
+
+    monkeypatch.setattr(api_module, "get_static_file_path", explode)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await serve_static_file("sw.js")
+
+    assert exc_info.value.status_code == 500
+    assert "filesystem went away" in str(exc_info.value.detail)
+
+
+# ---------------------------------------------------------------------------
+# PWA root endpoints
+#
+# Each of these is a thin wrapper whose whole job is the filename and media
+# type it pins - the pair a browser needs exactly right to install the PWA.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("endpoint", "args", "filename", "media_type"),
+    [
+        (api_module.serve_manifest, (), "manifest.json", "application/manifest+json"),
+        (api_module.serve_service_worker, (), "sw.js", "application/javascript"),
+        (api_module.serve_register_sw, (), "registerSW.js", "application/javascript"),
+        (api_module.serve_favicon, (), "favicon.svg", "image/svg+xml"),
+        (api_module.serve_screenshot_narrow, (), "screenshot-narrow.png", "image/png"),
+        (api_module.serve_screenshot_wide, (), "screenshot-wide.png", "image/png"),
+        (api_module.serve_workbox, ("abc123",), "workbox-abc123.js", "application/javascript"),
+        (api_module.serve_pwa_icon, ("192x192",), "pwa-192x192.png", "image/png"),
+        (
+            api_module.serve_maskable_icon,
+            ("512x512",),
+            "maskable-icon-512x512.png",
+            "image/png",
+        ),
+    ],
+)
+async def test_pwa_root_endpoint_serves_expected_file(
+    static_dir, endpoint, args, filename, media_type
+):
+    content = f"contents of {filename}".encode()
+    (static_dir / filename).write_bytes(content)
+
+    response = await endpoint(*args)
+    status, headers, body = await _collect_response(response)
+
+    assert status == 200
+    assert headers["content-type"] == media_type
+    assert body == content
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "endpoint", [api_module.serve_pwa_icon, api_module.serve_maskable_icon]
+)
+@pytest.mark.parametrize("size", ["../../etc/passwd", "192x192/../..", "abc"])
+async def test_icon_endpoints_reject_non_numeric_sizes(static_dir, endpoint, size):
+    with pytest.raises(HTTPException) as exc_info:
+        await endpoint(size)
+
+    assert exc_info.value.status_code == 400
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["manifest.json", "pwa-192x192.png", "bundle.js"])
+async def test_ui_catchall_rejects_static_paths(path):
+    with pytest.raises(HTTPException) as exc_info:
+        await api_module.serve_ui_catchall(path)
+
+    assert exc_info.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_ui_root_serves_react_app(monkeypatch):
+    monkeypatch.setattr(
+        api_module,
+        "serve_react_app",
+        lambda: api_module.HTMLResponse(content="app shell"),
+    )
+
+    response = await api_module.serve_ui_root()
+
+    assert response.status_code == 200
+    assert response.body == b"app shell"
+
+
+@pytest.mark.asyncio
+async def test_ui_catchall_serves_react_for_client_side_route(monkeypatch):
+    monkeypatch.setattr(
+        api_module,
+        "serve_react_app",
+        lambda: api_module.HTMLResponse(content="app shell"),
+    )
+
+    response = await api_module.serve_ui_catchall("containers")
+
+    assert response.status_code == 200
+    assert response.body == b"app shell"
+
+
+@pytest.mark.asyncio
+async def test_ui_catchall_rejects_api_path():
+    with pytest.raises(HTTPException) as exc_info:
+        await api_module.serve_ui_catchall("api/status")
+
+    assert exc_info.value.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# React app shell
+# ---------------------------------------------------------------------------
+
+
+def test_serve_react_app_returns_built_index_html(tmp_path, monkeypatch):
+    (tmp_path / "static").mkdir()
+    (tmp_path / "static" / "index.html").write_text(
+        "<!doctype html><title>built app</title>", encoding="utf-8"
+    )
+    monkeypatch.chdir(tmp_path)
+
+    response = api_module.serve_react_app()
+
+    assert response.status_code == 200
+    assert b"built app" in response.body
+
+
+def test_serve_react_app_falls_back_when_frontend_is_not_built(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)  # no static/index.html here
+
+    response = api_module.serve_react_app()
+
+    assert response.status_code == 200
+    assert b"React UI not found" in response.body
+    assert b"npm run build" in response.body

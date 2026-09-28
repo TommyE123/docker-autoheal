@@ -26,7 +26,8 @@ Integration boundary: real ``MonitoringEngine`` and real
 the outbound HTTP session is faked, reusing ``_FakeSession`` from
 ``test_notification_manager.py``.
 
-``unquarantine`` is emitted by ``app/api/api.py``, not by the engine, so it is
+``unquarantine`` is emitted by ``app/api/routes/containers.py``, not by the
+engine, so it is
 driven through that endpoint coroutine directly (the pattern
 ``test_api.py`` already uses - no HTTP client, no Docker daemon) rather than by
 hand-building the event. Hand-building it would pin nothing: the whole point of
@@ -36,7 +37,7 @@ locally constructed event can never drift from itself.
 
 import pytest
 
-from app.api.api import unquarantine_container
+from app.api.routes.containers import unquarantine_container
 from app.config.config_manager import NotificationService, config_manager
 from app.notifications.notification_manager import NotificationManager
 from app.tests.unit.conftest import make_container
@@ -70,8 +71,8 @@ def real_notification_manager(monkeypatch, docker_client) -> NotificationManager
     manager = NotificationManager()
     manager._session = _FakeSession()
     monkeypatch.setattr("app.monitor.monitoring_engine.notification_manager", manager)
-    monkeypatch.setattr("app.api.api.notification_manager", manager)
-    monkeypatch.setattr("app.api.api.docker_client", docker_client)
+    monkeypatch.setattr("app.api.state.notification_manager", manager)
+    monkeypatch.setattr("app.api.state.docker_client", docker_client)
     return manager
 
 

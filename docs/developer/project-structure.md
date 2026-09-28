@@ -5,7 +5,10 @@ docker-autoheal/
 ├── app/                          # Python application package
 │   ├── main.py                   # Entry point: wires everything together, starts the API + monitoring loop
 │   ├── api/
-│   │   └── api.py                # FastAPI app: all /api/* routes + static/React serving
+│   │   ├── api.py                # FastAPI setup and router registration (UI catch-all last)
+│   │   ├── state.py              # Shared Docker/monitoring/notification state + init_api()
+│   │   ├── models.py             # Shared Pydantic request/response models
+│   │   └── routes/               # Per-domain API routers
 │   ├── config/
 │   │   ├── config_manager.py     # Pydantic config models + thread-safe JSON persistence
 │   │   └── init_defaults.py      # Writes default config.json/events.json/etc. on first run
@@ -62,8 +65,14 @@ suites (see [Testing](testing.md#legacy-script-triage) for what happened to each
 - **`app/main.py`** — process entry point: logging setup, Docker client and monitoring
   engine construction, Prometheus metrics server startup, signal handling, and running
   the FastAPI server and monitoring engine concurrently via `asyncio.gather`.
-- **`app/api/api.py`** — every HTTP endpoint. Also serves the built React app (including a
-  catch-all route for client-side routing) and PWA assets.
+- **`app/api/api.py`** — FastAPI app construction (CORS, static asset mount) and wiring
+  each router from `app/api/routes/` into the app; holds no endpoints itself.
+- **`app/api/state.py`** — the shared `docker_client`/`monitoring_engine` instances every
+  route module reads, plus `init_api()`.
+- **`app/api/routes/`** — every HTTP endpoint, one module per domain: containers,
+  maintenance mode, configuration, health checks, events, Uptime Kuma integration,
+  notifications, health/status, and UI/PWA static file serving (including the catch-all
+  route for client-side routing).
 - **`app/config/config_manager.py`** — the single source of truth for configuration and
   persisted state (events, quarantine, maintenance mode, restart counts). All reads/writes
   go through a `ConfigManager` singleton guarded by a lock.

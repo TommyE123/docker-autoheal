@@ -11,7 +11,10 @@ import asyncio
 import json
 from datetime import datetime, timezone
 
-from app.api.api import clear_events, get_events
+import pytest
+from fastapi import HTTPException
+
+from app.api.routes.events import clear_events, get_events
 from app.config.config_manager import AutoHealEvent
 
 
@@ -73,3 +76,29 @@ def test_events_api_preserves_legacy_naive_timestamp_text(isolated_config_manage
     events = asyncio.run(get_events())
 
     assert events[0]["timestamp"] == naive_timestamp
+
+
+def test_get_events_failure_becomes_http_500(isolated_config_manager, monkeypatch):
+    def explode(*_args, **_kwargs):
+        raise RuntimeError("event log unreadable")
+
+    monkeypatch.setattr(isolated_config_manager, "get_events", explode)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(get_events())
+
+    assert exc_info.value.status_code == 500
+    assert "event log unreadable" in str(exc_info.value.detail)
+
+
+def test_clear_events_failure_becomes_http_500(isolated_config_manager, monkeypatch):
+    def explode(*_args, **_kwargs):
+        raise RuntimeError("event log locked")
+
+    monkeypatch.setattr(isolated_config_manager, "clear_events", explode)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(clear_events())
+
+    assert exc_info.value.status_code == 500
+    assert "event log locked" in str(exc_info.value.detail)

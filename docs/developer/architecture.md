@@ -65,10 +65,11 @@ database — all state is JSON files under `/data`.
    a background thread feeding an asyncio queue) so containers labelled `autoheal=true`
    are picked up the moment they start, without waiting for the next polling cycle.
 
-3. **REST API** (`app/api/api.py`): a FastAPI app exposing `/api/*` endpoints for
-   containers, configuration, health checks, maintenance mode, notifications, and Uptime
-   Kuma integration, plus static file serving for the built React app (with a catch-all
-   route so React Router's client-side routes work on refresh).
+3. **REST API** (`app/api/api.py`, routes in `app/api/routes/`): a FastAPI app exposing
+   `/api/*` endpoints for containers, configuration, health checks, maintenance mode,
+   notifications, and Uptime Kuma integration, plus static file serving for the built
+   React app (with a catch-all route so React Router's client-side routes work on
+   refresh).
 
 4. **Persistence** (`app/config/config_manager.py`): a `ConfigManager` singleton, guarded
    by a re-entrant lock, that owns `/data/config.json`, `/data/events.json`,
