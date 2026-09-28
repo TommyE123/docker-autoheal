@@ -146,5 +146,5 @@ docker-compose.override.yml
 *.code-workspace
 data/
 
-# MegaLinter reports
-megalinter-reports/
+# Linter reports
+.lint/
