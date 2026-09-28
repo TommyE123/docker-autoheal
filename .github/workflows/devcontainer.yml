@@ -37,6 +37,7 @@ jobs:
         with:
           runCmd: |
             set -e
+            trap 'status=$?; printf "::error::Command failed (exit %s): %s\n" "$status" "$BASH_COMMAND"; exit "$status"' ERR
 
             # devcontainers/ci's headless exec ignores devcontainer.json's
             # remoteEnv.PATH, so re-add ~/.local/bin here.
