@@ -7,7 +7,6 @@
     "@prantlf/jsonlint": "17.0.1",
     "@reteps/dockerfmt": "0.5.4",
     "@secretlint/secretlint-rule-preset-recommend": "13.0.6",
-    "editorconfig-checker": "7.0.0",
     "htmlhint": "1.9.2",
     "markdown-table-formatter": "1.7.0",
     "markdownlint-cli2": "0.23.3",

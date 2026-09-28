@@ -23,6 +23,10 @@
     {
       "repository": "betterleaks/betterleaks",
       "version": "1.8.1"
+    },
+    {
+      "repository": "editorconfig-checker/editorconfig-checker",
+      "version": "3.11.2"
     }
   ]
 }

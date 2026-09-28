@@ -121,6 +121,12 @@ install_release betterleaks/betterleaks "$betterleaks_version" \
   "betterleaks_${betterleaks_version}_linux_${betterleaks_architecture}.tar.gz" betterleaks \
   checksums.txt
 
+editorconfig_version="$(get_version editorconfig-checker/editorconfig-checker)"
+install_release editorconfig-checker/editorconfig-checker "$editorconfig_version" \
+  "editorconfig-checker-linux-${architecture_suffix}.tar.gz" editorconfig-checker \
+  checksums.txt
+ln -sf editorconfig-checker "${install_dir}/ec"
+
 case ":${PATH}:" in
 *":${install_dir}:"*) ;;
 *) echo "Add ${install_dir} to PATH to use the installed tools." >&2 ;;

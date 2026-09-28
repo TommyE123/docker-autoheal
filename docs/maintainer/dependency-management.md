@@ -25,7 +25,7 @@ The standard `config:recommended` preset provides the managers for the main depe
 ecosystems above. A custom Renovate manager is also enabled for pinned versions of apt
 packages in the Dockerfiles, and a second one for the pinned GitHub release versions in
 `.devcontainer/tools.json` (`actionlint`, `hadolint`, `osv-scanner`, `trivy`, `trufflehog`,
-`betterleaks`), which are installed by `.devcontainer/install-tools.sh`.
+`betterleaks`, `editorconfig-checker`), which are installed by `.devcontainer/install-tools.sh`.
 
 Currently, `curl` is pinned in the Dockerfiles so that its version can be tracked and updated
 by Renovate. This allows the Dockerfile dependency to receive a normal Renovate PR rather than
