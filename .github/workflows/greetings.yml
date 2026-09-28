@@ -2,7 +2,7 @@ name: Greetings
 
 permissions: read-all
 
-on:
+on: # zizmor: ignore[dangerous-triggers] - Retained to greet fork PRs; no PR code is run.
   pull_request_target:
     types:
       - opened
