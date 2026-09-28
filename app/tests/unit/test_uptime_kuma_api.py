@@ -247,3 +247,15 @@ class TestUptimeKumaIntegration:
         await disable_uptime_kuma_integration()
 
         engine.uptime_kuma_monitor.stop.assert_awaited_once_with()
+
+    async def test_disable_persistence_error_returns_500(self, monkeypatch):
+        monkeypatch.setattr(
+            config_manager,
+            "update_config",
+            MagicMock(side_effect=RuntimeError("disk error")),
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await disable_uptime_kuma_integration()
+
+        assert exc_info.value.status_code == 500

@@ -14,7 +14,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.api import state
-from app.api.routes.health import get_system_status, health_check
+from app.api.routes.health import get_manifest, get_system_status, health_check
 from app.config.config_manager import config_manager
 from app.tests.unit.conftest import make_container
 
@@ -64,6 +64,12 @@ class TestHealthCheck:
 
         assert state.docker_client is docker_client
         assert state.monitoring_engine is engine
+
+    async def test_manifest_returns_webmanifest_file_response(self):
+        response = await get_manifest()
+
+        assert response.path == "static/manifest.webmanifest"
+        assert response.media_type == "application/manifest+json"
 
 
 @pytest.mark.asyncio

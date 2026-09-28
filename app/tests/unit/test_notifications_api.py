@@ -194,6 +194,27 @@ class TestNotificationServiceCrud:
 
         assert exc_info.value.status_code == 404
 
+    async def test_update_notification_service_persistence_error_returns_500(
+        self, monkeypatch
+    ):
+        await add_notification_service(
+            {
+                "name": "Webhook",
+                "type": "webhook",
+                "url": "https://example.invalid/hook",
+            }
+        )
+        monkeypatch.setattr(
+            config_manager,
+            "update_config",
+            MagicMock(side_effect=RuntimeError("disk error")),
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await update_notification_service("Webhook", {"type": "webhook"})
+
+        assert exc_info.value.status_code == 500
+
     async def test_delete_notification_service_success(self):
         await add_notification_service(
             {
@@ -213,6 +234,27 @@ class TestNotificationServiceCrud:
             await delete_notification_service("does-not-exist")
 
         assert exc_info.value.status_code == 404
+
+    async def test_delete_notification_service_persistence_error_returns_500(
+        self, monkeypatch
+    ):
+        await add_notification_service(
+            {
+                "name": "Webhook",
+                "type": "webhook",
+                "url": "https://example.invalid/hook",
+            }
+        )
+        monkeypatch.setattr(
+            config_manager,
+            "update_config",
+            MagicMock(side_effect=RuntimeError("disk error")),
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_notification_service("Webhook")
+
+        assert exc_info.value.status_code == 500
 
 
 @pytest.mark.asyncio
