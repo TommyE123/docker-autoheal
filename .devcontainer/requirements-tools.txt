@@ -3,8 +3,8 @@
 # docs/maintainer/dependency-management.md for why checkov is absent.
 djlint==1.46.2
 pyright==1.1.414
-ruff==0.16.8
-semgrep==1.177.0
+ruff==0.16.9
+semgrep==1.178.0
 # Wrapper wheels: neither tool publishes release checksums for
 # install-tools.sh to verify.
 shellcheck-py==0.11.0.1
