@@ -4,14 +4,14 @@ Monitors containers and performs auto-healing actions
 """
 
 import asyncio
+import fnmatch
 import logging
 from datetime import datetime, timezone
 from typing import Optional
-import fnmatch
 
 from docker.models.containers import Container
 
-from app.config.config_manager import config_manager, AutoHealEvent, HealthCheckConfig
+from app.config.config_manager import AutoHealEvent, HealthCheckConfig, config_manager
 from app.docker_client.docker_client_wrapper import DockerClientWrapper
 from app.notifications.notification_manager import notification_manager
 
@@ -717,8 +717,8 @@ class MonitoringEngine:
         """
         Listen for Docker events and auto-add containers with autoheal=true label
         """
-        import threading
         import queue
+        import threading
 
         # Queue for events from the blocking thread
         event_queue = queue.Queue()

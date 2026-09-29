@@ -3,12 +3,13 @@ Docker client wrapper for container operations
 Provides interface to Docker API for monitoring and management
 """
 
-import docker
-from docker.models.containers import Container
-from typing import List, Dict, Optional, Any
 import logging
-import requests
 import socket
+from typing import Any, Dict, List, Optional
+
+import docker
+import requests
+from docker.models.containers import Container
 
 logger = logging.getLogger(__name__)
 
