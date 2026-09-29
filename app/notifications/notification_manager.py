@@ -6,7 +6,7 @@ Supports: Webhook, Discord, Slack, Telegram, Email, Ntfy, Gotify, Pushover
 import asyncio
 import logging
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 import aiohttp
@@ -16,7 +16,7 @@ from app.config.config_manager import AutoHealEvent, config_manager
 logger = logging.getLogger(__name__)
 
 
-class NotificationType(str, Enum):
+class NotificationType(StrEnum):
     """Types of notification services"""
     WEBHOOK = "webhook"
     DISCORD = "discord"
@@ -28,7 +28,7 @@ class NotificationType(str, Enum):
     PUSHOVER = "pushover"
 
 
-class NotificationPriority(str, Enum):
+class NotificationPriority(StrEnum):
     """Notification priority levels"""
     LOW = "low"
     NORMAL = "normal"
