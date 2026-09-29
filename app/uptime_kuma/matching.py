@@ -11,7 +11,10 @@ Compose service name. See issue #141.
 
 import logging
 import re
-from typing import Dict, Iterable, List, NotRequired, Optional, Set, TypedDict
+from typing import TYPE_CHECKING, NotRequired, TypedDict
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +26,7 @@ class ContainerNameInfo(TypedDict):
 
     stable_id: str
     name: str
-    compose_service: NotRequired[Optional[str]]
+    compose_service: NotRequired[str | None]
 
 
 class MonitorInfo(TypedDict):
@@ -45,7 +48,7 @@ def normalize_name(name: str) -> str:
     return re.sub(r"[-_\s]+", "-", name.strip().lower()).strip("-")
 
 
-def _candidate_names(container: ContainerNameInfo) -> List[str]:
+def _candidate_names(container: ContainerNameInfo) -> list[str]:
     """Names to match this container by, highest precedence first."""
     names = [container["name"]]
     compose_service = container.get("compose_service")
@@ -55,10 +58,10 @@ def _candidate_names(container: ContainerNameInfo) -> List[str]:
 
 
 def _log_monitors_taken_by_higher_precedence(
-    containers: List[ContainerNameInfo],
-    names_by_container: List[List[str]],
-    monitor_indices_by_norm: Dict[str, List[int]],
-    monitors: List[MonitorInfo],
+    containers: list[ContainerNameInfo],
+    names_by_container: list[list[str]],
+    monitor_indices_by_norm: dict[str, list[int]],
+    monitors: list[MonitorInfo],
     unresolved: Iterable[int],
 ) -> None:
     """Explain containers left unmapped because their monitor was already taken.
@@ -84,20 +87,20 @@ def _log_monitors_taken_by_higher_precedence(
 
 
 def _drop_stable_id_collisions(
-    matched_by_container: Dict[int, UptimeKumaMatch],
-) -> List[UptimeKumaMatch]:
+    matched_by_container: dict[int, UptimeKumaMatch],
+) -> list[UptimeKumaMatch]:
     """Discard matches whose ``stable_id`` was claimed by more than one container.
 
     Compose replicas of one service share a stable_id, and matching is per
     container, so they can each claim a different monitor. One persisted
     mapping cannot mean two monitors at once.
     """
-    matches_per_stable_id: Dict[str, int] = {}
+    matches_per_stable_id: dict[str, int] = {}
     for match in matched_by_container.values():
         container_id = match["container_id"]
         matches_per_stable_id[container_id] = matches_per_stable_id.get(container_id, 0) + 1
 
-    results: List[UptimeKumaMatch] = []
+    results: list[UptimeKumaMatch] = []
     for position in sorted(matched_by_container):
         match = matched_by_container[position]
         if matches_per_stable_id[match["container_id"]] > 1:
@@ -114,7 +117,7 @@ def _drop_stable_id_collisions(
 def match_uptime_kuma_monitors(
     containers: Iterable[ContainerNameInfo],
     monitors: Iterable[MonitorInfo],
-) -> List[UptimeKumaMatch]:
+) -> list[UptimeKumaMatch]:
     """Match Docker containers to Uptime-Kuma monitors by name, deterministically.
 
     Name sources are tried in precedence order: the Docker container name
@@ -158,14 +161,14 @@ def match_uptime_kuma_monitors(
     # monitor objects that happen to share an identical friendly_name are
     # never collapsed into a single candidate - each still counts as its own
     # ambiguous alternative rather than a single unambiguous match.
-    monitor_indices_by_norm: Dict[str, List[int]] = {}
+    monitor_indices_by_norm: dict[str, list[int]] = {}
     for index, monitor in enumerate(monitors):
         norm = normalize_name(monitor["friendly_name"])
         monitor_indices_by_norm.setdefault(norm, []).append(index)
 
-    available: Set[int] = set(range(len(monitors)))
-    unresolved: List[int] = list(range(len(containers)))
-    matched_by_container: Dict[int, UptimeKumaMatch] = {}
+    available: set[int] = set(range(len(monitors)))
+    unresolved: list[int] = list(range(len(containers)))
+    matched_by_container: dict[int, UptimeKumaMatch] = {}
 
     # Every container resolves its Docker name before any container falls back
     # to its Compose service name, so an unrelated stack's service can't
@@ -174,10 +177,10 @@ def match_uptime_kuma_monitors(
     tier_count = max((len(names) for names in names_by_container), default=0)
 
     for tier in range(tier_count):
-        candidates: Dict[int, Set[int]] = {}
+        candidates: dict[int, set[int]] = {}
         for position in unresolved:
             names = names_by_container[position]
-            indices: Set[int] = set()
+            indices: set[int] = set()
             if tier < len(names):
                 norm = normalize_name(names[tier])
                 indices = {
@@ -185,7 +188,7 @@ def match_uptime_kuma_monitors(
                 }
             candidates[position] = indices
 
-        counts: Dict[int, int] = {}
+        counts: dict[int, int] = {}
         for indices in candidates.values():
             for index in indices:
                 counts[index] = counts.get(index, 0) + 1

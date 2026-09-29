@@ -17,7 +17,7 @@ deployment's first boot.
 
 import json
 from pathlib import Path
-from typing import Type, get_args, get_origin
+from typing import get_args, get_origin
 
 import pytest
 from pydantic import BaseModel
@@ -31,7 +31,7 @@ from app.config.config_manager import (
 from app.config.init_defaults import get_default_config
 
 
-def _assert_keys_match_model_fields(data: dict, model: Type[BaseModel], path: str) -> None:
+def _assert_keys_match_model_fields(data: dict, model: type[BaseModel], path: str) -> None:
     """Recursively assert data's keys exactly match model's fields, at every level.
 
     Pydantic v2's default `extra` behaviour is to silently ignore an unknown

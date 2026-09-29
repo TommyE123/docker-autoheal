@@ -7,7 +7,6 @@ import asyncio
 import fnmatch
 import logging
 from datetime import datetime, timezone
-from typing import Optional
 
 from docker.models.containers import Container
 
@@ -31,8 +30,8 @@ class MonitoringEngine:
         """
         self.docker_client = docker_client
         self._running = False
-        self._task: Optional[asyncio.Task] = None
-        self._event_task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
+        self._event_task: asyncio.Task | None = None
         self._last_restart_times: dict[str, datetime] = {}
         self._backoff_delays: dict[str, int] = {}
 

@@ -7,7 +7,6 @@ import logging
 import signal
 import sys
 from pathlib import Path
-from typing import Optional
 
 import uvicorn
 from prometheus_client import Counter, Gauge, start_http_server
@@ -87,10 +86,10 @@ class AutoHealService:
     """Main service orchestrator"""
 
     def __init__(self):
-        self.docker_client: Optional[DockerClientWrapper] = None
-        self.monitoring_engine: Optional[MonitoringEngine] = None
+        self.docker_client: DockerClientWrapper | None = None
+        self.monitoring_engine: MonitoringEngine | None = None
         self.notification_manager = notification_manager
-        self.uptime_kuma_monitor: Optional[UptimeKumaMonitor] = None
+        self.uptime_kuma_monitor: UptimeKumaMonitor | None = None
         self.running = False
 
     async def start(self):
@@ -202,7 +201,7 @@ class AutoHealService:
 
 
 # Global service instance
-service: Optional[AutoHealService] = None
+service: AutoHealService | None = None
 
 
 def signal_handler(signum, _frame):

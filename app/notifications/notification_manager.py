@@ -7,7 +7,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any
 
 import aiohttp
 
@@ -43,9 +43,9 @@ class NotificationManager:
 
     def __init__(self):
         """Initialize notification manager"""
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
         self._notification_queue: asyncio.Queue = asyncio.Queue()
-        self._worker_task: Optional[asyncio.Task] = None
+        self._worker_task: asyncio.Task | None = None
         self._running = False
 
     async def start(self) -> None:
@@ -538,7 +538,7 @@ class NotificationManager:
         except Exception as e:
             logger.error(f"Failed to send Pushover notification: {e}")
 
-    async def test_notification(self, service_name: str) -> Dict[str, Any]:
+    async def test_notification(self, service_name: str) -> dict[str, Any]:
         """
         Send a test notification to verify configuration
 

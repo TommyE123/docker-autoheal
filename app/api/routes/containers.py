@@ -2,7 +2,6 @@
 
 import logging
 from datetime import datetime, timezone
-from typing import List
 
 from fastapi import APIRouter, HTTPException
 
@@ -15,7 +14,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/api/containers", response_model=List[ContainerInfo])
+@router.get("/api/containers", response_model=list[ContainerInfo])
 async def list_containers(include_stopped: bool = False):
     """List all containers with their monitoring status"""
     docker_client = state.docker_client

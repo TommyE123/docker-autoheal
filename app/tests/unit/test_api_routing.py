@@ -16,7 +16,7 @@ Requests are sent with a tiny in-process ASGI caller rather than
 reached here touches Docker.
 """
 
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 from fastapi.routing import APIRoute
@@ -100,7 +100,7 @@ async def _request(method: str, path: str) -> tuple[int, bytes, dict[str, str]]:
     async def receive() -> dict[str, Any]:
         return {"type": "http.request", "body": b"", "more_body": False}
 
-    status: Optional[int] = None
+    status: int | None = None
     headers: dict[str, str] = {}
     body = b""
 
