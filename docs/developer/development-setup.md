@@ -25,21 +25,22 @@ The container provides:
 - The GitHub CLI (`gh`) plus the `github/gh-aw` extension, for working on this
   repository's agentic GitHub Actions workflows locally. That extension needs a token, so
   its installation is best-effort and never fails container setup
-- The linter and security-scanning tools used by the Dev Container tasks are installed
-  from pinned, checksum-verified GitHub releases (`.devcontainer/tools.json`,
-  `.devcontainer/install-tools.sh`) and pinned npm/pip manifests
-  (`.devcontainer/package.json`, `.devcontainer/requirements-tools.txt`)
+- [mise](https://mise.jdx.dev), which installs the linter and security-scanning tools used
+  by the Dev Container tasks at the versions pinned in `mise.toml` and `mise.lock`. The
+  npm linters that need shared plugins or configuration (stylelint, secretlint, jsonlint)
+  are pinned in `.devcontainer/package.json` instead
 - Shared VS Code settings, a shared set of installed VS Code extensions, and forwarded
   ports for the frontend (3000), API (3131) and metrics (9090)
 
 Application services are **not** started automatically — use the tasks below.
 
 `postCreateCommand` runs `.devcontainer/post-create.sh`, which installs the dependencies
-and tooling. pip, npm, tool binaries and `gh` extensions live in named Docker volumes so
-rebuilds don't re-download everything; `.devcontainer/prepare-caches.sh` makes those
-volumes writable by the container user and purges the pip, npm and `gh` caches when
-they're more than seven days old. Pinned tool binaries are kept until `tools.json` pins a
-newer version, which replaces the old one.
+and tooling (`mise install --locked` for the pinned tools). pip, npm and `gh` extensions
+live in named Docker volumes so rebuilds don't re-download everything;
+`.devcontainer/prepare-caches.sh` makes those volumes writable by the container user and
+purges them when they're more than seven days old. mise keeps its own tool installs and
+cache; the container puts its shims on `PATH`, so the tasks find the tools without
+activating mise.
 
 ### Tasks
 
@@ -185,17 +186,14 @@ ls-lint, git_diff) run against the project rather than a file type. The report-o
 linters are the ones listed in `.mega-linter.yml`'s `DISABLE_ERRORS_LINTERS`.
 
 The Dev Container installs an equivalent of each of these, so every row above has a
-matching `Autoheal:` task. Most come from `.devcontainer/tools.json` (pinned GitHub
-releases, checksum-verified) or `.devcontainer/package.json` (npm); shellcheck and shfmt
-ship as GitHub releases without checksum files, so they come from the `shellcheck-py` and
-`shfmt-py` binary wrappers in `.devcontainer/requirements-tools.txt` instead. shfmt reads
-indentation from `.editorconfig`, which is why the shell scripts use two spaces.
+matching `Autoheal:` task. Most are installed by mise from `mise.toml`; stylelint,
+secretlint and jsonlint come from `.devcontainer/package.json` (npm). editorconfig-checker
+is exposed as `ec`, and reports its own version as 3.11.1 even though `mise.toml` pins the
+3.11.2 release. shfmt reads indentation from `.editorconfig`, which is why the shell
+scripts use two spaces.
 
-The repository includes a local Dockerfile formatter: the Dev Container's
-`.devcontainer/package.json` installs `@reteps/dockerfmt` and the VS Code task
-`Autoheal: Check Dockerfile Formatting` runs `dockerfmt -c Dockerfile Dockerfile.simple`
-to validate Dockerfile formatting locally. Hadolint remains the CI Dockerfile linter;
-MegaLinter configuration is unchanged and does not run `dockerfmt`.
+To change a tool version, edit `mise.toml`, then run `mise lock --platform
+linux-x64,linux-arm64` and commit `mise.lock` and the `.mise/locks/` directory with it.
 
 ## Data directory when developing locally
 

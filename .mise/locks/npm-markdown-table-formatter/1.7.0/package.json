@@ -1,0 +1,7 @@
+{
+  "name": "mise-npm-install",
+  "private": true,
+  "dependencies": {
+    "markdown-table-formatter": "1.7.0"
+  }
+}

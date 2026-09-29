@@ -12,20 +12,21 @@ updates are reviewed and merged.
 |---------------------------------|-----------------------------------------------------------------|-------------------------------------|
 | Python runtime dependencies     | `requirements.txt`                                              | `pip_requirements`                  |
 | Python test dependencies        | `requirements-dev.txt`                                          | `pip_requirements`                  |
-| Dev Container Python tooling    | `.devcontainer/requirements-tools.txt`                          | `pip_requirements`                  |
 | npm dependencies + lockfile     | `frontend/package.json`, `frontend/package-lock.json`           | `npm`                               |
 | Dev Container npm lint tools    | `.devcontainer/package.json`, `.devcontainer/package-lock.json` | `npm`                               |
-| Dev Container release tools     | `.devcontainer/tools.json`                                      | `customManagers:regex`              |
+| Dev Container CLI tools         | `mise.toml`, `mise.lock`                                        | `mise`                              |
+| Dev Container base image        | `.devcontainer/Dockerfile`                                      | `dockerfile`                        |
 | Docker base images              | `Dockerfile`, `Dockerfile.simple`                               | `dockerfile`                        |
 | Docker Compose images           | `docker-compose*.yml`                                           | `docker-compose`                    |
 | GitHub Actions                  | `.github/workflows/*.yml`                                       | `github-actions`                    |
 | Dockerfile apt package versions | `Dockerfile`, `Dockerfile.simple`                               | `customManagers:dockerfileVersions` |
 
 The standard `config:recommended` preset provides the managers for the main dependency
-ecosystems above. A custom Renovate manager is also enabled for pinned versions of apt
-packages in the Dockerfiles, and a second one for the pinned GitHub release versions in
-`.devcontainer/tools.json` (`actionlint`, `hadolint`, `osv-scanner`, `trivy`, `trufflehog`,
-`betterleaks`, `editorconfig-checker`), which are installed by `.devcontainer/install-tools.sh`.
+ecosystems above, including `mise` for the developer CLI tools pinned in `mise.toml`
+(`actionlint`, `hadolint`, `osv-scanner`, `trivy`, `trufflehog`, `betterleaks`,
+`editorconfig-checker`, `ruff`, `shellcheck`, `shfmt`, `semgrep`, `yamllint`, `zizmor`,
+`pyright`, `djlint` and the npm-based linters). A custom Renovate manager is also enabled for
+pinned versions of apt packages in the Dockerfiles.
 
 Currently, `curl` is pinned in the Dockerfiles so that its version can be tracked and updated
 by Renovate. This allows the Dockerfile dependency to receive a normal Renovate PR rather than
@@ -34,8 +35,8 @@ build time.
 
 ## Version pinning policy
 
-* **Python**: exact versions (`==`) are used throughout `requirements.txt`,
-  `requirements-dev.txt` and `.devcontainer/requirements-tools.txt`.
+* **Python**: exact versions (`==`) are used throughout `requirements.txt`
+  and `requirements-dev.txt`. Developer CLI tools in `mise.toml` are pinned exactly too.
 
   The packages that previously used `~=` (`pydantic`, `aiohttp`) were switched
   to `==` at their already-installed versions rather than being upgraded. Every subsequent
@@ -184,7 +185,7 @@ introduce compatibility or behavioural changes.
   minor version does not automatically mean a dependency is behaviourally risk-free.
 
 * **`checkov` as a Dev Container tool** — it is deliberately absent from
-  `.devcontainer/requirements-tools.txt`. Installing it alongside `semgrep` hangs
+  `mise.toml`. Installing it alongside `semgrep` hangs
   `osv-scanner`'s pip transitive-dependency resolver indefinitely (each resolves fine alone in
   ~12–13s; together `osv-scanner` never returns, even with a 600s timeout). `semgrep` is the
   one kept because it catches app-level issues nothing else in the local stack checks for,

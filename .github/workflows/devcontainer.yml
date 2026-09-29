@@ -11,6 +11,9 @@ on:
       - ".github/workflows/devcontainer.yml"
       - "requirements.txt"
       - "requirements-dev.txt"
+      - "mise.toml"
+      - "mise.lock"
+      - ".mise/**"
       - "frontend/package.json"
       - "frontend/package-lock.json"
   workflow_dispatch:
@@ -44,16 +47,16 @@ jobs:
             trap 'status=$?; printf "::error::Command failed (exit %s): %s\n" "$status" "$BASH_COMMAND"; exit "$status"' ERR
 
             # devcontainers/ci's headless exec ignores devcontainer.json's
-            # remoteEnv.PATH, so re-add ~/.local/bin here.
-            export PATH="${HOME}/.local/bin:${PATH}"
+            # remoteEnv.PATH, so re-add the mise shims here.
+            export PATH="${HOME}/.local/share/mise/shims:${PATH}"
 
             echo "== Versions =="
             actionlint --version
             betterleaks --version
             docker --version
             docker compose version
-            dockerfmt version
             gh --version
+            mise --version
             hadolint --version
             node --version
             npm --version
@@ -64,7 +67,7 @@ jobs:
 
             echo "== Development tools =="
             djlint --version
-            editorconfig-checker --version
+            ec --version
             htmlhint --version
             jsonlint --version
             ls-lint --version

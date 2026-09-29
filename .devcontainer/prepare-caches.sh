@@ -8,7 +8,7 @@ set -euo pipefail
 # root-owned, so chown the whole ~/.cache and ~/.local trees rather than only
 # the cache subdirectories below - pip's user-site fallback and per-tool
 # cache files land directly under the parents.
-sudo mkdir -p "${HOME}/.cache/pip" "${HOME}/.npm" "${HOME}/.cache/devcontainer-tools" "${HOME}/.local/share/gh"
+sudo mkdir -p "${HOME}/.cache/pip" "${HOME}/.npm" "${HOME}/.local/share/gh"
 sudo chown -R "$(id -u):$(id -g)" "${HOME}/.cache" "${HOME}/.npm" "${HOME}/.local"
 
 # Sits outside every path the purge below wipes, so it survives its own purge.

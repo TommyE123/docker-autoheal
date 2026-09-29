@@ -1,6 +1,8 @@
 {
   "name": "Docker Auto-Heal",
-  "image": "mcr.microsoft.com/devcontainers/python:3.14-bookworm@sha256:0f900e5c9aec62a7c3663b94afbff192fb7452192c5ab0e79ba0097199478ae2",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
 
   "features": {
     "ghcr.io/devcontainers/features/node:2": {
@@ -13,7 +15,6 @@
   "mounts": [
     "source=docker-autoheal-pip-cache,target=/home/vscode/.cache/pip,type=volume",
     "source=docker-autoheal-npm-cache,target=/home/vscode/.npm,type=volume",
-    "source=docker-autoheal-tools-cache,target=/home/vscode/.cache/devcontainer-tools,type=volume",
     "source=docker-autoheal-gh-cache,target=/home/vscode/.local/share/gh,type=volume"
   ],
 
@@ -63,7 +64,7 @@
   },
 
   "remoteEnv": {
-    "PATH": "${containerWorkspaceFolder}/.devcontainer/node_modules/.bin:/home/vscode/.local/bin:${containerEnv:PATH}",
+    "PATH": "${containerWorkspaceFolder}/.devcontainer/node_modules/.bin:/home/vscode/.local/share/mise/shims:${containerEnv:PATH}",
     "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
   },
 

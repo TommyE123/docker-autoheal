@@ -45,13 +45,13 @@ docker-autoheal/
 │   └── historical/                # Superseded documents, kept for context
 │
 ├── .devcontainer/                # Dev Container definition (see docs/developer/development-setup.md)
-│   ├── devcontainer.json         # Image, features, mounts, ports, VS Code customisations
+│   ├── devcontainer.json         # Build, features, mounts, ports, VS Code customisations
+│   ├── Dockerfile                # Pinned Python base image plus the mise binary
 │   ├── post-create.sh            # Installs dependencies and tooling on container creation
-│   ├── install-tools.sh          # Checksum-verified install of the pinned release tools
 │   ├── prepare-caches.sh         # Makes the cache volumes writable, then purges the pip/npm/gh caches weekly
-│   ├── tools.json                # Pinned GitHub release versions for the above
-│   ├── package.json              # Pinned npm-based linters used by the local tasks
-│   └── requirements-tools.txt    # Pinned Python linters/scanners used by the local tasks
+│   └── package.json              # Pinned npm linters that need shared plugins or config
+│
+├── mise.toml / mise.lock         # Pinned developer CLI tools, installed by mise (with .mise/locks/)
 │
 ├── requirements.txt              # Runtime Python dependencies
 ├── requirements-dev.txt          # Test dependencies (pytest, coverage)

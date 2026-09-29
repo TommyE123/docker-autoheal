@@ -57,18 +57,5 @@
       "matchPackageNames": ["tommye123/docker-autoheal"],
       "enabled": false
     }
-  ],
-  "customManagers": [
-    {
-      "customType": "regex",
-      "description": "Update the pinned GitHub release versions in .devcontainer/tools.json",
-      "managerFilePatterns": ["/^\\.devcontainer\\/tools\\.json$/"],
-      "matchStrings": [
-        "\\\"repository\\\":\\s*\\\"(?<depName>[^\\\"]+)\\\",\\s*\\\"version\\\":\\s*\\\"v?(?<currentValue>[^\\\"]+)\\\""
-      ],
-      "extractVersionTemplate": "^v?(?<version>.*)$",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
-    }
   ]
 }

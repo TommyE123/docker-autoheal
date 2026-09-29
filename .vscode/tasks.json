@@ -236,13 +236,13 @@
     {
       "label": "Autoheal: Check JSON and YAML Formatting",
       "type": "shell",
-      "command": "prettier --check \"**/*.json\" \"**/*.{yml,yaml}\" \"!**/*.lock.yml\" --ignore-path .gitignore",
+      "command": "prettier --check \"**/*.json\" \"**/*.{yml,yaml}\" \"!**/*.lock.yml\" \"!.mise/**\" --ignore-path .gitignore",
       "problemMatcher": []
     },
     {
       "label": "Autoheal: Validate JSON and YAML",
       "type": "shell",
-      "command": "v8r $(git ls-files '*.json' '*.yml' '*.yaml' | grep -v -e 'package-lock\\.json$' -e '\\.lock\\.yml$' -e '^\\.vscode/')",
+      "command": "v8r $(git ls-files '*.json' '*.yml' '*.yaml' | grep -v -e 'package-lock\\.json$' -e '\\.lock\\.yml$' -e '^\\.vscode/' -e '^\\.mise/')",
       "options": {
         "shell": {
           "executable": "bash",
@@ -255,12 +255,6 @@
       "label": "Autoheal: Check Dockerfiles",
       "type": "shell",
       "command": "hadolint Dockerfile Dockerfile.simple",
-      "problemMatcher": []
-    },
-    {
-      "label": "Autoheal: Check Dockerfile Formatting",
-      "type": "shell",
-      "command": "dockerfmt -c Dockerfile Dockerfile.simple",
       "problemMatcher": []
     },
     {
@@ -349,7 +343,6 @@
         "Autoheal: Check Workflows",
         "Autoheal: Check Markup and Data",
         "Autoheal: Check Dockerfiles",
-        "Autoheal: Check Dockerfile Formatting",
         "Autoheal: Check Repository Conventions",
         "Autoheal: Run Security Scanners"
       ],

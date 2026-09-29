@@ -46,7 +46,7 @@ DISABLE_ERRORS_LINTERS:
 # Global MegaLinter configuration
 # ---------------------------------------------------------------------------
 
-FILTER_REGEX_EXCLUDE: '(^|/)\.github/workflows/issue-triage\.lock\.yml$'
+FILTER_REGEX_EXCLUDE: '(^|/)(\.github/workflows/issue-triage\.lock\.yml$|\.mise/locks/)'
 ADDITIONAL_EXCLUDED_DIRECTORIES:
   - node_modules
   - static
