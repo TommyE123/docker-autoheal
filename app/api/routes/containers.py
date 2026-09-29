@@ -1,7 +1,7 @@
 """Container management endpoints."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
 
@@ -309,7 +309,7 @@ async def unquarantine_container(container_id: str):
         config_manager.clear_restart_history(stable_id)
 
         event = AutoHealEvent(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             container_name=f"{container_name} ({stable_id})",
             container_id=info.get("full_id"),  # Store current ID for reference
             event_type="unquarantine",

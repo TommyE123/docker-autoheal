@@ -10,7 +10,7 @@ real `/data` directory.
 """
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 from pydantic import ValidationError
@@ -20,7 +20,7 @@ from app.config.config_manager import AutoHealEvent, LegacyAutoHealEvent
 
 def _make_event(index: int) -> AutoHealEvent:
     return AutoHealEvent(
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         container_id=f"test_container_{index}",
         container_name=f"test-container-{index}",
         event_type="restart",

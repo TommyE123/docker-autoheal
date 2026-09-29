@@ -1,7 +1,7 @@
 """Health & status endpoints."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
@@ -20,7 +20,7 @@ async def health_check():
     """Health check endpoint for the service itself"""
     return {
         "status": "healthy",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "docker_connected": state.docker_client.is_connected() if state.docker_client else False,
         "monitoring_active": state.monitoring_engine._running if state.monitoring_engine else False
     }

@@ -5,7 +5,7 @@ Supports: Webhook, Discord, Slack, Telegram, Email, Ntfy, Gotify, Pushover
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -135,7 +135,7 @@ class NotificationManager:
                         self._notification_queue.get(),
                         timeout=1.0
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     continue
 
                 # Process the notification
@@ -565,7 +565,7 @@ class NotificationManager:
 
         # Create a test event
         test_event = AutoHealEvent(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             container_id="test-container-id",
             container_name="test-container",
             event_type="test",

@@ -1,7 +1,7 @@
 """Tests for ConfigManager state transitions and persisted round trips."""
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import pytest
@@ -31,7 +31,7 @@ def _redirect_manager_paths(monkeypatch, data_dir):
 
 def _make_event(container_id="web"):
     return AutoHealEvent(
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         container_id=container_id,
         container_name=container_id,
         event_type="restart",

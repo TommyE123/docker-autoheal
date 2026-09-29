@@ -6,7 +6,7 @@ Handles in-memory configuration state with JSON export/import support
 import json
 import logging
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -628,7 +628,7 @@ class ConfigManager:
         """Enable maintenance mode"""
         with self._lock:
             self._maintenance_mode = True
-            self._maintenance_start_time = datetime.now(timezone.utc)
+            self._maintenance_start_time = datetime.now(UTC)
             self._save_maintenance_mode()
 
     def disable_maintenance_mode(self) -> None:
