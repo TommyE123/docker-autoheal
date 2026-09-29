@@ -98,6 +98,9 @@ htmlcov/
 *.lcov
 *.lcov.info
 
+# Mutation testing (mutmut) working directory
+mutants/
+
 # Package managers
 yarn.lock
 pnpm-lock.yaml

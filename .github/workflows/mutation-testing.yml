@@ -1,0 +1,82 @@
+name: Mutation Testing
+
+# Informational only: weekly and on demand. Never a PR trigger, never a
+# required check, and no mutation-score threshold. See
+# docs/developer/mutation-testing.md for how to read the results.
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Queue rather than cancel: a run in progress is allowed to finish, and at most
+# one further run waits behind it.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  mutation-testing:
+    name: Mutation testing (informational)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Same Python version the Dockerfile ships, as in tests.yml.
+      - name: Determine Python version from Dockerfile
+        id: python-version
+        run: |
+          VERSION=$(sed -n 's/^FROM python:\([0-9]\+\.[0-9]\+\)-slim.*/\1/p' Dockerfile | head -n1)
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not find a 'FROM python:X.Y-slim' line in Dockerfile" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python ${{ steps.python-version.outputs.version }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ steps.python-version.outputs.version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-mutation.txt
+
+      # Deletes mutants/ first, so no earlier Mutmut state can be reused.
+      - name: Run mutation testing
+        run: ./mutation.sh
+
+      - name: Export results and summary
+        if: ${{ !cancelled() }}
+        run: |
+          mutmut export-cicd-stats
+          mutmut results > mutants/mutation-results.txt
+          {
+            echo "## Mutation testing (informational)"
+            echo
+            echo "Mutmut $(mutmut --version | awk '{print $NF}'), Python $(python -V | awk '{print $2}'), commit \`${GITHUB_SHA}\`"
+            echo
+            jq -r '"| Generated | Killed | Timeout | Survived | No tests | Detected |\n|---|---|---|---|---|---|\n| \(.total) | \(.killed) | \(.timeout) | \(.survived) | \(.no_tests) | \(((.killed + .timeout) / .total * 1000 | round) / 10)% |"' mutants/mutmut-cicd-stats.json
+            echo
+            echo "Detected = (killed + timeout) / generated. It excludes FastAPI route handlers and every other decorated function, which Mutmut does not mutate."
+            echo "Survivors are listed in \`mutation-results.txt\` in the \`mutation-results\` artifact."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload mutation results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mutation-results
+          path: |
+            mutants/
+            !mutants/**/__pycache__/
+            !mutants/data/
+          if-no-files-found: warn

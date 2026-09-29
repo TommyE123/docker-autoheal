@@ -1,0 +1,5 @@
+# Mutation-testing dependencies (see docs/developer/mutation-testing.md).
+# Kept separate from requirements-dev.txt so the normal unit-test job does not
+# install mutmut and its dependencies (libcst, textual, ...).
+-r requirements-dev.txt
+mutmut==3.8.0
