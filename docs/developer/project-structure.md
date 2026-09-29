@@ -49,6 +49,7 @@ docker-autoheal/
 ├── requirements-mutation.txt     # Mutation-testing dependencies (mutmut)
 ├── pytest.ini / .coveragerc
 ├── pyproject.toml                # Mutmut configuration only
+├── taskfile.yml                  # `task mutation` (wraps mutation.sh)
 ├── mutation.sh                   # Mutation-testing entry point (see docs/developer/mutation-testing.md)
 ├── run.py                        # Convenience entry point (`python run.py`)
 ├── Dockerfile                    # Multi-stage build: Node (frontend) → Python (backend)

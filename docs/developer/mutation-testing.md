@@ -18,9 +18,13 @@ Python version as the `Dockerfile`.
 ```bash
 pip install -r requirements-mutation.txt
 
-./mutation.sh                            # full run: a few minutes on 4 vCPUs
-./mutation.sh "app.uptime_kuma.matching*"  # focused run on a subset of mutants
+task mutation                                # full run: a few minutes on 4 vCPUs
+task mutation -- "app.uptime_kuma.matching*"  # focused run on a subset of mutants
 ```
+
+`task mutation` is a thin wrapper around [Task](https://taskfile.dev/) that calls
+`./mutation.sh`, which is also what CI runs. If you do not have Task installed, run
+`./mutation.sh` (or `./mutation.sh "<mutant-glob>"`) directly.
 
 `mutation.sh` deletes `mutants/` and then runs `mutmut run`, so every run starts clean.
 It finishes by printing the mutants that were not killed. `mutants/` is git-ignored.
@@ -62,7 +66,7 @@ function and the changed text, not by name.
 
 - installs `requirements-mutation.txt` on the Python version the `Dockerfile` uses;
 - starts from an empty `mutants/` (and never caches it);
-- is queued, not cancelled, if a previous run is still going, so runs never overlap;
+- never cancels a run in progress, and only one mutation run executes at a time;
 - is not a pull-request check and cannot block a merge.
 
 Find results on the workflow run page:

@@ -11,8 +11,8 @@ on:
 permissions:
   contents: read
 
-# Queue rather than cancel: a run in progress is allowed to finish, and at most
-# one further run waits behind it.
+# Queue rather than cancel an in-progress run: only one mutation run executes at
+# a time.
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
