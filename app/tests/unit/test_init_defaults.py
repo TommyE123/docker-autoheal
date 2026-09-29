@@ -48,14 +48,14 @@ class TestInitDefaults:
 
         # Create a custom config
         custom_data = {"test": "custom_value"}
-        with open(config_file, 'w') as f:
+        with config_file.open('w') as f:
             json.dump(custom_data, f)
 
         # Run initialization
         initialize_defaults(self.temp_dir)
 
         # Verify custom config was not overwritten
-        with open(config_file, 'r') as f:
+        with config_file.open('r') as f:
             loaded_data = json.load(f)
 
         assert loaded_data == custom_data
@@ -120,7 +120,7 @@ class TestInitDefaults:
         initialize_defaults(self.temp_dir)
         config_file = self.temp_dir / "config.json"
 
-        with open(config_file, 'r') as f:
+        with config_file.open('r') as f:
             data = json.load(f)  # Should not raise exception
 
         assert isinstance(data, dict)
@@ -130,7 +130,7 @@ class TestInitDefaults:
         initialize_defaults(self.temp_dir)
         events_file = self.temp_dir / "events.json"
 
-        with open(events_file, 'r') as f:
+        with events_file.open('r') as f:
             data = json.load(f)
 
         assert isinstance(data, list)
@@ -142,17 +142,17 @@ class TestInitDefaults:
 
         # Modify config
         config_file = self.temp_dir / "config.json"
-        with open(config_file, 'r') as f:
+        with config_file.open('r') as f:
             config = json.load(f)
         config["monitor"]["interval_seconds"] = 99
-        with open(config_file, 'w') as f:
+        with config_file.open('w') as f:
             json.dump(config, f)
 
         # Reset to defaults
         reset_to_defaults(self.temp_dir)
 
         # Verify config was reset
-        with open(config_file, 'r') as f:
+        with config_file.open('r') as f:
             config = json.load(f)
         assert config["monitor"]["interval_seconds"] == 30
 
@@ -177,7 +177,7 @@ class TestInitDefaults:
         initialize_defaults(self.temp_dir)
         config_file = self.temp_dir / "config.json"
 
-        with open(config_file, 'r') as f:
+        with config_file.open('r') as f:
             content = f.read()
 
         # Check that JSON is indented (not minified)

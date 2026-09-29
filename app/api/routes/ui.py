@@ -17,7 +17,7 @@ router = APIRouter()
 def serve_react_app():
     """Helper function to serve React index.html"""
     try:
-        with open("static/index.html", "r", encoding="utf-8") as f:
+        with Path("static/index.html").open(encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
     except FileNotFoundError:
         return HTMLResponse(
