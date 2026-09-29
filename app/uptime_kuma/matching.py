@@ -11,10 +11,8 @@ Compose service name. See issue #141.
 
 import logging
 import re
-from typing import TYPE_CHECKING, NotRequired, TypedDict
-
-if TYPE_CHECKING:
-    from collections.abc import Iterable
+from collections.abc import Iterable  # noqa: TC003 - keeps signatures evaluable at runtime
+from typing import NotRequired, TypedDict
 
 logger = logging.getLogger(__name__)
 
