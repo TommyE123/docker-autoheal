@@ -90,8 +90,9 @@ of the rest are noise (log messages, string literals, cosmetic constants).
 
 ## Configuration
 
-`pyproject.toml` contains only a `[tool.mutmut]` table; `pytest.ini` and `.coveragerc`
-still own test and coverage settings. Every non-default setting has a reason from the
+Mutmut is configured in the `[tool.mutmut]` table of `pyproject.toml` (which also holds
+the Ruff configuration); `pytest.ini` and `.coveragerc` still own test and coverage
+settings. Every non-default setting has a reason from the
 Phase 1 evaluation in [#333](https://github.com/TommyE123/docker-autoheal/issues/333):
 
 | Setting                              | Why                                                                                                                                                                                      |

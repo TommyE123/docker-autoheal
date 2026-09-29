@@ -59,6 +59,11 @@ VALIDATE_ALL_CODEBASE: true
 
 PYTHON_DEFAULT_STYLE: ruff
 
+# Ruff's configuration lives in pyproject.toml ([tool.ruff]). Without these,
+# MegaLinter looks for .ruff.toml and falls back to its own template config.
+PYTHON_RUFF_CONFIG_FILE: pyproject.toml
+PYTHON_RUFF_FORMAT_CONFIG_FILE: pyproject.toml
+
 PYTHON_PYRIGHT_PRE_COMMANDS:
   - command: pip install --no-cache-dir -r requirements-dev.txt
 

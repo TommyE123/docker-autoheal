@@ -48,7 +48,7 @@ docker-autoheal/
 ├── requirements-dev.txt          # Test dependencies (pytest, coverage, etc.)
 ├── requirements-mutation.txt     # Mutation-testing dependencies (mutmut)
 ├── pytest.ini / .coveragerc
-├── pyproject.toml                # Mutmut configuration only
+├── pyproject.toml                # Ruff and Mutmut configuration
 ├── taskfile.yml                  # `task mutation` (wraps mutation.sh)
 ├── mutation.sh                   # Mutation-testing entry point (see docs/developer/mutation-testing.md)
 ├── run.py                        # Convenience entry point (`python run.py`)
