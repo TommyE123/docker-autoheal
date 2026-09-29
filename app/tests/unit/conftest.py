@@ -24,7 +24,7 @@ import sys
 import tempfile
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -66,8 +66,8 @@ def make_container(
     name: str = "web",
     container_id: str = "a" * 64,
     status: str = "running",
-    labels: Optional[dict] = None,
-    health: Optional[dict] = None,
+    labels: dict | None = None,
+    health: dict | None = None,
     exit_code: int = 0,
 ) -> tuple[FakeContainer, dict]:
     """
@@ -139,11 +139,11 @@ class FakeDockerClient:
         self.restart_results: dict[str, bool] = {}
         self.restart_calls: list[str] = []
         self.reconnect_calls = 0
-        self.list_containers_error: Optional[Exception] = None
+        self.list_containers_error: Exception | None = None
         self.events: Any = []
         self.health_results: dict[str, bool] = {}
-        self.native_health: dict[str, Optional[str]] = {}
-        self.health_check_error: Optional[Exception] = None
+        self.native_health: dict[str, str | None] = {}
+        self.health_check_error: Exception | None = None
         self.info_errors: dict[str, Exception] = {}
 
     # -- test helpers -------------------------------------------------------
@@ -216,7 +216,7 @@ class FakeDockerClient:
             raise self.health_check_error
         return self.health_results.get(container.name, True)
 
-    def get_docker_native_health(self, container) -> Optional[str]:
+    def get_docker_native_health(self, container) -> str | None:
         if self.health_check_error is not None:
             raise self.health_check_error
         return self.native_health.get(container.name)
@@ -238,9 +238,9 @@ class FakeUptimeKumaClient:
     def __init__(
         self,
         connect_result: bool = True,
-        monitors: Optional[list] = None,
-        statuses: Optional[dict] = None,
-        get_all_monitors_error: Optional[Exception] = None,
+        monitors: list | None = None,
+        statuses: dict | None = None,
+        get_all_monitors_error: Exception | None = None,
     ) -> None:
         self.connect_result = connect_result
         self.monitors = monitors if monitors is not None else []

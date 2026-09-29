@@ -6,12 +6,12 @@ This module creates all necessary files in /data directory if they don't exist
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-def get_default_config() -> Dict[str, Any]:
+def get_default_config() -> dict[str, Any]:
     """Get default configuration dictionary"""
     return {
         "monitor": {
@@ -89,7 +89,7 @@ def get_default_quarantine() -> list:
     return []
 
 
-def get_default_maintenance() -> Dict[str, Any]:
+def get_default_maintenance() -> dict[str, Any]:
     """Get default maintenance mode settings"""
     return {
         "enabled": False,

@@ -38,9 +38,9 @@ select = [
     #            instead of lazy `%` formatting, plus a couple of
     #            logging.exception vs logging.error(exc_info=True) spots;
     #            worth a pass since some of these do affect what gets logged.
-    #   "UP",   # pyupgrade / syntax modernization - Optional[X] -> X | None,
-    #            Dict/List -> dict/list, datetime.utc -> datetime.UTC, etc.;
-    #            purely mechanical and largely auto-fixable in one sweep.
+    #   "UP",   # pyupgrade / syntax modernization - the typing subset is
+    #            enabled via extend-select below; the rest (datetime.UTC,
+    #            StrEnum, TimeoutError aliases, etc.) is still deferred.
     #   "TRY",  # exception-handling style (tryceratops) - things like
     #            logging.error instead of logging.exception inside except
     #            blocks, raising inside a try that could be restructured,
@@ -51,6 +51,15 @@ select = [
     #   "D",    # pydocstyle - missing/malformed docstrings on modules,
     #            classes and functions; overlaps with the ANN pass above
     #            in terms of which files need attention.
+]
+
+# Typing-syntax subset of "UP" (see the deferred-families note above).
+extend-select = [
+    "UP006",
+    "UP007",
+    "UP035",
+    "UP037",
+    "UP045",
 ]
 
 ignore = [

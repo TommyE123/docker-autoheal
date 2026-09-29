@@ -4,7 +4,6 @@ Uses the /metrics endpoint with Basic Authentication
 """
 import logging
 import re
-from typing import Dict, List, Optional
 
 import aiohttp
 
@@ -26,7 +25,7 @@ class UptimeKumaClient:
         self.auth_header = aiohttp.encode_basic_auth(
             username if username else '', password, encoding="latin1"
         )
-        self.session: Optional[aiohttp.ClientSession] = None
+        self.session: aiohttp.ClientSession | None = None
 
     async def connect(self) -> bool:
         """Test connection to Uptime-Kuma server"""
@@ -51,7 +50,7 @@ class UptimeKumaClient:
             logger.warning(f"Failed to connect to Uptime-Kuma: {e}")
             return False
 
-    async def get_all_monitors(self) -> List[Dict]:
+    async def get_all_monitors(self) -> list[dict]:
         """Fetch all monitors from /metrics endpoint"""
         try:
             async with aiohttp.ClientSession() as session:
@@ -72,7 +71,7 @@ class UptimeKumaClient:
             logger.error(f"Failed to fetch monitors: {e}")
             return []
 
-    def _parse_monitors_from_metrics(self, metrics_text: str) -> List[Dict]:
+    def _parse_monitors_from_metrics(self, metrics_text: str) -> list[dict]:
         """Parse monitor data from Prometheus metrics format"""
         # Uptime-Kuma allows two monitors to share a friendly name. Keeping both
         # lets the auto-mapper see the ambiguity and refuse to guess; collapsing
@@ -102,7 +101,7 @@ class UptimeKumaClient:
 
         return monitors
 
-    async def get_monitor_status(self, monitor_id: int) -> Optional[int]:
+    async def get_monitor_status(self, monitor_id: int) -> int | None:
         """Get status of a specific monitor by ID"""
         # Since we use hashed IDs, we need to fetch all monitors and find the matching one
         monitors = await self.get_all_monitors()
@@ -111,7 +110,7 @@ class UptimeKumaClient:
                 return monitor['status']
         return None
 
-    async def get_monitor_status_by_name(self, monitor_name: str) -> Optional[int]:
+    async def get_monitor_status_by_name(self, monitor_name: str) -> int | None:
         """Get status of a specific monitor by friendly name"""
         try:
             async with aiohttp.ClientSession() as session:
