@@ -336,9 +336,8 @@ class MonitoringEngine:
                 # For non-zero exit codes or if we don't respect manual stops, restart
                 if exit_code != 0:
                     return True, f"Container exited with code {exit_code}"
-                else:
-                    # exit_code = 0 but respect_manual_stop = False
-                    return True, f"Container stopped (exit 0)"
+                # exit_code = 0 but respect_manual_stop = False
+                return True, f"Container stopped (exit 0)"
 
         # Check health status
         if restart_mode in ["health", "both"]:
@@ -391,28 +390,27 @@ class MonitoringEngine:
                     health_check.http_expected_status,
                     health_check.timeout_seconds
                 )
-            elif check_type == "tcp":
+            if check_type == "tcp":
                 return await asyncio.to_thread(
                     self.docker_client.check_tcp_health,
                     container,
                     health_check.tcp_port,
                     health_check.timeout_seconds
                 )
-            elif check_type == "exec":
+            if check_type == "exec":
                 return await asyncio.to_thread(
                     self.docker_client.check_exec_health,
                     container,
                     health_check.exec_command
                 )
-            elif check_type == "docker":
+            if check_type == "docker":
                 status = await asyncio.to_thread(
                     self.docker_client.get_docker_native_health,
                     container
                 )
                 return status == "healthy" if status else True  # Assume healthy if no check
-            else:
-                logger.warning(f"Unknown health check type: {check_type}")
-                return True
+            logger.warning(f"Unknown health check type: {check_type}")
+            return True
         except Exception as e:
             logger.error(f"Error performing health check: {e}")
             return False

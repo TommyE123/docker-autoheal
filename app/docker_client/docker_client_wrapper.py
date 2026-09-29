@@ -126,7 +126,7 @@ class DockerClientWrapper:
             # Get network info for uniqueness
             networks = list(attrs.get("NetworkSettings", {}).get("Networks", {}).keys())
 
-            info = {
+            return {
                 "id": container.id[:12],  # Short ID
                 "full_id": container.id,
                 "name": container.name,
@@ -148,8 +148,6 @@ class DockerClientWrapper:
                 "compose_project": labels.get("com.docker.compose.project"),  # NEW: Compose project
                 "compose_service": labels.get("com.docker.compose.service"),  # NEW: Compose service
             }
-
-            return info
         except Exception as e:
             logger.error(f"Failed to get container info for {container.name}: {e}")
             return {}

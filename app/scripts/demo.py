@@ -7,6 +7,7 @@ Tests various features and demonstrates functionality
 import json
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 import requests
 
@@ -33,9 +34,8 @@ def check_service_health():
             print(f"   Docker Connected: {data['docker_connected']}")
             print(f"   Monitoring Active: {data['monitoring_active']}")
             return True
-        else:
-            print(f"❌ Service returned status code: {response.status_code}")
-            return False
+        print(f"❌ Service returned status code: {response.status_code}")
+        return False
     except Exception as e:
         print(f"❌ Cannot connect to service: {e}")
         print(f"   Make sure the service is running on {BASE_URL}")
@@ -157,9 +157,8 @@ def enable_autoheal_for_container(container_id):
         if response.status_code == 200:
             print(f"✅ Auto-heal enabled for container {container_id}")
             return True
-        else:
-            print(f"❌ Failed to enable auto-heal: {response.status_code}")
-            return False
+        print(f"❌ Failed to enable auto-heal: {response.status_code}")
+        return False
     except Exception as e:
         print(f"❌ Error enabling auto-heal: {e}")
         return False
@@ -187,9 +186,8 @@ def add_http_health_check(container_id, endpoint, expected_status=200):
             print(f"   Endpoint: {endpoint}")
             print(f"   Expected Status: {expected_status}")
             return True
-        else:
-            print(f"❌ Failed to add health check: {response.status_code}")
-            return False
+        print(f"❌ Failed to add health check: {response.status_code}")
+        return False
     except Exception as e:
         print(f"❌ Error adding health check: {e}")
         return False
@@ -203,14 +201,13 @@ def export_config():
 
         if response.status_code == 200:
             filename = f"config-backup-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.json"
-            with open(filename, 'w') as f:
+            with Path(filename).open('w') as f:
                 json.dump(response.json(), f, indent=2)
 
             print(f"✅ Configuration exported to {filename}")
             return filename
-        else:
-            print(f"❌ Failed to export config: {response.status_code}")
-            return None
+        print(f"❌ Failed to export config: {response.status_code}")
+        return None
     except Exception as e:
         print(f"❌ Error exporting config: {e}")
         return None
