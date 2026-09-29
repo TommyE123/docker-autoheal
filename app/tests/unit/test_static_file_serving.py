@@ -46,7 +46,7 @@ async def _collect_response(app: Any) -> tuple[int, dict[str, str], bytes]:
 
 
 @pytest.fixture
-def static_dir(tmp_path, monkeypatch) -> "Path":
+def static_dir(tmp_path, monkeypatch) -> "Path":  # noqa: UP037 - Path is TYPE_CHECKING-only
     monkeypatch.setattr(api_module, "STATIC_DIR", tmp_path)
     return tmp_path
 

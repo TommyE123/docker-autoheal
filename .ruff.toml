@@ -28,6 +28,7 @@ select = [
     "N",
     "PIE",
     "RUF",
+    "UP",
 
     # --- Deferred families --------------------------------------------
     # Pulled out of select rather than ignored code-by-code: these were
@@ -38,9 +39,6 @@ select = [
     #            instead of lazy `%` formatting, plus a couple of
     #            logging.exception vs logging.error(exc_info=True) spots;
     #            worth a pass since some of these do affect what gets logged.
-    #   "UP",   # pyupgrade / syntax modernization - Optional[X] -> X | None,
-    #            Dict/List -> dict/list, datetime.utc -> datetime.UTC, etc.;
-    #            purely mechanical and largely auto-fixable in one sweep.
     #   "TRY",  # exception-handling style (tryceratops) - things like
     #            logging.error instead of logging.exception inside except
     #            blocks, raising inside a try that could be restructured,

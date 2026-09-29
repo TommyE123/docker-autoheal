@@ -334,7 +334,7 @@ class TestTcpHealth:
         container = make_sdk_container()
         mock_sock = MagicMock()
         mock_sock.__enter__.return_value = mock_sock
-        mock_sock.connect_ex.side_effect = socket.timeout("timed out")
+        mock_sock.connect_ex.side_effect = TimeoutError("timed out")
 
         with patch(
             "app.docker_client.docker_client_wrapper.socket.socket",

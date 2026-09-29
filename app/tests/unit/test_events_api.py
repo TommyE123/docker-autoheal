@@ -9,7 +9,7 @@ risks clearing a real installation's event history.
 
 import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from fastapi import HTTPException
@@ -21,7 +21,7 @@ from app.config.config_manager import AutoHealEvent
 def test_delete_events_clears_a_seeded_event(isolated_config_manager):
     isolated_config_manager.add_event(
         AutoHealEvent(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             container_id="test-container",
             container_name="test-container",
             event_type="restart",
@@ -38,7 +38,7 @@ def test_delete_events_clears_a_seeded_event(isolated_config_manager):
 
 
 def test_events_api_serializes_utc_timestamp(isolated_config_manager):
-    timestamp = datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
+    timestamp = datetime(2024, 1, 1, 12, 0, tzinfo=UTC)
     isolated_config_manager.add_event(
         AutoHealEvent(
             timestamp=timestamp,

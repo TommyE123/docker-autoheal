@@ -6,9 +6,9 @@ Handles in-memory configuration state with JSON export/import support
 import json
 import logging
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
@@ -44,17 +44,17 @@ class RestartConfig(BaseModel):
 
 class ContainersConfig(BaseModel):
     """Container selection configuration"""
-    selected: List[str] = Field(default_factory=list, description="Explicitly selected container IDs/names")
-    excluded: List[str] = Field(default_factory=list, description="Explicitly excluded container IDs/names")
-    restart_counts: Dict[str, int] = Field(default_factory=dict, description="Restart counts by stable_id")
+    selected: list[str] = Field(default_factory=list, description="Explicitly selected container IDs/names")
+    excluded: list[str] = Field(default_factory=list, description="Explicitly excluded container IDs/names")
+    restart_counts: dict[str, int] = Field(default_factory=dict, description="Restart counts by stable_id")
 
 
 class FiltersConfig(BaseModel):
     """Filtering rules for containers"""
-    whitelist_names: List[str] = Field(default_factory=list, description="Container name patterns to whitelist")
-    blacklist_names: List[str] = Field(default_factory=list, description="Container name patterns to blacklist")
-    whitelist_labels: List[Dict[str, str]] = Field(default_factory=list, description="Label filters to whitelist")
-    blacklist_labels: List[Dict[str, str]] = Field(default_factory=list, description="Label filters to blacklist")
+    whitelist_names: list[str] = Field(default_factory=list, description="Container name patterns to whitelist")
+    blacklist_names: list[str] = Field(default_factory=list, description="Container name patterns to blacklist")
+    whitelist_labels: list[dict[str, str]] = Field(default_factory=list, description="Label filters to whitelist")
+    blacklist_labels: list[dict[str, str]] = Field(default_factory=list, description="Label filters to blacklist")
 
 
 class UIConfig(BaseModel):
@@ -70,7 +70,7 @@ class UIConfig(BaseModel):
 class AlertsConfig(BaseModel):
     """Alerting configuration"""
     enabled: bool = Field(default=True, description="Enable alerts")
-    webhook: Optional[str] = Field(default=None, description="Webhook URL for alerts")
+    webhook: str | None = Field(default=None, description="Webhook URL for alerts")
     notify_on_quarantine: bool = Field(default=True, description="Send alert when container is quarantined")
 
 
@@ -105,32 +105,32 @@ class NotificationService(BaseModel):
     enabled: bool = Field(default=True, description="Enable this notification service")
 
     # Common fields
-    url: Optional[str] = Field(default=None, description="Webhook URL (webhook, discord, slack)")
-    headers: Optional[Dict[str, str]] = Field(default=None, description="Custom headers for webhook")
-    username: Optional[str] = Field(default=None, description="Username (discord, ntfy)")
-    password: Optional[str] = Field(default=None, description="Password (ntfy)")
+    url: str | None = Field(default=None, description="Webhook URL (webhook, discord, slack)")
+    headers: dict[str, str] | None = Field(default=None, description="Custom headers for webhook")
+    username: str | None = Field(default=None, description="Username (discord, ntfy)")
+    password: str | None = Field(default=None, description="Password (ntfy)")
 
     # Telegram
-    bot_token: Optional[str] = Field(default=None, description="Telegram bot token")
-    chat_id: Optional[str] = Field(default=None, description="Telegram chat ID")
+    bot_token: str | None = Field(default=None, description="Telegram bot token")
+    chat_id: str | None = Field(default=None, description="Telegram chat ID")
 
     # Ntfy
-    topic: Optional[str] = Field(default=None, description="Ntfy topic")
-    server_url: Optional[str] = Field(default=None, description="Ntfy server URL (default: https://ntfy.sh)")
+    topic: str | None = Field(default=None, description="Ntfy topic")
+    server_url: str | None = Field(default=None, description="Ntfy server URL (default: https://ntfy.sh)")
 
     # Gotify
-    app_token: Optional[str] = Field(default=None, description="Gotify app token")
+    app_token: str | None = Field(default=None, description="Gotify app token")
 
     # Pushover
-    user_key: Optional[str] = Field(default=None, description="Pushover user key")
-    api_token: Optional[str] = Field(default=None, description="Pushover API token")
+    user_key: str | None = Field(default=None, description="Pushover user key")
+    api_token: str | None = Field(default=None, description="Pushover API token")
 
 
 class NotificationsConfig(BaseModel):
     """Notifications configuration"""
     enabled: bool = Field(default=False, description="Enable notification system")
-    services: List[NotificationService] = Field(default_factory=list, description="List of notification services")
-    event_filters: List[str] = Field(
+    services: list[NotificationService] = Field(default_factory=list, description="List of notification services")
+    event_filters: list[str] = Field(
         default_factory=lambda: ["restart", "quarantine", "health_check_failed", "auto_unquarantine"],
         description="Event types to send notifications for (empty = all events)"
     )
@@ -146,7 +146,7 @@ class AutoHealConfig(BaseModel):
     alerts: AlertsConfig = Field(default_factory=AlertsConfig)
     observability: ObservabilityConfig = Field(default_factory=ObservabilityConfig)
     uptime_kuma: UptimeKumaConfig = Field(default_factory=UptimeKumaConfig)
-    uptime_kuma_mappings: List[UptimeKumaMapping] = Field(default_factory=list)
+    uptime_kuma_mappings: list[UptimeKumaMapping] = Field(default_factory=list)
     notifications: NotificationsConfig = Field(default_factory=NotificationsConfig)
 
 
@@ -158,12 +158,12 @@ class HealthCheckConfig(BaseModel):
     timeout_seconds: int = Field(default=10, ge=1)
     retries: int = Field(default=3, ge=1)
     # For HTTP checks
-    http_endpoint: Optional[str] = None
-    http_expected_status: Optional[int] = 200
+    http_endpoint: str | None = None
+    http_expected_status: int | None = 200
     # For TCP checks
-    tcp_port: Optional[int] = None
+    tcp_port: int | None = None
     # For exec checks
-    exec_command: Optional[List[str]] = None
+    exec_command: list[str] | None = None
 
 
 class AutoHealEvent(BaseModel):
@@ -216,13 +216,13 @@ class LegacyAutoHealEvent(BaseModel):
         return value
 
 
-StoredAutoHealEvent = Union[AutoHealEvent, LegacyAutoHealEvent]
+StoredAutoHealEvent = AutoHealEvent | LegacyAutoHealEvent
 
 
 # Top-level AutoHealConfig sections that are themselves a single model and can
 # be validated independently of one another. uptime_kuma_mappings is handled
 # separately below since it is a list rather than a single model.
-_CONFIG_SECTION_MODELS: Dict[str, type] = {
+_CONFIG_SECTION_MODELS: dict[str, type] = {
     "monitor": MonitorConfig,
     "containers": ContainersConfig,
     "restart": RestartConfig,
@@ -260,12 +260,12 @@ class ConfigManager:
 
         # Load persisted data or initialize with defaults
         self._config = self._load_config()
-        self._event_log: List[StoredAutoHealEvent] = self._load_events()
-        self._custom_health_checks: Dict[str, HealthCheckConfig] = self._load_custom_health_checks()
+        self._event_log: list[StoredAutoHealEvent] = self._load_events()
+        self._custom_health_checks: dict[str, HealthCheckConfig] = self._load_custom_health_checks()
         # _container_restart_counts removed - now stored in self._config.containers.restart_counts
         self._quarantined_containers: set = self._load_quarantine()
         self._maintenance_mode: bool = False
-        self._maintenance_start_time: Optional[datetime] = None
+        self._maintenance_start_time: datetime | None = None
         self._load_maintenance_mode()
 
         logger.info("ConfigManager initialized with persistent storage at /data")
@@ -329,7 +329,7 @@ class ConfigManager:
         logger.info("Configuration loaded from disk")
         return config
 
-    def _parse_custom_health_checks(self, raw: Any) -> Dict[str, HealthCheckConfig]:
+    def _parse_custom_health_checks(self, raw: Any) -> dict[str, HealthCheckConfig]:
         """Parse the custom_health_checks block, defaulting to empty on failure."""
         try:
             return {cid: HealthCheckConfig(**hc) for cid, hc in raw.items()}
@@ -344,7 +344,7 @@ class ConfigManager:
         wrong type, an unrecognized shape, a future field an older version
         can't read) can't discard the rest of a working configuration.
         """
-        sections: Dict[str, Any] = {}
+        sections: dict[str, Any] = {}
 
         for name, model in _CONFIG_SECTION_MODELS.items():
             if name not in data:
@@ -379,13 +379,13 @@ class ConfigManager:
         except Exception as e:
             logger.error(f"Failed to save config to disk: {e}")
 
-    def _load_events(self) -> List[StoredAutoHealEvent]:
+    def _load_events(self) -> list[StoredAutoHealEvent]:
         """Load current and legacy events without losing valid history."""
         try:
             if self.EVENTS_FILE.exists():
                 with self.EVENTS_FILE.open('r') as f:
                     data = json.load(f)
-                    events: List[StoredAutoHealEvent] = []
+                    events: list[StoredAutoHealEvent] = []
                     for index, event in enumerate(data):
                         try:
                             events.append(AutoHealEvent(**event))
@@ -418,7 +418,7 @@ class ConfigManager:
         except Exception as e:
             logger.error(f"Failed to save events to disk: {e}")
 
-    def _load_custom_health_checks(self) -> Dict[str, HealthCheckConfig]:
+    def _load_custom_health_checks(self) -> dict[str, HealthCheckConfig]:
         """Load custom health checks (already loaded in _load_config)"""
         return getattr(self, '_custom_health_checks', {})
 
@@ -535,7 +535,7 @@ class ConfigManager:
                 self._event_log = self._event_log[-max_entries:]
             self._save_events()
 
-    def get_events(self, limit: Optional[int] = None) -> List[StoredAutoHealEvent]:
+    def get_events(self, limit: int | None = None) -> list[StoredAutoHealEvent]:
         """Get event log (thread-safe)"""
         with self._lock:
             if limit:
@@ -555,7 +555,7 @@ class ConfigManager:
             self._custom_health_checks[health_check.container_id] = health_check
             self._save_config()
 
-    def get_custom_health_check(self, container_id: str) -> Optional[HealthCheckConfig]:
+    def get_custom_health_check(self, container_id: str) -> HealthCheckConfig | None:
         """Get custom health check for a container"""
         with self._lock:
             return self._custom_health_checks.get(container_id)
@@ -566,7 +566,7 @@ class ConfigManager:
             self._custom_health_checks.pop(container_id, None)
             self._save_config()
 
-    def get_all_custom_health_checks(self) -> Dict[str, HealthCheckConfig]:
+    def get_all_custom_health_checks(self) -> dict[str, HealthCheckConfig]:
         """Get all custom health checks"""
         with self._lock:
             return self._custom_health_checks.copy()
@@ -589,7 +589,7 @@ class ConfigManager:
         with self._lock:
             return self._config.containers.restart_counts.get(container_id, 0)
 
-    def cleanup_restart_counts(self, active_container_ids: List[str]) -> None:
+    def cleanup_restart_counts(self, active_container_ids: list[str]) -> None:
         """Remove restart counts for containers that no longer exist (DISABLED to preserve manual entries)"""
         # DISABLED: Auto-cleanup was removing manual entries because stable_id matching is complex
         # Users can manually edit config.json to remove old entries if needed
@@ -628,7 +628,7 @@ class ConfigManager:
         """Enable maintenance mode"""
         with self._lock:
             self._maintenance_mode = True
-            self._maintenance_start_time = datetime.now(timezone.utc)
+            self._maintenance_start_time = datetime.now(UTC)
             self._save_maintenance_mode()
 
     def disable_maintenance_mode(self) -> None:
@@ -643,7 +643,7 @@ class ConfigManager:
         with self._lock:
             return self._maintenance_mode
 
-    def get_maintenance_start_time(self) -> Optional[datetime]:
+    def get_maintenance_start_time(self) -> datetime | None:
         """Get maintenance mode start time"""
         with self._lock:
             return self._maintenance_start_time

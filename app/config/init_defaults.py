@@ -6,12 +6,12 @@ This module creates all necessary files in /data directory if they don't exist
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-def get_default_config() -> Dict[str, Any]:
+def get_default_config() -> dict[str, Any]:
     """Get default configuration dictionary"""
     return {
         "monitor": {
@@ -89,7 +89,7 @@ def get_default_quarantine() -> list:
     return []
 
 
-def get_default_maintenance() -> Dict[str, Any]:
+def get_default_maintenance() -> dict[str, Any]:
     """Get default maintenance mode settings"""
     return {
         "enabled": False,
@@ -115,7 +115,7 @@ def init_data_file(file_path: Path, default_data: Any, description: str) -> bool
 
     try:
         file_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(file_path, 'w') as f:
+        with file_path.open('w') as f:
             json.dump(default_data, f, indent=2)
         logger.info(f"Created default {description} at {file_path}")
         return True
@@ -202,7 +202,7 @@ def reset_to_defaults(data_dir: Path = Path("/data")) -> None:
     for filename, default_data in files.items():
         file_path = data_dir / filename
         try:
-            with open(file_path, 'w') as f:
+            with file_path.open('w') as f:
                 json.dump(default_data, f, indent=2)
             logger.info(f"Reset {filename} to defaults")
         except Exception as e:

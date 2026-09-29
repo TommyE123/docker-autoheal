@@ -12,7 +12,8 @@ the background worker drains the queue.
 import asyncio
 import base64
 import logging
-from datetime import datetime, timezone
+from contextlib import suppress
+from datetime import UTC, datetime
 
 import pytest
 
@@ -57,7 +58,7 @@ def manager() -> NotificationManager:
 
 def _make_event(event_type: str = "restart") -> AutoHealEvent:
     return AutoHealEvent(
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         container_id="test-container-123",
         container_name="nginx-test",
         event_type=event_type,
@@ -453,6 +454,48 @@ async def test_notification_worker_recovers_after_processing_error(
 
     assert len(calls) == 2
     assert len(manager._session.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_notification_worker_keeps_polling_after_queue_wait_timeout(
+    caplog, monkeypatch, isolated_config_manager, manager
+):
+    """A queue-wait timeout must make the worker poll again, not stop."""
+    _configure_webhook(isolated_config_manager)
+
+    real_wait_for = asyncio.wait_for
+    timeouts_raised = 0
+
+    async def wait_for_timing_out_once(awaitable, **kwargs):
+        nonlocal timeouts_raised
+        if timeouts_raised == 0:
+            timeouts_raised += 1
+            awaitable.close()
+            raise TimeoutError
+        return await real_wait_for(awaitable, **kwargs)
+
+    monkeypatch.setattr(
+        "app.notifications.notification_manager.asyncio.wait_for", wait_for_timing_out_once
+    )
+
+    manager._running = True
+    await manager._notification_queue.put(_make_event("restart"))
+    with caplog.at_level(logging.ERROR):
+        worker = asyncio.create_task(manager._notification_worker())
+
+        for _ in range(200):
+            if manager._session.calls:
+                break
+            await asyncio.sleep(0.01)
+
+        manager._running = False
+        worker.cancel()
+        with suppress(asyncio.CancelledError):
+            await worker
+
+    assert timeouts_raised == 1
+    assert len(manager._session.calls) == 1
+    assert not any("Error in notification worker" in r.message for r in caplog.records)
 
 
 @pytest.mark.asyncio

@@ -6,7 +6,7 @@ exponential backoff, successful restarts, failed restarts and the events they
 produce.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -115,7 +115,7 @@ class TestCooldown:
     async def test_restart_suppressed_during_cooldown(self, engine, docker_client):
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
-        engine._last_restart_times["web"] = datetime.now(timezone.utc)
+        engine._last_restart_times["web"] = datetime.now(UTC)
 
         await engine._handle_container_restart(container, info, "unhealthy")
 
@@ -127,7 +127,7 @@ class TestCooldown:
         update_config(lambda c: setattr(c.restart, "cooldown_seconds", 60))
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
-        engine._last_restart_times["web"] = datetime.now(timezone.utc) - timedelta(seconds=61)
+        engine._last_restart_times["web"] = datetime.now(UTC) - timedelta(seconds=61)
 
         await engine._handle_container_restart(container, info, "unhealthy")
 

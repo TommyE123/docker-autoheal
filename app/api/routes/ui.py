@@ -2,7 +2,6 @@
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
@@ -17,7 +16,7 @@ router = APIRouter()
 def serve_react_app():
     """Helper function to serve React index.html"""
     try:
-        with open("static/index.html", "r", encoding="utf-8") as f:
+        with Path("static/index.html").open(encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
     except FileNotFoundError:
         return HTMLResponse(
@@ -89,7 +88,7 @@ def get_static_file_path(filename: str) -> Path:
     return file_path
 
 
-async def serve_static_file(filename: str, media_type: Optional[str] = None) -> FileResponse:
+async def serve_static_file(filename: str, media_type: str | None = None) -> FileResponse:
     """Generic handler for serving static files with validation"""
     try:
         file_path = get_static_file_path(filename)

@@ -10,7 +10,6 @@ Core functionality (restarts, quarantine, events, etc.) is delegated to Monitori
 """
 import asyncio
 import logging
-from typing import Dict, Optional
 
 from app.config.config_manager import config_manager
 from app.uptime_kuma.uptime_kuma_client import UptimeKumaClient
@@ -27,11 +26,11 @@ class UptimeKumaMonitor:
 
     def __init__(self):
         """Initialize Uptime-Kuma monitor"""
-        self.client: Optional[UptimeKumaClient] = None
+        self.client: UptimeKumaClient | None = None
         self._running = False
-        self._task: Optional[asyncio.Task] = None
-        self._monitor_cache: Dict[str, dict] = {}  # Cache monitor IDs by friendly name
-        self._container_status_cache: Dict[str, int] = {}  # Cache of stable_id -> status
+        self._task: asyncio.Task | None = None
+        self._monitor_cache: dict[str, dict] = {}  # Cache monitor IDs by friendly name
+        self._container_status_cache: dict[str, int] = {}  # Cache of stable_id -> status
 
     async def start(self):
         """Start Uptime-Kuma monitoring"""
@@ -153,7 +152,7 @@ class UptimeKumaMonitor:
 
             logger.debug(f"Cached status for {mapping.container_id}: {status} (monitor: {mapping.monitor_friendly_name})")
 
-    def get_container_status(self, stable_id: str) -> Optional[int]:
+    def get_container_status(self, stable_id: str) -> int | None:
         return self._container_status_cache.get(stable_id)
 
     def is_container_mapped(self, stable_id: str) -> bool:

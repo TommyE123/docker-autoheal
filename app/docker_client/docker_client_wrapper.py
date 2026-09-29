@@ -5,7 +5,7 @@ Provides interface to Docker API for monitoring and management
 
 import logging
 import socket
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import docker
 import requests
@@ -24,7 +24,7 @@ class DockerClientWrapper:
             base_url: Docker daemon socket URL
         """
         self.base_url = base_url
-        self._client: Optional[docker.DockerClient] = None
+        self._client: docker.DockerClient | None = None
         self._connect()
 
     def _connect(self) -> None:
@@ -57,7 +57,7 @@ class DockerClientWrapper:
             logger.warning(f"Connection check failed: {e}")
         return False
 
-    def list_containers(self, all_containers: bool = False) -> List[Container]:
+    def list_containers(self, all_containers: bool = False) -> list[Container]:
         """
         List containers
         Args:
@@ -73,7 +73,7 @@ class DockerClientWrapper:
                 self.reconnect()
             return []
 
-    def get_container(self, container_id: str) -> Optional[Container]:
+    def get_container(self, container_id: str) -> Container | None:
         """
         Get container by ID or name
         Args:
@@ -90,7 +90,7 @@ class DockerClientWrapper:
             logger.error(f"Failed to get container {container_id}: {e}")
             return None
 
-    def get_container_info(self, container: Container) -> Dict[str, Any]:
+    def get_container_info(self, container: Container) -> dict[str, Any]:
         """
         Get detailed container information
         Args:
@@ -126,7 +126,7 @@ class DockerClientWrapper:
             # Get network info for uniqueness
             networks = list(attrs.get("NetworkSettings", {}).get("Networks", {}).keys())
 
-            info = {
+            return {
                 "id": container.id[:12],  # Short ID
                 "full_id": container.id,
                 "name": container.name,
@@ -148,13 +148,11 @@ class DockerClientWrapper:
                 "compose_project": labels.get("com.docker.compose.project"),  # NEW: Compose project
                 "compose_service": labels.get("com.docker.compose.service"),  # NEW: Compose service
             }
-
-            return info
         except Exception as e:
             logger.error(f"Failed to get container info for {container.name}: {e}")
             return {}
 
-    def _get_health_status(self, attrs: Dict) -> Optional[Dict[str, Any]]:
+    def _get_health_status(self, attrs: dict) -> dict[str, Any] | None:
         """Extract health status from container attributes"""
         state = attrs.get("State", {})
         health = state.get("Health")
@@ -201,7 +199,7 @@ class DockerClientWrapper:
             logger.error(f"Failed to stop container {container.name}: {e}")
             return False
 
-    def execute_command(self, container: Container, command: List[str]) -> tuple[int, str]:
+    def execute_command(self, container: Container, command: list[str]) -> tuple[int, str]:
         """
         Execute command in container
         Args:
@@ -302,7 +300,7 @@ class DockerClientWrapper:
             logger.warning(f"TCP health check failed for {container.name}: {e}")
             return False
 
-    def check_exec_health(self, container: Container, command: List[str]) -> bool:
+    def check_exec_health(self, container: Container, command: list[str]) -> bool:
         """
         Perform exec-based health check on container
         Args:
@@ -314,7 +312,7 @@ class DockerClientWrapper:
         exit_code, _ = self.execute_command(container, command)
         return exit_code == 0
 
-    def get_docker_native_health(self, container: Container) -> Optional[str]:
+    def get_docker_native_health(self, container: Container) -> str | None:
         """
         Get Docker's native health check status
         Args:

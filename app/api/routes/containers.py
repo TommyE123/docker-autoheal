@@ -1,8 +1,7 @@
 """Container management endpoints."""
 
 import logging
-from datetime import datetime, timezone
-from typing import List
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException
 
@@ -15,7 +14,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/api/containers", response_model=List[ContainerInfo])
+@router.get("/api/containers", response_model=list[ContainerInfo])
 async def list_containers(include_stopped: bool = False):
     """List all containers with their monitoring status"""
     docker_client = state.docker_client
@@ -310,7 +309,7 @@ async def unquarantine_container(container_id: str):
         config_manager.clear_restart_history(stable_id)
 
         event = AutoHealEvent(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             container_name=f"{container_name} ({stable_id})",
             container_id=info.get("full_id"),  # Store current ID for reference
             event_type="unquarantine",
