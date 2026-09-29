@@ -2,10 +2,11 @@
 Uptime-Kuma API client for fetching monitor statuses
 Uses the /metrics endpoint with Basic Authentication
 """
-import aiohttp
 import logging
 import re
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
+
+import aiohttp
 
 logger = logging.getLogger(__name__)
 

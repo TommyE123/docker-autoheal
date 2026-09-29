@@ -4,10 +4,11 @@ Demo script for Docker Auto-Heal Service
 Tests various features and demonstrates functionality
 """
 
-import requests
-import time
 import json
+import time
 from datetime import datetime, timezone
+
+import requests
 
 BASE_URL = "http://localhost:3131"
 API_URL = f"{BASE_URL}/api"

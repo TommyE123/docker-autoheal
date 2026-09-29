@@ -4,18 +4,17 @@ Tests the automatic creation of default configuration files
 """
 
 import json
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
-import pytest
 
 from app.config.init_defaults import (
-    initialize_defaults,
-    reset_to_defaults,
     get_default_config,
     get_default_events,
+    get_default_maintenance,
     get_default_quarantine,
-    get_default_maintenance
+    initialize_defaults,
+    reset_to_defaults,
 )
 
 

@@ -4,9 +4,10 @@ When a quarantined container becomes healthy again, it should be automatically
 removed from quarantine with an event logged.
 """
 
-import pytest
 from datetime import datetime, timezone
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 
 class TestAutoUnquarantine:
@@ -14,9 +15,10 @@ class TestAutoUnquarantine:
 
     def test_quarantine_check_logic(self):
         """Test that quarantine check logic correctly identifies quarantined containers"""
-        from app.config.config_manager import ConfigManager
-        import tempfile
         import shutil
+        import tempfile
+
+        from app.config.config_manager import ConfigManager
 
         # Create temp directory for test data
         temp_dir = tempfile.mkdtemp()
@@ -74,8 +76,8 @@ class TestAutoUnquarantine:
     @pytest.mark.asyncio
     async def test_auto_unquarantine_flow(self):
         """Test the full auto-unquarantine flow"""
-        from app.monitor.monitoring_engine import MonitoringEngine
         from app.docker_client.docker_client_wrapper import DockerClientWrapper
+        from app.monitor.monitoring_engine import MonitoringEngine
 
         # Create mock docker client
         mock_docker = Mock(spec=DockerClientWrapper)
@@ -120,8 +122,8 @@ class TestAutoUnquarantine:
     @pytest.mark.asyncio
     async def test_quarantine_check_reuses_evaluate_health(self):
         """Test that quarantine check reuses _evaluate_container_health for health verification"""
-        from app.monitor.monitoring_engine import MonitoringEngine
         from app.docker_client.docker_client_wrapper import DockerClientWrapper
+        from app.monitor.monitoring_engine import MonitoringEngine
 
         # Create mock docker client
         mock_docker = Mock(spec=DockerClientWrapper)
@@ -180,8 +182,8 @@ class TestAutoUnquarantine:
     @pytest.mark.asyncio
     async def test_quarantine_check_stays_quarantined_if_unhealthy(self):
         """Test that container stays quarantined if still unhealthy"""
-        from app.monitor.monitoring_engine import MonitoringEngine
         from app.docker_client.docker_client_wrapper import DockerClientWrapper
+        from app.monitor.monitoring_engine import MonitoringEngine
 
         # Create mock docker client
         mock_docker = Mock(spec=DockerClientWrapper)

@@ -7,9 +7,9 @@ events.
 """
 
 import asyncio
+from unittest.mock import AsyncMock
 
 import pytest
-from unittest.mock import AsyncMock
 
 from app.config.config_manager import config_manager
 from app.tests.unit.conftest import make_container

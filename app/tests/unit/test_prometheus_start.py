@@ -4,8 +4,8 @@ Verifies that start_http_server is called when prometheus_enabled is True,
 regardless of notification settings.
 """
 
-import asyncio
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 
 from app.main import AutoHealService
