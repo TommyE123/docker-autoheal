@@ -46,8 +46,8 @@ newer version, which replaces the old one.
 `.vscode/tasks.json` wires the common workflows up to **Terminal → Run Task** (every
 label is prefixed `Autoheal:`): running the backend and the frontend dev server, the unit
 and integration suites, the frontend build, `docker compose up --build`, and each linter
-and security scanner individually. The aggregate entry points are **Run Local Linters**,
-**Lint Python**, **Lint Frontend**, **Lint Shell Scripts**, **Lint Workflows**, **Lint
+and security scanner individually. The aggregate entry points are **Run Local Checks**,
+**Check Python**, **Check Frontend**, **Check Shell Scripts**, **Check Workflows**, **Check
 Markup and Data**, **Check Repository Conventions** and **Run Security Scanners**.
 
 The tasks that need shell globbing run under `bash`, so outside the Dev Container they
@@ -145,16 +145,18 @@ npx markdownlint-cli2 "**/*.md" "#node_modules" "#frontend/node_modules" "#.devc
 npx markdown-table-formatter --check "**/*.md"   # drop --check to auto-fix
 ```
 
-In the Dev Container these are the **Autoheal: Lint Markdown** and **Autoheal: Check
+In the Dev Container these are the **Autoheal: Check Markdown** and **Autoheal: Check
 Markdown Tables** tasks, which lint tracked files only.
 
 The frontend has `npm run lint` (ESLint) and `npm run format:check` (Prettier) scripts —
 see [Frontend Development](frontend.md#linting-and-formatting).
 
 Linter configuration lives at the repository root (`.markdownlint.jsonc`,
-`.stylelintrc.json`, `.secretlintrc.json`, `.secretlintignore`, `.trufflehog-exclude.txt`,
-`.yamllint.yml`, `.ls-lint.yml`) and is shared: the Dev Container tasks and MegaLinter
-both read it, so a rule change applies in both places.
+`.stylelintrc.json`, `.secretlintrc.json`, `.yamllint.yml`, `.ls-lint.yml`) and is
+shared: the Dev Container tasks and MegaLinter both read it, so a rule change applies in
+both places. `.secretlintignore` and `.trufflehog-exclude.txt` are the exception: they
+only apply to the local tasks, because MegaLinter passes secretlint and TruffleHog its own
+generated exclusion lists.
 
 ### What lints what
 
@@ -174,7 +176,7 @@ formatter is CLI-only.
 | `.md`           | markdownlint              | markdown-table-formatter | Yes              |
 | `.html`, `.htm` | djlint, htmlhint          | none                     | Yes              |
 | `.sh`           | shellcheck, bash-exec     | shfmt                    | Yes              |
-| `Dockerfile*`   | hadolint                  | dockerfmt                | Yes              |
+| `Dockerfile*`   | hadolint                  | none                     | Yes              |
 | Every file      | editorconfig-checker      | —                        | Yes              |
 
 Workflow files are additionally scanned by zizmor, which is report-only. Repository-wide

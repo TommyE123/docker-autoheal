@@ -4,7 +4,7 @@ extends: default
 
 # *.lock.yml is compiled by the `gh aw` CLI, not hand-authored;
 # `gh aw compile --yamllint` validates it instead.
-# node_modules: the "Lint YAML" task scans the whole workspace, and
+# node_modules: the "Check YAML" task scans the whole workspace, and
 # MegaLinter's eslint pre-command creates frontend/node_modules mid-run.
 ignore: |
   .github/workflows/*.lock.yml
