@@ -6,7 +6,7 @@ Tests various features and demonstrates functionality
 
 import json
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
@@ -200,7 +200,7 @@ def export_config():
         response = requests.get(f"{API_URL}/config/export")
 
         if response.status_code == 200:
-            filename = f"config-backup-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.json"
+            filename = f"config-backup-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}.json"
             with Path(filename).open('w') as f:
                 json.dump(response.json(), f, indent=2)
 

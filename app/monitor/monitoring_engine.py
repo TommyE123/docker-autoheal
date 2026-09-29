@@ -6,7 +6,7 @@ Monitors containers and performs auto-healing actions
 import asyncio
 import fnmatch
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from docker.models.containers import Container
 
@@ -438,7 +438,7 @@ class MonitoringEngine:
 
             # Log the event
             event = AutoHealEvent(
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 container_name=f"{container_name} ({stable_id})",
                 container_id=container_id,
                 event_type="auto_unquarantine",
@@ -483,7 +483,7 @@ class MonitoringEngine:
         # Check cooldown (using stable_id)
         last_restart = self._last_restart_times.get(stable_id)
         if last_restart:
-            elapsed = (datetime.now(timezone.utc) - last_restart).total_seconds()
+            elapsed = (datetime.now(UTC) - last_restart).total_seconds()
             if elapsed < config.restart.cooldown_seconds:
                 logger.debug(f"Container {container_name} (stable_id: {stable_id}) in cooldown period ({elapsed:.1f}s)")
                 return
@@ -499,7 +499,7 @@ class MonitoringEngine:
             config_manager.quarantine_container(stable_id)
 
             event = AutoHealEvent(
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 container_name=f"{container_name} ({stable_id})",
                 container_id=container_id,  # Store current ID for reference
                 event_type="quarantine",
@@ -537,11 +537,11 @@ class MonitoringEngine:
 
         # Record restart (using stable_id - persists across ID changes and handles all edge cases)
         config_manager.record_restart(stable_id)
-        self._last_restart_times[stable_id] = datetime.now(timezone.utc)
+        self._last_restart_times[stable_id] = datetime.now(UTC)
 
         # Log event
         event = AutoHealEvent(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             container_name=f"{container_name} ({stable_id})",
             container_id=container_id,
             event_type="restart",
@@ -683,7 +683,7 @@ class MonitoringEngine:
 
                     # Create an event for this
                     event_obj = AutoHealEvent(
-                        timestamp=datetime.now(timezone.utc),
+                        timestamp=datetime.now(UTC),
                         container_name=f"{container_name} ({stable_id})",
                         container_id=container_id,
                         event_type="auto_monitor",
@@ -850,7 +850,7 @@ class MonitoringEngine:
 
                 # Create an event for this
                 event_obj = AutoHealEvent(
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     container_name=f"{container_name} ({stable_id})",
                     container_id=container_id,  # Store current ID for reference
                     event_type="auto_monitor",

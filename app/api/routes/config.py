@@ -9,7 +9,7 @@ domains rather than preserving that historical placement).
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
@@ -74,7 +74,7 @@ async def export_config():
         return JSONResponse(
             content=json.loads(config_json),
             headers={
-                "Content-Disposition": f"attachment; filename=autoheal-config-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.json"
+                "Content-Disposition": f"attachment; filename=autoheal-config-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}.json"
             }
         )
     except Exception as e:

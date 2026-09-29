@@ -4,7 +4,7 @@ When a quarantined container becomes healthy again, it should be automatically
 removed from quarantine with an event logged.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -60,7 +60,7 @@ class TestAutoUnquarantine:
 
         # Create auto_unquarantine event
         event = AutoHealEvent(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             container_id="test123",
             container_name="test-container (test_stable_id)",
             event_type="auto_unquarantine",
