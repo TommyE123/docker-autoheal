@@ -17,7 +17,6 @@ import pytest
 
 from app.uptime_kuma.uptime_kuma_client import UptimeKumaClient
 
-
 METRICS_TEXT = (
     'monitor_status{monitor_name="Web",monitor_type="http"} 1\n'
     'monitor_status{monitor_name="API",monitor_type="http"} 0\n'

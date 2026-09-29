@@ -10,7 +10,7 @@ Core functionality (restarts, quarantine, events, etc.) is delegated to Monitori
 """
 import asyncio
 import logging
-from typing import Optional, Dict
+from typing import Dict, Optional
 
 from app.config.config_manager import config_manager
 from app.uptime_kuma.uptime_kuma_client import UptimeKumaClient

@@ -23,10 +23,10 @@ import pytest
 from pydantic import BaseModel
 
 from app.config.config_manager import (
+    _CONFIG_SECTION_MODELS,
     AutoHealConfig,
     ConfigManager,
     NotificationService,
-    _CONFIG_SECTION_MODELS,
 )
 from app.config.init_defaults import get_default_config
 

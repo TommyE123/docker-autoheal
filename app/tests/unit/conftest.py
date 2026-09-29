@@ -32,13 +32,12 @@ import pytest
 # Allow running pytest from anywhere in the repository.
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from app.config.config_manager import (  # noqa: E402
+from app.config.config_manager import (
     AutoHealConfig,
     config_manager,
 )
-from app.docker_client.docker_client_wrapper import DockerClientWrapper  # noqa: E402
-from app.monitor.monitoring_engine import MonitoringEngine  # noqa: E402
-
+from app.docker_client.docker_client_wrapper import DockerClientWrapper
+from app.monitor.monitoring_engine import MonitoringEngine
 
 # ---------------------------------------------------------------------------
 # Fakes

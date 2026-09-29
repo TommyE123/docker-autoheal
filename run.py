@@ -5,8 +5,9 @@ This is a convenience wrapper that runs the main application from the app packag
 """
 
 if __name__ == "__main__":
-    from app.main import main
     import asyncio
+
+    from app.main import main
 
     asyncio.run(main())
 

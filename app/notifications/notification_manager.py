@@ -5,12 +5,13 @@ Supports: Webhook, Discord, Slack, Telegram, Email, Ntfy, Gotify, Pushover
 
 import asyncio
 import logging
-import aiohttp
-from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 from enum import Enum
+from typing import Any, Dict, Optional
 
-from app.config.config_manager import config_manager, AutoHealEvent
+import aiohttp
+
+from app.config.config_manager import AutoHealEvent, config_manager
 
 logger = logging.getLogger(__name__)
 

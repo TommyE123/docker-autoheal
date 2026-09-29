@@ -51,8 +51,8 @@ async def test_uptime_kuma_connection(config_data: dict):
 @router.post("/api/uptime-kuma/enable")
 async def enable_uptime_kuma_integration(integration_config: dict):
     """Enable Uptime-Kuma integration and fetch monitors"""
-    from app.uptime_kuma.uptime_kuma_client import UptimeKumaClient
     from app.uptime_kuma.matching import match_uptime_kuma_monitors
+    from app.uptime_kuma.uptime_kuma_client import UptimeKumaClient
 
     docker_client = state.docker_client
     monitoring_engine = state.monitoring_engine

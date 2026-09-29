@@ -6,8 +6,9 @@ Tests cover healthy containers, unhealthy containers, exit-code handling,
 custom health checks and health-check failure paths.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from app.config.config_manager import HealthCheckConfig, config_manager
 from app.tests.unit.conftest import make_container
