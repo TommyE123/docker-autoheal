@@ -312,7 +312,7 @@
     {
       "label": "Autoheal: Run TruffleHog",
       "type": "shell",
-      "command": "mkdir -p .lint && set -o pipefail && trufflehog filesystem . --no-update --exclude-paths=.trufflehog-exclude.txt --json | tee .lint/trufflehog.jsonl",
+      "command": "mkdir -p .lint && set -o pipefail && trufflehog filesystem . --no-update --fail --results=verified --exclude-paths=.trufflehog-exclude.txt --json | tee .lint/trufflehog.jsonl",
       "options": {
         "shell": {
           "executable": "bash",
