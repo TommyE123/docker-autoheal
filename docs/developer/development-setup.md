@@ -37,8 +37,9 @@ Application services are **not** started automatically — use the tasks below.
 `postCreateCommand` runs `.devcontainer/post-create.sh`, which installs the dependencies
 and tooling. pip, npm, tool binaries and `gh` extensions live in named Docker volumes so
 rebuilds don't re-download everything; `.devcontainer/prepare-caches.sh` makes those
-volumes writable by the container user and purges them when they're more than seven days
-old.
+volumes writable by the container user and purges the pip, npm and `gh` caches when
+they're more than seven days old. Pinned tool binaries are kept until `tools.json` pins a
+newer version, which replaces the old one.
 
 ### Tasks
 

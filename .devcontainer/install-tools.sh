@@ -34,31 +34,41 @@ install_release() {
   temporary_directory="$(mktemp -d)"
   trap 'rm -rf "$temporary_directory"' RETURN
 
-  # Same-release checksum: verifies integrity, not provenance.
-  curl --fail --silent --show-error --location \
-    --output "${temporary_directory}/checksums.txt" \
-    "${release_url}/${checksum_asset}"
-
-  local expected_checksum
-  expected_checksum="$(grep -E "(^|[[:space:]])\*?${asset//./\\.}$" "${temporary_directory}/checksums.txt" | head -n 1 | awk '{print $1}')"
-  if [[ ! "$expected_checksum" =~ ^[[:xdigit:]]{64}$ ]]; then
-    echo "No valid checksum found for ${repository} ${asset}" >&2
-    return 1
-  fi
-
   # Some assets (hadolint, osv-scanner) encode only the architecture in their
-  # filename, so the cache key needs the repository and version too.
-  local cached_asset="${cache_dir}/${repository//\//_}_${version}_${asset}"
-  if [[ -f "$cached_asset" ]] &&
-    printf '%s  %s\n' "$expected_checksum" "$cached_asset" | sha256sum --check --status -; then
+  # filename, so the cache key needs the repository and version too. Each tool
+  # has its own directory so a superseded version can be removed safely.
+  local tool_cache="${cache_dir}/${repository//\//_}"
+  local cached_asset="${tool_cache}/${version}_${asset}"
+  local cached_checksum="${cached_asset}.sha256"
+  mkdir -p "$tool_cache"
+
+  # A cache hit needs no network: the binary is re-verified against the
+  # checksum stored when it was first downloaded and verified.
+  if [[ -f "$cached_asset" && -f "$cached_checksum" ]] &&
+    printf '%s  %s\n' "$(cat "$cached_checksum")" "$cached_asset" | sha256sum --check --status -; then
     cp "$cached_asset" "${temporary_directory}/${asset}"
   else
+    rm -f "$cached_asset" "$cached_checksum"
+
+    # Same-release checksum: verifies integrity, not provenance.
+    curl --fail --silent --show-error --location \
+      --output "${temporary_directory}/checksums.txt" \
+      "${release_url}/${checksum_asset}"
+
+    local expected_checksum
+    expected_checksum="$(grep -E "(^|[[:space:]])\*?${asset//./\\.}$" "${temporary_directory}/checksums.txt" | head -n 1 | awk '{print $1}')"
+    if [[ ! "$expected_checksum" =~ ^[[:xdigit:]]{64}$ ]]; then
+      echo "No valid checksum found for ${repository} ${asset}" >&2
+      return 1
+    fi
+
     curl --fail --silent --show-error --location \
       --output "${temporary_directory}/${asset}" \
       "${release_url}/${asset}"
     printf '%s  %s\n' "$expected_checksum" "${temporary_directory}/${asset}" |
       sha256sum --check --status -
     cp "${temporary_directory}/${asset}" "$cached_asset"
+    printf '%s\n' "$expected_checksum" >"$cached_checksum"
   fi
 
   local install_source
@@ -77,6 +87,11 @@ install_release() {
     return 1
   fi
   install -m 0755 "$install_source" "${install_dir}/${binary}"
+
+  # Only now that the new version is verified and installed, drop superseded ones.
+  find "$tool_cache" -mindepth 1 -maxdepth 1 \
+    ! -name "${version}_${asset}" ! -name "${version}_${asset}.sha256" \
+    -exec rm -rf {} +
 }
 
 architecture="$(uname -m)"

@@ -48,7 +48,7 @@ docker-autoheal/
 │   ├── devcontainer.json         # Image, features, mounts, ports, VS Code customisations
 │   ├── post-create.sh            # Installs dependencies and tooling on container creation
 │   ├── install-tools.sh          # Checksum-verified install of the pinned release tools
-│   ├── prepare-caches.sh         # Makes the cache volumes writable, then purges them weekly
+│   ├── prepare-caches.sh         # Makes the cache volumes writable, then purges the pip/npm/gh caches weekly
 │   ├── tools.json                # Pinned GitHub release versions for the above
 │   ├── package.json              # Pinned npm-based linters used by the local tasks
 │   └── requirements-tools.txt    # Pinned Python linters/scanners used by the local tasks

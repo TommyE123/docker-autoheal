@@ -6,8 +6,8 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 bash .devcontainer/prepare-caches.sh
 
 python -m pip install -r requirements-dev.txt -r .devcontainer/requirements-tools.txt
-npm ci --prefix frontend
-npm ci --ignore-scripts --prefix .devcontainer
+npm ci --no-audit --prefix frontend
+npm ci --ignore-scripts --no-audit --prefix .devcontainer
 
 bash .devcontainer/install-tools.sh
 
