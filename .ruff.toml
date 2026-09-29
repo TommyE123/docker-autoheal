@@ -28,6 +28,7 @@ select = [
     "N",
     "PIE",
     "RUF",
+    "UP",
 
     # --- Deferred families --------------------------------------------
     # Pulled out of select rather than ignored code-by-code: these were
@@ -38,9 +39,6 @@ select = [
     #            instead of lazy `%` formatting, plus a couple of
     #            logging.exception vs logging.error(exc_info=True) spots;
     #            worth a pass since some of these do affect what gets logged.
-    #   "UP",   # pyupgrade / syntax modernization - the typing, datetime.UTC
-    #            and TimeoutError-alias subsets are enabled via
-    #            extend-select below; the rest (StrEnum, etc.) is still deferred.
     #   "TRY",  # exception-handling style (tryceratops) - things like
     #            logging.error instead of logging.exception inside except
     #            blocks, raising inside a try that could be restructured,
@@ -51,17 +49,6 @@ select = [
     #   "D",    # pydocstyle - missing/malformed docstrings on modules,
     #            classes and functions; overlaps with the ANN pass above
     #            in terms of which files need attention.
-]
-
-# Enabled subset of "UP" (see the deferred-families note above).
-extend-select = [
-    "UP006",
-    "UP007",
-    "UP035",
-    "UP037",
-    "UP045",
-    "UP017",
-    "UP041",
 ]
 
 ignore = [
