@@ -2,6 +2,9 @@
 language: en-GB
 
 reviews:
+  review_status: false
+  collapse_walkthrough: false
+
   path_filters:
     - "!**/*.lock"
     - "!**/dist/**"

@@ -13,4 +13,4 @@ Choose validation based on the changed behaviour and `.claude/rules/testing.md`.
 - Frontend: use `npm run test`, `npm run lint`, or `npm run build` from `frontend/` only when the changed surface warrants them.
 - Docker, workflows, or configuration: inspect the affected deployment/CI behaviour and run available targeted checks. Leave repository-wide CI validation to CI unless diagnosing a failure.
 
-You may repair failures introduced by the implementation, rerun the affected check, and report the result. Do not fix unrelated failures, weaken checks, or turn validation into an unattended CI-watching loop.
+You may repair failures caused by this change and rerun the affected check. Keep each repair minimal, report it, and don't extend the implementation beyond the fix. Do not fix unrelated failures, weaken checks, or turn validation into an unattended CI-watching loop.
