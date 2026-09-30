@@ -14,7 +14,7 @@ cmd=$(jq -r '.tool_input.command // empty')
 [ -n "$cmd" ] || exit 0
 
 case "$cmd" in
-  *$'\n'*) block "multi-line commands are not allowed" ;;
+*$'\n'*) block "multi-line commands are not allowed" ;;
 esac
 
 if printf '%s' "$cmd" | grep -q '[;&|<>`()$]'; then
