@@ -27,6 +27,7 @@ Autoheal monitors Docker containers, checks their health, and can restart or qua
 - `.claude/settings.json` enforces the push and merge limits at the permission layer; keep it consistent with this file.
 - Session titles: `I: #N - <issue title>`, `I: #N PR: #N - <issue title>` once a PR exists, or `PR: #N - <PR title>` with no linked issue.
 - If the request is ambiguous in a way that would materially change the implementation, ask the user before changing anything; relay any open questions from `analyze`. Don't ask about details that existing patterns already settle.
+- For complex changes (container lifecycle or restart logic, several components, or ambiguity left after `analyze`), summarise the approach and wait for a go-ahead before implementing. Also do this whenever the user asks for a plan. Otherwise go straight to implementing.
 
 ## Agents And Skills
 
