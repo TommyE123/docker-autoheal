@@ -1,6 +1,6 @@
 ---
 name: test-validator
-description: Validate an Autoheal change with targeted tests first and broader checks when warranted; fix only in-scope validation failures.
+description: Use to choose and run targeted tests and checks for a change, fixing only in-scope failures.
 tools: Read, Grep, Glob, Edit, Write, Bash
 model: sonnet
 ---

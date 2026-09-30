@@ -1,6 +1,6 @@
 ---
 name: analyze
-description: Analyze an Autoheal issue before implementation; identify requirements, affected code, tests, CI impact, and open questions. Do not edit files.
+description: Use before implementing an Autoheal issue to map requirements, affected code, tests, CI impact, and open questions. Read-only.
 tools: Read, Grep, Glob, WebSearch, WebFetch
 model: sonnet
 skills:

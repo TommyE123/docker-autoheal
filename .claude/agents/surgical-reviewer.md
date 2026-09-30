@@ -1,6 +1,6 @@
 ---
 name: surgical-reviewer
-description: Perform an explicit read-only review of the actual Autoheal PR diff against the issue and REVIEW.md; report evidence-backed findings only.
+description: Use when asked for a local, read-only review of a PR diff against the issue and REVIEW.md. Does not replace CodeRabbit.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---

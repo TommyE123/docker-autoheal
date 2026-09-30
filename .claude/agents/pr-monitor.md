@@ -1,6 +1,6 @@
 ---
 name: pr-monitor
-description: Inspect a PR and its CI once, including relevant MegaLinter findings, then report current status without polling or modifying anything.
+description: Use for a one-off snapshot of a PR's checks, MegaLinter findings, and new comments. Read-only; never polls or retries.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
