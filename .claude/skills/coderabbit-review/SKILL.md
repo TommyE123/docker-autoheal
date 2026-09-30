@@ -1,6 +1,6 @@
 ---
 name: coderabbit-review
-description: Use after pushing a substantive PR to `main`: wait for green PR checks, request CodeRabbit reviews by GitHub comment, fix in-scope findings, and report blockers without monitoring indefinitely.
+description: "Use after pushing a substantive PR to `main`: wait for green PR checks, request CodeRabbit reviews by GitHub comment, fix in-scope findings, and report blockers without monitoring indefinitely."
 ---
 
 # CodeRabbit PR Review
