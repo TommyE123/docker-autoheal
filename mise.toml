@@ -1,6 +1,5 @@
 # Developer CLI tools only. Application dependencies stay in requirements*.txt and
-# frontend/package.json; stylelint, secretlint and jsonlint stay in
-# .devcontainer/package.json because they need shared plugins or an npm override.
+# frontend/package.json; the npm-based linters stay in .devcontainer/package.json.
 # After editing, run: mise lock --platform linux-x64,linux-arm64
 [tools]
 # Installer for the pypi: tools below.
@@ -20,9 +19,3 @@ uv = "0.12.19"
 "pypi:yamllint" = "1.38.0"
 "pypi:djlint" = "1.46.2"
 "npm:pyright" = "1.1.414"
-"aqua:loeffel-io/ls-lint" = "2.3.1"
-"npm:markdownlint-cli2" = "0.23.3"
-"npm:markdown-table-formatter" = "1.7.0"
-"npm:htmlhint" = "1.9.2"
-"npm:prettier" = "3.9.9"
-"npm:v8r" = "6.1.0"

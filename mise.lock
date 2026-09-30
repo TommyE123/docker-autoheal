@@ -115,21 +115,6 @@ checksum = "sha256:8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227
 url = "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz"
 url_api = "https://api.github.com/repos/koalaman/shellcheck/releases/assets/279056942"
 
-[[tools."aqua:loeffel-io/ls-lint"]]
-version = "2.3.1"
-backend = "aqua:loeffel-io/ls-lint"
-specifiers = ["2.3.1"]
-
-[tools."aqua:loeffel-io/ls-lint"."platforms.linux-arm64"]
-checksum = "sha256:2abdb71243c619f0bb29587be5c228bec84c107985f2c066139ef0ec35fd3a99"
-url = "https://github.com/loeffel-io/ls-lint/releases/download/v2.3.1/ls-lint-linux-arm64"
-url_api = "https://api.github.com/repos/loeffel-io/ls-lint/releases/assets/260857550"
-
-[tools."aqua:loeffel-io/ls-lint"."platforms.linux-x64"]
-checksum = "sha256:b5a0d2e4427ad039fbc574551f17679f38f142b25d15e0e538769f8cf15af397"
-url = "https://github.com/loeffel-io/ls-lint/releases/download/v2.3.1/ls-lint-linux-amd64"
-url_api = "https://api.github.com/repos/loeffel-io/ls-lint/releases/assets/260857547"
-
 [[tools."aqua:mvdan/sh"]]
 version = "3.14.1"
 backend = "aqua:mvdan/sh"
@@ -194,41 +179,11 @@ url = "https://github.com/zizmorcore/zizmor/releases/download/v1.30.1/zizmor-x86
 url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/552067642"
 provenance = "github-attestations"
 
-[[tools."npm:htmlhint"]]
-version = "1.9.2"
-aube = { path = ".mise/locks/npm-htmlhint/1.9.2", digest = "sha256:36216c23c8108bddf60bc82fbde026cec69c12322de45981aeaa851782cb0683" }
-backend = "npm:htmlhint"
-specifiers = ["1.9.2"]
-
-[[tools."npm:markdown-table-formatter"]]
-version = "1.7.0"
-aube = { path = ".mise/locks/npm-markdown-table-formatter/1.7.0", digest = "sha256:8de66b2900cbd855899535fcf13a54af3ab9becf9c6b68c001d5c29dcad3ce8e" }
-backend = "npm:markdown-table-formatter"
-specifiers = ["1.7.0"]
-
-[[tools."npm:markdownlint-cli2"]]
-version = "0.23.3"
-aube = { path = ".mise/locks/npm-markdownlint-cli2/0.23.3", digest = "sha256:66eb146ec44a1c263abb9ad3d72184c4f820b95eca7815e8f7475945425f45d6" }
-backend = "npm:markdownlint-cli2"
-specifiers = ["0.23.3"]
-
-[[tools."npm:prettier"]]
-version = "3.9.9"
-aube = { path = ".mise/locks/npm-prettier/3.9.9", digest = "sha256:815f6667505e41ac2d03ecbac86b79f1beb78d45783879428193c9adc80760a3" }
-backend = "npm:prettier"
-specifiers = ["3.9.9"]
-
 [[tools."npm:pyright"]]
 version = "1.1.414"
 aube = { path = ".mise/locks/npm-pyright/1.1.414", digest = "sha256:69cd62e5613c907964fbb78b05a85eb9d12a503285d716f6529144cc884cf656" }
 backend = "npm:pyright"
 specifiers = ["1.1.414"]
-
-[[tools."npm:v8r"]]
-version = "6.1.0"
-aube = { path = ".mise/locks/npm-v8r/6.1.0", digest = "sha256:2597ea426980946c8a9b8408fb9cd5f455db4dbed9901eb8eb2db4e2804f9236" }
-backend = "npm:v8r"
-specifiers = ["6.1.0"]
 
 [[tools."pypi:djlint"]]
 version = "1.46.2"

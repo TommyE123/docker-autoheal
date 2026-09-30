@@ -236,13 +236,13 @@
     {
       "label": "Autoheal: Check JSON and YAML Formatting",
       "type": "shell",
-      "command": "prettier --check \"**/*.json\" \"**/*.{yml,yaml}\" \"!**/*.lock.yml\" \"!.mise/**\" --ignore-path .gitignore",
+      "command": "prettier --check \"**/*.json\" \"**/*.{yml,yaml}\" \"!**/*.lock.yml\" \"!.mise/**/aube-lock.yaml\" --ignore-path .gitignore",
       "problemMatcher": []
     },
     {
       "label": "Autoheal: Validate JSON and YAML",
       "type": "shell",
-      "command": "v8r $(git ls-files '*.json' '*.yml' '*.yaml' | grep -v -e 'package-lock\\.json$' -e '\\.lock\\.yml$' -e '^\\.vscode/' -e '^\\.mise/')",
+      "command": "v8r $(git ls-files '*.json' '*.yml' '*.yaml' | grep -v -e 'package-lock\\.json$' -e '\\.lock\\.yml$' -e '^\\.vscode/' -e '^\\.mise/.*/aube-lock\\.yaml$')",
       "options": {
         "shell": {
           "executable": "bash",

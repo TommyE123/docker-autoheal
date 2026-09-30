@@ -27,20 +27,20 @@ The container provides:
   its installation is best-effort and never fails container setup
 - [mise](https://mise.jdx.dev), which installs the linter and security-scanning tools used
   by the Dev Container tasks at the versions pinned in `mise.toml` and `mise.lock`. The
-  npm linters that need shared plugins or configuration (stylelint, secretlint, jsonlint)
-  are pinned in `.devcontainer/package.json` instead
+  npm-based linters (markdownlint, prettier, stylelint and the rest) stay pinned in
+  `.devcontainer/package.json`
 - Shared VS Code settings, a shared set of installed VS Code extensions, and forwarded
   ports for the frontend (3000), API (3131) and metrics (9090)
 
 Application services are **not** started automatically — use the tasks below.
 
 `postCreateCommand` runs `.devcontainer/post-create.sh`, which installs the dependencies
-and tooling (`mise install --locked` for the pinned tools). pip, npm and `gh` extensions
-live in named Docker volumes so rebuilds don't re-download everything;
+and tooling (`mise install --locked` for the pinned tools). pip, npm, `gh` extensions and
+mise's tool installs live in named Docker volumes so rebuilds don't re-download everything;
 `.devcontainer/prepare-caches.sh` makes those volumes writable by the container user and
-purges them when they're more than seven days old. mise keeps its own tool installs and
-cache; the container puts its shims on `PATH`, so the tasks find the tools without
-activating mise.
+purges the pip, npm and `gh` ones when they're more than seven days old. mise manages its
+own volume: superseded tool versions stay there until `mise prune` removes them. The
+container puts mise's shims on `PATH`, so the tasks find the tools without activating mise.
 
 ### Tasks
 
@@ -186,14 +186,17 @@ ls-lint, git_diff) run against the project rather than a file type. The report-o
 linters are the ones listed in `.mega-linter.yml`'s `DISABLE_ERRORS_LINTERS`.
 
 The Dev Container installs an equivalent of each of these, so every row above has a
-matching `Autoheal:` task. Most are installed by mise from `mise.toml`; stylelint,
-secretlint and jsonlint come from `.devcontainer/package.json` (npm). editorconfig-checker
+matching `Autoheal:` task. The binaries and Python tools are installed by mise from
+`mise.toml`; the npm linters come from `.devcontainer/package.json`. editorconfig-checker
 is exposed as `ec`, and reports its own version as 3.11.1 even though `mise.toml` pins the
 3.11.2 release. shfmt reads indentation from `.editorconfig`, which is why the shell
 scripts use two spaces.
 
 To change a tool version, edit `mise.toml`, then run `mise lock --platform
 linux-x64,linux-arm64` and commit `mise.lock` and the `.mise/locks/` directory with it.
+The `.mise/locks/**/aube-lock.yaml` file is written and digest-checked by mise, so
+Prettier is told to skip it in `.mega-linter.yml` and the `Validate JSON and YAML` and
+`Check JSON and YAML Formatting` tasks; every other linter and scanner still sees `.mise/`.
 
 ## Data directory when developing locally
 

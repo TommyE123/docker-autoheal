@@ -46,7 +46,7 @@ DISABLE_ERRORS_LINTERS:
 # Global MegaLinter configuration
 # ---------------------------------------------------------------------------
 
-FILTER_REGEX_EXCLUDE: '(^|/)(\.github/workflows/issue-triage\.lock\.yml$|\.mise/locks/)'
+FILTER_REGEX_EXCLUDE: '(^|/)\.github/workflows/issue-triage\.lock\.yml$'
 ADDITIONAL_EXCLUDED_DIRECTORIES:
   - node_modules
   - static
@@ -99,6 +99,10 @@ MARKDOWN_MARKDOWNLINT_CONFIG_FILE: ".markdownlint.jsonc"
 # ---------------------------------------------------------------------------
 
 YAML_YAMLLINT_ARGUMENTS: "--strict"
+
+# mise-generated npm dependency graph: mise verifies its digest, so a formatter
+# rewrite would break `mise install --locked`.
+YAML_PRETTIER_FILTER_REGEX_EXCLUDE: '(^|/)\.mise/locks/.*/aube-lock\.yaml$'
 
 # ---------------------------------------------------------------------------
 # Dockerfile

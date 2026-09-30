@@ -15,7 +15,8 @@
   "mounts": [
     "source=docker-autoheal-pip-cache,target=/home/vscode/.cache/pip,type=volume",
     "source=docker-autoheal-npm-cache,target=/home/vscode/.npm,type=volume",
-    "source=docker-autoheal-gh-cache,target=/home/vscode/.local/share/gh,type=volume"
+    "source=docker-autoheal-gh-cache,target=/home/vscode/.local/share/gh,type=volume",
+    "source=docker-autoheal-mise-data,target=/home/vscode/.local/share/mise,type=volume"
   ],
 
   "hostRequirements": {

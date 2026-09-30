@@ -25,7 +25,7 @@ The standard `config:recommended` preset provides the managers for the main depe
 ecosystems above, including `mise` for the developer CLI tools pinned in `mise.toml`
 (`actionlint`, `hadolint`, `osv-scanner`, `trivy`, `trufflehog`, `betterleaks`,
 `editorconfig-checker`, `ruff`, `shellcheck`, `shfmt`, `semgrep`, `yamllint`, `zizmor`,
-`pyright`, `djlint` and the npm-based linters). A custom Renovate manager is also enabled for
+`pyright` and `djlint`). A custom Renovate manager is also enabled for
 pinned versions of apt packages in the Dockerfiles.
 
 Currently, `curl` is pinned in the Dockerfiles so that its version can be tracked and updated
