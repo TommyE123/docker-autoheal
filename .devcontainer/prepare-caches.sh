@@ -24,9 +24,8 @@ if [[ -f "$marker" ]]; then
   fi
 fi
 
-echo "Cache is unpurged or older than ${max_age_days} days - purging pip/npm/gh caches..."
+echo "Cache is unpurged or older than ${max_age_days} days - purging pip/npm caches..."
 pip cache purge || true
 npm cache clean --force || true
-rm -rf "${HOME}/.local/share/gh/extensions"/*
 
 touch "$marker"

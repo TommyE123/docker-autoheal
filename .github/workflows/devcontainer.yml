@@ -16,6 +16,7 @@ on:
       - ".mise/**"
       - "frontend/package.json"
       - "frontend/package-lock.json"
+      - "docker-compose.test.yml"
   workflow_dispatch:
 
 permissions:

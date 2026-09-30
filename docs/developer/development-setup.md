@@ -22,9 +22,10 @@ The container provides:
 
 - Python (matching the pinned base image in `.devcontainer/Dockerfile`) and Node.js 24
 - Access to the host's Docker daemon, via the `docker-outside-of-docker` feature
-- The GitHub CLI (`gh`) plus the `github/gh-aw` extension, for working on this
-  repository's agentic GitHub Actions workflows locally. That extension needs a token, so
-  its installation is best-effort and never fails container setup
+- The GitHub CLI (`gh`). To work on the agentic workflows, authenticate and install the
+  `github/gh-aw` extension at the `compiler_version` recorded in the header of
+  `.github/workflows/issue-triage.lock.yml`, for example
+  `gh extension install github/gh-aw@v0.88.7`, so recompiling doesn't churn the lock file
 - [mise](https://mise.jdx.dev), which installs the linter and security-scanning tools used
   by the Dev Container tasks at the versions pinned in `mise.toml` and `mise.lock`. The
   npm-based linters (markdownlint, prettier, stylelint and the rest) stay pinned in
@@ -38,7 +39,7 @@ Application services are **not** started automatically — use the tasks below.
 and tooling (`mise install --locked` for the pinned tools). pip, npm, `gh` extensions and
 mise's tool installs live in named Docker volumes so rebuilds don't re-download everything;
 `.devcontainer/prepare-caches.sh` makes those volumes writable by the container user and
-purges the pip, npm and `gh` ones when they're more than seven days old. mise manages its
+purges the pip and npm ones when they're more than seven days old. mise manages its
 own volume: superseded tool versions stay there until `mise prune` removes them. The
 container puts mise's shims on `PATH`, so the tasks find the tools without activating mise.
 
