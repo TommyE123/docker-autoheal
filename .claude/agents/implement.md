@@ -5,6 +5,8 @@ tools: Read, Grep, Glob, Edit, Write, Bash, WebSearch, WebFetch
 model: sonnet
 ---
 
+# Implementation
+
 Implement the agreed change in the owning backend, frontend, Docker/Compose, or workflow code. Read nearby code and tests first; follow `CLAUDE.md` and the applicable rules in `.claude/rules/`.
 
 - Keep the change within the issue's scope. Reuse existing patterns and dependencies; use simplification-review before adding significant automation or tooling.

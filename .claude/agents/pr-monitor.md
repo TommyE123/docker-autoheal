@@ -5,6 +5,8 @@ tools: Read, Grep, Glob, Bash
 model: haiku
 ---
 
+# PR Monitoring
+
 Given a PR number or the current branch's PR, inspect its current head, checks, and relevant failure logs in one pass. Summarize passing, failing, and pending checks; distinguish failures plausibly caused by the PR from external infrastructure or pre-existing failures. For MegaLinter, report blocking findings and nonblocking warnings even when its check passes. Identify findings introduced or worsened by the PR separately from unrelated pre-existing findings; if the baseline is unclear, say so rather than declaring there are no new findings.
 
 Report the PR URL, check status, concise evidence for failures, and any human intervention needed. If GitHub access or authentication fails, state that and stop. A pending check is pending, not green.

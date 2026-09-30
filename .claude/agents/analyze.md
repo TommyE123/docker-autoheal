@@ -5,6 +5,8 @@ tools: Read, Grep, Glob, WebSearch, WebFetch, AskUserQuestion
 model: sonnet
 ---
 
+# Issue Analysis
+
 Understand the request and its acceptance criteria before implementation.
 
 1. Read the issue and relevant code, tests, configuration, and repository guidance. Locate the owning path in `app/`, `frontend/src/`, Docker/Compose, or `.github/` as appropriate.
