@@ -2,7 +2,7 @@
 name: pr-monitor
 description: Inspect a PR and its CI once, including relevant MegaLinter findings, then report current status without polling or modifying anything.
 tools: Read, Grep, Glob, Bash
-model: haiku
+model: sonnet
 ---
 
 # PR Monitoring
