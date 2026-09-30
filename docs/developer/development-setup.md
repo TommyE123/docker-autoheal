@@ -20,7 +20,7 @@ Container**. It also works as a GitHub Codespace.
 
 The container provides:
 
-- Python (matching the pinned base image in `.devcontainer/devcontainer.json`) and Node.js 24
+- Python (matching the pinned base image in `.devcontainer/Dockerfile`) and Node.js 24
 - Access to the host's Docker daemon, via the `docker-outside-of-docker` feature
 - The GitHub CLI (`gh`) plus the `github/gh-aw` extension, for working on this
   repository's agentic GitHub Actions workflows locally. That extension needs a token, so
