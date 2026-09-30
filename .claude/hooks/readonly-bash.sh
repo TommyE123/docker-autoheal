@@ -21,6 +21,10 @@ if printf '%s' "$cmd" | grep -q '[;&|<>`()$]'; then
   block "chaining, pipes, redirection and substitution are not allowed"
 fi
 
+if ! printf '%s' "$cmd" | grep -Eq '^[A-Za-z0-9 ._/:=@,%+~^-]+$'; then
+  block "quotes, escapes, braces, tabs and other unusual characters are not allowed"
+fi
+
 if printf '%s' "$cmd" | grep -Eq -- '(^| )--output'; then
   block "--output writes files"
 fi

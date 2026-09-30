@@ -48,7 +48,7 @@ Report the blocker to the user and stop, without requesting a review, in any of 
 
 ## 4. Handle findings
 
-1. Assess each finding against the changed code and the Evidence Threshold and Scope and Noise sections of `REVIEW.md`.
+1. Read the review's inline comments with `gh api repos/<owner>/<repo>/pulls/<PR>/comments --paginate`; `gh pr view` does not return them. Assess each finding against the changed code and the Evidence Threshold and Scope and Noise sections of `REVIEW.md`.
 2. The result is clean when three things are true: the review covers the current head, checks are still green, and no actionable in-scope findings remain. Then report the PR ready for the owner and stop. Don't post a fix reply or request a follow-up.
 3. Otherwise, fix every confirmed in-scope finding and validate.
 4. For a disputed finding, don't change code just to satisfy CodeRabbit, and don't dismiss it silently. Present it to the owner with the finding, your assessment, the relevant code, and your evidence. The owner decides. You may ask CodeRabbit about it in the thread to gather evidence (`chat.auto_reply` is on).
