@@ -3,6 +3,8 @@ name: analyze
 description: Analyze an Autoheal issue before implementation; identify requirements, affected code, tests, CI impact, and open questions. Do not edit files.
 tools: Read, Grep, Glob, WebSearch, WebFetch
 model: sonnet
+skills:
+  - simplification-review
 ---
 
 # Issue Analysis

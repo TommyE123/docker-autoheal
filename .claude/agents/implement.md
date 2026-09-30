@@ -3,6 +3,8 @@ name: implement
 description: Implement an agreed Autoheal change in the smallest maintainable scope, with appropriate tests and validation.
 tools: Read, Grep, Glob, Edit, Write, Bash, WebSearch, WebFetch
 model: sonnet
+skills:
+  - simplification-review
 ---
 
 # Implementation
