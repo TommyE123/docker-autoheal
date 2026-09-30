@@ -194,9 +194,6 @@ scripts use two spaces.
 
 To change a tool version, edit `mise.toml`, then run `mise lock --platform
 linux-x64,linux-arm64` and commit `mise.lock` and the `.mise/locks/` directory with it.
-The `.mise/locks/**/aube-lock.yaml` file is written and digest-checked by mise, so
-Prettier is told to skip it in `.mega-linter.yml` and the `Validate JSON and YAML` and
-`Check JSON and YAML Formatting` tasks; every other linter and scanner still sees `.mise/`.
 
 ## Data directory when developing locally
 

@@ -97,9 +97,6 @@ jobs:
             echo "== Pytest collection =="
             python -m pytest --collect-only -q
 
-            echo "== Docker access =="
-            docker run --rm hello-world
-
             # The fragile part: Compose talking to the host daemon via DooD.
             echo "== Docker Compose stack =="
             docker compose -f docker-compose.test.yml up -d --build autoheal
