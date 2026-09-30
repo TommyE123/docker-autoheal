@@ -8,19 +8,25 @@ updates are reviewed and merged.
 
 ## What Renovate manages
 
-| Ecosystem                       | Files                                                 | Renovate manager                    |
-|---------------------------------|-------------------------------------------------------|-------------------------------------|
-| Python runtime dependencies     | `requirements.txt`                                    | `pip_requirements`                  |
-| Python dev/test dependencies    | `requirements-dev.txt`                                | `pip_requirements`                  |
-| npm dependencies + lockfile     | `frontend/package.json`, `frontend/package-lock.json` | `npm`                               |
-| Docker base images              | `Dockerfile`, `Dockerfile.simple`                     | `dockerfile`                        |
-| Docker Compose images           | `docker-compose*.yml`                                 | `docker-compose`                    |
-| GitHub Actions                  | `.github/workflows/*.yml`                             | `github-actions`                    |
-| Dockerfile apt package versions | `Dockerfile`, `Dockerfile.simple`                     | `customManagers:dockerfileVersions` |
+| Ecosystem                       | Files                                                           | Renovate manager                    |
+|---------------------------------|-----------------------------------------------------------------|-------------------------------------|
+| Python runtime dependencies     | `requirements.txt`                                              | `pip_requirements`                  |
+| Python test dependencies        | `requirements-dev.txt`                                          | `pip_requirements`                  |
+| npm dependencies + lockfile     | `frontend/package.json`, `frontend/package-lock.json`           | `npm`                               |
+| Dev Container npm lint tools    | `.devcontainer/package.json`, `.devcontainer/package-lock.json` | `npm`                               |
+| Dev Container CLI tools         | `mise.toml`, `mise.lock`                                        | `mise`                              |
+| Dev Container base image        | `.devcontainer/Dockerfile`                                      | `dockerfile`                        |
+| Docker base images              | `Dockerfile`, `Dockerfile.simple`                               | `dockerfile`                        |
+| Docker Compose images           | `docker-compose*.yml`                                           | `docker-compose`                    |
+| GitHub Actions                  | `.github/workflows/*.yml`                                       | `github-actions`                    |
+| Dockerfile apt package versions | `Dockerfile`, `Dockerfile.simple`                               | `customManagers:dockerfileVersions` |
 
 The standard `config:recommended` preset provides the managers for the main dependency
-ecosystems above. A custom Renovate manager is also enabled for pinned versions of apt
-packages in the Dockerfiles.
+ecosystems above, including `mise` for the developer CLI tools pinned in `mise.toml`
+(`actionlint`, `hadolint`, `osv-scanner`, `trivy`, `trufflehog`, `betterleaks`,
+`editorconfig-checker`, `ruff`, `shellcheck`, `shfmt`, `semgrep`, `yamllint`, `zizmor`,
+`pyright` and `djlint`). A custom Renovate manager is also enabled for
+pinned versions of apt packages in the Dockerfiles.
 
 Currently, `curl` is pinned in the Dockerfiles so that its version can be tracked and updated
 by Renovate. This allows the Dockerfile dependency to receive a normal Renovate PR rather than
@@ -29,8 +35,8 @@ build time.
 
 ## Version pinning policy
 
-* **Python**: exact versions (`==`) are used throughout both `requirements.txt` and
-  `requirements-dev.txt`.
+* **Python**: exact versions (`==`) are used throughout `requirements.txt`
+  and `requirements-dev.txt`. Developer CLI tools in `mise.toml` are pinned exactly too.
 
   The packages that previously used `~=` (`pydantic`, `aiohttp`) were switched
   to `==` at their already-installed versions rather than being upgraded. Every subsequent
@@ -177,6 +183,15 @@ introduce compatibility or behavioural changes.
 
 * **Pre-1.0 and build tooling dependencies** — these remain manual-review updates. A patch or
   minor version does not automatically mean a dependency is behaviourally risk-free.
+
+* **`checkov` as a Dev Container tool** — it is deliberately absent from
+  `mise.toml`. Installing it alongside `semgrep` hangs
+  `osv-scanner`'s pip transitive-dependency resolver indefinitely (each resolves fine alone in
+  ~12–13s; together `osv-scanner` never returns, even with a 600s timeout). `semgrep` is the
+  one kept because it catches app-level issues nothing else in the local stack checks for,
+  whereas checkov's actual findings in this repo (Dockerfile non-root user, Actions
+  permissions) are already covered by Trivy and zizmor. Checkov still runs in CI through
+  MegaLinter's bundled `REPOSITORY_CHECKOV` linter, so CI coverage is unaffected.
 
 ## Current policy summary
 

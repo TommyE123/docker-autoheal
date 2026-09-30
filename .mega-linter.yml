@@ -47,6 +47,9 @@ DISABLE_ERRORS_LINTERS:
 # ---------------------------------------------------------------------------
 
 FILTER_REGEX_EXCLUDE: '(^|/)\.github/workflows/issue-triage\.lock\.yml$'
+ADDITIONAL_EXCLUDED_DIRECTORIES:
+  - node_modules
+  - static
 FLAVOR_SUGGESTIONS: false
 FORMATTERS_DISABLE_ERRORS: false
 GITHUB_STATUS_REPORTER: true
@@ -97,6 +100,10 @@ MARKDOWN_MARKDOWNLINT_CONFIG_FILE: ".markdownlint.jsonc"
 
 YAML_YAMLLINT_ARGUMENTS: "--strict"
 
+# mise-generated npm dependency graph: mise verifies its digest, so a formatter
+# rewrite would break `mise install --locked`.
+YAML_PRETTIER_FILTER_REGEX_EXCLUDE: '(^|/)\.mise/locks/.*/aube-lock\.yaml$'
+
 # ---------------------------------------------------------------------------
 # Dockerfile
 # ---------------------------------------------------------------------------
@@ -109,6 +116,8 @@ DOCKERFILE_HADOLINT_FILE_NAMES_REGEX: ["Dockerfile(\\..+)?"]
 
 ACTION_ZIZMOR_UNSECURED_ENV_VARIABLES:
   - GITHUB_TOKEN
+
+REPOSITORY_CHECKOV_ARGUMENTS: "--skip-framework secrets"
 
 REPOSITORY_SEMGREP_ARGUMENTS:
   [

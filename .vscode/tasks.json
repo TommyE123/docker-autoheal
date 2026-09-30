@@ -1,0 +1,382 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Autoheal: Run Backend",
+      "type": "shell",
+      "command": "python -m app.main",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run React Frontend",
+      "type": "shell",
+      "command": "npm run dev -- --host 0.0.0.0",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run Python Unit Tests",
+      "type": "shell",
+      "command": "python -m pytest",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run Python Integration Tests",
+      "type": "shell",
+      "command": "python -m pytest app/tests/integration",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Build Frontend",
+      "type": "shell",
+      "command": "npm run build",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Python",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "Autoheal: Check Python with Ruff",
+        "Autoheal: Check Python Formatting",
+        "Autoheal: Type Check Python"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Python with Ruff",
+      "type": "shell",
+      "command": "ruff check --output-format concise app",
+      "problemMatcher": {
+        "owner": "ruff",
+        "source": "ruff",
+        "fileLocation": ["relative", "${workspaceFolder}"],
+        "pattern": {
+          "regexp": "^(.+?):(\\d+):(\\d+):\\s+(\\S+)\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "code": 4,
+          "message": 5
+        }
+      }
+    },
+    {
+      "label": "Autoheal: Check Python Formatting",
+      "type": "shell",
+      "command": "ruff format --check app",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Type Check Python",
+      "type": "shell",
+      "command": "pyright",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Frontend",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "Autoheal: Check JavaScript",
+        "Autoheal: Check JavaScript Formatting",
+        "Autoheal: Check CSS"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check JavaScript",
+      "type": "shell",
+      "command": "npm run lint",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "problemMatcher": "$eslint-stylish"
+    },
+    {
+      "label": "Autoheal: Check JavaScript Formatting",
+      "type": "shell",
+      "command": "npm run format:check",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check CSS",
+      "type": "shell",
+      "command": "stylelint --config-basedir .devcontainer/node_modules \"frontend/src/**/*.css\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Shell Scripts",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "Autoheal: Check Shell Scripts with ShellCheck",
+        "Autoheal: Check Shell Formatting"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Shell Scripts with ShellCheck",
+      "type": "shell",
+      "command": "shellcheck $(git ls-files '*.sh')",
+      "options": {
+        "shell": {
+          "executable": "bash",
+          "args": ["-c"]
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Shell Formatting",
+      "type": "shell",
+      "command": "shfmt --diff $(git ls-files '*.sh')",
+      "options": {
+        "shell": {
+          "executable": "bash",
+          "args": ["-c"]
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Workflows",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "Autoheal: Check GitHub Actions",
+        "Autoheal: Check Workflow Security"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check GitHub Actions",
+      "type": "shell",
+      "command": "actionlint",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Workflow Security",
+      "type": "shell",
+      "command": "zizmor $(git ls-files '.github/workflows/*.yml' | grep -v '\\.lock\\.yml$')",
+      "options": {
+        "shell": {
+          "executable": "bash",
+          "args": ["-c"]
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Markup and Data",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "Autoheal: Check Markdown",
+        "Autoheal: Check Markdown Tables",
+        "Autoheal: Check YAML",
+        "Autoheal: Check HTML",
+        "Autoheal: Check JSON",
+        "Autoheal: Check JSON and YAML Formatting",
+        "Autoheal: Validate JSON and YAML"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Markdown",
+      "type": "shell",
+      "command": "markdownlint-cli2 $(git ls-files '*.md')",
+      "options": {
+        "shell": {
+          "executable": "bash",
+          "args": ["-c"]
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Markdown Tables",
+      "type": "shell",
+      "command": "markdown-table-formatter --check $(git ls-files '*.md')",
+      "options": {
+        "shell": {
+          "executable": "bash",
+          "args": ["-c"]
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check YAML",
+      "type": "shell",
+      "command": "yamllint --strict .",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check HTML",
+      "type": "shell",
+      "command": "djlint frontend/index.html && htmlhint frontend/index.html",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check JSON",
+      "type": "shell",
+      "command": "for file in $(git ls-files '*.json' | grep -v -e 'package-lock\\.json$' -e '^\\.vscode/'); do jsonlint --quiet \"$file\" || exit 1; done",
+      "options": {
+        "shell": {
+          "executable": "bash",
+          "args": ["-c"]
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check JSON and YAML Formatting",
+      "type": "shell",
+      "command": "prettier --check \"**/*.json\" \"**/*.{yml,yaml}\" \"!**/*.lock.yml\" \"!.mise/**/aube-lock.yaml\" --ignore-path .gitignore",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Validate JSON and YAML",
+      "type": "shell",
+      "command": "v8r $(git ls-files '*.json' '*.yml' '*.yaml' | grep -v -e 'package-lock\\.json$' -e '\\.lock\\.yml$' -e '^\\.vscode/' -e '^\\.mise/.*/aube-lock\\.yaml$')",
+      "options": {
+        "shell": {
+          "executable": "bash",
+          "args": ["-c"]
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Dockerfiles",
+      "type": "shell",
+      "command": "hadolint Dockerfile Dockerfile.simple",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Repository Conventions",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "Autoheal: Check EditorConfig",
+        "Autoheal: Check Paths",
+        "Autoheal: Check Secrets"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check EditorConfig",
+      "type": "shell",
+      "command": "ec",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Paths",
+      "type": "shell",
+      "command": "ls-lint",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Check Secrets",
+      "type": "shell",
+      "command": "secretlint \"**/*\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run Semgrep",
+      "type": "shell",
+      "command": "mkdir -p .lint && semgrep scan --config p/command-injection --config p/docker-compose --config p/insecure-transport --config p/javascript --config p/owasp-top-ten --config p/python --config p/react --exclude .github/workflows/issue-triage.lock.yml --exclude 'Dockerfile*' --exclude .lint --json-output .lint/semgrep.json .",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run OSV Scanner",
+      "type": "shell",
+      "command": "mkdir -p .lint && osv-scanner scan source -r . --format json --output-file .lint/osv.json",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run Trivy",
+      "type": "shell",
+      "command": "mkdir -p .lint && trivy fs --scanners vuln,misconfig,secret --skip-dirs '.lint' --format json --output .lint/trivy.json .",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run TruffleHog",
+      "type": "shell",
+      "command": "mkdir -p .lint && set -o pipefail && trufflehog filesystem . --no-update --fail --results=verified --exclude-paths=.trufflehog-exclude.txt --json | tee .lint/trufflehog.jsonl",
+      "options": {
+        "shell": {
+          "executable": "bash",
+          "args": ["-c"]
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run Betterleaks",
+      "type": "shell",
+      "command": "mkdir -p .lint && betterleaks --redact --verbose dir . --report-path .lint/betterleaks.json --report-format json",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run Security Scanners",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "Autoheal: Run Semgrep",
+        "Autoheal: Run OSV Scanner",
+        "Autoheal: Run Trivy",
+        "Autoheal: Run TruffleHog",
+        "Autoheal: Run Betterleaks"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run Local Checks",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "Autoheal: Check Python",
+        "Autoheal: Check Frontend",
+        "Autoheal: Check Shell Scripts",
+        "Autoheal: Check Workflows",
+        "Autoheal: Check Markup and Data",
+        "Autoheal: Check Dockerfiles",
+        "Autoheal: Check Repository Conventions",
+        "Autoheal: Run Security Scanners"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run Megalinter Cupcake",
+      "type": "shell",
+      "command": "docker run --rm --user \"$(id -u):$(id -g)\" -e \"HOME=/tmp\" -e \"CONSOLE_REPORTER=true\" -e \"CONSOLE_REPORTER_SECTIONS=true\" -e \"OUTPUT_DETAIL=detailed\" -e \"REPORT_OUTPUT_FOLDER=/tmp/lint/.lint/megalinter\" -e \"CLEAR_REPORT_FOLDER=true\" -e \"REPOSITORY_TRIVY_CLI_LINT_MODE=file\" -e \"REPOSITORY_TRIVY_FILTER_REGEX_INCLUDE=(^|/)(Dockerfile(\\..+)?|package-lock\\.json|requirements\\.txt)$\" -e \"REPOSITORY_TRIVY_SBOM_CLI_LINT_MODE=file\" -e \"REPOSITORY_TRIVY_SBOM_FILTER_REGEX_INCLUDE=(^|/)(package-lock\\.json|requirements\\.txt)$\" -v \"$(printenv LOCAL_WORKSPACE_FOLDER 2>/dev/null || pwd):/tmp/lint\" ghcr.io/oxsecurity/megalinter-cupcake:v10.1.0@sha256:7cce5b9d46564149d451a9752c5c266982f10c231be7df79996f46e3e171d2fc",
+      "options": {
+        "shell": {
+          "executable": "bash",
+          "args": ["-c"]
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run Megalinter Cupcake Beta",
+      "type": "shell",
+      "command": "docker run --rm --user \"$(id -u):$(id -g)\" -e \"HOME=/tmp\" -e \"CONSOLE_REPORTER=true\" -e \"CONSOLE_REPORTER_SECTIONS=true\" -e \"OUTPUT_DETAIL=detailed\" -e \"REPORT_OUTPUT_FOLDER=/tmp/lint/.lint/megalinter\" -e \"CLEAR_REPORT_FOLDER=true\" -v \"$(printenv LOCAL_WORKSPACE_FOLDER 2>/dev/null || pwd):/tmp/lint\" ghcr.io/oxsecurity/megalinter-cupcake:beta",
+      "options": {
+        "shell": {
+          "executable": "bash",
+          "args": ["-c"]
+        }
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Run Docker Stack",
+      "type": "shell",
+      "command": "docker compose up --build",
+      "problemMatcher": []
+    }
+  ]
+}
