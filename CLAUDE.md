@@ -22,6 +22,10 @@ Autoheal monitors Docker containers, checks their health, and can restart or qua
 - After locally validating and pushing a substantive PR targeting `main`, invoke `coderabbit-review` as part of the PR task; the skill waits for green CI and resolves PR-introduced MegaLinter findings before requesting review. Respect local-only, no-commit, no-push, and no-PR requests.
 - Do not add, remove, or request GitHub issue labels: classification and workflow labels belong to the automated triage workflow. PR labels are separate.
 - Treat changes to `CLAUDE.md`, `.claude/`, and other agent-governance files as their own scope, not as incidental application cleanup. Do not weaken governance to make a task easier.
+- Substantive PR definition: changes or could affect application code, Docker/Compose behaviour, tests, CI/CD, build or release logic, workflows or automation, or security/dependency config; docs, comments, formatting or metadata only is not; if in doubt, treat as substantive.
+- If repository instructions conflict, follow the more restrictive one, continue the task, and report the conflict.
+- `.claude/settings.json` enforces the push and merge limits at the permission layer; keep it consistent with this file.
+- Session titles: `I: #N - <issue title>`, `I: #N PR: #N - <issue title>` once a PR exists, or `PR: #N - <PR title>` with no linked issue.
 
 ## Agents And Skills
 
