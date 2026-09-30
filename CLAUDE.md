@@ -26,6 +26,7 @@ Autoheal monitors Docker containers, checks their health, and can restart or qua
 - If repository instructions conflict, follow the more restrictive one, continue the task, and report the conflict.
 - `.claude/settings.json` enforces the push and merge limits at the permission layer; keep it consistent with this file.
 - Session titles: `I: #N - <issue title>`, `I: #N PR: #N - <issue title>` once a PR exists, or `PR: #N - <PR title>` with no linked issue.
+- If the request is ambiguous in a way that would materially change the implementation, ask the user before changing anything; relay any open questions from `analyze`. Don't ask about details that existing patterns already settle.
 
 ## Agents And Skills
 
