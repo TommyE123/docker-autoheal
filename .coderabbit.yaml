@@ -2,6 +2,15 @@
 language: en-GB
 
 reviews:
+  path_filters:
+    - "!**/*.lock"
+    - "!**/dist/**"
+    - "!**/node_modules/**"
+    - "!frontend/dist/**"
+    - "!frontend/package-lock.json"
+    - "!**/coverage.xml"
+    - "!**/*.min.js"
+    - "!**/*.min.css"
   auto_review:
     enabled: false
 
