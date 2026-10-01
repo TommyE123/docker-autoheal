@@ -1,14 +1,7 @@
 # yaml-language-server: $schema=https://storage.googleapis.com/coderabbit_public_assets/schema.v2.json
 language: en-GB
 
-tone_instructions: >-
-  Follow REVIEW.md's format exactly: the overall review status, the
-  per-finding RED/AMBER/GREEN tags, and the single closing verdict.
-
 reviews:
-  profile: chill
-  request_changes_workflow: false
-  high_level_summary: true
   review_status: false
   collapse_walkthrough: false
 
@@ -21,20 +14,9 @@ reviews:
     - "!**/coverage.xml"
     - "!**/*.min.js"
     - "!**/*.min.css"
-
+  auto_review:
+    enabled: false
   path_instructions:
-    - path: "{**/*,**/.*,**/.*/**}"
-      instructions: |
-        Use REVIEW.md as the authoritative review standard for this
-        repository, in full — its review status, per-finding tags, and
-        verdict format all apply. This overrides CodeRabbit's default
-        review format.
-
-        Perform a surgical review: only issues introduced or materially
-        worsened by this PR's changes. Do not perform a general repository
-        audit or request unrelated cleanup, formatting, or refactoring.
-
-        Do not manufacture findings. If the PR is correct, say so plainly.
     - path: "app/**/*.py"
       instructions: >
         This is the FastAPI backend for a Docker container health-monitoring
@@ -63,14 +45,10 @@ reviews:
         Check that third-party actions are pinned to a full commit SHA (as
         already done in this repo) and that secrets aren't exposed in logs.
 
-  auto_review:
-    enabled: false
-
 chat:
   auto_reply: true
 
 knowledge_base:
   code_guidelines:
-    enabled: true
     filePatterns:
       - REVIEW.md
