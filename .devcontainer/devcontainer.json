@@ -64,11 +64,12 @@
   },
 
   "containerEnv": {
-    "NPM_CONFIG_CACHE": "/home/vscode/.cache/npm"
+    "NPM_CONFIG_CACHE": "/home/vscode/.cache/npm",
+    "UV_LINK_MODE": "copy"
   },
 
   "remoteEnv": {
-    "PATH": "${containerWorkspaceFolder}/.devcontainer/node_modules/.bin:/home/vscode/.local/share/mise/shims:${containerEnv:PATH}",
+    "PATH": "${containerWorkspaceFolder}/.devcontainer/node_modules/.bin:/home/vscode/.local/share/mise/shims:/home/vscode/.local/bin:${containerEnv:PATH}",
     "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
   },
 

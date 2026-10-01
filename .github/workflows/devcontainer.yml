@@ -17,6 +17,8 @@ on:
       - "frontend/package.json"
       - "frontend/package-lock.json"
       - "docker-compose.test.yml"
+      - "Dockerfile"
+      - ".dockerignore"
   workflow_dispatch:
 
 permissions:
@@ -48,8 +50,8 @@ jobs:
             trap 'status=$?; printf "::error::Command failed (exit %s): %s\n" "$status" "$BASH_COMMAND"; exit "$status"' ERR
 
             # devcontainers/ci's headless exec ignores devcontainer.json's
-            # remoteEnv.PATH, so re-add the mise shims here.
-            export PATH="${HOME}/.local/share/mise/shims:${PATH}"
+            # remoteEnv.PATH, so re-add the mise shims and pip's user scripts here.
+            export PATH="${HOME}/.local/share/mise/shims:${HOME}/.local/bin:${PATH}"
 
             echo "== Versions =="
             actionlint --version

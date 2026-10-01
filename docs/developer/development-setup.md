@@ -73,10 +73,11 @@ progress in another terminal.
 
 `.vscode/tasks.json` wires the common workflows up to **Terminal → Run Task** (every
 label is prefixed `Autoheal:`): running the backend and the frontend dev server, the unit
-and integration suites, the frontend build, `docker compose up --build`, and each linter
-and security scanner individually. The aggregate entry points are **Run Local Checks**,
-**Check Python**, **Check Frontend**, **Check Shell Scripts**, **Check Workflows**, **Check
-Markup and Data**, **Check Repository Conventions** and **Run Security Scanners**.
+and integration suites, the frontend tests, the frontend build, `docker compose up --build`
+and `docker compose down`, and each linter and security scanner individually. The
+aggregate entry points are **Run Local Checks**, **Check Python**, **Check Frontend**,
+**Check Shell Scripts**, **Check Workflows**, **Check Markup and Data**, **Check
+Repository Conventions** and **Run Security Scanners**.
 
 **Autoheal: Install gh-aw** installs the `github/gh-aw` extension pinned to the
 `compiler_version` recorded in the header of `.github/workflows/issue-triage.lock.yml`, so
@@ -84,6 +85,10 @@ recompiling the workflows doesn't churn the lock file. It needs `gh auth login` 
 Codespaces token) first, replaces any installed copy, and is not part of any aggregate
 task. The extension lives in the `gh` volume, so it survives rebuilds; run the task again
 after the lock file is recompiled with a newer version.
+
+**Autoheal: Stop Docker Stack** runs `docker compose down`. Stacks started with **Run
+Docker Stack** run on the host's Docker daemon (see below), so they keep running when the
+Dev Container stops or is rebuilt until you stop them.
 
 The tasks that need shell globbing run under `bash`, so outside the Dev Container they
 need `bash` on `PATH` (Git Bash or WSL on Windows).

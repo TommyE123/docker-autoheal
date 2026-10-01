@@ -29,6 +29,15 @@
       "problemMatcher": []
     },
     {
+      "label": "Autoheal: Run Frontend Tests",
+      "type": "shell",
+      "command": "npm test",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "Autoheal: Build Frontend",
       "type": "shell",
       "command": "npm run build",
@@ -254,7 +263,7 @@
     {
       "label": "Autoheal: Check Dockerfiles",
       "type": "shell",
-      "command": "hadolint Dockerfile Dockerfile.simple",
+      "command": "hadolint Dockerfile Dockerfile.simple .devcontainer/Dockerfile",
       "problemMatcher": []
     },
     {
@@ -376,6 +385,12 @@
       "label": "Autoheal: Run Docker Stack",
       "type": "shell",
       "command": "docker compose up --build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Autoheal: Stop Docker Stack",
+      "type": "shell",
+      "command": "docker compose down",
       "problemMatcher": []
     },
     {

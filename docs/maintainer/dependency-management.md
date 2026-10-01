@@ -28,6 +28,17 @@ ecosystems above, including `mise` for the developer CLI tools pinned in `mise.t
 and `djlint`). A custom Renovate manager is also enabled for
 pinned versions of apt packages in the Dockerfiles.
 
+Two Dev Container pins need manual attention:
+
+* **`mise.lock` and `.mise/locks/`.** A Renovate update to `mise.toml` must come with a
+  regenerated lock. If the PR changes `mise.toml` alone, `mise install --locked` fails and
+  the Dev Container workflow goes red; run
+  `mise lock --platform linux-x64,linux-arm64` on the branch and commit the result.
+* **Dev Container features.** Renovate's `devcontainer` manager updates the feature
+  versions in `.devcontainer/devcontainer.json` but not the digests pinned in
+  `.devcontainer/devcontainer-lock.json`. Refresh those periodically with
+  `devcontainer upgrade --workspace-folder .` from the Dev Containers CLI.
+
 Currently, `curl` is pinned in the Dockerfiles so that its version can be tracked and updated
 by Renovate. This allows the Dockerfile dependency to receive a normal Renovate PR rather than
 floating to whatever version happens to be available from the Debian package repository at
