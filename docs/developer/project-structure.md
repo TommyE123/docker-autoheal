@@ -44,8 +44,18 @@ docker-autoheal/
 │   ├── maintainer/               # Repository maintenance documentation
 │   └── historical/                # Superseded documents, kept for context
 │
+├── .devcontainer/                # Dev Container definition (see docs/developer/development-setup.md)
+│   ├── devcontainer.json         # Build, features, mounts, ports, VS Code customisations
+│   ├── devcontainer-lock.json    # Pinned digests for the Dev Container features
+│   ├── Dockerfile                # Pinned Python base image plus the mise binary
+│   ├── post-create.sh            # Installs dependencies and tooling on container creation
+│   ├── prepare-volumes.sh        # Makes the cache, `gh` and mise volumes writable by the container user
+│   └── package.json              # Pinned npm-based linters used by the local tasks
+│
+├── mise.toml / mise.lock         # Pinned developer CLI tools, installed by mise (with .mise/locks/)
+│
 ├── requirements.txt              # Runtime Python dependencies
-├── requirements-dev.txt          # Test dependencies (pytest, coverage, etc.)
+├── requirements-dev.txt          # Test dependencies (pytest, coverage)
 ├── pytest.ini / .coveragerc
 ├── run.py                        # Convenience entry point (`python run.py`)
 ├── Dockerfile                    # Multi-stage build: Node (frontend) → Python (backend)

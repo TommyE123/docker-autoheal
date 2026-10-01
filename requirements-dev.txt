@@ -1,4 +1,5 @@
-# Test-only dependencies (see pytest.ini / .coveragerc)
+# Test-only dependencies (see pytest.ini / .coveragerc).
+# Lint/security tooling lives in mise.toml.
 -r requirements.txt
 pytest==9.1.1
 pytest-asyncio==1.4.0
