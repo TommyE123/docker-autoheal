@@ -46,6 +46,7 @@ docker-autoheal/
 │
 ├── .devcontainer/                # Dev Container definition (see docs/developer/development-setup.md)
 │   ├── devcontainer.json         # Build, features, mounts, ports, VS Code customisations
+│   ├── devcontainer-lock.json    # Pinned digests for the Dev Container features
 │   ├── Dockerfile                # Pinned Python base image plus the mise binary
 │   ├── post-create.sh            # Installs dependencies and tooling on container creation
 │   ├── prepare-volumes.sh        # Makes the cache, `gh` and mise volumes writable by the container user
