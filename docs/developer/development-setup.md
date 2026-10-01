@@ -73,11 +73,16 @@ progress in another terminal.
 
 `.vscode/tasks.json` wires the common workflows up to **Terminal → Run Task** (every
 label is prefixed `Autoheal:`): running the backend and the frontend dev server, the unit
-and integration suites, the frontend tests, the frontend build, `docker compose up --build`
-and `docker compose down`, and each linter and security scanner individually. The
-aggregate entry points are **Run Local Checks**, **Check Python**, **Check Frontend**,
-**Check Shell Scripts**, **Check Workflows**, **Check Markup and Data**, **Check
-Repository Conventions** and **Run Security Scanners**.
+and integration suites, the frontend tests, the frontend build, starting and stopping
+the app in Docker, and each linter and security scanner individually. The aggregate
+entry points are **Run Local Checks**, **Check Python**, **Check Frontend**, **Check Shell
+Scripts**, **Check Workflows**, **Check Markup and Data**, **Check Repository
+Conventions** and **Run Security Scanners**.
+
+**Autoheal: Run Docker Stack** builds the app from your checkout and runs it with
+`docker compose -f docker-compose.test.yml up --build autoheal`. It uses
+`docker-compose.test.yml` because `docker-compose.yml` runs the published image rather
+than building your changes.
 
 **Autoheal: Install gh-aw** installs the `github/gh-aw` extension pinned to the
 `compiler_version` recorded in the header of `.github/workflows/issue-triage.lock.yml`, so
@@ -86,9 +91,9 @@ Codespaces token) first, replaces any installed copy, and is not part of any agg
 task. The extension lives in the `gh` volume, so it survives rebuilds; run the task again
 after the lock file is recompiled with a newer version.
 
-**Autoheal: Stop Docker Stack** runs `docker compose down`. Stacks started with **Run
-Docker Stack** run on the host's Docker daemon (see below), so they keep running when the
-Dev Container stops or is rebuilt until you stop them.
+**Autoheal: Stop Docker Stack** runs `docker compose -f docker-compose.test.yml down`.
+Stacks started with **Run Docker Stack** run on the host's Docker daemon (see below), so
+they keep running when the Dev Container stops or is rebuilt until you stop them.
 
 The tasks that need shell globbing run under `bash`, so outside the Dev Container they
 need `bash` on `PATH` (Git Bash or WSL on Windows).
