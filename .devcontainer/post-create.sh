@@ -5,7 +5,6 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 bash .devcontainer/prepare-volumes.sh
 
-mise trust
 mise install --locked
 # Only mise's tool installs grow without bound (each version bump leaves the old
 # install behind); prune is a no-op when nothing is superseded.
