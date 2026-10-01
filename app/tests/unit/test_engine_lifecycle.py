@@ -315,6 +315,32 @@ class TestProcessContainerStartEvent:
         assert config_manager.get_config().containers.selected == ["stack_web"]
         assert len(config_manager.get_events()) == 1
 
+    async def test_event_name_attribute_labels_the_container(self, engine, docker_client):
+        container, info = make_container(name="inspected-name", labels={"autoheal": "true"})
+        docker_client.add_container(container, info)
+
+        await engine._process_container_start_event(start_event(container.id, "event-name"))
+
+        assert config_manager.get_config().containers.selected == ["event-name"]
+        (event,) = config_manager.get_events()
+        assert event.container_name == "event-name (event-name)"
+
+    async def test_selection_is_saved_before_the_event_is_recorded(
+        self, engine, docker_client, mock_notification_manager, monkeypatch
+    ):
+        container, info = make_container(name="web", labels={"autoheal": "true"})
+        docker_client.add_container(container, info)
+
+        def failing_save(_config):
+            raise OSError("disk full")
+
+        monkeypatch.setattr(config_manager, "update_config", failing_save)
+
+        await engine._process_container_start_event(start_event(container.id, "web"))
+
+        assert config_manager.get_events() == []
+        mock_notification_manager.send_event_notification.assert_not_awaited()
+
     async def test_event_without_container_id_is_ignored(self, engine):
         await engine._process_container_start_event({"Actor": {"Attributes": {"name": "web"}}})
 

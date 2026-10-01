@@ -617,32 +617,33 @@ class MonitoringEngine:
     def _auto_monitor_container(
         self,
         config: AutoHealConfig,
-        info: dict,
         *,
-        message_prefix: str,
-        log_suffix: str = "",
+        stable_id: str,
+        container_id: str,
+        container_name: str,
+        startup: bool,
     ) -> AutoHealEvent | None:
         """
         Add a container carrying the autoheal label to the monitored list.
 
         Skips containers that are already selected or explicitly excluded.
         Mutates ``config`` and records an ``auto_monitor`` event when added. The
-        caller saves ``config`` and then sends the notification, so a failing
-        notification cannot lose the selection.
+        caller sends the notification afterwards, so a failing notification
+        cannot lose the selection.
 
         Args:
             config: Configuration to update (a working copy from ``get_config()``)
-            info: Container information dict
-            message_prefix: Start of the event message
-            log_suffix: Text appended to the "Auto-monitoring enabled" log line
+            stable_id: Stable identifier to store in the selected list
+            container_id: Container ID used for the checks and recorded on the event
+            container_name: Container name used for the checks and the event label
+            startup: True when called from the startup scan, which saves ``config``
+                once at the end and words its log and event for startup. Otherwise
+                ``config`` is saved right after the selection, before the event is
+                recorded.
 
         Returns:
             The recorded event if the container was added, None if it was skipped
         """
-        container_id = info.get("full_id")
-        container_name = info.get("name")
-        stable_id = self.get_stable_identifier(info)
-
         # Check if already in selected list (by stable_id, name, or ID for backwards compatibility)
         if (stable_id in config.containers.selected or
             container_name in config.containers.selected or
@@ -659,8 +660,10 @@ class MonitoringEngine:
 
         # Add to monitored list using STABLE ID
         config.containers.selected.append(stable_id)
+        if not startup:
+            config_manager.update_config(config)
 
-        logger.info(f"Auto-monitoring enabled for container '{container_name}' ({container_id[:12]}) with stable_id '{stable_id}' - detected autoheal=true label{log_suffix}")
+        logger.info(f"Auto-monitoring enabled for container '{container_name}' ({container_id[:12]}) with stable_id '{stable_id}' - detected autoheal=true label{' on startup' if startup else ''}")
 
         event = AutoHealEvent(
             timestamp=datetime.now(UTC),
@@ -669,7 +672,7 @@ class MonitoringEngine:
             event_type="auto_monitor",
             restart_count=0,
             status="enabled",
-            message=f"{message_prefix} due to autoheal=true label (stable_id: {stable_id})"
+            message=f"Automatically added to monitoring{' on startup' if startup else ''} due to autoheal=true label (stable_id: {stable_id})"
         )
         config_manager.add_event(event)
         return event
@@ -712,9 +715,10 @@ class MonitoringEngine:
 
                     event_obj = self._auto_monitor_container(
                         config,
-                        info,
-                        message_prefix="Automatically added to monitoring on startup",
-                        log_suffix=" on startup",
+                        stable_id=self.get_stable_identifier(info),
+                        container_id=info.get("full_id"),
+                        container_name=info.get("name"),
+                        startup=True,
                     )
                     if event_obj:
                         added_count += 1
@@ -839,11 +843,13 @@ class MonitoringEngine:
                 config = config_manager.get_config()
                 event_obj = self._auto_monitor_container(
                     config,
-                    info,
-                    message_prefix="Automatically added to monitoring",
+                    # The event's own ID and name label the container here, as before
+                    stable_id=self.get_stable_identifier({**info, "name": container_name}),
+                    container_id=container_id,
+                    container_name=container_name,
+                    startup=False,
                 )
                 if event_obj:
-                    config_manager.update_config(config)
                     await notification_manager.send_event_notification(event_obj)
 
         except Exception as e:
