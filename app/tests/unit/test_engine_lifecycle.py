@@ -108,6 +108,28 @@ class TestScanExistingContainers:
         assert config_manager.get_config().containers.selected == ["web"]
         assert [e.event_type for e in config_manager.get_events()] == ["auto_monitor"]
 
+    async def test_custom_label_container_is_added_to_monitoring(
+        self, engine, docker_client, update_config
+    ):
+        update_config(lambda c: (setattr(c.monitor, "label_key", "heal"), setattr(c.monitor, "label_value", "yes")))
+        container, info = make_container(name="web", labels={"heal": "yes"})
+        docker_client.add_container(container, info)
+
+        await engine._scan_existing_containers()
+
+        assert config_manager.get_config().containers.selected == ["web"]
+
+    async def test_default_label_is_ignored_when_a_custom_label_is_configured(
+        self, engine, docker_client, update_config
+    ):
+        update_config(lambda c: (setattr(c.monitor, "label_key", "heal"), setattr(c.monitor, "label_value", "yes")))
+        container, info = make_container(name="web", labels={"autoheal": "true"})
+        docker_client.add_container(container, info)
+
+        await engine._scan_existing_containers()
+
+        assert config_manager.get_config().containers.selected == []
+
     async def test_compose_container_is_added_under_its_stable_id(self, engine, docker_client):
         container, info = make_container(
             name="stack-web-1",
@@ -243,6 +265,28 @@ class TestProcessContainerStartEvent:
 
         assert config_manager.get_config().containers.selected == ["web"]
         assert [e.event_type for e in config_manager.get_events()] == ["auto_monitor"]
+
+    async def test_custom_label_container_is_added_to_monitoring(
+        self, engine, docker_client, update_config
+    ):
+        update_config(lambda c: (setattr(c.monitor, "label_key", "heal"), setattr(c.monitor, "label_value", "yes")))
+        container, info = make_container(name="web", labels={"heal": "yes"})
+        docker_client.add_container(container, info)
+
+        await engine._process_container_start_event(start_event(container.id, "web"))
+
+        assert config_manager.get_config().containers.selected == ["web"]
+
+    async def test_default_label_is_ignored_when_a_custom_label_is_configured(
+        self, engine, docker_client, update_config
+    ):
+        update_config(lambda c: (setattr(c.monitor, "label_key", "heal"), setattr(c.monitor, "label_value", "yes")))
+        container, info = make_container(name="web", labels={"autoheal": "true"})
+        docker_client.add_container(container, info)
+
+        await engine._process_container_start_event(start_event(container.id, "web"))
+
+        assert config_manager.get_config().containers.selected == []
 
     async def test_compose_container_is_added_under_its_stable_id(self, engine, docker_client):
         container, info = make_container(

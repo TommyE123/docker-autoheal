@@ -643,8 +643,8 @@ class MonitoringEngine:
                     container_id = info.get("full_id")
                     container_name = info.get("name")
 
-                    # Check if container has autoheal=true label
-                    if labels.get("autoheal") != "true":
+                    # Check if container has the configured monitor label (default autoheal=true)
+                    if labels.get(config.monitor.label_key) != config.monitor.label_value:
                         continue
 
                     # Get stable identifier (handles auto-generated names, compose services)
@@ -810,9 +810,9 @@ class MonitoringEngine:
 
             labels = info.get("labels", {})
 
-            # Check if container has autoheal=true label
-            if labels.get("autoheal") == "true":
-                config = config_manager.get_config()
+            # Check if container has the configured monitor label (default autoheal=true)
+            config = config_manager.get_config()
+            if labels.get(config.monitor.label_key) == config.monitor.label_value:
 
                 # Get stable identifier (handles auto-generated names, compose services)
                 compose_project = labels.get("com.docker.compose.project")
