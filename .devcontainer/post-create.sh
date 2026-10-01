@@ -12,5 +12,5 @@ mise install --locked
 mise prune --yes || echo "Warning: mise prune failed; superseded tool versions were kept"
 
 python -m pip install -r requirements-dev.txt
-npm ci --no-audit --prefix frontend
-npm ci --ignore-scripts --no-audit --prefix .devcontainer
+npm ci --prefer-offline --no-audit --prefix frontend
+npm ci --prefer-offline --ignore-scripts --no-audit --prefix .devcontainer

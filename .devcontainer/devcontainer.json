@@ -58,6 +58,7 @@
         "timonwong.shellcheck",
         "DavidAnson.vscode-markdownlint",
         "stylelint.vscode-stylelint",
+        "vitest.explorer",
         "yzhang.markdown-all-in-one"
       ]
     }
