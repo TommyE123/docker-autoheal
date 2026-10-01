@@ -1,0 +1,79 @@
+{
+  "name": "Docker Auto-Heal",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+
+  "features": {
+    "ghcr.io/devcontainers/features/node:2": {
+      "version": "24"
+    },
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+
+  "mounts": [
+    "source=docker-autoheal-cache,target=/home/vscode/.cache,type=volume",
+    "source=docker-autoheal-gh-cache,target=/home/vscode/.local/share/gh,type=volume",
+    "source=docker-autoheal-mise-data,target=/home/vscode/.local/share/mise,type=volume"
+  ],
+
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "8gb",
+    "storage": "32gb"
+  },
+
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+
+  "waitFor": "postCreateCommand",
+
+  "forwardPorts": [3000, 3131, 9090],
+
+  "portsAttributes": {
+    "3000": {
+      "label": "Frontend"
+    },
+    "3131": {
+      "label": "Autoheal API"
+    },
+    "9090": {
+      "label": "Metrics"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "charliermarsh.ruff",
+        "dbaeumer.vscode-eslint",
+        "editorconfig.editorconfig",
+        "esbenp.prettier-vscode",
+        "foxundermoon.shell-format",
+        "github.vscode-github-actions",
+        "ms-azuretools.vscode-docker",
+        "ms-python.python",
+        "redhat.vscode-xml",
+        "redhat.vscode-yaml",
+        "timonwong.shellcheck",
+        "DavidAnson.vscode-markdownlint",
+        "stylelint.vscode-stylelint",
+        "vitest.explorer",
+        "yzhang.markdown-all-in-one"
+      ]
+    }
+  },
+
+  "containerEnv": {
+    "NPM_CONFIG_CACHE": "/home/vscode/.cache/npm",
+    "UV_LINK_MODE": "copy"
+  },
+
+  "remoteEnv": {
+    "PATH": "${containerWorkspaceFolder}/.devcontainer/node_modules/.bin:/home/vscode/.local/share/mise/shims:/home/vscode/.local/bin:${containerEnv:PATH}",
+    "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
+  },
+
+  "remoteUser": "vscode",
+  "shutdownAction": "stopContainer"
+}
