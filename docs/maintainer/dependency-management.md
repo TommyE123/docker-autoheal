@@ -17,7 +17,7 @@ updates are reviewed and merged.
 | Dev Container CLI tools         | `mise.toml`, `mise.lock`                                        | `mise`                              |
 | Dev Container base image        | `.devcontainer/Dockerfile`                                      | `dockerfile`                        |
 | Docker base images              | `Dockerfile`                                                    | `dockerfile`                        |
-| Docker Compose images           | `docker-compose.yml`                                             | `docker-compose`                    |
+| Docker Compose images           | `docker-compose.yml`                                            | `docker-compose`                    |
 | GitHub Actions                  | `.github/workflows/*.yml`                                       | `github-actions`                    |
 | Dockerfile apt package versions | `Dockerfile`                                                    | `customManagers:dockerfileVersions` |
 
