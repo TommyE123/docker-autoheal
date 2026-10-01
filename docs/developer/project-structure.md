@@ -48,7 +48,7 @@ docker-autoheal/
 │   ├── devcontainer.json         # Build, features, mounts, ports, VS Code customisations
 │   ├── Dockerfile                # Pinned Python base image plus the mise binary
 │   ├── post-create.sh            # Installs dependencies and tooling on container creation
-│   ├── prepare-volumes.sh        # Makes the cache and tool volumes writable by the container user
+│   ├── prepare-volumes.sh        # Makes the cache, `gh` and mise volumes writable by the container user
 │   └── package.json              # Pinned npm-based linters used by the local tasks
 │
 ├── mise.toml / mise.lock         # Pinned developer CLI tools, installed by mise (with .mise/locks/)
