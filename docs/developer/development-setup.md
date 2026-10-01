@@ -81,7 +81,9 @@ Conventions** and **Run Security Scanners**.
 
 **Autoheal: Run Docker Stack** builds the app from your checkout and runs it with
 `docker compose up --build autoheal`. The `--build` flag is what makes
-`docker-compose.yml` build your changes instead of using the published image.
+`docker-compose.yml` build your changes instead of using the published image. The result is
+tagged `tommye123/docker-autoheal:latest` locally, replacing any copy you had pulled; run
+`docker compose pull` to get the published image back.
 
 **Autoheal: Install gh-aw** installs the `github/gh-aw` extension pinned to the
 `compiler_version` recorded in the header of `.github/workflows/issue-triage.lock.yml`, so
@@ -111,7 +113,9 @@ Compose client to the container's path and handed to the host daemon as-is, whic
 such path and silently creates an empty directory there instead of binding your checkout.
 The stack still starts and passes its health check, but persisted data (config, events,
 logs) won't be visible in your working copy — use `docker compose logs`/`docker exec` to
-inspect it instead.
+inspect it instead. If the mount does resolve (for example when running Compose from the
+host), the stack reads and writes the same `./data` a deployment from that checkout would
+use, and stopping the stack doesn't revert changes made to it.
 
 `.github/workflows/devcontainer.yml` builds the container and checks its tooling on pull
 requests that touch it, and can also be run manually from the Actions tab.
