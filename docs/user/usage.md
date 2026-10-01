@@ -32,6 +32,18 @@ started with the `autoheal=true` label. The UI shows the most recent entries (up
 curl "http://localhost:3131/api/events?limit=200"
 ```
 
+`GET /api/events` also accepts optional filters, applied before `limit`:
+
+| Parameter    | Meaning                                                                 |
+| ------------ | ----------------------------------------------------------------------- |
+| `limit`      | Maximum number of events to return, newest last (default 100, minimum 1) |
+| `event_type` | Only events of this exact type, e.g. `restart` or `quarantine`          |
+| `container`  | Only events whose container name contains this text (case-insensitive)  |
+
+```bash
+curl "http://localhost:3131/api/events?event_type=quarantine&container=web"
+```
+
 Clear the log with `DELETE /api/events` or the "Clear Events" control in the UI.
 
 ## Configuration tab
