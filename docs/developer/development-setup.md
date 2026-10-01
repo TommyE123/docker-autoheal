@@ -36,12 +36,31 @@ The container provides:
 Application services are **not** started automatically — use the tasks below.
 
 `postCreateCommand` runs `.devcontainer/post-create.sh`, which installs the dependencies
-and tooling (`mise install --locked` for the pinned tools). pip, npm, `gh` extensions and
-mise's tool installs live in named Docker volumes so rebuilds don't re-download everything;
-`.devcontainer/prepare-caches.sh` makes those volumes writable by the container user and
-purges the pip and npm ones when they're more than seven days old. mise manages its
-own volume: superseded tool versions stay there until `mise prune` removes them. The
-container puts mise's shims on `PATH`, so the tasks find the tools without activating mise.
+and tooling (`mise install --locked` for the pinned tools, then `mise prune` to remove
+superseded versions). pip, npm, `gh` extensions and mise's tool installs live in named
+Docker volumes so rebuilds don't re-download everything; `.devcontainer/prepare-volumes.sh`
+makes those volumes writable by the container user. The container puts mise's shims on
+`PATH`, so the tasks find the tools without activating mise.
+
+### Cleaning up caches
+
+Nothing purges the volumes automatically. mise's tool installs are the only part that
+grows noticeably (about 800 MB in total, and roughly 300 MB more for each Semgrep version
+bump), and `post-create.sh` already prunes them on every container creation. The pip and
+npm caches are small (about 90 MB together) and only grow when dependency versions change.
+To reclaim space sooner, run these inside the container:
+
+- `mise prune` removes superseded tool versions. Run it from the repository folder: it
+  keeps only the versions that configurations mise has already seen require, so run
+  anywhere else it can remove every installed tool until `mise install --locked` is run
+  again.
+- `pip cache purge` and `npm cache clean --force` empty the pip and npm caches. The next
+  install downloads what it needs again.
+
+To reset a volume completely, stop the container and remove the volume from the host with
+`docker volume rm`. The volumes are `docker-autoheal-pip-cache`, `docker-autoheal-npm-cache`,
+`docker-autoheal-gh-cache` and `docker-autoheal-mise-data`. Avoid running these cleanups
+while an install is in progress in another terminal.
 
 ### Tasks
 
