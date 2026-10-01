@@ -130,6 +130,51 @@ class TestScanExistingContainers:
 
         assert config_manager.get_config().containers.selected == []
 
+    async def test_custom_label_with_wrong_value_is_ignored(
+        self, engine, docker_client, update_config
+    ):
+        update_config(lambda c: (setattr(c.monitor, "label_key", "heal"), setattr(c.monitor, "label_value", "yes")))
+        container, info = make_container(name="web", labels={"heal": "no"})
+        docker_client.add_container(container, info)
+
+        await engine._scan_existing_containers()
+
+        assert config_manager.get_config().containers.selected == []
+
+    async def test_empty_custom_label_value_requires_the_label_to_be_present(
+        self, engine, docker_client, update_config
+    ):
+        update_config(lambda c: (setattr(c.monitor, "label_key", "heal"), setattr(c.monitor, "label_value", "")))
+        container, info = make_container(name="web", labels={})
+        docker_client.add_container(container, info)
+
+        await engine._scan_existing_containers()
+
+        assert config_manager.get_config().containers.selected == []
+
+    async def test_event_message_names_the_default_label(self, engine, docker_client):
+        container, info = make_container(name="web", labels={"autoheal": "true"})
+        docker_client.add_container(container, info)
+
+        await engine._scan_existing_containers()
+
+        assert config_manager.get_events()[0].message == (
+            "Automatically added to monitoring on startup due to autoheal=true label (stable_id: web)"
+        )
+
+    async def test_event_message_names_the_configured_label(
+        self, engine, docker_client, update_config
+    ):
+        update_config(lambda c: (setattr(c.monitor, "label_key", "heal"), setattr(c.monitor, "label_value", "yes")))
+        container, info = make_container(name="web", labels={"heal": "yes"})
+        docker_client.add_container(container, info)
+
+        await engine._scan_existing_containers()
+
+        assert config_manager.get_events()[0].message == (
+            "Automatically added to monitoring on startup due to heal=yes label (stable_id: web)"
+        )
+
     async def test_compose_container_is_added_under_its_stable_id(self, engine, docker_client):
         container, info = make_container(
             name="stack-web-1",
@@ -287,6 +332,51 @@ class TestProcessContainerStartEvent:
         await engine._process_container_start_event(start_event(container.id, "web"))
 
         assert config_manager.get_config().containers.selected == []
+
+    async def test_custom_label_with_wrong_value_is_ignored(
+        self, engine, docker_client, update_config
+    ):
+        update_config(lambda c: (setattr(c.monitor, "label_key", "heal"), setattr(c.monitor, "label_value", "yes")))
+        container, info = make_container(name="web", labels={"heal": "no"})
+        docker_client.add_container(container, info)
+
+        await engine._process_container_start_event(start_event(container.id, "web"))
+
+        assert config_manager.get_config().containers.selected == []
+
+    async def test_empty_custom_label_value_requires_the_label_to_be_present(
+        self, engine, docker_client, update_config
+    ):
+        update_config(lambda c: (setattr(c.monitor, "label_key", "heal"), setattr(c.monitor, "label_value", "")))
+        container, info = make_container(name="web", labels={})
+        docker_client.add_container(container, info)
+
+        await engine._process_container_start_event(start_event(container.id, "web"))
+
+        assert config_manager.get_config().containers.selected == []
+
+    async def test_event_message_names_the_default_label(self, engine, docker_client):
+        container, info = make_container(name="web", labels={"autoheal": "true"})
+        docker_client.add_container(container, info)
+
+        await engine._process_container_start_event(start_event(container.id, "web"))
+
+        assert config_manager.get_events()[0].message == (
+            "Automatically added to monitoring due to autoheal=true label (stable_id: web)"
+        )
+
+    async def test_event_message_names_the_configured_label(
+        self, engine, docker_client, update_config
+    ):
+        update_config(lambda c: (setattr(c.monitor, "label_key", "heal"), setattr(c.monitor, "label_value", "yes")))
+        container, info = make_container(name="web", labels={"heal": "yes"})
+        docker_client.add_container(container, info)
+
+        await engine._process_container_start_event(start_event(container.id, "web"))
+
+        assert config_manager.get_events()[0].message == (
+            "Automatically added to monitoring due to heal=yes label (stable_id: web)"
+        )
 
     async def test_compose_container_is_added_under_its_stable_id(self, engine, docker_client):
         container, info = make_container(

@@ -671,7 +671,7 @@ class MonitoringEngine:
                     if (stable_id in config.containers.excluded or
                         container_name in config.containers.excluded or
                         container_id in config.containers.excluded):
-                        logger.info(f"Container {container_name} (stable_id: {stable_id}) has autoheal=true but is in excluded list, skipping")
+                        logger.info(f"Container {container_name} (stable_id: {stable_id}) has the {config.monitor.label_key}={config.monitor.label_value} label but is in excluded list, skipping")
                         continue
 
                     # Add to monitored list using STABLE ID
@@ -679,7 +679,7 @@ class MonitoringEngine:
                     added_count += 1
 
                     # Log the auto-monitoring
-                    logger.info(f"Auto-monitoring enabled for container '{container_name}' ({container_id[:12]}) with stable_id '{stable_id}' - detected autoheal=true label on startup")
+                    logger.info(f"Auto-monitoring enabled for container '{container_name}' ({container_id[:12]}) with stable_id '{stable_id}' - detected {config.monitor.label_key}={config.monitor.label_value} label on startup")
 
                     # Create an event for this
                     event_obj = AutoHealEvent(
@@ -689,7 +689,7 @@ class MonitoringEngine:
                         event_type="auto_monitor",
                         restart_count=0,
                         status="enabled",
-                        message=f"Automatically added to monitoring on startup due to autoheal=true label (stable_id: {stable_id})"
+                        message=f"Automatically added to monitoring on startup due to {config.monitor.label_key}={config.monitor.label_value} label (stable_id: {stable_id})"
                     )
                     config_manager.add_event(event_obj)
 
@@ -838,7 +838,7 @@ class MonitoringEngine:
                 if (stable_id in config.containers.excluded or
                     container_name in config.containers.excluded or
                     container_id in config.containers.excluded):
-                    logger.info(f"Container {container_name} (stable_id: {stable_id}) has autoheal=true but is in excluded list, skipping")
+                    logger.info(f"Container {container_name} (stable_id: {stable_id}) has the {config.monitor.label_key}={config.monitor.label_value} label but is in excluded list, skipping")
                     return
 
                 # Add to monitored list using STABLE ID (solves all edge cases)
@@ -846,7 +846,7 @@ class MonitoringEngine:
                 config_manager.update_config(config)
 
                 # Log the auto-monitoring
-                logger.info(f"Auto-monitoring enabled for container '{container_name}' ({container_id[:12]}) with stable_id '{stable_id}' - detected autoheal=true label")
+                logger.info(f"Auto-monitoring enabled for container '{container_name}' ({container_id[:12]}) with stable_id '{stable_id}' - detected {config.monitor.label_key}={config.monitor.label_value} label")
 
                 # Create an event for this
                 event_obj = AutoHealEvent(
@@ -856,7 +856,7 @@ class MonitoringEngine:
                     event_type="auto_monitor",
                     restart_count=0,
                     status="enabled",
-                    message=f"Automatically added to monitoring due to autoheal=true label (stable_id: {stable_id})"
+                    message=f"Automatically added to monitoring due to {config.monitor.label_key}={config.monitor.label_value} label (stable_id: {stable_id})"
                 )
                 config_manager.add_event(event_obj)
 
