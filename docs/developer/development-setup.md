@@ -22,10 +22,9 @@ The container provides:
 
 - Python (matching the pinned base image in `.devcontainer/Dockerfile`) and Node.js 24
 - Access to the host's Docker daemon, via the `docker-outside-of-docker` feature
-- The GitHub CLI (`gh`). To work on the agentic workflows, authenticate and install the
-  `github/gh-aw` extension at the `compiler_version` recorded in the header of
-  `.github/workflows/issue-triage.lock.yml`, for example
-  `gh extension install github/gh-aw@v0.88.7`, so recompiling doesn't churn the lock file
+- The GitHub CLI (`gh`). The `github/gh-aw` extension, for working on the agentic
+  workflows, is not installed automatically: run **Autoheal: Install gh-aw** after
+  `gh auth login` (see below)
 - [mise](https://mise.jdx.dev), which installs the linter and security-scanning tools used
   by the Dev Container tasks at the versions pinned in `mise.toml` and `mise.lock`. The
   npm-based linters (markdownlint, prettier, stylelint and the rest) stay pinned in
@@ -70,6 +69,13 @@ and integration suites, the frontend build, `docker compose up --build`, and eac
 and security scanner individually. The aggregate entry points are **Run Local Checks**,
 **Check Python**, **Check Frontend**, **Check Shell Scripts**, **Check Workflows**, **Check
 Markup and Data**, **Check Repository Conventions** and **Run Security Scanners**.
+
+**Autoheal: Install gh-aw** installs the `github/gh-aw` extension pinned to the
+`compiler_version` recorded in the header of `.github/workflows/issue-triage.lock.yml`, so
+recompiling the workflows doesn't churn the lock file. It needs `gh auth login` (or a
+Codespaces token) first, replaces any installed copy, and is not part of any aggregate
+task. The extension lives in the `gh` volume, so it survives rebuilds; run the task again
+after the lock file is recompiled with a newer version.
 
 The tasks that need shell globbing run under `bash`, so outside the Dev Container they
 need `bash` on `PATH` (Git Bash or WSL on Windows).
