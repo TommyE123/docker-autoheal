@@ -80,9 +80,8 @@ Scripts**, **Check Workflows**, **Check Markup and Data**, **Check Repository
 Conventions** and **Run Security Scanners**.
 
 **Autoheal: Run Docker Stack** builds the app from your checkout and runs it with
-`docker compose -f docker-compose.test.yml up --build autoheal`. It uses
-`docker-compose.test.yml` because `docker-compose.yml` runs the published image rather
-than building your changes.
+`docker compose up --build autoheal`. The `--build` flag is what makes
+`docker-compose.yml` build your changes instead of using the published image.
 
 **Autoheal: Install gh-aw** installs the `github/gh-aw` extension pinned to the
 `compiler_version` recorded in the header of `.github/workflows/issue-triage.lock.yml`, so
@@ -91,7 +90,7 @@ Codespaces token) first, replaces any installed copy, and is not part of any agg
 task. The extension lives in the `gh` volume, so it survives rebuilds; run the task again
 after the lock file is recompiled with a newer version.
 
-**Autoheal: Stop Docker Stack** runs `docker compose -f docker-compose.test.yml down`.
+**Autoheal: Stop Docker Stack** runs `docker compose down`.
 Stacks started with **Run Docker Stack** run on the host's Docker daemon (see below), so
 they keep running when the Dev Container stops or is rebuilt until you stop them.
 
@@ -107,7 +106,7 @@ below). Without that it would mount an empty directory, lint nothing, and pass.
 
 `docker compose` talks to the Docker daemon through the `docker-outside-of-docker`
 feature — the daemon is the host's, not the container's. Relative bind mounts in
-`docker-compose.yml`/`docker-compose.test.yml` (e.g. `./data:/data`) are resolved by the
+`docker-compose.yml` (e.g. `./data:/data`) are resolved by the
 Compose client to the container's path and handed to the host daemon as-is, which has no
 such path and silently creates an empty directory there instead of binding your checkout.
 The stack still starts and passes its health check, but persisted data (config, events,
@@ -125,8 +124,6 @@ pip install -r requirements-dev.txt   # test dependencies
 
 # Run directly against your local Docker socket
 python -m app.main
-# or the convenience wrapper:
-python run.py
 ```
 
 The backend listens on `0.0.0.0:3131` by default (`ui.listen_port` in

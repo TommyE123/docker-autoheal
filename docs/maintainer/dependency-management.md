@@ -16,10 +16,10 @@ updates are reviewed and merged.
 | Dev Container npm lint tools    | `.devcontainer/package.json`, `.devcontainer/package-lock.json` | `npm`                               |
 | Dev Container CLI tools         | `mise.toml`, `mise.lock`                                        | `mise`                              |
 | Dev Container base image        | `.devcontainer/Dockerfile`                                      | `dockerfile`                        |
-| Docker base images              | `Dockerfile`, `Dockerfile.simple`                               | `dockerfile`                        |
-| Docker Compose images           | `docker-compose*.yml`                                           | `docker-compose`                    |
+| Docker base images              | `Dockerfile`                                                    | `dockerfile`                        |
+| Docker Compose images           | `docker-compose.yml`                                             | `docker-compose`                    |
 | GitHub Actions                  | `.github/workflows/*.yml`                                       | `github-actions`                    |
-| Dockerfile apt package versions | `Dockerfile`, `Dockerfile.simple`                               | `customManagers:dockerfileVersions` |
+| Dockerfile apt package versions | `Dockerfile`                                                    | `customManagers:dockerfileVersions` |
 
 The standard `config:recommended` preset provides the managers for the main dependency
 ecosystems above, including `mise` for the developer CLI tools pinned in `mise.toml`
@@ -75,7 +75,7 @@ build time.
 
 * **Docker images**:
 
-  * `Dockerfile` and `Dockerfile.simple` base images are pinned to both their human-readable
+  * The `Dockerfile` base images are pinned to both their human-readable
     tag and the SHA256 digest that tag resolves to, using the form
     `image:tag@sha256:digest`.
 
@@ -88,11 +88,6 @@ build time.
     the newest published release when copied by users.
 
     Renovate is explicitly configured not to manage this image.
-
-  * `docker-compose.test.yml` and `docker-compose.example.yml` are manual/demo compose files.
-    Their existing image references are not hand-maintained by this project, but Renovate can
-    still detect them. The Docker `pinDigests` rule means Renovate may create normal digest-pin
-    PRs for applicable Docker image references.
 
 * **Dockerfile apt packages**: versions are explicitly pinned where required by the Dockerfile
   linting policy. Renovate's `customManagers:dockerfileVersions` manager tracks these pins and
@@ -183,11 +178,6 @@ introduce compatibility or behavioural changes.
 * **The project's own Docker image** — `tommye123/docker-autoheal:latest` is intentionally
   excluded from Renovate dependency management because it is produced by this repository rather
   than being a third-party dependency.
-
-* **Demo/test Compose files** — `docker-compose.test.yml` and
-  `docker-compose.example.yml` are kept as project-controlled examples rather than being
-  manually rewritten simply to satisfy dependency pinning. Renovate can still propose digest
-  pinning where appropriate.
 
 * **Node 18** — the frontend build currently uses the Node 18 Alpine image. This is retained
   until there is a deliberate decision to change the frontend build/runtime baseline.

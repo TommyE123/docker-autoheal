@@ -1,9 +1,11 @@
 services:
   autoheal:
-    # This is our own published image (built by .github/workflows/docker-publish.yml), not a
-    # third-party dependency, kept on :latest so users who copy this file always deploy our
-    # newest release.
+    # This is our own published image (built and published by
+    # .github/workflows/release-please.yml), not a third-party dependency, kept on :latest
+    # so users who copy this file always deploy our newest release. `docker compose up
+    # --build` builds it from this checkout instead.
     image: tommye123/docker-autoheal:latest
+    build: .
     container_name: docker-autoheal
     restart: unless-stopped
 
@@ -32,19 +34,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
-# Example monitored container (for testing)
-# nginx-test:
-#   image: nginx:alpine
-#   container_name: nginx-test
-#   restart: unless-stopped
-#   ports:
-#     - "8081:80"
-#   labels:
-#     - "autoheal=true"
-#   healthcheck:
-#     test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
-#     interval: 10s
-#     timeout: 5s
-#     retries: 3
-#     start_period: 10s

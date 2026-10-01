@@ -16,7 +16,7 @@ on:
       - ".mise/**"
       - "frontend/package.json"
       - "frontend/package-lock.json"
-      - "docker-compose.test.yml"
+      - "docker-compose.yml"
       - "Dockerfile"
       - ".dockerignore"
   workflow_dispatch:
@@ -102,7 +102,7 @@ jobs:
 
             # The fragile part: Compose talking to the host daemon via DooD.
             echo "== Docker Compose stack =="
-            docker compose -f docker-compose.test.yml up -d --build autoheal
+            docker compose up -d --build autoheal
             healthy=false
             for _ in $(seq 1 60); do
               if [ "$(docker inspect -f '{{.State.Health.Status}}' docker-autoheal 2>/dev/null)" = "healthy" ]; then
@@ -113,9 +113,9 @@ jobs:
             done
             if [ "$healthy" != "true" ]; then
               echo "::error::docker compose stack did not become healthy"
-              docker compose -f docker-compose.test.yml logs
-              docker compose -f docker-compose.test.yml down --remove-orphans
+              docker compose logs
+              docker compose down --remove-orphans
               exit 1
             fi
             echo "docker compose stack is healthy"
-            docker compose -f docker-compose.test.yml down --remove-orphans
+            docker compose down --remove-orphans

@@ -263,7 +263,7 @@
     {
       "label": "Autoheal: Check Dockerfiles",
       "type": "shell",
-      "command": "hadolint Dockerfile Dockerfile.simple .devcontainer/Dockerfile",
+      "command": "hadolint Dockerfile .devcontainer/Dockerfile",
       "problemMatcher": []
     },
     {
@@ -384,13 +384,13 @@
     {
       "label": "Autoheal: Run Docker Stack",
       "type": "shell",
-      "command": "docker compose -f docker-compose.test.yml up --build autoheal",
+      "command": "docker compose up --build autoheal",
       "problemMatcher": []
     },
     {
       "label": "Autoheal: Stop Docker Stack",
       "type": "shell",
-      "command": "docker compose -f docker-compose.test.yml down",
+      "command": "docker compose down",
       "problemMatcher": []
     },
     {
