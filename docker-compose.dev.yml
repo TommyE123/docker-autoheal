@@ -2,13 +2,25 @@
 #
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
 #
-# Uses a distinct container name, host ports and data directory, so the deployment named
-# `docker-autoheal` is left untouched. Override the ports with AUTOHEAL_DEV_PORT and
-# AUTOHEAL_DEV_METRICS_PORT. `!override` replaces the base lists instead of appending to
-# them (needs Docker Compose v2.24+).
+# Uses a distinct image tag, container name, host ports, data directory and monitoring
+# label, so the deployment named `docker-autoheal` is left untouched. Only containers
+# labelled `autoheal.dev=true` are monitored; `autoheal=true` containers (the production
+# label) are ignored even though the Docker socket is shared. Override the ports with
+# AUTOHEAL_DEV_PORT and AUTOHEAL_DEV_METRICS_PORT. `!override` replaces the base lists
+# instead of appending to them (needs Docker Compose v2.24+).
 services:
   autoheal:
+    # Keeps the dev build from replacing the published `tommye123/docker-autoheal:latest`.
+    image: docker-autoheal:dev
     container_name: docker-autoheal-dev
+    # Seeds ./data-dev/config.json with the dev label on first start only; the app fills in
+    # every other setting from its defaults and keeps any later edits made in the UI.
+    command:
+      - sh
+      - -c
+      - |
+        [ -f /data/config.json ] || printf '{"monitor":{"label_key":"autoheal.dev"}}' > /data/config.json
+        exec python -m app.main
     volumes: !override
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./data-dev:/data
