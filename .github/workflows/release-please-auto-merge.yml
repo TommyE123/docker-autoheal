@@ -1,16 +1,16 @@
 name: Weekly Release Please auto-merge
 
 # Enables GitHub's native auto-merge on the standing Release Please PR every
-# Friday at 07:33 UK local time. It never merges anything itself - GitHub
+# Friday at 19:43 UK local time. It never merges anything itself - GitHub
 # handles required checks, approvals and the eventual merge. That merge is
 # an ordinary push to main and is picked up unchanged by release-please.yml,
 # which does the actual release/tag/Docker-publish work.
 on:
   schedule:
     # The timezone field makes GitHub evaluate this cron as Europe/London
-    # wall-clock time, so it stays 07:33 UK local across the GMT/BST
+    # wall-clock time, so it stays 19:43 UK local across the GMT/BST
     # changeover without a separate runtime guard.
-    - cron: "33 7 * * 5"
+    - cron: "43 19 * * 5"
       timezone: "Europe/London"
   workflow_dispatch:
 
