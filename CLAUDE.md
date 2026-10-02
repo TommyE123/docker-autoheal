@@ -38,6 +38,7 @@ Autoheal monitors Docker containers, checks their health, and can restart or qua
 
 - Name a new task branch `<type>/<issue-number>-<short-slug>` when there is an issue (for example, `fix/353-restart-handling`), or `<type>/<short-slug>` otherwise. Keep existing branches as they are, especially once pushed.
 - Commit, push, and open a PR on a feature branch unless the user says not to. Respect local-only, no-commit, no-push, and no-PR requests.
+- Work on the checked-out task branch in the current checkout. Don't create extra worktrees, or spawn agents with worktree isolation, unless the user explicitly asks, to avoid leaving extra generated branches (for example `ccr-*`, `claude/*` or `worktree-*`). If a worktree was explicitly requested, say so in the PR and remove its leftover branch when done.
 - Never push to a protected branch, force-push, or bypass hooks. Don't overwrite unrelated local changes.
 - When branch currency matters, merge `origin/main` as directed by `.claude/rules/branch-currency.md`. Don't update merely because `main` moved.
 - PR titles use Conventional Commits (`<type>: <description>`). The title check enforces this.
