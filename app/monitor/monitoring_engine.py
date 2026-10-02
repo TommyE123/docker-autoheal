@@ -614,6 +614,32 @@ class MonitoringEngine:
             "quarantined_containers": len(config_manager.get_quarantined_containers())
         }
 
+    @staticmethod
+    def _auto_monitor_stable_id(labels: dict, container_name: str) -> str:
+        """
+        Stable ID stored in the selected list when a container is auto-monitored.
+
+        Unlike ``get_stable_identifier``, an empty ``monitoring.id`` label is
+        ignored here, so it falls back to the Compose identity or the name rather
+        than storing an empty key that every other empty-label container would match.
+
+        Args:
+            labels: Container labels
+            container_name: Container name
+
+        Returns:
+            Stable identifier string
+        """
+        if labels.get("monitoring.id"):
+            return labels["monitoring.id"]
+
+        compose_project = labels.get("com.docker.compose.project")
+        compose_service = labels.get("com.docker.compose.service")
+        if compose_project and compose_service:
+            return f"{compose_project}_{compose_service}"
+
+        return container_name
+
     def _auto_monitor_container(
         self,
         config: AutoHealConfig,
@@ -715,7 +741,7 @@ class MonitoringEngine:
 
                     event_obj = self._auto_monitor_container(
                         config,
-                        stable_id=self.get_stable_identifier(info),
+                        stable_id=self._auto_monitor_stable_id(labels, info.get("name")),
                         container_id=info.get("full_id"),
                         container_name=info.get("name"),
                         startup=True,
@@ -844,7 +870,7 @@ class MonitoringEngine:
                 event_obj = self._auto_monitor_container(
                     config,
                     # The event's own ID and name label the container here, as before
-                    stable_id=self.get_stable_identifier({**info, "name": container_name}),
+                    stable_id=self._auto_monitor_stable_id(labels, container_name),
                     container_id=container_id,
                     container_name=container_name,
                     startup=False,

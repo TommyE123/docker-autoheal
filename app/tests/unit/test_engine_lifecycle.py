@@ -108,6 +108,34 @@ class TestScanExistingContainers:
         assert config_manager.get_config().containers.selected == ["web"]
         assert [e.event_type for e in config_manager.get_events()] == ["auto_monitor"]
 
+    async def test_empty_monitoring_id_falls_back_to_the_container_name(self, engine, docker_client):
+        container, info = make_container(
+            name="web", labels={"autoheal": "true", "monitoring.id": ""}
+        )
+        docker_client.add_container(container, info)
+
+        await engine._scan_existing_containers()
+
+        assert config_manager.get_config().containers.selected == ["web"]
+
+    async def test_empty_monitoring_id_falls_back_to_the_compose_identity(
+        self, engine, docker_client
+    ):
+        container, info = make_container(
+            name="stack-web-1",
+            labels={
+                "autoheal": "true",
+                "monitoring.id": "",
+                "com.docker.compose.project": "stack",
+                "com.docker.compose.service": "web",
+            },
+        )
+        docker_client.add_container(container, info)
+
+        await engine._scan_existing_containers()
+
+        assert config_manager.get_config().containers.selected == ["stack_web"]
+
     async def test_compose_container_is_added_under_its_stable_id(self, engine, docker_client):
         container, info = make_container(
             name="stack-web-1",
@@ -243,6 +271,34 @@ class TestProcessContainerStartEvent:
 
         assert config_manager.get_config().containers.selected == ["web"]
         assert [e.event_type for e in config_manager.get_events()] == ["auto_monitor"]
+
+    async def test_empty_monitoring_id_falls_back_to_the_container_name(self, engine, docker_client):
+        container, info = make_container(
+            name="web", labels={"autoheal": "true", "monitoring.id": ""}
+        )
+        docker_client.add_container(container, info)
+
+        await engine._process_container_start_event(start_event(container.id, "web"))
+
+        assert config_manager.get_config().containers.selected == ["web"]
+
+    async def test_empty_monitoring_id_falls_back_to_the_compose_identity(
+        self, engine, docker_client
+    ):
+        container, info = make_container(
+            name="stack-web-1",
+            labels={
+                "autoheal": "true",
+                "monitoring.id": "",
+                "com.docker.compose.project": "stack",
+                "com.docker.compose.service": "web",
+            },
+        )
+        docker_client.add_container(container, info)
+
+        await engine._process_container_start_event(start_event(container.id, "stack-web-1"))
+
+        assert config_manager.get_config().containers.selected == ["stack_web"]
 
     async def test_compose_container_is_added_under_its_stable_id(self, engine, docker_client):
         container, info = make_container(
