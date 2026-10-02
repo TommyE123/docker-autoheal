@@ -59,7 +59,7 @@
     {
       "label": "Autoheal: Check Python with Ruff",
       "type": "shell",
-      "command": "ruff check --output-format concise app",
+      "command": "ruff check --config .linter-rules/.ruff.toml --output-format concise app",
       "problemMatcher": {
         "owner": "ruff",
         "source": "ruff",
@@ -77,7 +77,7 @@
     {
       "label": "Autoheal: Check Python Formatting",
       "type": "shell",
-      "command": "ruff format --check app",
+      "command": "ruff format --config .linter-rules/.ruff.toml --check app",
       "problemMatcher": []
     },
     {
@@ -117,7 +117,7 @@
     {
       "label": "Autoheal: Check CSS",
       "type": "shell",
-      "command": "stylelint --config-basedir .devcontainer/node_modules \"frontend/src/**/*.css\"",
+      "command": "stylelint --config .linter-rules/.stylelintrc.json --config-basedir .devcontainer/node_modules \"frontend/src/**/*.css\"",
       "problemMatcher": []
     },
     {
@@ -197,7 +197,7 @@
     {
       "label": "Autoheal: Check Markdown",
       "type": "shell",
-      "command": "markdownlint-cli2 $(git ls-files '*.md')",
+      "command": "markdownlint-cli2 --config .linter-rules/.markdownlint.jsonc $(git ls-files '*.md')",
       "options": {
         "shell": {
           "executable": "bash",
@@ -221,7 +221,7 @@
     {
       "label": "Autoheal: Check YAML",
       "type": "shell",
-      "command": "yamllint --strict .",
+      "command": "yamllint --strict -c .linter-rules/.yamllint.yml .",
       "problemMatcher": []
     },
     {
@@ -285,13 +285,13 @@
     {
       "label": "Autoheal: Check Paths",
       "type": "shell",
-      "command": "ls-lint",
+      "command": "ls-lint --config .linter-rules/.ls-lint.yml",
       "problemMatcher": []
     },
     {
       "label": "Autoheal: Check Secrets",
       "type": "shell",
-      "command": "secretlint \"**/*\"",
+      "command": "secretlint --secretlintrc .linter-rules/.secretlintrc.json \"**/*\"",
       "problemMatcher": []
     },
     {
@@ -309,13 +309,13 @@
     {
       "label": "Autoheal: Run Trivy",
       "type": "shell",
-      "command": "mkdir -p .lint && trivy fs --scanners vuln,misconfig,secret --skip-dirs '.lint' --format json --output .lint/trivy.json .",
+      "command": "mkdir -p .lint && trivy fs --config .linter-rules/.trivy.yaml --scanners vuln,misconfig,secret --skip-dirs '.lint' --format json --output .lint/trivy.json .",
       "problemMatcher": []
     },
     {
       "label": "Autoheal: Run TruffleHog",
       "type": "shell",
-      "command": "mkdir -p .lint && set -o pipefail && trufflehog filesystem . --no-update --fail --results=verified --exclude-paths=.trufflehog-exclude.txt --json | tee .lint/trufflehog.jsonl",
+      "command": "mkdir -p .lint && set -o pipefail && trufflehog filesystem . --no-update --fail --results=verified --exclude-paths=.linter-rules/.trufflehog-exclude.txt --json | tee .lint/trufflehog.jsonl",
       "options": {
         "shell": {
           "executable": "bash",
