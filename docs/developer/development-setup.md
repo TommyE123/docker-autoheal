@@ -199,14 +199,13 @@ see [Frontend Development](frontend.md#linting-and-formatting).
 
 Linter configuration is shared: the Dev Container tasks and MegaLinter both read it, so a
 rule change applies in both places. MegaLinter's `LINTER_RULES_PATH` points at
-`.linter-rules/`, which holds the Checkov, Trivy, markdownlint, yamllint, ls-lint and Ruff
-configuration and exceptions. The Dev Container tasks and editor settings pass those paths
-explicitly, because these tools do not discover `.linter-rules/` on their own. Configuration
-that must stay beside the code it lints remains at the repository root
-(`.stylelintrc.json`, `.secretlintrc.json`, `pyrightconfig.json`, `.editorconfig`) or in
-`frontend/` (`eslint.config.js`). `.secretlintignore` and `.trufflehog-exclude.txt` are the exception: they
-only apply to the local tasks, because MegaLinter passes secretlint and TruffleHog its own
-generated exclusion lists.
+`.linter-rules/`, which holds the Checkov, Trivy, markdownlint, yamllint, ls-lint, Ruff and
+secretlint configuration and exceptions. The Dev Container tasks and editor settings pass
+those paths explicitly, because these tools do not discover `.linter-rules/` on their own.
+`.trufflehog-exclude.txt` there only applies to the local TruffleHog task: MegaLinter does
+not read it. Configuration that must stay beside the code it lints remains at the
+repository root (`.stylelintrc.json`, `pyrightconfig.json`, `.editorconfig`) or in
+`frontend/` (`eslint.config.js`).
 
 ### What lints what
 

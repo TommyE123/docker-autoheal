@@ -291,7 +291,7 @@
     {
       "label": "Autoheal: Check Secrets",
       "type": "shell",
-      "command": "secretlint \"**/*\"",
+      "command": "secretlint --secretlintrc .linter-rules/.secretlintrc.json --secretlintignore .linter-rules/.secretlintignore \"**/*\"",
       "problemMatcher": []
     },
     {
@@ -315,7 +315,7 @@
     {
       "label": "Autoheal: Run TruffleHog",
       "type": "shell",
-      "command": "mkdir -p .lint && set -o pipefail && trufflehog filesystem . --no-update --fail --results=verified --exclude-paths=.trufflehog-exclude.txt --json | tee .lint/trufflehog.jsonl",
+      "command": "mkdir -p .lint && set -o pipefail && trufflehog filesystem . --no-update --fail --results=verified --exclude-paths=.linter-rules/.trufflehog-exclude.txt --json | tee .lint/trufflehog.jsonl",
       "options": {
         "shell": {
           "executable": "bash",
