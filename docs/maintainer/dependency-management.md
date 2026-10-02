@@ -34,10 +34,10 @@ Two Dev Container pins need manual attention:
   regenerated lock. If the PR changes `mise.toml` alone, `mise install --locked` fails and
   the Dev Container workflow goes red; run
   `mise lock --platform linux-x64,linux-arm64` on the branch and commit the result.
-  `.mise/locks/` holds sidecars (`pyproject.toml` and `uv.lock`) that `mise lock`
-  generates for `pypi:` tools, with their digests recorded in `mise.lock`. Renovate ignores
-  that directory (`ignorePaths` in `renovate.json`), so its Python/uv managers cannot edit
-  a sidecar and break the digest; only `mise lock` changes them.
+  `.mise/locks/` contains generated sidecars (`pyproject.toml` and `uv.lock`) managed by
+  mise, with their digests recorded in `mise.lock`. Renovate ignores that directory
+  (`ignorePaths` in `renovate.json`) so its Python/uv managers don't modify generated files
+  independently of the corresponding `mise.lock` state.
 * **Dev Container features.** Renovate's `devcontainer` manager updates the feature
   versions in `.devcontainer/devcontainer.json` but not the digests pinned in
   `.devcontainer/devcontainer-lock.json`. Refresh those periodically with
