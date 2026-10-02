@@ -29,6 +29,12 @@
       "problemMatcher": []
     },
     {
+      "label": "Autoheal: Run Mutation Testing",
+      "type": "shell",
+      "command": "./mutation.sh",
+      "problemMatcher": []
+    },
+    {
       "label": "Autoheal: Run Frontend Tests",
       "type": "shell",
       "command": "npm test",

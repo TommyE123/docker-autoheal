@@ -16,15 +16,15 @@ Mutmut needs `fork`, so run it on Linux or macOS (on Windows, use WSL). Use the 
 Python version as the `Dockerfile`.
 
 ```bash
-pip install -r requirements-mutation.txt
+pip install -r requirements-mutation.txt   # already done in the Dev Container
 
-task mutation                                # full run: a few minutes on 4 vCPUs
-task mutation -- "app.uptime_kuma.matching*"  # focused run on a subset of mutants
+./mutation.sh                              # full run: a few minutes on 4 vCPUs
+./mutation.sh "app.uptime_kuma.matching*"  # focused run on a subset of mutants
 ```
 
-`task mutation` is a thin wrapper around [Task](https://taskfile.dev/) that calls
-`./mutation.sh`, which is also what CI runs. If you do not have Task installed, run
-`./mutation.sh` (or `./mutation.sh "<mutant-glob>"`) directly.
+In VS Code (including the Dev Container, which installs `requirements-mutation.txt`) the
+**Autoheal: Run Mutation Testing** task runs the full `./mutation.sh`. CI runs the same
+script.
 
 `mutation.sh` deletes `mutants/` and then runs `mutmut run`, so every run starts clean.
 It finishes by printing the mutants that were not killed. `mutants/` is git-ignored.

@@ -1,7 +1,0 @@
-version: "3"
-
-tasks:
-  mutation:
-    desc: Run mutation testing from a clean state (task mutation -- "<mutant-glob>" for a focused run)
-    cmds:
-      - ./mutation.sh {{.CLI_ARGS}}

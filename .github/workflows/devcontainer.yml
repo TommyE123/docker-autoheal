@@ -11,6 +11,7 @@ on:
       - ".github/workflows/devcontainer.yml"
       - "requirements.txt"
       - "requirements-dev.txt"
+      - "requirements-mutation.txt"
       - "mise.toml"
       - "mise.lock"
       - ".mise/**"
