@@ -6,7 +6,7 @@ Review the actual changes in the PR and focus on issues that could affect correc
 
 Do not manufacture findings. If no actionable issue exists, state that clearly.
 
-**Audience:** this document is addressed to the reviewing agent producing a review (for example CodeRabbit, wired up via `.coderabbit.yaml`), and applies in full whenever Claude is asked to review a PR itself. When Claude is instead _assessing and fixing_ another reviewer's findings, the review status, per-finding tag, and verdict formats do not apply to it, and neither does "Review only — do not push commits to the PR." Claude applies the Evidence Threshold and Scope and Noise sections as the standard for deciding which findings are actionable.
+**Audience:** this document is addressed to the reviewing agent producing a local PR review, and applies in full whenever Claude is asked to review a PR itself. CodeRabbit's GitHub review may use a different format; assess its findings against the Evidence Threshold and Scope and Noise sections rather than assuming it follows the status and verdict format below. When Claude is instead _assessing and fixing_ another reviewer's findings, the review status, per-finding tag, and verdict formats do not apply to it, and neither does "Review only — do not push commits to the PR."
 
 ---
 

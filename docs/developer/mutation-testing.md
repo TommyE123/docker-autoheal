@@ -90,16 +90,15 @@ of the rest are noise (log messages, string literals, cosmetic constants).
 
 ## Configuration
 
-Mutmut is configured in the `[tool.mutmut]` table of `pyproject.toml` (which also holds
-the Ruff configuration); `pytest.ini` and `.coveragerc` still own test and coverage
-settings. Every non-default setting has a reason from the
+`pyproject.toml` contains only a `[tool.mutmut]` table; `pytest.ini` and `.coveragerc`
+still own test and coverage settings. Every non-default setting has a reason from the
 Phase 1 evaluation in [#333](https://github.com/TommyE123/docker-autoheal/issues/333):
 
-| Setting                              | Why                                                                                                                                                                                      |
-|--------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `source_paths = ["app"]`             | Required: Mutmut's automatic detection fails for this repository's directory name.                                                                                                       |
-| `do_not_mutate`                      | Without `app/tests/*` Mutmut mutates the tests themselves (about 13.6k extra mutants, including the integration suite). `app/scripts/*` is omitted for the same reason as `.coveragerc`. |
-| `pytest_add_cli_args_test_selection` | `test_release_please_workflow.py` reads `.github/` files that do not exist inside `mutants/` and aborts stats collection. It imports nothing from `app/`.                                |
+| Setting                              | Why                                                                                                                                                       |
+|--------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `source_paths = ["app"]`             | Required: Mutmut's automatic detection fails for this repository's directory name.                                                                        |
+| `do_not_mutate`                      | Without `app/tests/*` Mutmut mutates the tests themselves (about 13.6k extra mutants, including the integration suite). `.coveragerc` omits it too.       |
+| `pytest_add_cli_args_test_selection` | `test_release_please_workflow.py` reads `.github/` files that do not exist inside `mutants/` and aborts stats collection. It imports nothing from `app/`. |
 
 Deliberately left at Mutmut's defaults:
 

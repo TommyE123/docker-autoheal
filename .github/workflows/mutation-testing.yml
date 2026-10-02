@@ -64,7 +64,11 @@ jobs:
             echo
             echo "Mutmut $(mutmut --version | awk '{print $NF}'), Python $(python -V | awk '{print $2}'), commit \`${GITHUB_SHA}\`"
             echo
-            jq -r '"| Generated | Killed | Timeout | Survived | No tests | Detected |\n|---|---|---|---|---|---|\n| \(.total) | \(.killed) | \(.timeout) | \(.survived) | \(.no_tests) | \(((.killed + .timeout) / .total * 1000 | round) / 10)% |"' mutants/mutmut-cicd-stats.json
+            jq -r '
+              "| Generated | Killed | Timeout | Survived | No tests | Detected |",
+              "|---|---|---|---|---|---|",
+              "| \(.total) | \(.killed) | \(.timeout) | \(.survived) | \(.no_tests) | \(((.killed + .timeout) / .total * 1000 | round) / 10)% |"
+            ' mutants/mutmut-cicd-stats.json
             echo
             echo "Detected = (killed + timeout) / generated. It excludes FastAPI route handlers and every other decorated function, which Mutmut does not mutate."
             echo "Survivors are listed in \`mutation-results.txt\` in the \`mutation-results\` artifact."

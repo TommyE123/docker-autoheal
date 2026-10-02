@@ -21,8 +21,6 @@ docker-autoheal/
 │   │   └── notification_manager.py   # Async notification dispatch (Discord/Slack/Telegram/ntfy/Gotify/Pushover/webhook)
 │   ├── uptime_kuma/
 │   │   └── uptime_kuma_client.py     # HTTP/websocket client for the Uptime Kuma API
-│   ├── scripts/
-│   │   └── demo.py               # Manual demo/exploration script (not part of the test suite)
 │   ├── models/, services/, utils/    # Currently near-empty; reserved for future growth
 │   └── tests/
 │       ├── unit/                 # Automated unit test suite (see docs/developer/testing.md)
@@ -44,20 +42,25 @@ docker-autoheal/
 │   ├── maintainer/               # Repository maintenance documentation
 │   └── historical/                # Superseded documents, kept for context
 │
+├── .devcontainer/                # Dev Container definition (see docs/developer/development-setup.md)
+│   ├── devcontainer.json         # Build, features, mounts, ports, VS Code customisations
+│   ├── devcontainer-lock.json    # Pinned digests for the Dev Container features
+│   ├── Dockerfile                # Pinned Python base image plus the mise binary
+│   ├── post-create.sh            # Installs dependencies and tooling on container creation
+│   ├── prepare-volumes.sh        # Makes the cache, `gh` and mise volumes writable by the container user
+│   └── package.json              # Pinned npm-based linters used by the local tasks
+│
+├── mise.toml / mise.lock         # Pinned developer CLI tools, installed by mise (with .mise/locks/)
+│
 ├── requirements.txt              # Runtime Python dependencies
-├── requirements-dev.txt          # Test dependencies (pytest, coverage, etc.)
+├── requirements-dev.txt          # Test dependencies (pytest, coverage)
 ├── requirements-mutation.txt     # Mutation-testing dependencies (mutmut)
 ├── pytest.ini / .coveragerc
-├── pyproject.toml                # Ruff and Mutmut configuration
+├── pyproject.toml                # Mutmut configuration only
 ├── taskfile.yml                  # `task mutation` (wraps mutation.sh)
 ├── mutation.sh                   # Mutation-testing entry point (see docs/developer/mutation-testing.md)
-├── run.py                        # Convenience entry point (`python run.py`)
 ├── Dockerfile                    # Multi-stage build: Node (frontend) → Python (backend)
-├── Dockerfile.simple             # Python-only build; expects a pre-built frontend/static/
-├── docker-compose.yml            # Production compose file, pulls the published image
-├── docker-compose.simple.yml     # Builds with Dockerfile.simple
-├── docker-compose.example.yml    # Demonstrates auto-monitoring with several sample services
-└── docker-compose.test.yml       # Test environment with sample containers
+└── docker-compose.yml            # Runs the published image; `up --build` builds from this checkout
 ```
 
 There are no root-level Python test/verification scripts — the manual scripts that used
@@ -93,8 +96,7 @@ suites (see [Testing](testing.md#legacy-script-triage) for what happened to each
 ## Running things from this layout
 
 ```bash
-python -m app.main      # module syntax
-python run.py           # convenience wrapper, equivalent to the above
+python -m app.main      # run the backend
 pytest                  # unit test suite (app/tests/unit, per pytest.ini)
 ```
 

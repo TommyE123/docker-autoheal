@@ -2,12 +2,13 @@
 # Documentation: https://yamllint.readthedocs.io/en/stable/configuration.html
 extends: default
 
-# *.lock.yml files under .github/workflows/ are compiled by the `gh aw`
-# GitHub Agentic Workflows CLI from a Markdown source and are not
-# hand-authored; `gh aw compile --yamllint` is the correct validation for
-# them instead.
+# *.lock.yml is compiled by the `gh aw` CLI, not hand-authored;
+# `gh aw compile --yamllint` validates it instead.
+# node_modules: the "Check YAML" task scans the whole workspace, and
+# MegaLinter's eslint pre-command creates frontend/node_modules mid-run.
 ignore: |
   .github/workflows/*.lock.yml
+  node_modules/
 
 rules:
   comments:
@@ -17,10 +18,12 @@ rules:
     max: 200
   truthy:
     ignore: |
+      .github/workflows/devcontainer.yml
       .github/workflows/docker-build.yml
       .github/workflows/greetings.yml
       .github/workflows/labels-sync.yml
       .github/workflows/mega-linter.yml
+      .github/workflows/mutation-testing.yml
       .github/workflows/production-smoke-test.yml
       .github/workflows/release-please.yml
       .github/workflows/release-please-auto-merge.yml

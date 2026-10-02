@@ -37,7 +37,6 @@ DISABLE_ERRORS_LINTERS:
   - PYTHON_PYRIGHT
   - PYTHON_RUFF
   - PYTHON_RUFF_FORMAT
-  - REPOSITORY_CHECKOV
   - REPOSITORY_OSV_SCANNER
   - REPOSITORY_SEMGREP
   - REPOSITORY_TRIVY
@@ -48,6 +47,7 @@ DISABLE_ERRORS_LINTERS:
 
 FILTER_REGEX_EXCLUDE: '(^|/)\.github/workflows/issue-triage\.lock\.yml$'
 FLAVOR_SUGGESTIONS: false
+LINTER_RULES_PATH: .linter-rules
 FORMATTERS_DISABLE_ERRORS: false
 GITHUB_STATUS_REPORTER: true
 SHOW_ELAPSED_TIME: true
@@ -58,11 +58,6 @@ VALIDATE_ALL_CODEBASE: true
 # ---------------------------------------------------------------------------
 
 PYTHON_DEFAULT_STYLE: ruff
-
-# Ruff's configuration lives in pyproject.toml ([tool.ruff]). Without these,
-# MegaLinter looks for .ruff.toml and falls back to its own template config.
-PYTHON_RUFF_CONFIG_FILE: pyproject.toml
-PYTHON_RUFF_FORMAT_CONFIG_FILE: pyproject.toml
 
 PYTHON_PYRIGHT_PRE_COMMANDS:
   - command: pip install --no-cache-dir -r requirements-dev.txt
@@ -114,6 +109,8 @@ DOCKERFILE_HADOLINT_FILE_NAMES_REGEX: ["Dockerfile(\\..+)?"]
 
 ACTION_ZIZMOR_UNSECURED_ENV_VARIABLES:
   - GITHUB_TOKEN
+
+REPOSITORY_TRIVY_CONFIG_FILE: .trivy.yaml
 
 REPOSITORY_SEMGREP_ARGUMENTS:
   [

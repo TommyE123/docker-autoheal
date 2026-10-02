@@ -8,19 +8,40 @@ updates are reviewed and merged.
 
 ## What Renovate manages
 
-| Ecosystem                       | Files                                                 | Renovate manager                    |
-|---------------------------------|-------------------------------------------------------|-------------------------------------|
-| Python runtime dependencies     | `requirements.txt`                                    | `pip_requirements`                  |
-| Python dev/test dependencies    | `requirements-dev.txt`, `requirements-mutation.txt`   | `pip_requirements`                  |
-| npm dependencies + lockfile     | `frontend/package.json`, `frontend/package-lock.json` | `npm`                               |
-| Docker base images              | `Dockerfile`, `Dockerfile.simple`                     | `dockerfile`                        |
-| Docker Compose images           | `docker-compose*.yml`                                 | `docker-compose`                    |
-| GitHub Actions                  | `.github/workflows/*.yml`                             | `github-actions`                    |
-| Dockerfile apt package versions | `Dockerfile`, `Dockerfile.simple`                     | `customManagers:dockerfileVersions` |
+| Ecosystem                       | Files                                                           | Renovate manager                    |
+|---------------------------------|-----------------------------------------------------------------|-------------------------------------|
+| Python runtime dependencies     | `requirements.txt`                                              | `pip_requirements`                  |
+| Python test dependencies        | `requirements-dev.txt`, `requirements-mutation.txt`             | `pip_requirements`                  |
+| npm dependencies + lockfile     | `frontend/package.json`, `frontend/package-lock.json`           | `npm`                               |
+| Dev Container npm lint tools    | `.devcontainer/package.json`, `.devcontainer/package-lock.json` | `npm`                               |
+| Dev Container CLI tools         | `mise.toml`, `mise.lock`                                        | `mise`                              |
+| Dev Container base image        | `.devcontainer/Dockerfile`                                      | `dockerfile`                        |
+| Docker base images              | `Dockerfile`                                                    | `dockerfile`                        |
+| Docker Compose images           | `docker-compose.yml`                                            | `docker-compose`                    |
+| GitHub Actions                  | `.github/workflows/*.yml`                                       | `github-actions`                    |
+| Dockerfile apt package versions | `Dockerfile`                                                    | `customManagers:dockerfileVersions` |
 
 The standard `config:recommended` preset provides the managers for the main dependency
-ecosystems above. A custom Renovate manager is also enabled for pinned versions of apt
-packages in the Dockerfiles.
+ecosystems above, including `mise` for the developer CLI tools pinned in `mise.toml`
+(`actionlint`, `hadolint`, `osv-scanner`, `trivy`, `trufflehog`, `betterleaks`,
+`editorconfig-checker`, `ruff`, `shellcheck`, `shfmt`, `semgrep`, `yamllint`, `zizmor`
+and `djlint`). A custom Renovate manager is also enabled for
+pinned versions of apt packages in the Dockerfiles.
+
+Two Dev Container pins need manual attention:
+
+* **`mise.lock` and `.mise/locks/`.** A Renovate update to `mise.toml` must come with a
+  regenerated lock. If the PR changes `mise.toml` alone, `mise install --locked` fails and
+  the Dev Container workflow goes red; run
+  `mise lock --platform linux-x64,linux-arm64` on the branch and commit the result.
+  `.mise/locks/` contains generated sidecars (`pyproject.toml` and `uv.lock`) managed by
+  mise, with their digests recorded in `mise.lock`. Renovate ignores that directory
+  (`ignorePaths` in `renovate.json`) so its Python/uv managers don't modify generated files
+  independently of the corresponding `mise.lock` state.
+* **Dev Container features.** Renovate's `devcontainer` manager updates the feature
+  versions in `.devcontainer/devcontainer.json` but not the digests pinned in
+  `.devcontainer/devcontainer-lock.json`. Refresh those periodically with
+  `devcontainer upgrade --workspace-folder .` from the Dev Containers CLI.
 
 Currently, `curl` is pinned in the Dockerfiles so that its version can be tracked and updated
 by Renovate. This allows the Dockerfile dependency to receive a normal Renovate PR rather than
@@ -29,8 +50,8 @@ build time.
 
 ## Version pinning policy
 
-* **Python**: exact versions (`==`) are used throughout both `requirements.txt` and
-  `requirements-dev.txt`.
+* **Python**: exact versions (`==`) are used throughout `requirements.txt`
+  and `requirements-dev.txt`. Developer CLI tools in `mise.toml` are pinned exactly too.
 
   The packages that previously used `~=` (`pydantic`, `aiohttp`) were switched
   to `==` at their already-installed versions rather than being upgraded. Every subsequent
@@ -58,7 +79,7 @@ build time.
 
 * **Docker images**:
 
-  * `Dockerfile` and `Dockerfile.simple` base images are pinned to both their human-readable
+  * The `Dockerfile` base images are pinned to both their human-readable
     tag and the SHA256 digest that tag resolves to, using the form
     `image:tag@sha256:digest`.
 
@@ -71,11 +92,6 @@ build time.
     the newest published release when copied by users.
 
     Renovate is explicitly configured not to manage this image.
-
-  * `docker-compose.test.yml` and `docker-compose.example.yml` are manual/demo compose files.
-    Their existing image references are not hand-maintained by this project, but Renovate can
-    still detect them. The Docker `pinDigests` rule means Renovate may create normal digest-pin
-    PRs for applicable Docker image references.
 
 * **Dockerfile apt packages**: versions are explicitly pinned where required by the Dockerfile
   linting policy. Renovate's `customManagers:dockerfileVersions` manager tracks these pins and
@@ -167,16 +183,20 @@ introduce compatibility or behavioural changes.
   excluded from Renovate dependency management because it is produced by this repository rather
   than being a third-party dependency.
 
-* **Demo/test Compose files** — `docker-compose.test.yml` and
-  `docker-compose.example.yml` are kept as project-controlled examples rather than being
-  manually rewritten simply to satisfy dependency pinning. Renovate can still propose digest
-  pinning where appropriate.
-
 * **Node 18** — the frontend build currently uses the Node 18 Alpine image. This is retained
   until there is a deliberate decision to change the frontend build/runtime baseline.
 
 * **Pre-1.0 and build tooling dependencies** — these remain manual-review updates. A patch or
   minor version does not automatically mean a dependency is behaviourally risk-free.
+
+* **`checkov` as a Dev Container tool** — it is deliberately absent from
+  `mise.toml`. Installing it alongside `semgrep` hangs
+  `osv-scanner`'s pip transitive-dependency resolver indefinitely (each resolves fine alone in
+  ~12–13s; together `osv-scanner` never returns, even with a 600s timeout). `semgrep` is the
+  one kept because it catches app-level issues nothing else in the local stack checks for,
+  whereas checkov's actual findings in this repo (Dockerfile non-root user, Actions
+  permissions) are already covered by Trivy and zizmor. Checkov still runs in CI through
+  MegaLinter's bundled `REPOSITORY_CHECKOV` linter, so CI coverage is unaffected.
 
 ## Current policy summary
 

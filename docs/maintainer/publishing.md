@@ -57,11 +57,6 @@ docker push <your-username>/docker-autoheal:latest
 docker push <your-username>/docker-autoheal:v1.2.3
 ```
 
-The repository also includes Windows helper scripts for this (`publish.bat`,
-`publish.ps1`, `publish-interactive.bat`) — these predate both the automated release
-workflow and the GHCR mirror (Docker Hub only), and are not part of the real release
-path.
-
 ### Multi-platform manual build
 
 ```bash
