@@ -203,9 +203,10 @@ rule change applies in both places. MegaLinter's `LINTER_RULES_PATH` points at
 secretlint and Stylelint configuration and exceptions. The Dev Container tasks and editor settings pass
 those paths explicitly, because these tools do not discover `.linter-rules/` on their own.
 `.trufflehog-exclude.txt` there only applies to the local TruffleHog task: MegaLinter does
-not read it. Configuration that must stay beside the code it lints remains at the
-repository root (`pyrightconfig.json`, `.editorconfig`) or in
-`frontend/` (`eslint.config.js`).
+not read it. `.secretlintignore` stays at the repository root, because MegaLinter builds
+its generated secretlint exclusion list only from the root copy. Configuration that must
+stay beside the code it lints remains at the repository root (`pyrightconfig.json`,
+`.editorconfig`) or in `frontend/` (`eslint.config.js`).
 
 ### What lints what
 

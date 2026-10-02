@@ -291,7 +291,7 @@
     {
       "label": "Autoheal: Check Secrets",
       "type": "shell",
-      "command": "secretlint --secretlintrc .linter-rules/.secretlintrc.json --secretlintignore .linter-rules/.secretlintignore \"**/*\"",
+      "command": "secretlint --secretlintrc .linter-rules/.secretlintrc.json \"**/*\"",
       "problemMatcher": []
     },
     {
