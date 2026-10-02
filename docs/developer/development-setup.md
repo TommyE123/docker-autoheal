@@ -80,8 +80,10 @@ Scripts**, **Check Workflows**, **Check Markup and Data**, **Check Repository
 Conventions** and **Run Security Scanners**.
 
 **Autoheal: Run Docker Stack** builds the app from your checkout and runs it with
-`docker compose up --build autoheal`. The `--build` flag is what makes
-`docker-compose.yml` build your changes instead of using the published image. The result is
+`docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build autoheal` (see
+[Running beside an existing deployment](#running-beside-an-existing-deployment)). The
+`--build` flag is what makes `docker-compose.yml` build your changes instead of using the
+published image. The result is
 tagged `tommye123/docker-autoheal:latest` locally, replacing any copy you had pulled; run
 `docker compose pull` to get the published image back.
 
@@ -92,7 +94,7 @@ Codespaces token) first, replaces any installed copy, and is not part of any agg
 task. The extension lives in the `gh` volume, so it survives rebuilds; run the task again
 after the lock file is recompiled with a newer version.
 
-**Autoheal: Stop Docker Stack** runs `docker compose down`.
+**Autoheal: Stop Docker Stack** runs `docker compose down` with the same two `-f` files.
 Stacks started with **Run Docker Stack** run on the host's Docker daemon (see below), so
 they keep running when the Dev Container stops or is rebuilt until you stop them.
 
