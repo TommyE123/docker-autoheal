@@ -8,7 +8,8 @@
   "ignorePaths": [
     "**/node_modules/**",
     "**/bower_components/**",
-    ".github/workflows/issue-triage.lock.yml"
+    ".github/workflows/issue-triage.lock.yml",
+    "**/.mise/locks/**"
   ],
   "description": "Dependency-update policy for docker-autoheal. Renovate creates and maintains dependency PRs, but all updates require manual review and merge. See docs/maintainer/dependency-management.md for the full explanation.",
   "minimumReleaseAge": "3 days",
