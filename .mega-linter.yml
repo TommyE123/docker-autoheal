@@ -110,6 +110,10 @@ DOCKERFILE_HADOLINT_FILE_NAMES_REGEX: ["Dockerfile(\\..+)?"]
 ACTION_ZIZMOR_UNSECURED_ENV_VARIABLES:
   - GITHUB_TOKEN
 
+# The descriptor default is trivy.yaml; keep the dotted name used by the other
+# files in .linter-rules/.
+REPOSITORY_TRIVY_CONFIG_FILE: .trivy.yaml
+
 REPOSITORY_SEMGREP_ARGUMENTS:
   [
     "--exclude",
