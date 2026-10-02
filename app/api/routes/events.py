@@ -27,9 +27,9 @@ async def get_events(
     """
     try:
         events = config_manager.get_events()
-        if event_type:
+        if event_type is not None:
             events = [event for event in events if event.event_type == event_type]
-        if container:
+        if container is not None:
             needle = container.lower()
             events = [event for event in events if needle in event.container_name.lower()]
         events = events[-limit:]

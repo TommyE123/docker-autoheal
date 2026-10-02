@@ -159,6 +159,22 @@ def test_filters_combine(isolated_config_manager):
     assert [(e["container_name"], e["event_type"]) for e in events] == [("web", "quarantine")]
 
 
+def test_empty_event_type_matches_only_events_with_an_empty_type(isolated_config_manager):
+    _seed(isolated_config_manager, ("web", "restart"), ("db", "quarantine"))
+
+    events = asyncio.run(get_events(event_type=""))
+
+    assert events == []
+
+
+def test_empty_container_matches_every_event(isolated_config_manager):
+    _seed(isolated_config_manager, ("web", "restart"), ("db", "quarantine"))
+
+    events = asyncio.run(get_events(container=""))
+
+    assert [e["container_name"] for e in events] == ["web", "db"]
+
+
 def test_limit_applies_after_filtering_and_keeps_the_most_recent(isolated_config_manager):
     _seed(
         isolated_config_manager,
