@@ -152,6 +152,21 @@ This builds the frontend and backend into a single image (see
 [Architecture](architecture.md)) and runs it the same way an end user would, on port
 `3131`.
 
+### Running beside an existing deployment
+
+`docker-compose.yml` fixes the container name (`docker-autoheal`) and host ports (`3131`,
+`9090`), so it can't start on a Docker daemon that already runs an Autoheal deployment.
+Add the dev override to run your checkout alongside it without touching the deployment:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
+```
+
+This uses the container name `docker-autoheal-dev`, serves the UI on `3132` and metrics on
+`9091`, and stores data in `./data-dev`. Set `AUTOHEAL_DEV_PORT` and
+`AUTOHEAL_DEV_METRICS_PORT` to change the ports. The override needs Docker Compose v2.24
+or later. Pass the same `-f` flags to `docker compose down` to stop it.
+
 Inside the Dev Container this comes with a caveat — see
 [Docker Compose inside the Dev Container](#docker-compose-inside-the-dev-container).
 

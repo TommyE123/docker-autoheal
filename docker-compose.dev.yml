@@ -1,0 +1,17 @@
+# Development/testing override: runs this checkout beside an existing Autoheal deployment.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
+#
+# Uses a distinct container name, host ports and data directory, so the deployment named
+# `docker-autoheal` is left untouched. Override the ports with AUTOHEAL_DEV_PORT and
+# AUTOHEAL_DEV_METRICS_PORT. `!override` replaces the base lists instead of appending to
+# them (needs Docker Compose v2.24+).
+services:
+  autoheal:
+    container_name: docker-autoheal-dev
+    volumes: !override
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./data-dev:/data
+    ports: !override
+      - "${AUTOHEAL_DEV_PORT:-3132}:3131" # Web UI (React)
+      - "${AUTOHEAL_DEV_METRICS_PORT:-9091}:9090" # Prometheus metrics
