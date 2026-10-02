@@ -6,9 +6,9 @@ small changes to the production code (a "mutant", e.g. `>=` becomes `>`), runs t
 tests against each one, and reports whether any test failed (the mutant was **killed**) or
 all of them still passed (the mutant **survived**).
 
-It is informational only. It is not part of `pytest`, is not a pull-request check, and has
-no score threshold. It is complementary to the coverage reported to Codecov and is
-deliberately kept out of it.
+It is informational only. It is not part of `pytest`, is not a required check or merge
+gate, and has no score threshold. It is complementary to the coverage reported to Codecov
+and is deliberately kept out of it.
 
 ## Running it locally
 
@@ -58,23 +58,26 @@ A mutant name is `<module>.<function>__mutmut_<n>`. The number is positional, so
 changes when the surrounding code changes: compare survivors between runs by file,
 function and the changed text, not by name.
 
-## Weekly CI run
+## CI run
 
-`.github/workflows/mutation-testing.yml` runs the same `./mutation.sh`. It has no GitHub
-`schedule` trigger because GitHub's scheduler is unreliable; it is `workflow_dispatch`
-only, and is meant to be started every Monday by [cron-job.org](https://cron-job.org/)
-calling the GitHub API (`POST /repos/TommyE123/docker-autoheal/actions/workflows/mutation-testing.yml/dispatches`
-with body `{"ref": "main"}` and a token that has Actions write access). The schedule and
-token live in the cron-job.org account, not in this repository, and nothing here creates
-that job: until it is set up, the workflow only runs when started manually from the
-Actions tab (**Mutation Testing** -> **Run workflow**). The workflow:
+`.github/workflows/mutation-testing.yml` runs the same `./mutation.sh`, always the full
+suite. It runs:
+
+- automatically on pull requests to `main` that change `app/**/*.py` (production code or
+  tests), `requirements*.txt`, `pyproject.toml`, `mutation.sh` or the workflow itself;
+  documentation-only and other unrelated pull requests do not run it;
+- manually, from the Actions tab (**Mutation Testing** -> **Run workflow**).
+
+The workflow:
 
 - installs `requirements-mutation.txt` on the Python version the `Dockerfile` uses;
 - starts from an empty `mutants/` (and never caches it);
-- never cancels a run in progress, and only one mutation run executes at a time;
-- is not a pull-request check and cannot block a merge.
+- runs once per ref: a new push to a pull request supersedes its in-progress run;
+- is informational: it is not a required check, has no score threshold, and must not be
+  made one.
 
-Find results on the workflow run page:
+Find results on the workflow run page (for a pull request, the **Mutation testing
+(informational)** check's details link):
 
 - the **job summary** shows the counts and the score;
 - the **`mutation-results`** artifact contains `mutation-results.txt` (survivors, timeouts

@@ -1,26 +1,29 @@
 name: Mutation Testing
 
-# Informational only: weekly and on demand. Never a PR trigger, never a
-# required check, and no mutation-score threshold. See
+# Informational only: never a required check, never a merge gate, and no
+# mutation-score threshold. Runs the full suite on demand and on pull requests
+# that change Python code or tests, or the mutation tooling. See
 # docs/developer/mutation-testing.md for how to read the results.
-#
-# Triggered weekly (Mondays) by cron-job.org calling the workflow_dispatch API,
-# because GitHub's own schedule event is too unreliable (see the same change to
-# release-please-auto-merge.yml). The GitHub schedule is deliberately disabled;
-# to re-enable it, add under "on:":
-#   schedule:
-#     - cron: "17 3 * * 1"
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "app/**/*.py"
+      - "app/tests/**/*.py"
+      - "requirements*.txt"
+      - "pyproject.toml"
+      - "mutation.sh"
+      - ".github/workflows/mutation-testing.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# Queue rather than cancel an in-progress run: only one mutation run executes at
-# a time.
+# One run per ref: a new push to a pull request supersedes its in-progress run.
 concurrency:
-  group: ${{ github.workflow }}
-  cancel-in-progress: false
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   mutation-testing:
@@ -67,7 +70,7 @@ jobs:
           {
             echo "## Mutation testing (informational)"
             echo
-            echo "Mutmut $(mutmut --version | awk '{print $NF}'), Python $(python -V | awk '{print $2}'), commit \`${GITHUB_SHA}\`"
+            echo "Mutmut $(mutmut --version | awk '{print $NF}'), Python $(python -V | awk '{print $2}'), commit \`${GITHUB_SHA}\` (\`${GITHUB_REF}\`)"
             echo
             jq -r '
               "| Generated | Killed | Timeout | Survived | No tests | Detected |",
