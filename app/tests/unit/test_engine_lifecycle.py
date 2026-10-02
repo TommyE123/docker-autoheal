@@ -136,6 +136,21 @@ class TestScanExistingContainers:
 
         assert config_manager.get_config().containers.selected == ["stack_web"]
 
+    async def test_selection_is_kept_when_recording_the_event_fails(
+        self, engine, docker_client, monkeypatch
+    ):
+        container, info = make_container(name="web", labels={"autoheal": "true"})
+        docker_client.add_container(container, info)
+
+        def failing_add_event(_event):
+            raise RuntimeError("event store unavailable")
+
+        monkeypatch.setattr(config_manager, "add_event", failing_add_event)
+
+        await engine._scan_existing_containers()
+
+        assert config_manager.get_config().containers.selected == ["web"]
+
     async def test_compose_container_is_added_under_its_stable_id(self, engine, docker_client):
         container, info = make_container(
             name="stack-web-1",
@@ -299,6 +314,21 @@ class TestProcessContainerStartEvent:
         await engine._process_container_start_event(start_event(container.id, "stack-web-1"))
 
         assert config_manager.get_config().containers.selected == ["stack_web"]
+
+    async def test_selection_is_kept_when_recording_the_event_fails(
+        self, engine, docker_client, monkeypatch
+    ):
+        container, info = make_container(name="web", labels={"autoheal": "true"})
+        docker_client.add_container(container, info)
+
+        def failing_add_event(_event):
+            raise RuntimeError("event store unavailable")
+
+        monkeypatch.setattr(config_manager, "add_event", failing_add_event)
+
+        await engine._process_container_start_event(start_event(container.id, "web"))
+
+        assert config_manager.get_config().containers.selected == ["web"]
 
     async def test_compose_container_is_added_under_its_stable_id(self, engine, docker_client):
         container, info = make_container(

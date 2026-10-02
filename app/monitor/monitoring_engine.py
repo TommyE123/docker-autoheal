@@ -739,15 +739,21 @@ class MonitoringEngine:
                     if labels.get("autoheal") != "true":
                         continue
 
-                    event_obj = self._auto_monitor_container(
-                        config,
-                        stable_id=self._auto_monitor_stable_id(labels, info.get("name")),
-                        container_id=info.get("full_id"),
-                        container_name=info.get("name"),
-                        startup=True,
-                    )
+                    selected_before = len(config.containers.selected)
+                    try:
+                        event_obj = self._auto_monitor_container(
+                            config,
+                            stable_id=self._auto_monitor_stable_id(labels, info.get("name")),
+                            container_id=info.get("full_id"),
+                            container_name=info.get("name"),
+                            startup=True,
+                        )
+                    finally:
+                        # Count the selection as soon as it is made, so it is still saved
+                        # if recording the event fails afterwards.
+                        if len(config.containers.selected) > selected_before:
+                            added_count += 1
                     if event_obj:
-                        added_count += 1
                         await notification_manager.send_event_notification(event_obj)
 
                 except Exception as e:
