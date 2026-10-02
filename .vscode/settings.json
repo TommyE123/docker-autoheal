@@ -70,6 +70,9 @@
 
   "editorconfig.enable": true,
 
+  "ruff.configuration": "${workspaceFolder}/.linter-rules/.ruff.toml",
+  "markdownlint.configFile": ".linter-rules/.markdownlint.jsonc",
+
   "stylelint.stylelintPath": "${workspaceFolder}/.devcontainer/node_modules/stylelint",
   "stylelint.configBasedir": "${workspaceFolder}/.devcontainer/node_modules",
 

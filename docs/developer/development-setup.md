@@ -181,13 +181,13 @@ to fail the build over them; they still run and report. There is no repository-w
 
 Markdown *is* fully enforced — neither `MARKDOWN_MARKDOWNLINT` nor
 `MARKDOWN_MARKDOWN_TABLE_FORMATTER` is in that disabled list, so every Markdown file must
-pass both. `.markdownlint.jsonc` at the repo root turns off only `MD013` (line length) and
+pass both. `.linter-rules/.markdownlint.jsonc` turns off only `MD013` (line length) and
 `MD060` (table pipe spacing), which conflict with this repo's established long-prose
 style — everything else is at markdownlint's defaults. Run both locally before pushing
 docs changes:
 
 ```bash
-npx markdownlint-cli2 "**/*.md" "#node_modules" "#frontend/node_modules" "#.devcontainer/node_modules"
+npx markdownlint-cli2 --config .linter-rules/.markdownlint.jsonc "**/*.md" "#node_modules" "#frontend/node_modules" "#.devcontainer/node_modules"
 npx markdown-table-formatter --check "**/*.md"   # drop --check to auto-fix
 ```
 
@@ -197,10 +197,14 @@ Markdown Tables** tasks, which lint tracked files only.
 The frontend has `npm run lint` (ESLint) and `npm run format:check` (Prettier) scripts —
 see [Frontend Development](frontend.md#linting-and-formatting).
 
-Linter configuration lives at the repository root (`.markdownlint.jsonc`,
-`.stylelintrc.json`, `.secretlintrc.json`, `.yamllint.yml`, `.ls-lint.yml`) and is
-shared: the Dev Container tasks and MegaLinter both read it, so a rule change applies in
-both places. `.secretlintignore` and `.trufflehog-exclude.txt` are the exception: they
+Linter configuration is shared: the Dev Container tasks and MegaLinter both read it, so a
+rule change applies in both places. MegaLinter's `LINTER_RULES_PATH` points at
+`.linter-rules/`, which holds the Checkov, Trivy, markdownlint, yamllint, ls-lint and Ruff
+configuration and exceptions. The Dev Container tasks and editor settings pass those paths
+explicitly, because these tools do not discover `.linter-rules/` on their own. Configuration
+that must stay beside the code it lints remains at the repository root
+(`.stylelintrc.json`, `.secretlintrc.json`, `pyrightconfig.json`, `.editorconfig`) or in
+`frontend/` (`eslint.config.js`). `.secretlintignore` and `.trufflehog-exclude.txt` are the exception: they
 only apply to the local tasks, because MegaLinter passes secretlint and TruffleHog its own
 generated exclusion lists.
 
