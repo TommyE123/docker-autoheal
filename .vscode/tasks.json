@@ -117,7 +117,7 @@
     {
       "label": "Autoheal: Check CSS",
       "type": "shell",
-      "command": "stylelint --config-basedir .devcontainer/node_modules \"frontend/src/**/*.css\"",
+      "command": "stylelint --config .linter-rules/.stylelintrc.json --config-basedir .devcontainer/node_modules \"frontend/src/**/*.css\"",
       "problemMatcher": []
     },
     {
