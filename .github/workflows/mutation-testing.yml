@@ -1,11 +1,23 @@
-name: Mutation Testing
+name: Mutation Testing (informational)
 
 # Informational only: never a required check, never a merge gate, and no
 # mutation-score threshold. Runs the full suite on demand and on pull requests
-# that change Python code or tests, or the mutation tooling. See
-# docs/developer/mutation-testing.md for how to read the results.
+# and pushes to main that change Python code or tests, or the mutation tooling.
+# See docs/developer/mutation-testing.md for how to read the results.
 on:
   pull_request:
+    branches:
+      - main
+    paths:
+      - "app/**/*.py"
+      - "app/tests/**/*.py"
+      - "requirements*.txt"
+      - "pyproject.toml"
+      - "mutation.sh"
+      - ".github/workflows/mutation-testing.yml"
+  # Runs on main keep the README status badge current: it shows the latest run
+  # on the default branch, and pull request runs are not on that branch.
+  push:
     branches:
       - main
     paths:

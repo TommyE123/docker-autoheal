@@ -63,10 +63,12 @@ function and the changed text, not by name.
 `.github/workflows/mutation-testing.yml` runs the same `./mutation.sh`, always the full
 suite. It runs:
 
-- automatically on pull requests to `main` that change `app/**/*.py` (production code or
-  tests), `requirements*.txt`, `pyproject.toml`, `mutation.sh` or the workflow itself;
-  documentation-only and other unrelated pull requests do not run it;
-- manually, from the Actions tab (**Mutation Testing** -> **Run workflow**).
+- automatically on pull requests to `main`, and on pushes to `main`, that change
+  `app/**/*.py` (production code or tests), `requirements*.txt`, `pyproject.toml`,
+  `mutation.sh` or the workflow itself; documentation-only and other unrelated changes do
+  not run it;
+- manually, from the Actions tab (**Mutation Testing (informational)** -> **Run
+  workflow**).
 
 The workflow:
 
@@ -75,6 +77,11 @@ The workflow:
 - runs once per ref: a new push to a pull request supersedes its in-progress run;
 - is informational: it is not a required check, has no score threshold, and must not be
   made one.
+
+The README badge is GitHub's status badge for this workflow. It shows the latest run on
+`main` (hence the push trigger), and it reports whether that run completed, not a mutation
+score: the run succeeds whatever the score, so a green badge does not mean any quality
+threshold was met. Follow the badge to the run for the numbers.
 
 Find results on the workflow run page (for a pull request, the **Mutation testing
 (informational)** check's details link):
