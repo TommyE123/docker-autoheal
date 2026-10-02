@@ -1,3 +1,5 @@
+name: docker-autoheal-dev # Separate Compose project, so dev `up`/`down` never touch the deployment's project
+
 # Development/testing override: runs this checkout beside an existing Autoheal deployment.
 #
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
