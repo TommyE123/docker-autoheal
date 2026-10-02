@@ -70,7 +70,7 @@ jobs:
 
             echo "== Development tools =="
             djlint --version
-            ec --version
+            editorconfig-checker --version
             htmlhint --version
             jsonlint --version
             ls-lint --version
