@@ -15,6 +15,7 @@ on:
       - "pyproject.toml"
       - "mutation.sh"
       - ".github/workflows/mutation-testing.yml"
+      - "Dockerfile" # selects the Python version the job runs on
   # Runs on main keep the README status badge current: it shows the latest run
   # on the default branch, and pull request runs are not on that branch.
   push:
@@ -27,6 +28,7 @@ on:
       - "pyproject.toml"
       - "mutation.sh"
       - ".github/workflows/mutation-testing.yml"
+      - "Dockerfile" # selects the Python version the job runs on
   workflow_dispatch:
 
 permissions:

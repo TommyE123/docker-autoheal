@@ -65,8 +65,8 @@ suite. It runs:
 
 - automatically on pull requests to `main`, and on pushes to `main`, that change
   `app/**/*.py` (production code or tests), `requirements*.txt`, `pyproject.toml`,
-  `mutation.sh` or the workflow itself; documentation-only and other unrelated changes do
-  not run it;
+  `mutation.sh`, the `Dockerfile` (which sets the Python version) or the workflow itself;
+  documentation-only and other unrelated changes do not run it;
 - manually, from the Actions tab (**Mutation Testing (informational)** -> **Run
   workflow**).
 
