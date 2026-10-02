@@ -126,11 +126,11 @@ def test_release_please_uses_a_non_default_token_so_its_pr_gets_normal_checks():
     assert "token: ${{ secrets.RELEASE_PLEASE_TOKEN }}" in WORKFLOW
 
 
-def test_weekly_workflow_schedules_for_friday_7pm_uk_time_and_supports_manual_dispatch():
+def test_weekly_workflow_schedules_for_friday_0733_uk_time_and_supports_manual_dispatch():
     # The timezone field makes GitHub evaluate this cron as Europe/London
-    # wall-clock time, so it stays 19:00 UK local across the GMT/BST
+    # wall-clock time, so it stays 07:33 UK local across the GMT/BST
     # changeover without a separate runtime guard.
-    assert '- cron: "0 19 * * 5"' in AUTO_MERGE_WORKFLOW
+    assert '- cron: "33 7 * * 5"' in AUTO_MERGE_WORKFLOW
     assert 'timezone: "Europe/London"' in AUTO_MERGE_WORKFLOW
     assert "workflow_dispatch:" in AUTO_MERGE_WORKFLOW
 
