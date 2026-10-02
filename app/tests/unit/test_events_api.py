@@ -160,11 +160,16 @@ def test_filters_combine(isolated_config_manager):
 
 
 def test_empty_event_type_matches_only_events_with_an_empty_type(isolated_config_manager):
-    _seed(isolated_config_manager, ("web", "restart"), ("db", "quarantine"))
+    _seed(
+        isolated_config_manager,
+        ("web", "restart"),
+        ("cache", ""),
+        ("db", "quarantine"),
+    )
 
     events = asyncio.run(get_events(event_type=""))
 
-    assert events == []
+    assert [e["container_name"] for e in events] == ["cache"]
 
 
 def test_empty_container_matches_every_event(isolated_config_manager):
