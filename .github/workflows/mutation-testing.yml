@@ -3,9 +3,14 @@ name: Mutation Testing
 # Informational only: weekly and on demand. Never a PR trigger, never a
 # required check, and no mutation-score threshold. See
 # docs/developer/mutation-testing.md for how to read the results.
+#
+# Triggered weekly (Mondays) by cron-job.org calling the workflow_dispatch API,
+# because GitHub's own schedule event is too unreliable (see the same change to
+# release-please-auto-merge.yml). The GitHub schedule is deliberately disabled;
+# to re-enable it, add under "on:":
+#   schedule:
+#     - cron: "17 3 * * 1"
 on:
-  schedule:
-    - cron: "17 3 * * 1"
   workflow_dispatch:
 
 permissions:
