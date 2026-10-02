@@ -80,7 +80,7 @@ def _registered_routes() -> list[tuple[str, str]]:
 
 
 async def _request(
-    method: str, path: str, headers: dict[str, str] | None = None
+    method: str, path: str, request_headers: dict[str, str] | None = None
 ) -> tuple[int, bytes, dict[str, str]]:
     """Send one request through the ASGI app and return (status, body, headers)."""
     scope: dict[str, Any] = {
@@ -94,7 +94,9 @@ async def _request(
         "query_string": b"",
         "root_path": "",
         "headers": [(b"host", b"testserver")]
-        + [(key.lower().encode(), value.encode()) for key, value in (headers or {}).items()],
+        + [
+            (key.lower().encode(), value.encode()) for key, value in (request_headers or {}).items()
+        ],
         "client": ("127.0.0.1", 12345),
         "server": ("testserver", 80),
         "app": app,
