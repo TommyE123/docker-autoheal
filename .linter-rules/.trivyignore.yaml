@@ -1,0 +1,8 @@
+# Deferred, see issue #19: running as non-root needs deliberate Docker socket
+# group and /data bind-mount ownership handling.
+misconfigurations:
+  - id: DS-0002
+    paths:
+      - Dockerfile
+      - .devcontainer/Dockerfile
+    statement: "Non-root user deferred, see issue #19"
