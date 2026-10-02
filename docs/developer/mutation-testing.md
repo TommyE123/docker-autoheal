@@ -62,11 +62,12 @@ function and the changed text, not by name.
 
 `.github/workflows/mutation-testing.yml` runs the same `./mutation.sh`. It has no GitHub
 `schedule` trigger because GitHub's scheduler is unreliable; it is `workflow_dispatch`
-only, and [cron-job.org](https://cron-job.org/) starts it every Monday by calling the
-GitHub API (`POST /repos/TommyE123/docker-autoheal/actions/workflows/mutation-testing.yml/dispatches`
+only, and is meant to be started every Monday by [cron-job.org](https://cron-job.org/)
+calling the GitHub API (`POST /repos/TommyE123/docker-autoheal/actions/workflows/mutation-testing.yml/dispatches`
 with body `{"ref": "main"}` and a token that has Actions write access). The schedule and
-token live in the cron-job.org account, not in this repository. It can also be started
-manually from the Actions tab (**Mutation Testing** -> **Run workflow**). The workflow:
+token live in the cron-job.org account, not in this repository, and nothing here creates
+that job: until it is set up, the workflow only runs when started manually from the
+Actions tab (**Mutation Testing** -> **Run workflow**). The workflow:
 
 - installs `requirements-mutation.txt` on the Python version the `Dockerfile` uses;
 - starts from an empty `mutants/` (and never caches it);

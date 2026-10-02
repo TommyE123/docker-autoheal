@@ -31,8 +31,9 @@ Coverage is reported to Codecov (see `.codecov.yml` and `.github/workflows/tests
 rather than enforced locally - `.coveragerc` no longer sets a `fail_under` floor.
 
 Whether the tests would notice a change to the code, rather than merely execute it, is
-measured separately by the weekly, informational mutation-testing run - see
-[Mutation testing](mutation-testing.md). It is not part of `pytest` or the PR checks.
+measured separately by the informational mutation-testing workflow, which is meant to be
+started weekly by an external scheduler - see [Mutation testing](mutation-testing.md). It
+is not part of `pytest` or the PR checks.
 
 ## Running the integration suite
 
