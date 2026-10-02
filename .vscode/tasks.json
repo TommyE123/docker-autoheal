@@ -309,7 +309,7 @@
     {
       "label": "Autoheal: Run Trivy",
       "type": "shell",
-      "command": "mkdir -p .lint && trivy fs --scanners vuln,misconfig,secret --skip-dirs '.lint' --format json --output .lint/trivy.json .",
+      "command": "mkdir -p .lint && trivy fs --config .linter-rules/.trivy.yaml --scanners vuln,misconfig,secret --skip-dirs '.lint' --format json --output .lint/trivy.json .",
       "problemMatcher": []
     },
     {

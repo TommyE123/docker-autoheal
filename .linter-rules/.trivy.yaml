@@ -1,5 +1,1 @@
-# Trivy config for MegaLinter (REPOSITORY_TRIVY), found via LINTER_RULES_PATH.
-# Vulnerability and misconfiguration scanning stay enabled; only the finding
-# IDs in the ignore file below are suppressed.
-
 ignorefile: .linter-rules/.trivyignore.yaml

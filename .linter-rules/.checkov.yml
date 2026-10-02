@@ -1,7 +1,3 @@
-# Checkov policy for MegaLinter (REPOSITORY_CHECKOV), found via LINTER_RULES_PATH.
-# Keep exceptions here, not as inline comments in source files.
-
 skip-check:
-  # Containers run as root. Deferred, see issue #19: the non-root change needs
-  # deliberate Docker socket group and /data bind-mount ownership handling.
+  # Non-root user deferred, see issue #19.
   - CKV_DOCKER_3
