@@ -44,7 +44,26 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      # DIAGNOSTIC (temporary): gh-aw only reports "exit status 1" for a failed
+      # push, so have git itself write its trace (including server rejection
+      # messages) to files that the next step prints.
       - name: Upgrade gh-aw
         env:
           GH_TOKEN: ${{ github.token }}
+          GIT_TRACE: ${{ runner.temp }}/git-trace.log
+          GIT_TRACE_PACKET: ${{ runner.temp }}/git-trace-packet.log
+          GIT_TRACE_CURL: ${{ runner.temp }}/git-trace-curl.log
+          GIT_TRACE_CURL_NO_DATA: "1"
         run: gh aw upgrade --create-pull-request
+
+      - name: Show git push diagnostics
+        if: failure()
+        run: |
+          git branch -a
+          git log -3 --format='%H %an <%ae> %s'
+          git status --short
+          for f in git-trace git-trace-packet git-trace-curl; do
+            echo "::group::$f"
+            grep -v -i 'authorization' "$RUNNER_TEMP/$f.log" || true
+            echo "::endgroup::"
+          done
