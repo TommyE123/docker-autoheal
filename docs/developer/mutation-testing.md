@@ -87,14 +87,19 @@ stats; nothing calculates the score by hand. The score equals the **Detected** f
 the job summary, since no mutants are skipped. It is informational only: the run succeeds
 whatever the score, so no threshold is implied, and it is not a gate.
 
-The file is updated in the pull request that changes the score, not by automation:
+The file is updated automatically after a successful run on `main`:
 
-- A full `./mutation.sh` run (no arguments) rewrites the file; commit it if it changed.
+- A full `./mutation.sh` run (no arguments) rewrites the file locally.
   Focused runs leave it alone, because they score only part of the target.
-- The workflow is read-only, so it cannot commit to a pull request branch (and fork
-  pull requests get no write token anyway). It regenerates the file and, if it differs
-  from the committed copy, adds a notice and a line to the job summary. The new file is
-  in the `mutation-badge` artifact, so the update needs no local 5-minute run.
+- After a successful run on `main`, the workflow's `commit-badge` job commits the new
+  file as `ci: update mutation badge`, unless it is unchanged. Only that job has a write
+  token. Pull request runs never commit (and fork pull requests get no write token
+  anyway): they add a notice and a line to the job summary if the file differs. The new
+  file is in the `mutation-badge` artifact.
+- The commit is pushed with `GITHUB_TOKEN`, which does not trigger workflows, and the
+  file is outside the workflow's trigger paths, so the commit starts no further run.
+  If branch protection on `main` rejects the push, the job fails (the mutation job
+  itself stays green) and the badge keeps its last score.
 - If the file is left stale, the badge simply keeps showing the last committed score.
 
 Find results on the workflow run page (for a pull request, the **Mutation testing
