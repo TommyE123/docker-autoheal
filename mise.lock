@@ -180,10 +180,9 @@ url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/552067
 provenance = "github-attestations"
 
 [[tools."pypi:djlint"]]
-version = "1.46.2"
+version = "1.46.3"
 backend = "pypi:djlint"
-specifiers = ["1.46.2"]
-uv = { path = ".mise/locks/pypi-djlint/1.46.2", digest = "sha256:b91e2e2dd8c45abd1d5b95d66b64ad72be20e965fef6d904e393491c6887bd2e" }
+specifiers = ["1.46.3"]
 
 [[tools."pypi:semgrep"]]
 version = "1.178.0"
