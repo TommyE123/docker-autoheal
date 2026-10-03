@@ -38,7 +38,6 @@ DISABLE_ERRORS_LINTERS:
   - PYTHON_RUFF
   - PYTHON_RUFF_FORMAT
   - REPOSITORY_OSV_SCANNER
-  - REPOSITORY_SEMGREP
   - REPOSITORY_TRIVY
 
 # ---------------------------------------------------------------------------
