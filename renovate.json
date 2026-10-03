@@ -8,10 +8,10 @@
   "ignorePaths": [
     "**/node_modules/**",
     "**/bower_components/**",
-    ".github/workflows/issue-triage.lock.yml"
+    ".github/workflows/issue-triage.lock.yml",
+    "**/.mise/locks/**"
   ],
   "description": "Dependency-update policy for docker-autoheal. Renovate creates and maintains dependency PRs, but all updates require manual review and merge. See docs/maintainer/dependency-management.md for the full explanation.",
-  "minimumReleaseAge": "3 days",
   "internalChecksFilter": "strict",
   "forkProcessing": "enabled",
   "platformAutomerge": false,
@@ -24,7 +24,8 @@
     {
       "description": "Require manual review and merge for all dependency updates. No Renovate update is automatically merged.",
       "matchPackageNames": ["*"],
-      "automerge": false
+      "automerge": false,
+      "minimumReleaseAge": "7 days"
     },
     {
       "description": "Label Renovate patch updates.",
@@ -55,7 +56,8 @@
       "description": "tommye123/docker-autoheal is this project's own published image, not a third-party dependency. Renovate should not manage it.",
       "matchDatasources": ["docker"],
       "matchPackageNames": ["tommye123/docker-autoheal"],
-      "enabled": false
+      "enabled": false,
+      "minimumReleaseAge": null
     }
   ]
 }

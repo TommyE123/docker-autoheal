@@ -30,6 +30,13 @@ tests and one-off scripts omitted).
 Coverage is reported to Codecov (see `.codecov.yml` and `.github/workflows/tests.yml`)
 rather than enforced locally - `.coveragerc` no longer sets a `fail_under` floor.
 
+Whether the tests would notice a change to the code, rather than merely execute it, is
+measured separately by the informational mutation-testing workflow, which runs on pull
+requests and pushes to `main` that change Python code, tests or the mutation tooling, and
+on demand - see
+[Mutation testing](mutation-testing.md). It is not part of `pytest` and is not a required
+check.
+
 ## Running the integration suite
 
 The integration suite requires a real Docker daemon reachable at the default

@@ -16,10 +16,10 @@ updates are reviewed and merged.
 | Dev Container npm lint tools    | `.devcontainer/package.json`, `.devcontainer/package-lock.json` | `npm`                               |
 | Dev Container CLI tools         | `mise.toml`, `mise.lock`                                        | `mise`                              |
 | Dev Container base image        | `.devcontainer/Dockerfile`                                      | `dockerfile`                        |
-| Docker base images              | `Dockerfile`, `Dockerfile.simple`                               | `dockerfile`                        |
-| Docker Compose images           | `docker-compose*.yml`                                           | `docker-compose`                    |
+| Docker base images              | `Dockerfile`                                                    | `dockerfile`                        |
+| Docker Compose images           | `docker-compose.yml`                                            | `docker-compose`                    |
 | GitHub Actions                  | `.github/workflows/*.yml`                                       | `github-actions`                    |
-| Dockerfile apt package versions | `Dockerfile`, `Dockerfile.simple`                               | `customManagers:dockerfileVersions` |
+| Dockerfile apt package versions | `Dockerfile`                                                    | `customManagers:dockerfileVersions` |
 
 The standard `config:recommended` preset provides the managers for the main dependency
 ecosystems above, including `mise` for the developer CLI tools pinned in `mise.toml`
@@ -34,6 +34,10 @@ Two Dev Container pins need manual attention:
   regenerated lock. If the PR changes `mise.toml` alone, `mise install --locked` fails and
   the Dev Container workflow goes red; run
   `mise lock --platform linux-x64,linux-arm64` on the branch and commit the result.
+  `.mise/locks/` contains generated sidecars (`pyproject.toml` and `uv.lock`) managed by
+  mise, with their digests recorded in `mise.lock`. Renovate ignores that directory
+  (`ignorePaths` in `renovate.json`) so its Python/uv managers don't modify generated files
+  independently of the corresponding `mise.lock` state.
 * **Dev Container features.** Renovate's `devcontainer` manager updates the feature
   versions in `.devcontainer/devcontainer.json` but not the digests pinned in
   `.devcontainer/devcontainer-lock.json`. Refresh those periodically with
@@ -75,7 +79,7 @@ build time.
 
 * **Docker images**:
 
-  * `Dockerfile` and `Dockerfile.simple` base images are pinned to both their human-readable
+  * The `Dockerfile` base images are pinned to both their human-readable
     tag and the SHA256 digest that tag resolves to, using the form
     `image:tag@sha256:digest`.
 
@@ -88,11 +92,6 @@ build time.
     the newest published release when copied by users.
 
     Renovate is explicitly configured not to manage this image.
-
-  * `docker-compose.test.yml` and `docker-compose.example.yml` are manual/demo compose files.
-    Their existing image references are not hand-maintained by this project, but Renovate can
-    still detect them. The Docker `pinDigests` rule means Renovate may create normal digest-pin
-    PRs for applicable Docker image references.
 
 * **Dockerfile apt packages**: versions are explicitly pinned where required by the Dockerfile
   linting policy. Renovate's `customManagers:dockerfileVersions` manager tracks these pins and
@@ -110,7 +109,7 @@ Renovate is responsible for **detecting and proposing** dependency updates. It m
 * maintain GitHub Actions digest pins
 * maintain other configured version and digest pins
 
-For regular dependency updates, Renovate waits at least three days after a release before
+For regular dependency updates, Renovate waits at least seven days after a release before
 proposing it. `internalChecksFilter: "strict"` makes Renovate skip releases that have not
 cleared this window instead of selecting a newer, still-pending release. Security updates
 bypass the minimum release age so that vulnerability fixes are not delayed.
@@ -183,11 +182,6 @@ introduce compatibility or behavioural changes.
 * **The project's own Docker image** — `tommye123/docker-autoheal:latest` is intentionally
   excluded from Renovate dependency management because it is produced by this repository rather
   than being a third-party dependency.
-
-* **Demo/test Compose files** — `docker-compose.test.yml` and
-  `docker-compose.example.yml` are kept as project-controlled examples rather than being
-  manually rewritten simply to satisfy dependency pinning. Renovate can still propose digest
-  pinning where appropriate.
 
 * **Node 18** — the frontend build currently uses the Node 18 Alpine image. This is retained
   until there is a deliberate decision to change the frontend build/runtime baseline.

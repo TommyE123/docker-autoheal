@@ -59,7 +59,7 @@ ignore = [
 
     # --- Deferred: local/lazy imports -----------------------------------
     # PLC0415 (`import` should be at top-level) - flags function-local
-    # imports, mostly inside api.py's route handlers and demo.py. Some of
+    # imports, mostly inside api.py's route handlers. Some of
     # these are a deliberate pattern (avoiding circular imports, keeping
     # startup-time imports light) and some may just be unintentional
     # sprawl; worth going through each occurrence individually rather than
