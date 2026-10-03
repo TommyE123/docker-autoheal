@@ -67,7 +67,7 @@ suite. It runs:
   `app/**/*.py` (production code or tests), `requirements*.txt`, `pyproject.toml`,
   `mutation.sh`, the `Dockerfile` (which sets the Python version) or the workflow itself;
   documentation-only and other unrelated changes do not run it;
-- manually, from the Actions tab (**Mutation Testing (informational)** -> **Run
+- manually, from the Actions tab (**Mutation Testing** -> **Run
   workflow**).
 
 A run takes about 4-5 minutes on a GitHub-hosted runner (235-327 s per job over eight
@@ -87,23 +87,26 @@ stats; nothing calculates the score by hand. The score equals the **Detected** f
 the job summary, since no mutants are skipped. It is informational only: the run succeeds
 whatever the score, so no threshold is implied, and it is not a gate.
 
-The file is updated automatically after a successful run on `main`:
+The file is updated by the pull request that changes the score:
 
 - A full `./mutation.sh` run (no arguments) rewrites the file locally.
   Focused runs leave it alone, because they score only part of the target.
-- After a successful run on `main`, the workflow's `commit-badge` job commits the new
-  file as `ci: update mutation badge`, unless it is unchanged. Only that job has a write
-  token. Pull request runs never commit (and fork pull requests get no write token
-  anyway): they add a notice and a line to the job summary if the file differs. The new
-  file is in the `mutation-badge` artifact.
+- On a pull request from this repository, the workflow's `commit-badge` job commits the
+  new file to the PR branch as `ci: update mutation badge`, unless it is unchanged. Only
+  that job has a write token. Fork pull requests get no write token, so they never
+  commit: they add a notice and a line to the job summary if the file differs. The new
+  file is in the `mutation-badge` artifact. Runs on `main` never commit.
 - The commit is pushed with `GITHUB_TOKEN`, which does not trigger workflows, and the
-  file is outside the workflow's trigger paths, so the commit starts no further run.
-  If branch protection on `main` rejects the push, the job fails (the mutation job
-  itself stays green) and the badge keeps its last score.
+  file is outside the workflow's trigger paths, so the commit starts no further run. For
+  the same reason the PR's other checks do not re-run on it. If that blocks merging
+  (required checks pending on the new head), or branch protection rejects the push,
+  push with a fine-grained personal access token instead. A rejected push fails the
+  `commit-badge` job (the mutation job itself stays green) and the badge keeps its last
+  score.
 - If the file is left stale, the badge simply keeps showing the last committed score.
 
-Find results on the workflow run page (for a pull request, the **Mutation testing
-(informational)** check's details link):
+Find results on the workflow run page (for a pull request, the **Mutmut**
+check's details link):
 
 - the **job summary** shows the counts and the score;
 - the **`mutation-results`** artifact contains `mutation-results.txt` (survivors, timeouts
