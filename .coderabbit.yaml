@@ -45,6 +45,129 @@ reviews:
         Check that third-party actions are pinned to a full commit SHA (as
         already done in this repo) and that secrets aren't exposed in logs.
 
+  tools:
+    # Disabled: already covered by MegaLinter
+    actionlint:
+      enabled: false
+    biome:
+      enabled: false
+    checkov:
+      enabled: false
+    clippy:
+      enabled: false
+    cppcheck:
+      enabled: false
+    detekt:
+      enabled: false
+    dotenvLint:
+      enabled: false
+    eslint:
+      enabled: false
+    flake8:
+      enabled: false
+    gitleaks:
+      enabled: false
+    golangci-lint:
+      enabled: false
+    hadolint:
+      enabled: false
+    htmlhint:
+      enabled: false
+    luacheck:
+      enabled: false
+    markdownlint:
+      enabled: false
+    osvScanner:
+      enabled: false
+    phpcs:
+      enabled: false
+    phpstan:
+      enabled: false
+    pmd:
+      enabled: false
+    pylint:
+      enabled: false
+    rubocop:
+      enabled: false
+    ruff:
+      enabled: false
+    semgrep:
+      enabled: false
+    shellcheck:
+      enabled: false
+    sqlfluff:
+      enabled: false
+    stylelint:
+      enabled: false
+    swiftlint:
+      enabled: false
+    tflint:
+      enabled: false
+    trivy:
+      enabled: false
+    trufflehog:
+      enabled: false
+    vale:
+      enabled: false
+    yamllint:
+      enabled: false
+    zizmor:
+      enabled: false
+
+    # Disabled: CodeRabbit-only but irrelevant to this repository
+    blinter:
+      enabled: false
+    brakeman:
+      enabled: false
+    buf:
+      enabled: false
+    checkmake:
+      enabled: false
+    circleci:
+      enabled: false
+    clang:
+      enabled: false
+    emberTemplateLint:
+      enabled: false
+    fbinfer:
+      enabled: false
+    fortitudeLint:
+      enabled: false
+    phpmd:
+      enabled: false
+    prismaLint:
+      enabled: false
+    psscriptanalyzer:
+      enabled: false
+    regal:
+      enabled: false
+    shopifyThemeCheck:
+      enabled: false
+    skillspector:
+      enabled: false
+    smartyLint:
+      enabled: false
+    squawk:
+      enabled: false
+    verilator:
+      enabled: false
+
+    # Enabled: useful coverage not supplied by MegaLinter
+    ast-grep:
+      enabled: true
+    github-checks:
+      enabled: true
+    languagetool:
+      enabled: true
+    oasdiff:
+      enabled: true
+    opengrep:
+      enabled: true
+    oxc:
+      enabled: true
+    presidio:
+      enabled: true
+
 chat:
   auto_reply: true
 
