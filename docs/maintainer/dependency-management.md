@@ -11,7 +11,7 @@ updates are reviewed and merged.
 | Ecosystem                       | Files                                                           | Renovate manager                    |
 |---------------------------------|-----------------------------------------------------------------|-------------------------------------|
 | Python runtime dependencies     | `requirements.txt`                                              | `pip_requirements`                  |
-| Python test dependencies        | `requirements-dev.txt`, `requirements-mutation.txt`             | `pip_requirements`                  |
+| Python test dependencies        | `requirements-dev.txt`                                          | `pip_requirements`                  |
 | npm dependencies + lockfile     | `frontend/package.json`, `frontend/package-lock.json`           | `npm`                               |
 | Dev Container npm lint tools    | `.devcontainer/package.json`, `.devcontainer/package-lock.json` | `npm`                               |
 | Dev Container CLI tools         | `mise.toml`, `mise.lock`                                        | `mise`                              |

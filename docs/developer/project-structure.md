@@ -53,8 +53,7 @@ docker-autoheal/
 ├── mise.toml / mise.lock         # Pinned developer CLI tools, installed by mise (with .mise/locks/)
 │
 ├── requirements.txt              # Runtime Python dependencies
-├── requirements-dev.txt          # Test dependencies (pytest, coverage)
-├── requirements-mutation.txt     # Mutation-testing dependencies (mutmut)
+├── requirements-dev.txt          # Test dependencies (pytest, coverage, mutmut)
 ├── pytest.ini / .coveragerc
 ├── pyproject.toml                # Mutmut configuration only
 ├── mutation.sh                   # Mutation-testing entry point (see docs/developer/mutation-testing.md)

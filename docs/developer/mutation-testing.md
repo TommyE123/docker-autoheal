@@ -16,13 +16,13 @@ Mutmut needs `fork`, so run it on Linux or macOS (on Windows, use WSL). Use the 
 Python version as the `Dockerfile`.
 
 ```bash
-pip install -r requirements-mutation.txt   # already done in the Dev Container
+pip install -r requirements-dev.txt        # already done in the Dev Container
 
 ./mutation.sh                              # full run: a few minutes on 4 vCPUs
 ./mutation.sh "app.uptime_kuma.matching*"  # focused run on a subset of mutants
 ```
 
-In VS Code (including the Dev Container, which installs `requirements-mutation.txt`) the
+In VS Code (including the Dev Container, which installs `requirements-dev.txt`) the
 **Autoheal: Run Mutation Testing** task runs the full `./mutation.sh`. CI runs the same
 script.
 
@@ -72,7 +72,7 @@ suite. It runs:
 
 The workflow:
 
-- installs `requirements-mutation.txt` on the Python version the `Dockerfile` uses;
+- installs `requirements-dev.txt` on the Python version the `Dockerfile` uses;
 - starts from an empty `mutants/` (and never caches it);
 - runs once per ref: a new push to a pull request supersedes its in-progress run;
 - is informational: it is not a required check, has no score threshold, and must not be

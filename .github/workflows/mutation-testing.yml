@@ -70,7 +70,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-mutation.txt
+          pip install -r requirements-dev.txt
 
       # Deletes mutants/ first, so no earlier Mutmut state can be reused.
       - name: Run mutation testing
