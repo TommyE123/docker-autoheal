@@ -1,4 +1,4 @@
-name: Mutation Testing (informational)
+name: Mutation Testing
 
 # Informational only: never a required check, never a merge gate, and no
 # mutation-score threshold. Runs the full suite on demand and on pull requests

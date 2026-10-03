@@ -67,7 +67,7 @@ suite. It runs:
   `app/**/*.py` (production code or tests), `requirements*.txt`, `pyproject.toml`,
   `mutation.sh`, the `Dockerfile` (which sets the Python version) or the workflow itself;
   documentation-only and other unrelated changes do not run it;
-- manually, from the Actions tab (**Mutation Testing (informational)** -> **Run
+- manually, from the Actions tab (**Mutation Testing** -> **Run
   workflow**).
 
 A run takes about 4-5 minutes on a GitHub-hosted runner (235-327 s per job over eight
