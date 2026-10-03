@@ -13,7 +13,6 @@ modules). This module owns app construction and wiring each router in.
 import logging
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.state import init_api  # noqa: F401  (re-exported for app/main.py)
@@ -27,14 +26,10 @@ app = FastAPI(
     version="1.1.0"
 )
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# No CORS middleware: the bundled UI is served by this same app (and the Vite
+# dev server proxies /api and /health), so every legitimate browser request is
+# same-origin. Granting cross-origin access would only let other websites drive
+# this unauthenticated API from a user's browser.
 
 # Mount static files for React build - MUST be done early
 try:

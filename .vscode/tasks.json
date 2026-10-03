@@ -303,7 +303,7 @@
     {
       "label": "Autoheal: Run Semgrep",
       "type": "shell",
-      "command": "mkdir -p .lint && semgrep scan --config p/command-injection --config p/docker-compose --config p/insecure-transport --config p/javascript --config p/owasp-top-ten --config p/python --config p/react --exclude .github/workflows/issue-triage.lock.yml --exclude 'Dockerfile*' --exclude .lint --json-output .lint/semgrep.json .",
+      "command": "mkdir -p .lint && semgrep scan --error --config p/command-injection --config p/docker-compose --config p/insecure-transport --config p/javascript --config p/owasp-top-ten --config p/python --config p/react --exclude .github/workflows/issue-triage.lock.yml --exclude 'Dockerfile*' --exclude .lint --json-output .lint/semgrep.json .",
       "problemMatcher": []
     },
     {

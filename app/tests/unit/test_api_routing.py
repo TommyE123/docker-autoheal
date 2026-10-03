@@ -79,7 +79,9 @@ def _registered_routes() -> list[tuple[str, str]]:
     ]
 
 
-async def _request(method: str, path: str) -> tuple[int, bytes, dict[str, str]]:
+async def _request(
+    method: str, path: str, request_headers: dict[str, str] | None = None
+) -> tuple[int, bytes, dict[str, str]]:
     """Send one request through the ASGI app and return (status, body, headers)."""
     scope: dict[str, Any] = {
         "type": "http",
@@ -91,7 +93,10 @@ async def _request(method: str, path: str) -> tuple[int, bytes, dict[str, str]]:
         "raw_path": path.encode(),
         "query_string": b"",
         "root_path": "",
-        "headers": [(b"host", b"testserver")],
+        "headers": [(b"host", b"testserver")]
+        + [
+            (key.lower().encode(), value.encode()) for key, value in (request_headers or {}).items()
+        ],
         "client": ("127.0.0.1", 12345),
         "server": ("testserver", 80),
         "app": app,
@@ -216,3 +221,37 @@ class TestRoutingThroughTheAsgiApp:
 
         assert status == 200
         assert headers["content-type"].startswith("application/json")
+
+
+@pytest.mark.asyncio
+class TestNoCrossOriginAccess:
+    """
+    The UI is served by this same app, so the API must not grant other
+    websites cross-origin access (it has no authentication of its own).
+    """
+
+    FOREIGN_ORIGIN = "https://attacker.example"
+
+    async def test_preflight_from_a_foreign_origin_is_not_granted(self):
+        _, _, headers = await _request(
+            "OPTIONS",
+            "/api/config",
+            {
+                "Origin": self.FOREIGN_ORIGIN,
+                "Access-Control-Request-Method": "PUT",
+                "Access-Control-Request-Headers": "content-type",
+            },
+        )
+
+        assert "access-control-allow-origin" not in headers
+        assert "access-control-allow-credentials" not in headers
+
+    async def test_cross_origin_read_is_not_granted(self):
+        status, _, headers = await _request(
+            "GET", "/api/maintenance/status", {"Origin": self.FOREIGN_ORIGIN}
+        )
+
+        # The request is still served (same-origin UI is unaffected); the
+        # browser just isn't told it may expose the response to another site.
+        assert status == 200
+        assert "access-control-allow-origin" not in headers
