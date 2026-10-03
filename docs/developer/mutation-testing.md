@@ -70,6 +70,9 @@ suite. It runs:
 - manually, from the Actions tab (**Mutation Testing (informational)** -> **Run
   workflow**).
 
+A run takes about 4-5 minutes on a GitHub-hosted runner (235-327 s per job over eight
+successful runs, of which 214-279 s is the mutation step).
+
 The workflow:
 
 - installs `requirements-dev.txt` on the Python version the `Dockerfile` uses;
