@@ -74,9 +74,40 @@ jobs:
           HOOK
           chmod +x .git/hooks/pre-commit
 
+      # gh-aw opens a new PR (on a fresh random branch) every run, so skip
+      # the upgrade while one is still open. The branch prefix is what gh-aw
+      # currently uses; if it changes this check stops matching.
+      - name: Check for an open upgrade PR
+        id: existing
+        env:
+          GH_TOKEN: ${{ secrets.GH_AW_UPGRADE_TOKEN }}
+        run: |
+          number=$(gh pr list --state open --limit 100 --json number,headRefName \
+            --jq '[.[] | select(.headRefName | startswith("upgrade-agentic-workflows-")) | .number] | first // empty')
+          if [ -n "$number" ]; then
+            echo "Skipping upgrade: upgrade PR #$number is already open"
+          fi
+          echo "pr=$number" >> "$GITHUB_OUTPUT"
+
       - name: Upgrade gh-aw
+        if: steps.existing.outputs.pr == ''
         env:
           # gh API auth for gh-aw's `gh pr create` (git push auth comes from
           # the checkout step above).
           GH_TOKEN: ${{ secrets.GH_AW_UPGRADE_TOKEN }}
         run: gh aw upgrade --create-pull-request
+
+      # gh-aw titles its PR "Upgrade agentic workflows", which fails the
+      # Conventional Commits title check; retitling re-runs that check.
+      - name: Retitle the upgrade PR
+        if: steps.existing.outputs.pr == ''
+        env:
+          GH_TOKEN: ${{ secrets.GH_AW_UPGRADE_TOKEN }}
+        run: |
+          number=$(gh pr list --state open --limit 100 --json number,headRefName \
+            --jq '[.[] | select(.headRefName | startswith("upgrade-agentic-workflows-")) | .number] | first // empty')
+          if [ -z "$number" ]; then
+            echo "No upgrade PR was created; nothing to retitle"
+            exit 0
+          fi
+          gh pr edit "$number" --title "chore: upgrade agentic workflows"
