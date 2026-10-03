@@ -96,13 +96,13 @@ The file is updated by the pull request that changes the score:
   that job has a write token. Fork pull requests get no write token, so they never
   commit: they add a notice and a line to the job summary if the file differs. The new
   file is in the `mutation-badge` artifact. Runs on `main` never commit.
-- The commit is pushed with `GITHUB_TOKEN`, which does not trigger workflows, and the
-  file is outside the workflow's trigger paths, so the commit starts no further run. For
-  the same reason the PR's other checks do not re-run on it. If that blocks merging
-  (required checks pending on the new head), or branch protection rejects the push,
-  push with a fine-grained personal access token instead. A rejected push fails the
-  `commit-badge` job (the mutation job itself stays green) and the badge keeps its last
-  score.
+- The commit is pushed with the `BADGE_PUSH_TOKEN` repository secret, a fine-grained
+  personal access token with **Contents: read and write** on this repository. A push made
+  with `GITHUB_TOKEN` would not start the PR's other checks, leaving the required ones
+  missing on the new head. The badge commit does start them, and the mutation workflow
+  runs once more; that run finds the file unchanged and commits nothing. If the token
+  expires or is removed, or branch protection rejects the push, the `commit-badge` job
+  fails (the mutation job itself stays green) and the badge keeps its last score.
 - If the file is left stale, the badge simply keeps showing the last committed score.
 
 Find results on the workflow run page (for a pull request, the **Mutmut**
