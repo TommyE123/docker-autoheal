@@ -3,13 +3,13 @@
 # After editing, run: mise lock --platform linux-x64,linux-arm64
 [tools]
 # Installer for the pypi: tools below.
-uv = "0.12.20"
+uv = "0.12.21"
 "aqua:rhysd/actionlint" = "1.7.12"
 "aqua:hadolint/hadolint" = "2.15.1"
 "aqua:google/osv-scanner" = "2.6.0"
 "aqua:aquasecurity/trivy" = "0.74.0"
 "aqua:trufflesecurity/trufflehog" = "3.97.9"
-"aqua:betterleaks/betterleaks" = "1.8.1"
+"aqua:betterleaks/betterleaks" = "1.9.0"
 "aqua:editorconfig-checker/editorconfig-checker" = "4.0.2"
 "aqua:astral-sh/ruff" = "0.16.9"
 "aqua:koalaman/shellcheck" = "0.11.0"
