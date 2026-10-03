@@ -1,0 +1,6 @@
+misconfigurations:
+  - id: DS-0002
+    paths:
+      - Dockerfile
+      - .devcontainer/Dockerfile
+    statement: "Non-root user deferred, see issue #19"

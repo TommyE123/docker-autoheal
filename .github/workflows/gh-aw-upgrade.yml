@@ -1,0 +1,119 @@
+name: Upgrade gh-aw
+
+# Runs `gh aw upgrade` on main and, only if something wanted changes, opens a
+# normal PR for it. Triggered by cron-job.org through workflow_dispatch (no
+# GitHub Actions schedule here); can also be run by hand. See #384.
+on: # yamllint disable-line rule:truthy
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  upgrade:
+    name: Upgrade gh-aw
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # GH_AW_UPGRADE_TOKEN is a fine-grained PAT (this repo only: contents,
+      # pull requests and workflows read/write). The default GITHUB_TOKEN cannot
+      # be granted `workflows`, which GitHub requires to push a recompiled
+      # *.lock.yml, and PRs/pushes made with it do not trigger CI. checkout
+      # persists the PAT as the git credential used by the push below.
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          token: ${{ secrets.GH_AW_UPGRADE_TOKEN }}
+
+      # Branches are named chore/upgrade-gh-aw-<version> below, so any open PR
+      # from such a branch is an upgrade PR that is still waiting for review.
+      - name: Check for an open upgrade PR
+        id: existing
+        env:
+          GH_TOKEN: ${{ secrets.GH_AW_UPGRADE_TOKEN }}
+        run: |
+          number=$(gh pr list --state open --limit 100 --json number,headRefName \
+            --jq '[.[] | select(.headRefName | startswith("chore/upgrade-gh-aw-")) | .number] | first // empty')
+          if [ -n "$number" ]; then
+            echo "Skipping: upgrade PR #$number is already open"
+          fi
+          echo "pr=$number" >> "$GITHUB_OUTPUT"
+
+      # The pin in .github/aw/actions-lock.json is for the setup action used by
+      # compiled workflows, not a CLI installer, so use the documented
+      # standalone installer (always the latest release).
+      - name: Install gh-aw CLI
+        if: steps.existing.outputs.pr == ''
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/install-gh-aw.sh" https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh
+          bash "$RUNNER_TEMP/install-gh-aw.sh"
+
+      # `gh aw upgrade` unconditionally generates three files this repo does
+      # not keep (the engine is gemini, not copilot). They must all be present:
+      # if gh-aw stops generating one, fail so this cleanup gets reviewed
+      # rather than silently going stale. Nothing is branched, committed or
+      # pushed here. Only the files gh-aw manages are staged (the gh-aw
+      # actions lock, workflow sources it applies codemods to, and compiled
+      # lock files); any other change fails the job.
+      - name: Upgrade gh-aw and drop unwanted artefacts
+        id: upgrade
+        if: steps.existing.outputs.pr == ''
+        env:
+          GH_TOKEN: ${{ secrets.GH_AW_UPGRADE_TOKEN }}
+        run: |
+          set -euo pipefail
+          version=$(gh aw --version 2>&1 | awk '{print $NF}')
+          [ -n "$version" ] || { echo "::error::could not read the gh-aw version"; exit 1; }
+          echo "gh-aw $version"
+          gh aw upgrade
+
+          unwanted=(
+            .github/agents/agentic-workflows.md
+            .github/workflows/copilot-setup-steps.yml
+            .github/skills/agentic-workflows/SKILL.md
+          )
+          missing=0
+          for f in "${unwanted[@]}"; do
+            if [ ! -e "$f" ]; then
+              echo "::error::gh-aw did not generate $f. gh-aw may have stopped generating its Copilot artefacts; review and remove this cleanup."
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ] || exit 1
+          rm -- "${unwanted[@]}"
+
+          git add -- .github/aw '.github/workflows/*.md' '.github/workflows/*.lock.yml'
+          unexpected=$(git diff --name-only; git ls-files --others --exclude-standard)
+          if [ -n "$unexpected" ]; then
+            echo "::error::gh aw upgrade changed files outside the managed set:"
+            echo "$unexpected"
+            exit 1
+          fi
+
+          if git diff --cached --quiet; then
+            echo "gh-aw is already current; nothing to do"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git diff --cached --stat
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Create upgrade PR
+        if: steps.existing.outputs.pr == '' && steps.upgrade.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_AW_UPGRADE_TOKEN }}
+          VERSION: ${{ steps.upgrade.outputs.version }}
+        run: |
+          branch="chore/upgrade-gh-aw-$VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -m "chore: upgrade agentic workflows to $VERSION"
+          # No upgrade PR is open (checked above), so a same-named remote branch
+          # is a leftover from a PR that was closed without merging: replace it.
+          git push --force -u origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "chore: upgrade agentic workflows to $VERSION" \
+            --body "Automatically generated by the Upgrade gh-aw workflow (gh aw upgrade, gh-aw $VERSION). Review the generated workflow and lock file changes as normal."
