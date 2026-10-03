@@ -42,7 +42,7 @@ concurrency:
 
 jobs:
   mutation-testing:
-    name: Mutation testing
+    name: Mutmut
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
