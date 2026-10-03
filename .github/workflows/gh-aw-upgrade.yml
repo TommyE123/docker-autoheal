@@ -53,17 +53,17 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       # TEMPORARY WORKAROUND: `gh aw upgrade` unconditionally generates Copilot
-      # artefacts even for this repo's gemini engine, and pushing the workflow
-      # file among them needs a `workflows` permission GITHUB_TOKEN cannot
-      # have. gh-aw commits and pushes inside the same command, so remove them
-      # with a runner-only pre-commit hook. The hook fails (aborting the commit)
-      # if gh-aw stops generating them, so this does not silently go stale.
+      # artefacts even for this repo's gemini engine, plus the dispatcher skill,
+      # none of which are wanted here. gh-aw commits and pushes inside the same
+      # command, so remove them with a runner-only pre-commit hook. The hook
+      # fails (aborting the commit) if gh-aw stops generating any of them, so
+      # this does not silently go stale.
       - name: Install pre-commit hook to drop Copilot artefacts
         run: |
           cat > .git/hooks/pre-commit <<'HOOK'
           #!/usr/bin/env bash
           set -euo pipefail
-          files=(.github/agents/agentic-workflows.md .github/workflows/copilot-setup-steps.yml)
+          files=(.github/agents/agentic-workflows.md .github/workflows/copilot-setup-steps.yml .github/skills/agentic-workflows/SKILL.md)
           for f in "${files[@]}"; do
             if [ ! -e "$f" ]; then
               echo "::error::gh-aw did not generate $f. gh-aw may have stopped generating its Copilot artefacts; review and remove this cleanup workaround." >&2
