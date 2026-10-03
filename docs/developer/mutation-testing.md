@@ -105,8 +105,8 @@ The file is updated by the pull request that changes the score:
   score.
 - If the file is left stale, the badge simply keeps showing the last committed score.
 
-Find results on the workflow run page (for a pull request, the **Mutation testing
-(informational)** check's details link):
+Find results on the workflow run page (for a pull request, the **Mutation testing**
+check's details link):
 
 - the **job summary** shows the counts and the score;
 - the **`mutation-results`** artifact contains `mutation-results.txt` (survivors, timeouts
