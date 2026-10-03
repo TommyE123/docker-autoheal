@@ -81,10 +81,20 @@ The workflow:
 - is informational: it is not a required check, has no score threshold, and must not be
   made one.
 
-The README badge is GitHub's status badge for this workflow. It shows the latest run on
-`main` (hence the push trigger), and it reports whether that run completed, not a mutation
-score: the run succeeds whatever the score, so a green badge does not mean any quality
-threshold was met. Follow the badge to the run for the numbers.
+The README badge shows the mutation score of the latest run on `main`, as calculated by
+`mutmut badge` from the exported stats. It equals the **Detected** figure in the job
+summary, since no mutants are skipped. It is informational only: the run succeeds whatever
+the score, so no threshold is implied, and it is not a gate.
+
+The badge data is a Shields endpoint JSON file. The mutation workflow generates it with
+`mutmut badge` and uploads it as the `mutation-badge` artifact; it stays read-only, since it
+runs pull request code. After a successful run on `main`, the separate
+`.github/workflows/mutation-badge.yml` workflow checks the file and commits it to
+`badges/mutation.json` on the `badges` branch, which the README badge reads through
+Shields. That workflow holds the only write permission and runs no repository code. The
+data goes to a branch of its own because the `main` ruleset requires pull request checks
+and does not allow direct pushes. Pushes made with the workflow token do not start other
+workflows, so publishing does not trigger another run.
 
 Find results on the workflow run page (for a pull request, the **Mutation testing
 (informational)** check's details link):

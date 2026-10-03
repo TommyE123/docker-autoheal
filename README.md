@@ -2,7 +2,7 @@
 
 [![Unit Tests](https://github.com/TommyE123/docker-autoheal/actions/workflows/tests.yml/badge.svg)](https://github.com/TommyE123/docker-autoheal/actions/workflows/tests.yml)
 [![Test Coverage](https://img.shields.io/codecov/c/github/TommyE123/docker-autoheal?branch=main&label=Test%20Coverage)](https://codecov.io/gh/TommyE123/docker-autoheal)
-[![Mutation Testing (informational)](https://github.com/TommyE123/docker-autoheal/actions/workflows/mutation-testing.yml/badge.svg)](https://github.com/TommyE123/docker-autoheal/actions/workflows/mutation-testing.yml)
+[![Mutation score](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FTommyE123%2Fdocker-autoheal%2Fbadges%2Fbadges%2Fmutation.json)](docs/developer/mutation-testing.md)
 [![Docker Hub Pulls](https://img.shields.io/docker/pulls/tommye123/docker-autoheal?label=Docker%20Hub%20Pulls)](https://hub.docker.com/r/tommye123/docker-autoheal)
 [![GHCR Pulls](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fghcr-badge.elias.eu.org%2Fapi%2FTommyE123%2Fdocker-autoheal&query=downloadCount&label=GHCR%20Pulls)](https://github.com/users/TommyE123/packages/container/package/docker-autoheal)
 [![Docker Image Size](https://img.shields.io/docker/image-size/tommye123/docker-autoheal/latest?label=Docker%20Image%20Size)](https://hub.docker.com/r/tommye123/docker-autoheal)
