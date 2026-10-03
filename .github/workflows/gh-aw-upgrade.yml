@@ -1,0 +1,42 @@
+name: Upgrade gh-aw
+
+# Runs the official `gh aw upgrade --create-pull-request` and lets gh-aw decide
+# whether an update is required. Phase 1 of #384: manual dispatch only.
+on:
+  workflow_dispatch:
+
+# Provisional - narrow once the first real run shows what is required.
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  upgrade:
+    name: Run gh aw upgrade
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The pin in .github/aw/actions-lock.json is for the reusable setup
+      # action used by compiled workflows, not a CLI installer, so use the
+      # documented standalone installer (always the latest release).
+      - name: Install gh-aw CLI
+        run: curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash
+
+      - name: Verify gh-aw supports --create-pull-request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh aw --version
+          help_output=$(gh aw upgrade --help)
+          echo "$help_output"
+          if ! grep -q -- '--create-pull-request' <<<"$help_output"; then
+            echo "::error::Installed gh-aw does not support 'upgrade --create-pull-request'"
+            exit 1
+          fi
+
+      - name: Upgrade gh-aw
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh aw upgrade --create-pull-request
