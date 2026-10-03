@@ -79,8 +79,9 @@ jobs:
       - name: Run mutation testing
         run: ./mutation.sh
 
+      # Runs only after a successful mutation run, so a failed run reports one
+      # error instead of a second one from missing results.
       - name: Export results and summary
-        if: ${{ !cancelled() }}
         run: |
           mutmut export-cicd-stats
           mutmut results > mutants/mutation-results.txt
