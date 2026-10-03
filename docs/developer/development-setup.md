@@ -80,9 +80,10 @@ Scripts**, **Check Workflows**, **Check Markup and Data**, **Check Repository
 Conventions** and **Run Security Scanners**.
 
 **Autoheal: Run Docker Stack** builds the app from your checkout and runs it with
-`docker compose -f docker-compose.test.yml up --build autoheal`. It uses
-`docker-compose.test.yml` because `docker-compose.yml` runs the published image rather
-than building your changes.
+`docker compose up --build autoheal`. The `--build` flag is what makes
+`docker-compose.yml` build your changes instead of using the published image. The result is
+tagged `tommye123/docker-autoheal:latest` locally, replacing any copy you had pulled; run
+`docker compose pull` to get the published image back.
 
 **Autoheal: Install gh-aw** installs the `github/gh-aw` extension pinned to the
 `compiler_version` recorded in the header of `.github/workflows/issue-triage.lock.yml`, so
@@ -91,7 +92,7 @@ Codespaces token) first, replaces any installed copy, and is not part of any agg
 task. The extension lives in the `gh` volume, so it survives rebuilds; run the task again
 after the lock file is recompiled with a newer version.
 
-**Autoheal: Stop Docker Stack** runs `docker compose -f docker-compose.test.yml down`.
+**Autoheal: Stop Docker Stack** runs `docker compose down`.
 Stacks started with **Run Docker Stack** run on the host's Docker daemon (see below), so
 they keep running when the Dev Container stops or is rebuilt until you stop them.
 
@@ -107,12 +108,14 @@ below). Without that it would mount an empty directory, lint nothing, and pass.
 
 `docker compose` talks to the Docker daemon through the `docker-outside-of-docker`
 feature — the daemon is the host's, not the container's. Relative bind mounts in
-`docker-compose.yml`/`docker-compose.test.yml` (e.g. `./data:/data`) are resolved by the
+`docker-compose.yml` (e.g. `./data:/data`) are resolved by the
 Compose client to the container's path and handed to the host daemon as-is, which has no
 such path and silently creates an empty directory there instead of binding your checkout.
 The stack still starts and passes its health check, but persisted data (config, events,
 logs) won't be visible in your working copy — use `docker compose logs`/`docker exec` to
-inspect it instead.
+inspect it instead. If the mount does resolve (for example when running Compose from the
+host), the stack reads and writes the same `./data` a deployment from that checkout would
+use, and stopping the stack doesn't revert changes made to it.
 
 `.github/workflows/devcontainer.yml` builds the container and checks its tooling on pull
 requests that touch it, and can also be run manually from the Actions tab.
@@ -125,8 +128,6 @@ pip install -r requirements-dev.txt   # test dependencies
 
 # Run directly against your local Docker socket
 python -m app.main
-# or the convenience wrapper:
-python run.py
 ```
 
 The backend listens on `0.0.0.0:3131` by default (`ui.listen_port` in
@@ -180,13 +181,13 @@ to fail the build over them; they still run and report. There is no repository-w
 
 Markdown *is* fully enforced — neither `MARKDOWN_MARKDOWNLINT` nor
 `MARKDOWN_MARKDOWN_TABLE_FORMATTER` is in that disabled list, so every Markdown file must
-pass both. `.markdownlint.jsonc` at the repo root turns off only `MD013` (line length) and
+pass both. `.linter-rules/.markdownlint.jsonc` turns off only `MD013` (line length) and
 `MD060` (table pipe spacing), which conflict with this repo's established long-prose
 style — everything else is at markdownlint's defaults. Run both locally before pushing
 docs changes:
 
 ```bash
-npx markdownlint-cli2 "**/*.md" "#node_modules" "#frontend/node_modules" "#.devcontainer/node_modules"
+npx markdownlint-cli2 --config .linter-rules/.markdownlint.jsonc "**/*.md" "#node_modules" "#frontend/node_modules" "#.devcontainer/node_modules"
 npx markdown-table-formatter --check "**/*.md"   # drop --check to auto-fix
 ```
 
@@ -196,12 +197,16 @@ Markdown Tables** tasks, which lint tracked files only.
 The frontend has `npm run lint` (ESLint) and `npm run format:check` (Prettier) scripts —
 see [Frontend Development](frontend.md#linting-and-formatting).
 
-Linter configuration lives at the repository root (`.markdownlint.jsonc`,
-`.stylelintrc.json`, `.secretlintrc.json`, `.yamllint.yml`, `.ls-lint.yml`) and is
-shared: the Dev Container tasks and MegaLinter both read it, so a rule change applies in
-both places. `.secretlintignore` and `.trufflehog-exclude.txt` are the exception: they
-only apply to the local tasks, because MegaLinter passes secretlint and TruffleHog its own
-generated exclusion lists.
+Linter configuration is shared: the Dev Container tasks and MegaLinter both read it, so a
+rule change applies in both places. MegaLinter's `LINTER_RULES_PATH` points at
+`.linter-rules/`, which holds the Checkov, Trivy, markdownlint, yamllint, ls-lint, Ruff,
+secretlint and Stylelint configuration and exceptions. The Dev Container tasks and editor settings pass
+those paths explicitly, because these tools do not discover `.linter-rules/` on their own.
+`.trufflehog-exclude.txt` there only applies to the local TruffleHog task: MegaLinter does
+not read it. `.secretlintignore` stays at the repository root, because MegaLinter builds
+its generated secretlint exclusion list only from the root copy. Configuration that must
+stay beside the code it lints remains at the repository root (`pyrightconfig.json`,
+`.editorconfig`) or in `frontend/` (`eslint.config.js`).
 
 ### What lints what
 

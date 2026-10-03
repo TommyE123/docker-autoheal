@@ -16,6 +16,9 @@ ENV/
 *.log
 logs/
 
+# Runtime data (config, events, integration credentials); mounted, never built in
+data/
+
 # OS
 .DS_Store
 Thumbs.db
