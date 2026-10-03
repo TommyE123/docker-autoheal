@@ -41,8 +41,44 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # The badge commit made by commit-badge below only changes
+  # .github/badges/mutation.json, so a full mutation run on it would just
+  # reproduce the score it already carries. Skip that run (and with it
+  # commit-badge); the PR's other workflows still run for the commit. The pull
+  # request checkout is a merge commit, so its second parent is the PR head.
+  gate:
+    name: Skip badge commits
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Is the head commit the badge commit?
+        id: check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          skip=false
+          if [ "$EVENT_NAME" = "pull_request" ] \
+            && [ "$(git log -1 --format='%an|%s' HEAD^2)" = "github-actions[bot]|ci: update mutation badge" ]; then
+            skip=true
+            echo "The head commit is the mutation badge commit; skipping the mutation run."
+          fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+
   mutation-testing:
     name: Mutmut
+    needs: gate
+    if: ${{ needs.gate.outputs.skip != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -142,8 +178,8 @@ jobs:
   # fine-grained personal access token with Contents: read and write), not
   # GITHUB_TOKEN, because a GITHUB_TOKEN push does not start the PR's other
   # checks, which would leave the required ones missing on the new head. Those
-  # checks and this workflow run again for the badge commit; the second run
-  # finds the file unchanged and commits nothing, so it does not loop.
+  # checks run again for the badge commit; the gate job skips the mutation run
+  # for it, so it does not loop.
   commit-badge:
     name: Commit mutation badge
     needs: mutation-testing

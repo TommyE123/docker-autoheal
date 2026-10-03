@@ -99,8 +99,8 @@ The file is updated by the pull request that changes the score:
 - The commit is pushed with the `BADGE_PUSH_TOKEN` repository secret, a fine-grained
   personal access token with **Contents: read and write** on this repository. A push made
   with `GITHUB_TOKEN` would not start the PR's other checks, leaving the required ones
-  missing on the new head. The badge commit does start them, and the mutation workflow
-  runs once more; that run finds the file unchanged and commits nothing. If the token
+  missing on the new head. The badge commit does start them, but the workflow's `gate` job
+  skips the mutation run for it, since the commit only changes the badge file. If the token
   expires or is removed, or branch protection rejects the push, the `commit-badge` job
   fails (the mutation job itself stays green) and the badge keeps its last score.
 - If the file is left stale, the badge simply keeps showing the last committed score.
