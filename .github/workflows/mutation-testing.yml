@@ -10,7 +10,6 @@ on:
       - main
     paths:
       - "app/**/*.py"
-      - "app/tests/**/*.py"
       - "requirements*.txt"
       - "pyproject.toml"
       - "mutation.sh"
@@ -23,7 +22,6 @@ on:
       - main
     paths:
       - "app/**/*.py"
-      - "app/tests/**/*.py"
       - "requirements*.txt"
       - "pyproject.toml"
       - "mutation.sh"
