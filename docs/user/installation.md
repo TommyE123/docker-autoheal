@@ -104,15 +104,18 @@ You should see a `restart` event for `test-nginx`.
 
 The published image (`tommye123/docker-autoheal`, also mirrored to
 `ghcr.io/tommye123/docker-autoheal`) is a multi-stage build: it builds the React frontend
-with Node 18 in the first stage, then copies the build output into a Python image (the
+with Node in the first stage, then copies the build output into a Python image (the
 version is whatever the `Dockerfile`'s `FROM python:X.Y-slim` line currently pins). To
 build it locally:
 
 ```bash
 git clone https://github.com/TommyE123/docker-autoheal.git
 cd docker-autoheal
-docker build -t docker-autoheal .
+docker compose up --build -d
 ```
+
+This builds the image from your checkout (the `build:` key in `docker-compose.yml`) and
+starts it. To build the image without starting it, run `docker build -t docker-autoheal .`.
 
 See [Development Setup](../developer/development-setup.md) if you want to run the
 backend and frontend outside Docker.

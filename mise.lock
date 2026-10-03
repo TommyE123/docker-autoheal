@@ -37,36 +37,36 @@ url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/586788051
 provenance = "github-attestations"
 
 [[tools."aqua:betterleaks/betterleaks"]]
-version = "1.8.1"
+version = "1.9.0"
 backend = "aqua:betterleaks/betterleaks"
-specifiers = ["1.8.1"]
+specifiers = ["1.9.0"]
 
 [tools."aqua:betterleaks/betterleaks"."platforms.linux-arm64"]
-checksum = "sha256:bbb578b12a2f65d7082ab436abf37724232bc71d8a078e3c41336574420f1b48"
-url = "https://github.com/betterleaks/betterleaks/releases/download/v1.8.1/betterleaks_1.8.1_linux_arm64.tar.gz"
-url_api = "https://api.github.com/repos/betterleaks/betterleaks/releases/assets/519981771"
+checksum = "sha256:1d39116e0a58dc94574715e2aa12a2dbd5062f193eee3fec011fef6ba06bd13b"
+url = "https://github.com/betterleaks/betterleaks/releases/download/v1.9.0/betterleaks_1.9.0_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/betterleaks/betterleaks/releases/assets/599108932"
 provenance = "cosign"
 
 [tools."aqua:betterleaks/betterleaks"."platforms.linux-x64"]
-checksum = "sha256:efa407244e1ea8e35f582b8a42becdeac08bdead04f68eb752adda722d583c2a"
-url = "https://github.com/betterleaks/betterleaks/releases/download/v1.8.1/betterleaks_1.8.1_linux_x64.tar.gz"
-url_api = "https://api.github.com/repos/betterleaks/betterleaks/releases/assets/519981768"
+checksum = "sha256:f8b185a39ffcece2a1ca82bf3a4e7435cd81963ffd16b7a9128daf75f35f6de7"
+url = "https://github.com/betterleaks/betterleaks/releases/download/v1.9.0/betterleaks_1.9.0_linux_x64.tar.gz"
+url_api = "https://api.github.com/repos/betterleaks/betterleaks/releases/assets/599108929"
 provenance = "cosign"
 
 [[tools."aqua:editorconfig-checker/editorconfig-checker"]]
-version = "3.11.2"
+version = "4.0.2"
 backend = "aqua:editorconfig-checker/editorconfig-checker"
-specifiers = ["3.11.2"]
+specifiers = ["4.0.2"]
 
 [tools."aqua:editorconfig-checker/editorconfig-checker"."platforms.linux-arm64"]
-checksum = "sha256:7c61c94a67658bff62467453c3d7d9a98d57139728d27e545e9d3e3688fc9ca6"
-url = "https://github.com/editorconfig-checker/editorconfig-checker/releases/download/v3.11.2/ec-linux-arm64.tar.gz"
-url_api = "https://api.github.com/repos/editorconfig-checker/editorconfig-checker/releases/assets/529790774"
+checksum = "sha256:abad76da8c9950fdc2a314bcd66969172aa823e9c595fa7e3a389a91e34d025e"
+url = "https://github.com/editorconfig-checker/editorconfig-checker/releases/download/v4.0.2/editorconfig-checker-linux-arm64.tar.gz"
+url_api = "https://api.github.com/repos/editorconfig-checker/editorconfig-checker/releases/assets/574675779"
 
 [tools."aqua:editorconfig-checker/editorconfig-checker"."platforms.linux-x64"]
-checksum = "sha256:bc815e5b3b1891a0ee9e1242fe3475312655f8b0f4c4a79510be0a009294571a"
-url = "https://github.com/editorconfig-checker/editorconfig-checker/releases/download/v3.11.2/ec-linux-amd64.tar.gz"
-url_api = "https://api.github.com/repos/editorconfig-checker/editorconfig-checker/releases/assets/529790765"
+checksum = "sha256:44efaef3ed14c6ab52eb87481d78e5e5c204796dccf26e2f4598a61ba17f8003"
+url = "https://github.com/editorconfig-checker/editorconfig-checker/releases/download/v4.0.2/editorconfig-checker-linux-amd64.tar.gz"
+url_api = "https://api.github.com/repos/editorconfig-checker/editorconfig-checker/releases/assets/574675771"
 
 [[tools."aqua:google/osv-scanner"]]
 version = "2.6.0"
@@ -198,18 +198,18 @@ specifiers = ["1.38.0"]
 uv = { path = ".mise/locks/pypi-yamllint/1.38.0", digest = "sha256:3165671f6d929f2f261158d69fbd2fab6634c4564a929557987ef5e1ab8d602d" }
 
 [[tools.uv]]
-version = "0.12.19"
+version = "0.12.21"
 backend = "aqua:astral-sh/uv"
-specifiers = ["0.12.19"]
+specifiers = ["0.12.21"]
 
 [tools.uv."platforms.linux-arm64"]
-checksum = "sha256:0804e9b164c64b6914182d5920c08551958a095986f10a3731056df701126436"
-url = "https://github.com/astral-sh/uv/releases/download/0.12.19/uv-aarch64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/587158851"
+checksum = "sha256:030b69227b40af8c1981b7301793dc66e71ed3c796ea8688209dd268bd91ec51"
+url = "https://github.com/astral-sh/uv/releases/download/0.12.21/uv-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/599237845"
 provenance = "github-attestations"
 
 [tools.uv."platforms.linux-x64"]
-checksum = "sha256:23bf5552d220e0842b65c862097b2ebaeba0064b74eda5e565e77fd25969d8c8"
-url = "https://github.com/astral-sh/uv/releases/download/0.12.19/uv-x86_64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/587159011"
+checksum = "sha256:23f02075b652bb1df64178cfae41b5caf160822e720e2663568f3f5d63bc52c0"
+url = "https://github.com/astral-sh/uv/releases/download/0.12.21/uv-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/599238020"
 provenance = "github-attestations"
