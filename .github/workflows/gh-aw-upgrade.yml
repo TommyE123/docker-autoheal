@@ -2,18 +2,19 @@ name: Upgrade gh-aw
 
 # Runs the official `gh aw upgrade --create-pull-request` and lets gh-aw decide
 # whether an update is required. Phase 1 of #384: manual dispatch only.
-on:
+on: # yamllint disable-line rule:truthy
   workflow_dispatch:
 
-# Provisional - narrow once the first real run shows what is required.
-permissions:
-  contents: write
-  pull-requests: write
+permissions: {}
 
 jobs:
   upgrade:
     name: Run gh aw upgrade
     runs-on: ubuntu-latest
+    # Provisional - narrow once the first real run shows what is required.
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -22,7 +23,9 @@ jobs:
       # action used by compiled workflows, not a CLI installer, so use the
       # documented standalone installer (always the latest release).
       - name: Install gh-aw CLI
-        run: curl -sL https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh | bash
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/install-gh-aw.sh" https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh
+          bash "$RUNNER_TEMP/install-gh-aw.sh"
 
       - name: Verify gh-aw supports --create-pull-request
         env:
