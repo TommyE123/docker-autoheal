@@ -1,14 +1,7 @@
 # yaml-language-server: $schema=https://storage.googleapis.com/coderabbit_public_assets/schema.v2.json
 language: en-GB
 
-tone_instructions: >-
-  Follow REVIEW.md's format exactly: the overall review status, the
-  per-finding RED/AMBER/GREEN tags, and the single closing verdict.
-
 reviews:
-  profile: chill
-  request_changes_workflow: false
-  high_level_summary: true
   review_status: false
   collapse_walkthrough: false
 
@@ -21,20 +14,9 @@ reviews:
     - "!**/coverage.xml"
     - "!**/*.min.js"
     - "!**/*.min.css"
-
+  auto_review:
+    enabled: false
   path_instructions:
-    - path: "{**/*,**/.*,**/.*/**}"
-      instructions: |
-        Use REVIEW.md as the authoritative review standard for this
-        repository, in full — its review status, per-finding tags, and
-        verdict format all apply. This overrides CodeRabbit's default
-        review format.
-
-        Perform a surgical review: only issues introduced or materially
-        worsened by this PR's changes. Do not perform a general repository
-        audit or request unrelated cleanup, formatting, or refactoring.
-
-        Do not manufacture findings. If the PR is correct, say so plainly.
     - path: "app/**/*.py"
       instructions: >
         This is the FastAPI backend for a Docker container health-monitoring
@@ -63,14 +45,142 @@ reviews:
         Check that third-party actions are pinned to a full commit SHA (as
         already done in this repo) and that secrets aren't exposed in logs.
 
-  auto_review:
-    enabled: false
+  # Walkthrough noise: single maintainer, labels owned by the triage workflow
+  related_issues: false
+  related_prs: false
+  suggested_labels: false
+  suggested_reviewers: false
+  in_progress_fortune: false
+
+  tools:
+    # Disabled: already covered by MegaLinter
+    actionlint:
+      enabled: false
+    biome:
+      enabled: false
+    checkov:
+      enabled: false
+    clippy:
+      enabled: false
+    cppcheck:
+      enabled: false
+    detekt:
+      enabled: false
+    dotenvLint:
+      enabled: false
+    eslint:
+      enabled: false
+    flake8:
+      enabled: false
+    gitleaks:
+      enabled: false
+    golangci-lint:
+      enabled: false
+    hadolint:
+      enabled: false
+    htmlhint:
+      enabled: false
+    luacheck:
+      enabled: false
+    markdownlint:
+      enabled: false
+    osvScanner:
+      enabled: false
+    phpcs:
+      enabled: false
+    phpstan:
+      enabled: false
+    pmd:
+      enabled: false
+    pylint:
+      enabled: false
+    rubocop:
+      enabled: false
+    ruff:
+      enabled: false
+    semgrep:
+      enabled: false
+    shellcheck:
+      enabled: false
+    sqlfluff:
+      enabled: false
+    stylelint:
+      enabled: false
+    swiftlint:
+      enabled: false
+    tflint:
+      enabled: false
+    trivy:
+      enabled: false
+    trufflehog:
+      enabled: false
+    vale:
+      enabled: false
+    yamllint:
+      enabled: false
+    zizmor:
+      enabled: false
+
+    # Disabled: CodeRabbit-only but irrelevant to this repository
+    blinter:
+      enabled: false
+    brakeman:
+      enabled: false
+    buf:
+      enabled: false
+    checkmake:
+      enabled: false
+    circleci:
+      enabled: false
+    clang:
+      enabled: false
+    emberTemplateLint:
+      enabled: false
+    fbinfer:
+      enabled: false
+    fortitudeLint:
+      enabled: false
+    oasdiff:
+      enabled: false
+    phpmd:
+      enabled: false
+    prismaLint:
+      enabled: false
+    psscriptanalyzer:
+      enabled: false
+    regal:
+      enabled: false
+    shopifyThemeCheck:
+      enabled: false
+    skillspector:
+      enabled: false
+    smartyLint:
+      enabled: false
+    squawk:
+      enabled: false
+    verilator:
+      enabled: false
+
+    # Enabled: useful coverage not supplied by MegaLinter
+    ast-grep:
+      enabled: true
+    github-checks:
+      enabled: true
+    languagetool:
+      enabled: true
+    opengrep:
+      enabled: true
+    oxc:
+      enabled: true
+    presidio:
+      enabled: true
+    reactDoctor:
+      enabled: true
 
 chat:
   auto_reply: true
 
 knowledge_base:
   code_guidelines:
-    enabled: true
     filePatterns:
       - REVIEW.md

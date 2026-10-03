@@ -1,166 +1,85 @@
 ---
 name: coderabbit-review
-
-description: Handle the repository's mandatory CodeRabbit review process for a substantive PR. Use after Sourcery has been addressed when a review is available, or proceed if no Sourcery review exists. The first CodeRabbit request must be a full review; subsequent requests must be targeted follow-ups covering changes made in response to the review.
+description: "Use after pushing a substantive PR to `main`: wait for green PR checks, request CodeRabbit reviews by GitHub comment, fix in-scope findings, and report blockers without monitoring indefinitely."
 ---
 
-# CodeRabbit Review
+# CodeRabbit PR Review
 
-## Purpose
+Run this after pushing a substantive PR targeting `main`; don't wait to be asked. GitHub automatic reviews stay disabled. Never merge; the owner decides.
 
-CodeRabbit is the repository's mandatory final automated PR review process.
+## Ground rules
 
-Every substantive PR targeting `main` must receive a CodeRabbit review before the repository owner merges it.
+- All evidence must be for the current pushed head (`gh pr view <PR> --json headRefOid`). Recheck the head and its checks immediately before requesting a review or reporting the PR ready. If the head changed, go back to the CI gate.
+- A verified, intentionally skipped job (such as the Docker smoke test on a fork PR) is not applicable, not passing. Investigate any unexpected skipped, neutral, or missing check.
+- Read new PR comments and submitted reviews from people and bots. Act on actionable in-scope feedback. Don't treat every suggestion as a required fix, and don't wait for reviewers who haven't commented.
+- Respect no-commit and no-push instructions. Without a new pushed head, stop before any PR reply or review request.
+- Don't resolve threads automatically, keep a review database, or post about rate limits on the PR. Report blockers privately to the user.
 
-Automatic CodeRabbit review is disabled for this repository (`reviews.auto_review.enabled` in `.coderabbit.yaml`), so Claude is responsible for requesting the review at the appropriate stage. Check that setting if the behaviour ever appears to differ.
+## 1. CI gate (per pushed head)
 
-The repository owner remains the final gatekeeper.
+1. Confirm the PR targets `main`, the head is pushed, and GitHub access works. Follow `.claude/rules/branch-currency.md` only when being behind `main` matters.
+2. Run `gh pr checks <PR>`. While checks are pending, `sleep 60` and run it again, at most 10 times per pushed head.
+3. Every applicable check must pass.
+4. Inspect MegaLinter findings even if its job passed. Fix findings this PR introduced or worsened, including nonblocking warnings, under `.claude/rules/megalinter.md`. Leave unrelated pre-existing findings alone. If you can't classify a warning, compare narrowly against `main` or available pre-PR results. If the baseline is still unclear, report that and stop.
+5. Fix in-scope CI failures, run targeted validation for each fix, and push under `CLAUDE.md`.
+6. Make at most two CI fix-and-push rounds per invocation. Rounds after CodeRabbit fixes count towards the two.
 
-Follow `.claude/rules/review-fix-workflow.md` for REVIEW.md authority, assessing findings, fixing findings, disputed findings, CI handling, and commit and push behaviour. This skill covers only what's specific to CodeRabbit: when to request a review, the full-vs-follow-up distinction, and completion criteria.
+Report the blocker to the user and stop, without requesting a review, in any of these cases:
 
-## Substantive PR
+- Checks are still pending after 10 attempts.
+- An unrelated failure blocks green CI.
+- The same failure persists after a fix.
+- Anything PR-related is unresolved after two rounds.
 
-A substantive PR is one that changes or could affect:
+## 2. Request a review
 
-- Application or library code.
-- Infrastructure or Docker behaviour.
-- Tests or test behaviour.
-- CI/CD, build, or release logic.
-- Workflows or automation.
-- Security or dependency configuration.
-- Other meaningful project behaviour or configuration.
+- Check existing requests and CodeRabbit responses first. Don't duplicate an active request or one already covering the current head.
+- If no full review has completed, post a top-level PR comment: `@coderabbitai full review`.
+- If a full review completed and a new head has been pushed since, post `@coderabbitai review` once all checks are green.
 
-PRs containing only documentation, comments, formatting, metadata, or similarly mechanical changes may not require CodeRabbit unless the repository owner explicitly requests a review.
+## 3. Wait for the review
 
-If in doubt, treat the PR as substantive.
+- Run `gh pr view <PR> --json reviews,comments` every 60 seconds, at most 10 times. You are looking for a CodeRabbit review of the requested head.
+- These do not count as completion: an acknowledgment, silence, a skipped review, or a review of an older head. Re-read the bot's reply to your command each time, because an acknowledgment may be edited into a rate-limit notice.
+- If a review arrives, report that CodeRabbit reviewed that head and what it found. That alone doesn't make the PR ready.
+- If you are rate limited, stop immediately. Don't retry and don't comment on the PR.
+- If the review is still pending after 10 checks, stop without sending another request.
+- In both stop cases, report "review not completed" and the reason to the user.
 
-## Review Model
+## 4. Handle findings
 
-The expected workflow is:
+1. Read inline comments with `gh api repos/<owner>/<repo>/pulls/<PR>/comments --paginate`; `gh pr view` does not return them. The endpoint also returns older reviews and replies, so keep only top-level comments (no `in_reply_to_id`) whose `commit_id` is the requested head, and skip threads already handled. Assess each finding against the changed code and the Evidence Threshold and Scope and Noise sections of `REVIEW.md`.
+2. The result is clean when three things are true: the review covers the current head, checks are still green, and no actionable in-scope findings remain. Then report the PR ready for the owner and stop. Don't post a fix reply or request a follow-up.
+3. Otherwise, fix every confirmed in-scope finding and validate.
+4. For a disputed finding, don't change code just to satisfy CodeRabbit, and don't dismiss it silently. Present it to the owner with the finding, your assessment, the relevant code, and your evidence. The owner decides. You may ask CodeRabbit about it in the thread to gather evidence (`chat.auto_reply` is on).
+5. After pushing fixes, repeat the CI gate for the new head.
+6. Once green, reply once to each fixed finding in its thread with the fix and the pushed commit. If a finding has no thread, identify it in a PR comment. Then request one `@coderabbitai review` and apply section 3.
+7. Recheck the final head and its checks before reporting. Never start an unbounded fix/review loop.
 
-Sourcery review, if available
-→ assess findings
-→ fix valid findings
-→ update the branch only if branch currency matters
-→ CI green
-→ Claude requests `@coderabbitai full review`
-→ assess findings
-→ fix valid findings or ask user if disputed
-→ push the fix
-→ check CI
-→ if CI fails, fix and push again
-→ once CI is green, Claude requests `@coderabbitai review` as a targeted follow-up
-→ assess follow-up findings
-→ repeat if necessary
-→ repository owner final review/merge
+## Owner change requests
 
-The first CodeRabbit request must always be a full review. Subsequent requests must be targeted follow-ups. Never request another full review.
+An outstanding owner change request assigned to Claude supersedes any earlier clean-review handoff. When asked to address one:
 
-## Before Requesting A Review
+1. Read the comment and the current head, and clarify any material ambiguity.
+2. Implement only the requested change, with targeted validation.
+3. Run the CI gate for the new head.
+4. Reply once in the owner's inline thread, or post a PR comment linking their top-level request, with the fix and the pushed commit.
+5. Request one `@coderabbitai review` and apply section 3.
 
-A PR's CodeRabbit workflow often spans multiple sessions, interruptions, or restarts. Never assume this is the first interaction with CodeRabbit on a PR just because the current session has no memory of it — check the PR's existing comments for any prior `@coderabbitai full review` or `@coderabbitai review` request and CodeRabbit's response before acting.
+The earlier clean review doesn't cover the new head.
 
-For any review (initial or follow-up):
+## Resuming later
 
-1. Determine whether the initial full review has actually completed — not just requested. Check that CodeRabbit's walkthrough (summary) comment reflects a real completed review (not silence, an error, or only a premature follow-up sent before any full review occurred).
-2. If no full-review request exists yet, the initial full review is still owed and must be requested regardless of session history, once the checklist below is satisfied. If a request already exists but has not completed, do not send another — check its current status and covered head commit, and wait for it to complete. A "Review rate limited" / "Action not completed" reply is a failed request, not a pending one — it does not count as "not yet completed" under this step, so don't wait on it; the review is still owed and should be retried (see step 4).
-3. Once a full review has completed, never request another — only a targeted follow-up is allowed from then on. Skip a follow-up if the head commit hasn't changed since the last CodeRabbit request (full or follow-up); there's nothing new for CodeRabbit to review, and it will decline anyway.
-4. The plan allows 1 included review per hour, but don't pre-check or wait for a rate-limit window before requesting — assume the request will succeed and send it. If it comes back rate limited, retry once; if that retry is also rate limited, stop retrying and report it rather than continuing to guess when the window clears. If the rate-limited request was the initial full review, that full review is still owed.
+Inspect the head, checks, prior requests, replies, and CodeRabbit results afresh.
 
-Additionally, before the initial full review specifically:
+- If an earlier review completed late, handle its findings.
+- If CodeRabbit is still actively reviewing, report it as pending and don't request again.
+- If an earlier request was rate limited or stayed silent past the wait, and there's no sign of an active review, send one new request for the review still owed.
+- A rate-limited full request means the first full review is still owed. A completed full review followed by a new head needs a follow-up.
+- Don't duplicate replies, and don't request a review of an unchanged head that already has a completed review.
 
-1. Confirm the PR targets `main` and is substantive (or the owner explicitly requested CodeRabbit).
-2. If a Sourcery review exists, assess it and address valid findings; if none exists yet, proceed without waiting — do not block the PR on it.
-3. Check the branch against `.claude/rules/branch-currency.md`, updating it only if being behind `main` actually matters, and rerun affected validation if it was updated.
-4. Check CI. Proceed only once checks covering the PR's changes are green — if a check fails for a reason unrelated to and pre-existing before the PR, report it and ask whether to proceed rather than fixing it.
-5. Ensure there are no outstanding, unvalidated changes.
+## Reporting
 
-Do not request CodeRabbit before these prerequisites are satisfied.
-
-## Initial CodeRabbit Review
-
-Claude requests the first review only after the prerequisites above are satisfied:
-
-```text
-@coderabbitai full review
-```
-
-This is the only full CodeRabbit review request permitted for the PR.
-
-Treat a GREEN review as a successful review outcome; take no further CodeRabbit action unless subsequent material changes require review.
-
-Do not request a CodeRabbit follow-up while relevant CI is failing or still running.
-
-## Follow-Up Review
-
-After valid findings have been addressed, changes have been pushed, and relevant CI is green, request a targeted follow-up review.
-
-Before sending it, confirm the PR's head commit differs from the commit covered by the last CodeRabbit request (see "Before Requesting A Review" above). If it doesn't, the fix hasn't actually reached the PR yet — do not request a follow-up until it has.
-
-Use a message such as:
-
-```text
-@coderabbitai review
-
-Addressed the actionable findings from the previous review:
-
-- Fixed "<finding>" in `<file>`.
-- Fixed "<finding>" in `<file>`.
-
-Validation completed:
-- <checks>
-
-CI is green.
-
-Please perform a follow-up review of these changes and any directly affected code.
-```
-
-Do not request another full review.
-
-The follow-up should focus on the changes made in response to the previous review and directly affected code.
-
-CodeRabbit's short reply to a review command always includes a generic disclaimer about not re-reviewing already-reviewed commits — this appears on both successful and unsuccessful runs, so it isn't evidence of a refusal on its own. Confirm the follow-up actually ran by checking that the walkthrough comment was updated to cover the new commit; if not (including a "Review rate limited" reply), retry once rather than moving on (see "Before Requesting A Review" step 4).
-
-A zero-actionable-finding follow-up doesn't use REVIEW.md's format — CodeRabbit posts its own fixed "No actionable comments" template plus a native Merge Risk badge instead of `🟢 GREEN — READY` / `✅ APPROVE`. This is expected CodeRabbit behaviour that `.coderabbit.yaml` can't override, not a broken review. Once confirmed against the current head commit as above, treat it as GREEN/APPROVE-equivalent only when the Merge Risk indicator is also low/minimal; assess further if it shows material risk.
-
-## Confirming And Closing Findings
-
-Apply the same shared workflow (assess, fix or escalate, validate, branch currency, CI) to follow-up findings as the initial review. Never request another full review — only another targeted follow-up. Continue until there are no unresolved actionable findings.
-
-CodeRabbit's review submissions (the top-level summary and inline findings) use its own fixed template, never REVIEW.md's status/verdict format — expected, not a bug. To discuss or confirm a specific finding, post a PR comment containing `@coderabbitai` or reply inside that finding's own review-comment thread; with `chat.auto_reply: true` CodeRabbit may also respond without an explicit mention. This chat path isn't a review submission and isn't guaranteed to follow REVIEW.md's exact format — assess whatever it replies with against REVIEW.md rather than assuming automatic compliance, and don't treat it as required for every resolved finding.
-
-## Review Scope
-
-CodeRabbit reviews the PR state available when the review is requested.
-
-Material changes made afterwards may result from:
-
-- Sourcery findings.
-- CodeRabbit findings.
-- MegaLinter or other CI findings.
-- Human review.
-- Changes requested by the repository owner.
-- Additional task requirements.
-
-Subsequent material changes remain subject to the CodeRabbit follow-up process.
-
-Do not turn the review into a general repository audit or manufacture changes simply to obtain another review.
-
-## Completion
-
-The CodeRabbit review process is complete when:
-
-1. Any available Sourcery review has been assessed and valid findings resolved.
-2. Branch currency has been checked against `.claude/rules/branch-currency.md`, and the branch updated if that was needed.
-3. Relevant CI is green before the initial CodeRabbit review.
-4. The initial full CodeRabbit review has completed, with the walkthrough confirming the requested head commit was reviewed.
-5. Valid CodeRabbit findings have been resolved.
-6. Disputed findings have been escalated to the owner.
-7. Relevant validation has passed.
-8. CI is green after fixes.
-9. All latest material changes requiring CodeRabbit review have been covered by the applicable review or targeted follow-up.
-10. No unnecessary full review has been requested.
-11. There are no unresolved actionable findings.
-12. The outcome, including any disputed or unactioned findings, has been reported to the repository owner.
-
-Do not merge the PR. The repository owner is the final gatekeeper for merging.
+- List findings not actioned, each with a one-line reason.
+- Report genuine out-of-scope defects and ask whether to file an issue. Don't fix them or create one.
+- A clean CodeRabbit review posts its own "No actionable comments" message and a Merge Risk badge instead of the `REVIEW.md` format. That is expected, not a broken review. Once it's confirmed to cover the current head, treat it as clean only if Merge Risk is low or minimal. Otherwise, assess further before reporting the PR ready.

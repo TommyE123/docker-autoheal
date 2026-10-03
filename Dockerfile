@@ -46,7 +46,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code (new structure)
 COPY app/ ./app/
-COPY run.py ./
 
 # Copy React build from stage 1 (vite outputs to frontend/../static which is /frontend/../static)
 COPY --from=frontend-builder /static ./static/

@@ -1,0 +1,31 @@
+# Configuration file for yamllint.
+# Documentation: https://yamllint.readthedocs.io/en/stable/configuration.html
+extends: default
+
+# *.lock.yml is compiled by the `gh aw` CLI, not hand-authored;
+# `gh aw compile --yamllint` validates it instead.
+# node_modules: the "Check YAML" task scans the whole workspace, and
+# MegaLinter's eslint pre-command creates frontend/node_modules mid-run.
+ignore: |
+  .github/workflows/*.lock.yml
+  node_modules/
+
+rules:
+  comments:
+    min-spaces-from-content: 1
+  document-start: disable
+  line-length:
+    max: 200
+  truthy:
+    ignore: |
+      .github/workflows/devcontainer.yml
+      .github/workflows/docker-build.yml
+      .github/workflows/greetings.yml
+      .github/workflows/labels-sync.yml
+      .github/workflows/mega-linter.yml
+      .github/workflows/mutation-testing.yml
+      .github/workflows/production-smoke-test.yml
+      .github/workflows/release-please.yml
+      .github/workflows/release-please-auto-merge.yml
+      .github/workflows/semantic-pr-title.yml
+      .github/workflows/tests.yml

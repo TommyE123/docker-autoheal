@@ -34,7 +34,9 @@ env.bak/
 venv.bak/
 
 # IDEs
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
 .idea/
 *.sublime-workspace
 *.sublime-project
@@ -98,6 +100,9 @@ htmlcov/
 *.lcov
 *.lcov.info
 
+# Mutation testing (mutmut) working directory
+mutants/
+
 # Package managers
 yarn.lock
 pnpm-lock.yaml
@@ -143,3 +148,6 @@ docker-compose.override.yml
 # VSCode Workspaces
 *.code-workspace
 data/
+
+# Linter reports
+.lint/
