@@ -99,6 +99,29 @@ jobs:
             echo "Survivors are listed in \`mutation-results.txt\` in the \`mutation-results\` artifact."
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # ./mutation.sh has just regenerated .github/badges/mutation.json with
+      # `mutmut badge`. This job is read-only, so it cannot commit the file;
+      # it says whether the committed copy is stale and offers the new one.
+      - name: Check the committed mutation badge
+        run: |
+          if [ -z "$(git status --porcelain -- .github/badges/mutation.json)" ]; then
+            echo "The committed mutation badge is current."
+          else
+            echo "::notice title=Mutation badge out of date::Commit the new .github/badges/mutation.json (mutation-badge artifact, or run ./mutation.sh)."
+            {
+              echo
+              echo "The committed README badge (\`.github/badges/mutation.json\`) does not match this run."
+              echo "Commit the file from the \`mutation-badge\` artifact, or run \`./mutation.sh\`, to update it."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload badge data
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mutation-badge
+          path: .github/badges/mutation.json
+          if-no-files-found: error
+
       - name: Upload mutation results
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
