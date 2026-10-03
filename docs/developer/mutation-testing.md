@@ -81,20 +81,21 @@ The workflow:
 - is informational: it is not a required check, has no score threshold, and must not be
   made one.
 
-The README badge shows the mutation score of the latest run on `main`, as calculated by
-`mutmut badge` from the exported stats. It equals the **Detected** figure in the job
-summary, since no mutants are skipped. It is informational only: the run succeeds whatever
-the score, so no threshold is implied, and it is not a gate.
+The README badge shows the mutation score stored in `.github/badges/mutation.json`, a
+small Shields endpoint file on `main`. `mutmut badge` generates it from the exported
+stats; nothing calculates the score by hand. The score equals the **Detected** figure in
+the job summary, since no mutants are skipped. It is informational only: the run succeeds
+whatever the score, so no threshold is implied, and it is not a gate.
 
-The badge data is a Shields endpoint JSON file. The mutation workflow generates it with
-`mutmut badge` and uploads it as the `mutation-badge` artifact; it stays read-only, since it
-runs pull request code. After a successful run on `main`, the separate
-`.github/workflows/mutation-badge.yml` workflow checks the file and commits it to
-`badges/mutation.json` on the `badges` branch, which the README badge reads through
-Shields. That workflow holds the only write permission and runs no repository code. The
-data goes to a branch of its own because the `main` ruleset requires pull request checks
-and does not allow direct pushes. Pushes made with the workflow token do not start other
-workflows, so publishing does not trigger another run.
+The file is updated in the pull request that changes the score, not by automation:
+
+- A full `./mutation.sh` run (no arguments) rewrites the file; commit it if it changed.
+  Focused runs leave it alone, because they score only part of the target.
+- The workflow is read-only, so it cannot commit to a pull request branch (and fork
+  pull requests get no write token anyway). It regenerates the file and, if it differs
+  from the committed copy, adds a notice and a line to the job summary. The new file is
+  in the `mutation-badge` artifact, so the update needs no local 5-minute run.
+- If the file is left stale, the badge simply keeps showing the last committed score.
 
 Find results on the workflow run page (for a pull request, the **Mutation testing
 (informational)** check's details link):

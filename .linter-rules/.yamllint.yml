@@ -23,7 +23,6 @@ rules:
       .github/workflows/greetings.yml
       .github/workflows/labels-sync.yml
       .github/workflows/mega-linter.yml
-      .github/workflows/mutation-badge.yml
       .github/workflows/mutation-testing.yml
       .github/workflows/production-smoke-test.yml
       .github/workflows/release-please.yml
