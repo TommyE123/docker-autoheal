@@ -85,7 +85,7 @@ jobs:
           mutmut export-cicd-stats
           mutmut results > mutants/mutation-results.txt
           {
-            echo "## Mutation testing (informational)"
+            echo "## Mutation testing"
             echo
             echo "Mutmut $(mutmut --version | awk '{print $NF}'), Python $(python -V | awk '{print $2}'), commit \`${GITHUB_SHA}\` (\`${GITHUB_REF}\`)"
             echo
