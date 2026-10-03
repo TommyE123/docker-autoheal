@@ -89,8 +89,36 @@ jobs:
           fi
           echo "pr=$number" >> "$GITHUB_OUTPUT"
 
-      - name: Upgrade gh-aw
+      # Plain `gh aw upgrade` (no --create-pull-request) only edits the working
+      # tree: it does not commit, branch or push. Run it to see whether it would
+      # change anything other than the three files the pre-commit hook above
+      # removes (keep these paths in sync with the hook), then reset the tree so
+      # the real run below starts clean. Without this, an already-current repo
+      # still got an empty PR: gh-aw commits the three files and the hook then
+      # removes them.
+      - name: Check whether an upgrade would change anything
+        id: precheck
         if: steps.existing.outputs.pr == ''
+        env:
+          GH_TOKEN: ${{ secrets.GH_AW_UPGRADE_TOKEN }}
+        run: |
+          gh aw upgrade
+          changes=$(git status --porcelain --untracked-files=all -- . \
+            ':(exclude).github/agents/agentic-workflows.md' \
+            ':(exclude).github/workflows/copilot-setup-steps.yml' \
+            ':(exclude).github/skills/agentic-workflows/SKILL.md')
+          git checkout -- .
+          git clean -fdq
+          if [ -n "$changes" ]; then
+            echo "Upgrade would change:"
+            echo "$changes"
+          else
+            echo "Skipping upgrade: gh-aw is already current"
+          fi
+          echo "changed=$([ -n "$changes" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Upgrade gh-aw
+        if: steps.existing.outputs.pr == '' && steps.precheck.outputs.changed == 'true'
         env:
           # gh API auth for gh-aw's `gh pr create` (git push auth comes from
           # the checkout step above).
@@ -100,7 +128,7 @@ jobs:
       # gh-aw titles its PR "Upgrade agentic workflows", which fails the
       # Conventional Commits title check; retitling re-runs that check.
       - name: Retitle the upgrade PR
-        if: steps.existing.outputs.pr == ''
+        if: steps.existing.outputs.pr == '' && steps.precheck.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GH_AW_UPGRADE_TOKEN }}
         run: |
