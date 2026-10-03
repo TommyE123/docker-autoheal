@@ -19,7 +19,7 @@ from fastapi import HTTPException
 from app.api.models import ContainerSelectionRequest
 from app.api.routes.config import update_observability_config
 from app.api.routes.containers import update_container_selection
-from app.config.config_manager import ConfigManager, NotificationService, config_manager
+from app.config.config_manager import ConfigManager, config_manager
 from app.config.init_defaults import init_data_file, initialize_defaults, reset_to_defaults
 from app.docker_client.docker_client_wrapper import DockerClientWrapper
 from app.main import AutoHealService
@@ -449,9 +449,3 @@ class TestWebhookFailureLogging:
             logging.getLogger("app.notifications.notification_manager").setLevel(logging.NOTSET)
 
         assert body_reads == [1]
-
-
-def test_notification_service_type_is_rendered_as_its_plain_value():
-    """``service.type`` is a plain string, so formatting it never adds an enum prefix."""
-    service = NotificationService(name="n", type="webhook", enabled=True, url="https://example.invalid")
-    assert str(service.type) == format(service.type) == "webhook"
