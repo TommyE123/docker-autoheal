@@ -74,7 +74,7 @@ The workflow:
 
 - installs `requirements-dev.txt` on the Python version the `Dockerfile` uses;
 - starts from an empty `mutants/` (and never caches it);
-- runs once per ref: a new push to a pull request supersedes its in-progress run;
+- runs once per ref: a new push to a pull request supersedes that PR's in-progress run, while runs on `main` and manual runs are never cancelled;
 - is informational: it is not a required check, has no score threshold, and must not be
   made one.
 
