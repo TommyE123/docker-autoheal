@@ -133,6 +133,8 @@ reviews:
       enabled: false
     fortitudeLint:
       enabled: false
+    oasdiff:
+      enabled: false
     phpmd:
       enabled: false
     prismaLint:
@@ -159,13 +161,13 @@ reviews:
       enabled: true
     languagetool:
       enabled: true
-    oasdiff:
-      enabled: true
     opengrep:
       enabled: true
     oxc:
       enabled: true
     presidio:
+      enabled: true
+    reactDoctor:
       enabled: true
 
 chat:
