@@ -36,7 +36,12 @@ Autoheal monitors Docker containers, checks their health, and can restart or qua
 
 ## Branches, commits and PRs
 
-- Name a new task branch `<type>/<issue-number>-<short-slug>` when there is an issue (for example, `fix/353-restart-handling`), or `<type>/<short-slug>` otherwise. Keep existing branches as they are, especially once pushed.
+- Name task branches `<type>/<issue-number>-<short-slug>`, e.g. `fix/353-restart-handling`. If there's no issue, use `<type>/<short-slug>`, e.g. `docs/update-readme`.
+  - Types: `feat`, `fix`, `chore`, `refactor`, `test`, `ci`, `docs`, `perf`, `build`, `style`. Pick the one that matches the work; don't default to `feat`/`chore`.
+  - Issue number: digits only, no `#`. If an issue exists but you can't find its number, **stop and ask**; never invent one.
+  - Slug: **2–5 meaningful words**, lowercase kebab-case, ideally ≤40 characters.
+  - Never use random or generated names, UUIDs, timestamps, usernames, or similar non-descriptive names.
+  - **Validate the branch name before committing or opening a PR.** If it doesn't comply, rename it before continuing. If already pushed, follow the existing safe branch-rename guidance.
 - Commit, push, and open a PR on a feature branch unless the user says not to. Respect local-only, no-commit, no-push, and no-PR requests.
 - Never push to a protected branch, force-push, or bypass hooks. Don't overwrite unrelated local changes.
 - When branch currency matters, merge `origin/main` as directed by `.claude/rules/branch-currency.md`. Don't update merely because `main` moved.

@@ -94,10 +94,10 @@ frontend/
 - `npm run format:check` — Prettier, checks the same scope without writing changes.
 
 These also run in CI via MegaLinter (`JAVASCRIPT_ES` and `JAVASCRIPT_PRETTIER`, scoped to
-`frontend/`). Both currently have pre-existing findings across `src/` that predate this
-tooling being wired up — MegaLinter is configured to report them without failing the
-build (see `.mega-linter.yml`'s `DISABLE_ERRORS_LINTERS`); fix them incrementally rather
-than in one mass reformat/cleanup.
+`frontend/`). ESLint errors fail the MegaLinter check. Prettier still has pre-existing
+findings across `src/` that predate this tooling being wired up, so it is configured to
+report them without failing the build (see `.mega-linter.yml`'s `DISABLE_ERRORS_LINTERS`);
+fix those incrementally rather than in one mass reformat.
 
 ## Docker build
 
