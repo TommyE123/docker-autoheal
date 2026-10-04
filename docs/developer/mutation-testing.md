@@ -117,6 +117,30 @@ To browse a CI run with `mutmut show` or `mutmut browse`, download the artifact 
 `mutants/` at the repository root (e.g. `gh run download <run-id> -n mutation-results -D mutants`)
 and use the commands above.
 
+## Targeted run: API server smoke test ([#412](https://github.com/TommyE123/docker-autoheal/issues/412))
+
+`app/tests/unit/test_main_api_server_smoke.py` is part of the normal unit suite and the
+mutation run (`mutation.sh` only ignores `test_release_please_workflow.py`). It runs the real
+`app.main.run_api_server()` against a real Uvicorn server. The code it exercises is mutated as
+follows (focused runs; the verdicts are valid because `mutation.sh` starts from an empty
+`mutants/`):
+
+```bash
+./mutation.sh "app.main.x_run_api_server*"   # 18 mutants: all killed
+./mutation.sh "app.api*"                     # all mutants killed, none survive
+```
+
+- `run_api_server`: every mutant is killed (by the smoke test and the mocked
+  `test_main_lifecycle.py::TestRunApiServer`).
+- The smoke test requests only `/health` and `/api/status`. Those handlers are decorated, so
+  Mutmut does not mutate them (see [Known limitations](#known-limitations)).
+- `app/api/routes/ui.py` initially had 33 survivors (static-file serving and the fallback
+  page). They were killed by tests added to `test_static_file_serving.py`: exact fallback
+  page and error details, `utf-8` encoding, media-type defaults, subdirectory and directory
+  path handling, and the success and error log messages. No equivalent mutants remain
+  undocumented: `"utf-8"` vs `"UTF-8"` is behaviourally equivalent but the test pins the
+  exact spelling.
+
 ## Reading the score
 
 The score is `(killed + timeout) / generated`. A timeout counts as detected: a mutant that
