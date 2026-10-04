@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, within, waitFor, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../services/api", () => ({
@@ -139,6 +139,36 @@ describe("ConfigPage", () => {
       render(<ConfigPage />);
 
       expect(screen.getByText(/loading configuration/i)).toBeInTheDocument();
+    });
+
+    it("loads the configuration exactly once on mount", async () => {
+      getConfig.mockResolvedValue({ data: config });
+
+      render(<ConfigPage />);
+      await screen.findByText("Monitor Settings");
+      await act(async () => {});
+
+      expect(getConfig).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the page usable and logs an error when the Uptime Kuma data fails to load", async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        getConfig.mockResolvedValue({ data: kumaEnabledConfig });
+        api.get.mockRejectedValue(new Error("kuma down"));
+
+        render(<ConfigPage />);
+
+        expect(await screen.findByText("Monitor Settings")).toBeInTheDocument();
+        await waitFor(() =>
+          expect(consoleError).toHaveBeenCalledWith(
+            "Failed to load Uptime Kuma data:",
+            expect.any(Error),
+          ),
+        );
+      } finally {
+        consoleError.mockRestore();
+      }
     });
 
     it("shows a failure message when the initial configuration request rejects", async () => {
