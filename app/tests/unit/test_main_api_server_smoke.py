@@ -47,7 +47,7 @@ class _RecordingServer(uvicorn.Server):
     replacing Uvicorn itself with a mock.
     """
 
-    instances: ClassVar[list[_RecordingServer]] = []
+    instances: ClassVar[list["_RecordingServer"]] = []
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

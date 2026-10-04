@@ -117,6 +117,28 @@ To browse a CI run with `mutmut show` or `mutmut browse`, download the artifact 
 `mutants/` at the repository root (e.g. `gh run download <run-id> -n mutation-results -D mutants`)
 and use the commands above.
 
+## Targeted run: API server smoke test ([#412](https://github.com/TommyE123/docker-autoheal/issues/412))
+
+`app/tests/unit/test_main_api_server_smoke.py` is part of the normal unit suite and the
+mutation run (`mutation.sh` only ignores `test_release_please_workflow.py`). It runs the real
+`app.main.run_api_server()` against a real Uvicorn server. The code it exercises is mutated as
+follows (focused runs; the verdicts are valid because `mutation.sh` starts from an empty
+`mutants/`):
+
+```bash
+./mutation.sh "app.main.x_run_api_server*"   # 18 mutants: all killed
+./mutation.sh "app.api*"                     # 33 survivors, all in app/api/routes/ui.py
+```
+
+- `run_api_server`: every mutant is killed (by the smoke test and the mocked
+  `test_main_lifecycle.py::TestRunApiServer`).
+- The smoke test requests only `/health` and `/api/status`. Those handlers are decorated, so
+  Mutmut does not mutate them (see [Known limitations](#known-limitations)).
+- The survivors in `app/api/routes/ui.py` (`serve_react_app`, `get_media_type`,
+  `get_static_file_path`, `serve_static_file`) are static-file serving code that the smoke
+  test never calls. They are not actionable from it and are left for a separate issue
+  rather than widening this one.
+
 ## Reading the score
 
 The score is `(killed + timeout) / generated`. A timeout counts as detected: a mutant that
