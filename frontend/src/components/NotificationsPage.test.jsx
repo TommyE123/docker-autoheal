@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../services/api", () => ({
@@ -75,6 +75,28 @@ describe("NotificationsPage", () => {
     expect(
       await screen.findByText(/no notification services configured/i),
     ).toBeInTheDocument();
+  });
+
+  it("quotes the Add Service button name in the empty-state message", async () => {
+    getNotificationsConfig.mockResolvedValue({ data: config });
+
+    render(<NotificationsPage />);
+
+    expect(
+      await screen.findByText(
+        'No notification services configured. Click "Add Service" to get started.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("loads the configuration exactly once on mount", async () => {
+    getNotificationsConfig.mockResolvedValue({ data: config });
+
+    render(<NotificationsPage />);
+    await screen.findByText(/notifications are disabled/i);
+    await act(async () => {});
+
+    expect(getNotificationsConfig).toHaveBeenCalledTimes(1);
   });
 
   it("shows an alert when loading the configuration fails", async () => {
