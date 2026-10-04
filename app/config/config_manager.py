@@ -117,6 +117,7 @@ class NotificationService(BaseModel):
     # Ntfy
     topic: str | None = Field(default=None, description="Ntfy topic")
     server_url: str | None = Field(default=None, description="Ntfy server URL (default: https://ntfy.sh)")
+    access_token: str | None = Field(default=None, description="Ntfy access token (takes precedence over username/password)")
 
     # Gotify
     app_token: str | None = Field(default=None, description="Gotify app token")

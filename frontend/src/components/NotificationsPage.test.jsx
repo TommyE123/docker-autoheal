@@ -764,6 +764,20 @@ describe("NotificationsPage", () => {
       });
     });
 
+    it("sends the access token for an ntfy service", async () => {
+      const user = await openAddModal("ntfy", "Ntfy");
+      await user.type(screen.getByPlaceholderText("docker-autoheal"), "alerts");
+      await user.type(screen.getByPlaceholderText("tk_..."), "tk_secret");
+
+      expect(await submitAndGetPayload(user)).toEqual({
+        name: "Ntfy",
+        type: "ntfy",
+        enabled: true,
+        topic: "alerts",
+        access_token: "tk_secret",
+      });
+    });
+
     it("sends the server url and app token for a gotify service", async () => {
       const user = await openAddModal("gotify", "Gotify");
       await user.type(

@@ -210,6 +210,7 @@ function NotificationsPage() {
         if (formData.server_url) cleanedData.server_url = formData.server_url;
         if (formData.username) cleanedData.username = formData.username;
         if (formData.password) cleanedData.password = formData.password;
+        if (formData.access_token) cleanedData.access_token = formData.access_token;
       }
       if (formData.type === 'gotify') {
         if (formData.server_url) cleanedData.server_url = formData.server_url;
@@ -389,6 +390,16 @@ function NotificationsPage() {
                 value={formData.password || ''}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Access token (optional)</Form.Label>
+              <Form.Control
+                type="password"
+                value={formData.access_token || ''}
+                onChange={(e) => setFormData({ ...formData, access_token: e.target.value })}
+                placeholder="tk_..."
+              />
+              <Form.Text muted>Takes precedence over username/password.</Form.Text>
             </Form.Group>
           </>
         );
