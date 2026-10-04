@@ -5,9 +5,10 @@ name: docker-autoheal-dev # Default project name only; COMPOSE_PROJECT_NAME over
 #   docker compose -p docker-autoheal-dev -f docker-compose.yml -f docker-compose.dev.yml up --build -d
 #
 # Uses a distinct image tag, container name, host ports, data directory and monitoring
-# label, so the deployment named `docker-autoheal` is left untouched. Only containers
-# labelled `autoheal.dev=true` are monitored; `autoheal=true` containers (the production
-# label) are ignored even though the Docker socket is shared. Override the ports with
+# label, so the deployment named `docker-autoheal` is left untouched. The label controls
+# automatic discovery: `autoheal=true` containers (the production label) are not discovered
+# or auto-added, but the Docker socket is shared, so anything explicitly selected in the UI
+# or restarted through the API is still reachable. Override the ports with
 # AUTOHEAL_DEV_PORT and AUTOHEAL_DEV_METRICS_PORT. `!override` replaces the base lists
 # instead of appending to them (needs Docker Compose v2.24.4 or later).
 services:
@@ -16,12 +17,30 @@ services:
     image: docker-autoheal:dev
     container_name: docker-autoheal-dev
     # Seeds ./data-dev/config.json with the dev label on first start only; the app fills in
-    # every other setting from its defaults and keeps any later edits made in the UI.
+    # every other setting from its defaults and keeps any later edits made in the UI. Fails
+    # closed: a failed seed, or an existing config whose monitor section is missing, invalid or
+    # still the production label, stops the container instead of letting the app fall back to
+    # monitoring autoheal=true containers.
     command:
       - sh
       - -c
       - |
-        [ -f /data/config.json ] || printf '{"monitor":{"label_key":"autoheal.dev"}}' > /data/config.json
+        set -eu
+        if [ ! -f /data/config.json ]; then
+          printf '{"monitor":{"label_key":"autoheal.dev"}}' > /data/config.json.tmp
+          mv /data/config.json.tmp /data/config.json
+        fi
+        python - <<'PY'
+        import json, sys
+        from app.config.config_manager import MonitorConfig
+        try:
+            with open("/data/config.json") as f:
+                monitor = MonitorConfig(**json.load(f)["monitor"])
+        except Exception as error:
+            sys.exit(f"Refusing to start: /data/config.json is not a valid dev config: {error}")
+        if (monitor.label_key, monitor.label_value) == ("autoheal", "true"):
+            sys.exit("Refusing to start: /data/config.json uses the production label autoheal=true")
+        PY
         exec python -m app.main
     # Only changes the URLs shown in the startup logs; the server still listens on 0.0.0.0:3131
     # inside the container. Set AUTOHEAL_DEV_HOST to the address you reach this host at to log a

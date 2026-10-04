@@ -644,10 +644,10 @@ class TestCustomMonitorLabel:
         assert f"{DEV_LABEL}=true" in event.message
         assert "autoheal=true" not in event.message
 
-    async def test_dev_config_never_monitors_production_labelled_container(
+    async def test_dev_config_does_not_monitor_unselected_production_labelled_container(
         self, engine, docker_client, update_config
     ):
-        """A dev instance on the shared Docker socket must not act on ``autoheal=true``."""
+        """With the dev label, automatic discovery does not pick up ``autoheal=true`` containers."""
         prod, prod_info = make_container(name="prod", container_id="a" * 64, labels={"autoheal": "true"})
         dev, dev_info = make_container(name="dev", container_id="b" * 64, labels={DEV_LABEL: "true"})
 

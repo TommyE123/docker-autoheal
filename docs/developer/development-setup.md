@@ -193,12 +193,21 @@ container. Outside this override, `AUTOHEAL_PUBLIC_HOST` and `AUTOHEAL_PUBLIC_PO
 same job.
 
 The dev instance shares the host's Docker socket, so it can see every container on the
-daemon. To keep it away from production containers, the override seeds
-`./data-dev/config.json` on first start with `monitor.label_key` set to `autoheal.dev`.
-Only containers labelled `autoheal.dev=true` are monitored or auto-added; containers
-labelled `autoheal=true` are ignored. Label your test containers accordingly. If
-`./data-dev/config.json` already exists it is left alone, so delete `./data-dev` to
-re-seed it.
+daemon. To keep its automatic discovery away from production containers, the override seeds
+`./data-dev/config.json` on first start with `monitor.label_key` set to `autoheal.dev`. Only
+containers labelled `autoheal.dev=true` are discovered and auto-added; containers labelled
+`autoheal=true` are not. Label your test containers accordingly.
+
+This is not a security boundary. The label only controls automatic discovery: a container
+explicitly selected in the UI (`containers.selected`) is monitored whatever its labels, and the
+API can restart any container on the shared socket. Don't select production containers in the
+dev instance.
+
+An existing `./data-dev/config.json` is kept, so your own changes to the monitoring label
+survive restarts; delete `./data-dev` to re-seed it. The container refuses to start, and logs
+why, if the file is unreadable or its `monitor` section is invalid or still uses the production
+`autoheal=true` label, or if the seed can't be written. Without that check the app would fall
+back to its defaults and monitor `autoheal=true` containers.
 
 Inside the Dev Container this comes with a caveat — see
 [Docker Compose inside the Dev Container](#docker-compose-inside-the-dev-container).
