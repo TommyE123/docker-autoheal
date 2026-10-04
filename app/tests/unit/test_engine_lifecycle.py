@@ -107,6 +107,7 @@ class TestScanExistingContainers:
 
         assert config_manager.get_config().containers.selected == ["web"]
         assert [e.event_type for e in config_manager.get_events()] == ["auto_monitor"]
+        assert "autoheal=true" in config_manager.get_events()[0].message
 
     async def test_compose_container_is_added_under_its_stable_id(self, engine, docker_client):
         container, info = make_container(
@@ -585,3 +586,76 @@ class TestEventListenerLoop:
         await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
 
         assert attempts == [1]
+
+
+DEV_LABEL = "autoheal.dev"
+
+
+@pytest.fixture
+def dev_label_config(update_config):
+    """Configure the monitoring label the way the dev Compose stack does."""
+    update_config(lambda c: setattr(c.monitor, "label_key", DEV_LABEL))
+
+
+@pytest.mark.asyncio
+class TestCustomMonitorLabel:
+    """Auto-discovery honours ``monitor.label_key``/``label_value`` (#369)."""
+
+    async def test_scan_and_event_use_default_label_by_default(self, engine, docker_client):
+        prod, prod_info = make_container(name="prod", container_id="a" * 64, labels={"autoheal": "true"})
+        dev, dev_info = make_container(name="dev", container_id="b" * 64, labels={DEV_LABEL: "true"})
+        docker_client.add_container(prod, prod_info)
+        docker_client.add_container(dev, dev_info)
+
+        await engine._scan_existing_containers()
+        await engine._process_container_start_event(start_event(dev.id, "dev"))
+
+        assert config_manager.get_config().containers.selected == ["prod"]
+
+    async def test_scan_selects_only_custom_labelled_containers(
+        self, engine, docker_client, dev_label_config
+    ):
+        prod, prod_info = make_container(name="prod", container_id="a" * 64, labels={"autoheal": "true"})
+        dev, dev_info = make_container(name="dev", container_id="b" * 64, labels={DEV_LABEL: "true"})
+        docker_client.add_container(prod, prod_info)
+        docker_client.add_container(dev, dev_info)
+
+        await engine._scan_existing_containers()
+
+        assert config_manager.get_config().containers.selected == ["dev"]
+        [event] = config_manager.get_events()
+        assert f"{DEV_LABEL}=true" in event.message
+        assert "autoheal=true" not in event.message
+
+    async def test_start_event_selects_only_custom_labelled_containers(
+        self, engine, docker_client, dev_label_config
+    ):
+        prod, prod_info = make_container(name="prod", container_id="a" * 64, labels={"autoheal": "true"})
+        dev, dev_info = make_container(name="dev", container_id="b" * 64, labels={DEV_LABEL: "true"})
+        docker_client.add_container(prod, prod_info)
+        docker_client.add_container(dev, dev_info)
+
+        await engine._process_container_start_event(start_event(prod.id, "prod"))
+        assert config_manager.get_config().containers.selected == []
+
+        await engine._process_container_start_event(start_event(dev.id, "dev"))
+        assert config_manager.get_config().containers.selected == ["dev"]
+        [event] = config_manager.get_events()
+        assert f"{DEV_LABEL}=true" in event.message
+        assert "autoheal=true" not in event.message
+
+    async def test_dev_config_does_not_monitor_unselected_production_labelled_container(
+        self, engine, docker_client, update_config
+    ):
+        """With the dev label, automatic discovery does not pick up ``autoheal=true`` containers."""
+        prod, prod_info = make_container(name="prod", container_id="a" * 64, labels={"autoheal": "true"})
+        dev, dev_info = make_container(name="dev", container_id="b" * 64, labels={DEV_LABEL: "true"})
+
+        # Default (production) config: only autoheal=true is monitored.
+        assert engine.should_monitor_container(prod, prod_info) is True
+        assert engine.should_monitor_container(dev, dev_info) is False
+
+        # Dev config: only autoheal.dev=true is monitored.
+        update_config(lambda c: setattr(c.monitor, "label_key", DEV_LABEL))
+        assert engine.should_monitor_container(dev, dev_info) is True
+        assert engine.should_monitor_container(prod, prod_info) is False

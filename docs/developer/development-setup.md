@@ -80,10 +80,11 @@ Scripts**, **Check Workflows**, **Check Markup and Data**, **Check Repository
 Conventions** and **Run Security Scanners**.
 
 **Autoheal: Run Docker Stack** builds the app from your checkout and runs it with
-`docker compose up --build autoheal`. The `--build` flag is what makes
-`docker-compose.yml` build your changes instead of using the published image. The result is
-tagged `tommye123/docker-autoheal:latest` locally, replacing any copy you had pulled; run
-`docker compose pull` to get the published image back.
+`docker compose -p docker-autoheal-dev -f docker-compose.yml -f docker-compose.dev.yml up --build autoheal`
+(see [Running beside an existing deployment](#running-beside-an-existing-deployment)). The
+`--build` flag is what makes `docker-compose.yml` build your changes instead of using the
+published image. The result is tagged `docker-autoheal:dev` locally, so it does not replace
+`tommye123/docker-autoheal:latest`.
 
 **Autoheal: Install gh-aw** installs the `github/gh-aw` extension pinned to the
 `compiler_version` recorded in the header of `.github/workflows/issue-triage.lock.yml`, so
@@ -92,7 +93,7 @@ Codespaces token) first, replaces any installed copy, and is not part of any agg
 task. The extension lives in the `gh` volume, so it survives rebuilds; run the task again
 after the lock file is recompiled with a newer version.
 
-**Autoheal: Stop Docker Stack** runs `docker compose down`.
+**Autoheal: Stop Docker Stack** runs `docker compose down` with the same `-p` and `-f` options.
 Stacks started with **Run Docker Stack** run on the host's Docker daemon (see below), so
 they keep running when the Dev Container stops or is rebuilt until you stop them.
 
@@ -151,6 +152,62 @@ docker compose up --build
 This builds the frontend and backend into a single image (see
 [Architecture](architecture.md)) and runs it the same way an end user would, on port
 `3131`.
+
+### Running beside an existing deployment
+
+`docker-compose.yml` fixes the container name (`docker-autoheal`) and host ports (`3131`,
+`9090`), so it can't start on a Docker daemon that already runs an Autoheal deployment.
+Add the dev override to run your checkout alongside it without touching the deployment:
+
+```bash
+docker compose -p docker-autoheal-dev -f docker-compose.yml -f docker-compose.dev.yml up --build -d
+```
+
+This uses the image `docker-autoheal:dev` (so `tommye123/docker-autoheal:latest` is not
+replaced), the container name `docker-autoheal-dev`, the UI on `3132`, metrics on `9091`,
+`./data-dev` for data, and its own Compose project, `docker-autoheal-dev`. Set
+`AUTOHEAL_DEV_PORT` and `AUTOHEAL_DEV_METRICS_PORT` to change the ports. The override needs
+Docker Compose v2.24.4 or later. Pass the same `-p` and `-f` options to `docker compose down`
+to stop it.
+
+Always pass `-p docker-autoheal-dev`. The `name:` in `docker-compose.dev.yml` is only a default:
+Compose gives the `COMPOSE_PROJECT_NAME` environment variable precedence over it, so with that
+variable set the stack would otherwise land in another project, and `docker compose down` could
+remove that project's containers and networks. `-p` takes precedence over both.
+
+By default the startup log reports the published host port (`3132`) and the container port
+(`3131`), for example `Web UI published on host port 3132 (container port 3131)`, because the
+application cannot know which address other machines use to reach the host. Open that port on
+the host's address. To have the log print a full, clickable URL instead, set
+`AUTOHEAL_DEV_HOST` to that address. The simplest way is a `.env` file next to
+`docker-compose.yml`, which Docker Compose reads automatically and Git ignores:
+
+```bash
+echo 'AUTOHEAL_DEV_HOST=192.0.2.10' > .env
+```
+
+The log then shows `Web UI available at http://192.0.2.10:3132`. Exporting the variable in
+the shell that runs the command works too. Nothing detects the address for you. This only
+changes the logged messages. The server still listens on `0.0.0.0:3131` inside the
+container. Outside this override, `AUTOHEAL_PUBLIC_HOST` and `AUTOHEAL_PUBLIC_PORT` do the
+same job.
+
+The dev instance shares the host's Docker socket, so it can see every container on the
+daemon. To keep its automatic discovery away from production containers, the override seeds
+`./data-dev/config.json` on first start with `monitor.label_key` set to `autoheal.dev`. Only
+containers labelled `autoheal.dev=true` are discovered and auto-added; containers labelled
+`autoheal=true` are not. Label your test containers accordingly.
+
+This is not a security boundary. The label only controls automatic discovery: a container
+explicitly selected in the UI (`containers.selected`) is monitored whatever its labels, and the
+API can restart any container on the shared socket. Don't select production containers in the
+dev instance.
+
+An existing `./data-dev/config.json` is kept, so your own changes to the monitoring label
+survive restarts; delete `./data-dev` to re-seed it. The container refuses to start, and logs
+why, if the file is unreadable or its `monitor` section is invalid or still uses the production
+`autoheal=true` label, or if the seed can't be written. Without that check the app would fall
+back to its defaults and monitor `autoheal=true` containers.
 
 Inside the Dev Container this comes with a caveat — see
 [Docker Compose inside the Dev Container](#docker-compose-inside-the-dev-container).
