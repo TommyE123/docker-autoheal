@@ -24,6 +24,12 @@ Auto-Heal service.
 The label key and value are configurable (`monitor.label_key` / `monitor.label_value` in
 [Configuration](configuration.md)), but default to `autoheal` / `true`.
 
+When a container with the configured label is discovered (at startup or on a `start`
+event), its stable identifier is added to `containers.selected`, so it becomes an explicit
+selection. That means it is monitored regardless of the whitelist/blacklist filters, and
+removing the label later does not by itself stop monitoring: the selection must be removed
+explicitly, for example from the **Containers** tab in the web UI or through the API.
+
 You can also enable monitoring for a container from the **Containers** tab in the web UI
 without adding a label — this stores an explicit selection that persists in
 `config.json`.
