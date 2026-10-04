@@ -78,13 +78,17 @@ class MonitoringEngine:
 
         self._running = True
 
-        # Proactively scan for existing containers with the configured monitor label
+        # Proactively scan for existing containers with the configured monitoring label
         await self._scan_existing_containers()
 
         self._task = asyncio.create_task(self._monitor_loop())
         self._event_task = asyncio.create_task(self._event_listener_loop())
         logger.info("Monitoring engine started")
-        logger.info("Event listener started for auto-monitoring containers with the configured monitor label")
+        monitor_config = config_manager.get_config().monitor
+        logger.info(
+            "Event listener started for auto-monitoring containers with "
+            f"{monitor_config.label_key}={monitor_config.label_value} label"
+        )
 
     async def stop(self) -> None:
         """Stop the monitoring engine"""
@@ -611,11 +615,14 @@ class MonitoringEngine:
 
     async def _scan_existing_containers(self) -> None:
         """
-        Proactively scan all existing containers on startup and auto-add those with the configured monitor label
+        Proactively scan all existing containers on startup and auto-add those with the configured
+        monitoring label (autoheal=true by default)
         This ensures containers that are already running when the service starts are added to config.json
         """
         try:
-            logger.info("Scanning existing containers for the configured monitor label...")
+            config = config_manager.get_config()
+            label = f"{config.monitor.label_key}={config.monitor.label_value}"
+            logger.info(f"Scanning existing containers for {label} label...")
 
             # Ensure Docker connection is active
             if not self.docker_client.is_connected():
@@ -626,7 +633,6 @@ class MonitoringEngine:
             containers = await asyncio.to_thread(self.docker_client.list_containers, all_containers=False)
 
             added_count = 0
-            config = config_manager.get_config()
 
             for container in containers:
                 try:
@@ -643,7 +649,7 @@ class MonitoringEngine:
                     container_id = info.get("full_id")
                     container_name = info.get("name")
 
-                    # Check if container has the configured monitor label (default autoheal=true)
+                    # Check if container has the configured monitoring label (autoheal=true by default)
                     if labels.get(config.monitor.label_key) != config.monitor.label_value:
                         continue
 
@@ -671,7 +677,7 @@ class MonitoringEngine:
                     if (stable_id in config.containers.excluded or
                         container_name in config.containers.excluded or
                         container_id in config.containers.excluded):
-                        logger.info(f"Container {container_name} (stable_id: {stable_id}) has the {config.monitor.label_key}={config.monitor.label_value} label but is in excluded list, skipping")
+                        logger.info(f"Container {container_name} (stable_id: {stable_id}) has {label} but is in excluded list, skipping")
                         continue
 
                     # Add to monitored list using STABLE ID
@@ -679,7 +685,7 @@ class MonitoringEngine:
                     added_count += 1
 
                     # Log the auto-monitoring
-                    logger.info(f"Auto-monitoring enabled for container '{container_name}' ({container_id[:12]}) with stable_id '{stable_id}' - detected {config.monitor.label_key}={config.monitor.label_value} label on startup")
+                    logger.info(f"Auto-monitoring enabled for container '{container_name}' ({container_id[:12]}) with stable_id '{stable_id}' - detected {label} label on startup")
 
                     # Create an event for this
                     event_obj = AutoHealEvent(
@@ -689,7 +695,7 @@ class MonitoringEngine:
                         event_type="auto_monitor",
                         restart_count=0,
                         status="enabled",
-                        message=f"Automatically added to monitoring on startup due to {config.monitor.label_key}={config.monitor.label_value} label (stable_id: {stable_id})"
+                        message=f"Automatically added to monitoring on startup due to {label} label (stable_id: {stable_id})"
                     )
                     config_manager.add_event(event_obj)
 
@@ -712,7 +718,8 @@ class MonitoringEngine:
 
     async def _event_listener_loop(self) -> None:
         """
-        Listen for Docker events and auto-add containers with the configured monitor label
+        Listen for Docker events and auto-add containers with the configured monitoring label
+        (autoheal=true by default)
         """
         import queue
         import threading
@@ -774,7 +781,8 @@ class MonitoringEngine:
 
     async def _process_container_start_event(self, event: dict) -> None:
         """
-        Process a container start event and add to monitoring if it has the configured monitor label
+        Process a container start event and add to monitoring if it has the configured monitoring
+        label (autoheal=true by default)
         Args:
             event: Docker event dictionary
         """
@@ -810,8 +818,9 @@ class MonitoringEngine:
 
             labels = info.get("labels", {})
 
-            # Check if container has the configured monitor label (default autoheal=true)
+            # Check if container has the configured monitoring label (autoheal=true by default)
             config = config_manager.get_config()
+            label = f"{config.monitor.label_key}={config.monitor.label_value}"
             if labels.get(config.monitor.label_key) == config.monitor.label_value:
 
                 # Get stable identifier (handles auto-generated names, compose services)
@@ -838,7 +847,7 @@ class MonitoringEngine:
                 if (stable_id in config.containers.excluded or
                     container_name in config.containers.excluded or
                     container_id in config.containers.excluded):
-                    logger.info(f"Container {container_name} (stable_id: {stable_id}) has the {config.monitor.label_key}={config.monitor.label_value} label but is in excluded list, skipping")
+                    logger.info(f"Container {container_name} (stable_id: {stable_id}) has {label} but is in excluded list, skipping")
                     return
 
                 # Add to monitored list using STABLE ID (solves all edge cases)
@@ -846,7 +855,7 @@ class MonitoringEngine:
                 config_manager.update_config(config)
 
                 # Log the auto-monitoring
-                logger.info(f"Auto-monitoring enabled for container '{container_name}' ({container_id[:12]}) with stable_id '{stable_id}' - detected {config.monitor.label_key}={config.monitor.label_value} label")
+                logger.info(f"Auto-monitoring enabled for container '{container_name}' ({container_id[:12]}) with stable_id '{stable_id}' - detected {label} label")
 
                 # Create an event for this
                 event_obj = AutoHealEvent(
@@ -856,7 +865,7 @@ class MonitoringEngine:
                     event_type="auto_monitor",
                     restart_count=0,
                     status="enabled",
-                    message=f"Automatically added to monitoring due to {config.monitor.label_key}={config.monitor.label_value} label (stable_id: {stable_id})"
+                    message=f"Automatically added to monitoring due to {label} label (stable_id: {stable_id})"
                 )
                 config_manager.add_event(event_obj)
 

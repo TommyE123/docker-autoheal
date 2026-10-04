@@ -58,7 +58,8 @@ docker-autoheal/
 ├── pyproject.toml                # Mutmut configuration only
 ├── mutation.sh                   # Mutation-testing entry point (see docs/developer/mutation-testing.md)
 ├── Dockerfile                    # Multi-stage build: Node (frontend) → Python (backend)
-└── docker-compose.yml            # Runs the published image; `up --build` builds from this checkout
+├── docker-compose.yml            # Runs the published image; `up --build` builds from this checkout
+└── docker-compose.dev.yml        # Override: distinct name, ports and data dir to run beside a deployment
 ```
 
 There are no root-level Python test/verification scripts — the manual scripts that used
