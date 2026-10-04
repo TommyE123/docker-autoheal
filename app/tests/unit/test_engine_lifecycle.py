@@ -266,6 +266,13 @@ class TestScanExistingContainers:
 
         assert config_manager.get_config().containers.selected == []
 
+    async def test_scan_start_log_does_not_name_a_hardcoded_label(self, engine, caplog):
+        with caplog.at_level("INFO"):
+            await engine._scan_existing_containers()
+
+        assert "Scanning existing containers for the configured monitor label" in caplog.text
+        assert "autoheal=true" not in caplog.text
+
     async def test_uninspectable_container_is_skipped(self, engine, docker_client):
         container, info = make_container(name="web", labels={"autoheal": "true"})
         docker_client.add_container(container, info)

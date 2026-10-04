@@ -78,13 +78,13 @@ class MonitoringEngine:
 
         self._running = True
 
-        # Proactively scan for existing containers with autoheal=true label
+        # Proactively scan for existing containers with the configured monitor label
         await self._scan_existing_containers()
 
         self._task = asyncio.create_task(self._monitor_loop())
         self._event_task = asyncio.create_task(self._event_listener_loop())
         logger.info("Monitoring engine started")
-        logger.info("Event listener started for auto-monitoring containers with autoheal=true label")
+        logger.info("Event listener started for auto-monitoring containers with the configured monitor label")
 
     async def stop(self) -> None:
         """Stop the monitoring engine"""
@@ -611,11 +611,11 @@ class MonitoringEngine:
 
     async def _scan_existing_containers(self) -> None:
         """
-        Proactively scan all existing containers on startup and auto-add those with autoheal=true label
+        Proactively scan all existing containers on startup and auto-add those with the configured monitor label
         This ensures containers that are already running when the service starts are added to config.json
         """
         try:
-            logger.info("Scanning existing containers for autoheal=true label...")
+            logger.info("Scanning existing containers for the configured monitor label...")
 
             # Ensure Docker connection is active
             if not self.docker_client.is_connected():
@@ -712,7 +712,7 @@ class MonitoringEngine:
 
     async def _event_listener_loop(self) -> None:
         """
-        Listen for Docker events and auto-add containers with autoheal=true label
+        Listen for Docker events and auto-add containers with the configured monitor label
         """
         import queue
         import threading
@@ -774,7 +774,7 @@ class MonitoringEngine:
 
     async def _process_container_start_event(self, event: dict) -> None:
         """
-        Process a container start event and add to monitoring if it has autoheal=true label
+        Process a container start event and add to monitoring if it has the configured monitor label
         Args:
             event: Docker event dictionary
         """
