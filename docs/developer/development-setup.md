@@ -172,11 +172,19 @@ Docker Compose v2.24.4 or later. Pass the same `-f` flags to `docker compose dow
 By default the startup log reports the published host port (`3132`) and the container port
 (`3131`), for example `Web UI published on host port 3132 (container port 3131)`, because the
 application cannot know which address other machines use to reach the host. Open that port on
-the host's address. To have the log print a full URL instead, set `AUTOHEAL_DEV_HOST` to that
-address before starting the stack, for example `AUTOHEAL_DEV_HOST=192.0.2.10`. Nothing
-detects the address for you. This only changes the logged messages. The server still listens
-on `0.0.0.0:3131` inside the container. Outside this override, `AUTOHEAL_PUBLIC_HOST` and
-`AUTOHEAL_PUBLIC_PORT` do the same job.
+the host's address. To have the log print a full, clickable URL instead, set
+`AUTOHEAL_DEV_HOST` to that address. The simplest way is a `.env` file next to
+`docker-compose.yml`, which Docker Compose reads automatically and Git ignores:
+
+```bash
+echo 'AUTOHEAL_DEV_HOST=192.0.2.10' > .env
+```
+
+The log then shows `Web UI available at http://192.0.2.10:3132`. Exporting the variable in
+the shell that runs the command works too. Nothing detects the address for you. This only
+changes the logged messages. The server still listens on `0.0.0.0:3131` inside the
+container. Outside this override, `AUTOHEAL_PUBLIC_HOST` and `AUTOHEAL_PUBLIC_PORT` do the
+same job.
 
 The dev instance shares the host's Docker socket, so it can see every container on the
 daemon. To keep it away from production containers, the override seeds
