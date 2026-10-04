@@ -4,6 +4,7 @@ Main entry point for Docker Auto-Heal Service
 
 import asyncio
 import logging
+import os
 import signal
 import sys
 from pathlib import Path
@@ -150,8 +151,9 @@ class AutoHealService:
 
             self.running = True
             logger.info("Docker Auto-Heal Service started successfully")
-            logger.info(f"Web UI available at http://{config.ui.listen_address}:{config.ui.listen_port}")
-            logger.info(f"API documentation available at http://{config.ui.listen_address}:{config.ui.listen_port}/docs")
+            ui_url = get_ui_url(config)
+            logger.info(f"Web UI available at {ui_url}")
+            logger.info(f"API documentation available at {ui_url}/docs")
 
         except Exception as e:
             logger.error(f"Failed to start service: {e}", exc_info=True)
@@ -202,6 +204,21 @@ class AutoHealService:
 
 # Global service instance
 service: AutoHealService | None = None
+
+
+def get_ui_url(config) -> str:
+    """
+    Build the URL shown in the startup messages for reaching the web UI.
+
+    Display only: the server still binds to ``config.ui.listen_address`` and
+    ``config.ui.listen_port``. Inside a container those are the bind address and the
+    container port, which are not what a user connects to. ``AUTOHEAL_PUBLIC_HOST`` and
+    ``AUTOHEAL_PUBLIC_PORT`` let a deployment supply the host address and published port
+    instead; each falls back to the configured value when unset or empty.
+    """
+    host = os.environ.get("AUTOHEAL_PUBLIC_HOST", "").strip() or config.ui.listen_address
+    port = os.environ.get("AUTOHEAL_PUBLIC_PORT", "").strip() or config.ui.listen_port
+    return f"http://{host}:{port}"
 
 
 def signal_handler(signum, _frame):

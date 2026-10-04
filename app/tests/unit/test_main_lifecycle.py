@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 import app.main as main_module
-from app.main import AutoHealService, CancelledErrorFilter, signal_handler
+from app.main import AutoHealService, CancelledErrorFilter, get_ui_url, signal_handler
 
 
 class TestCancelledErrorFilter:
@@ -211,6 +211,79 @@ class TestAutoHealServiceStartFailure:
 
             assert service.running is True
             mock_notif.stop.assert_not_called()
+
+
+class TestUiUrl:
+    """Displayed UI URL: supplied public host/port, defaults unchanged, bind address unaffected."""
+
+    @staticmethod
+    def _config(address="0.0.0.0", port=3131):
+        config = MagicMock()
+        config.ui.listen_address = address
+        config.ui.listen_port = port
+        config.observability.log_level = "INFO"
+        return config
+
+    def test_default_url_is_the_configured_address_and_port(self, monkeypatch):
+        monkeypatch.delenv("AUTOHEAL_PUBLIC_HOST", raising=False)
+        monkeypatch.delenv("AUTOHEAL_PUBLIC_PORT", raising=False)
+
+        assert get_ui_url(self._config()) == "http://0.0.0.0:3131"
+
+    def test_public_host_and_port_are_used_when_supplied(self, monkeypatch):
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_HOST", "192.0.2.10")
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_PORT", "3132")
+
+        assert get_ui_url(self._config()) == "http://192.0.2.10:3132"
+
+    def test_each_value_falls_back_independently_and_empty_is_ignored(self, monkeypatch):
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_HOST", "192.0.2.10")
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_PORT", "  ")
+
+        assert get_ui_url(self._config()) == "http://192.0.2.10:3131"
+
+    @pytest.mark.asyncio
+    async def test_startup_messages_report_the_public_url(self, monkeypatch, caplog):
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_HOST", "192.0.2.10")
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_PORT", "3132")
+        config = self._config()
+        config.observability.prometheus_enabled = False
+        config.monitor.interval_seconds = 30
+        config.notifications.enabled = False
+        config.uptime_kuma.enabled = False
+
+        with patch('app.main.config_manager') as mock_cm, \
+             patch('app.main.DockerClientWrapper'), \
+             patch('app.main.MonitoringEngine') as mock_engine_cls, \
+             patch('app.main.UptimeKumaMonitor'), \
+             patch('app.main.init_api'), \
+             patch('app.main.notification_manager') as mock_notif, \
+             caplog.at_level("INFO", logger="app.main"):
+            mock_cm.get_config.return_value = config
+            mock_engine_cls.return_value.start = AsyncMock()
+            mock_notif.start = AsyncMock()
+
+            await AutoHealService().start()
+
+        assert "Web UI available at http://192.0.2.10:3132" in caplog.text
+        assert "API documentation available at http://192.0.2.10:3132/docs" in caplog.text
+        assert "0.0.0.0" not in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_server_still_binds_to_all_interfaces_with_a_public_host_set(self, monkeypatch):
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_HOST", "192.0.2.10")
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_PORT", "3132")
+
+        with patch('app.main.config_manager') as mock_cm, \
+             patch('app.main.uvicorn') as mock_uvicorn:
+            mock_cm.get_config.return_value = self._config()
+            mock_uvicorn.Server.return_value.serve = AsyncMock()
+
+            await main_module.run_api_server()
+
+        kwargs = mock_uvicorn.Config.call_args.kwargs
+        assert kwargs["host"] == "0.0.0.0"
+        assert kwargs["port"] == 3131
 
 
 class TestSignalHandler:

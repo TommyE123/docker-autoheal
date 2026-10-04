@@ -23,6 +23,12 @@ services:
       - |
         [ -f /data/config.json ] || printf '{"monitor":{"label_key":"autoheal.dev"}}' > /data/config.json
         exec python -m app.main
+    # Only changes the URLs shown in the startup logs; the server still listens on 0.0.0.0:3131
+    # inside the container. AUTOHEAL_DEV_HOST is the address you reach the host at (the
+    # "Run Docker Stack" task sets it to the host's first IP); the port is the published one.
+    environment:
+      - AUTOHEAL_PUBLIC_HOST=${AUTOHEAL_DEV_HOST:-localhost}
+      - AUTOHEAL_PUBLIC_PORT=${AUTOHEAL_DEV_PORT:-3132}
     volumes: !override
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./data-dev:/data
