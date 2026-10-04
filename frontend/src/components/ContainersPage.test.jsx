@@ -439,7 +439,7 @@ describe("ContainersPage", () => {
       name: "web-app",
       image: "nginx:latest",
       status: "running",
-      exit_code: 0,
+      exit_code: 137,
       restart_count: 2,
       recent_restart_count: 1,
       monitored: true,
@@ -462,8 +462,7 @@ describe("ContainersPage", () => {
       expect(within(dialog).getByText("abc123full")).toBeInTheDocument();
       expect(within(dialog).getByText("Health Status")).toBeInTheDocument();
       expect(within(dialog).getByText(/"autoheal": "true"/)).toBeInTheDocument();
-      // exit_code of 0 is falsy, so the modal falls back to N/A
-      expect(within(dialog).getByText("N/A")).toBeInTheDocument();
+      expect(within(dialog).getByText("Exit Code:").nextSibling).toHaveTextContent("137");
     });
 
     it("omits the health section when the container has no health data", async () => {
