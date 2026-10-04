@@ -83,9 +83,8 @@ Conventions** and **Run Security Scanners**.
 `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build autoheal` (see
 [Running beside an existing deployment](#running-beside-an-existing-deployment)). The
 `--build` flag is what makes `docker-compose.yml` build your changes instead of using the
-published image. The result is
-tagged `tommye123/docker-autoheal:latest` locally, replacing any copy you had pulled; run
-`docker compose pull` to get the published image back.
+published image. The result is tagged `docker-autoheal:dev` locally, so it does not replace
+`tommye123/docker-autoheal:latest`.
 
 **Autoheal: Install gh-aw** installs the `github/gh-aw` extension pinned to the
 `compiler_version` recorded in the header of `.github/workflows/issue-triage.lock.yml`, so
