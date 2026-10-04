@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within, waitFor } from "@testing-library/react";
+import { render, screen, within, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../services/api", () => ({
@@ -159,6 +159,76 @@ describe("ConfigPage", () => {
       expect(
         await screen.findByText(/failed to load configuration/i),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("editing settings before saving", () => {
+    it("saves the edited monitor interval", async () => {
+      const user = userEvent.setup();
+      getConfig.mockResolvedValue({ data: config });
+      updateMonitorConfig.mockResolvedValue({});
+
+      render(<ConfigPage />);
+      await screen.findByText("Monitor Settings");
+
+      const interval = screen.getAllByRole("spinbutton")[0];
+      fireEvent.change(interval, { target: { value: "45" } });
+      await user.click(screen.getByRole("button", { name: /save monitor settings/i }));
+
+      await waitForCalled(updateMonitorConfig, { ...config.monitor, interval_seconds: 45 });
+    });
+
+    it("saves the edited restart mode", async () => {
+      const user = userEvent.setup();
+      getConfig.mockResolvedValue({ data: config });
+      updateRestartConfig.mockResolvedValue({});
+
+      render(<ConfigPage />);
+      await screen.findByText("Restart Policy");
+
+      await user.selectOptions(screen.getAllByRole("combobox")[0], "health");
+      await user.click(screen.getByRole("button", { name: /save restart policy/i }));
+
+      await waitForCalled(updateRestartConfig, { ...config.restart, mode: "health" });
+    });
+
+    it("saves the edited observability settings", async () => {
+      const user = userEvent.setup();
+      getConfig.mockResolvedValue({ data: config });
+      updateObservabilityConfig.mockResolvedValue({});
+
+      render(<ConfigPage />);
+      await screen.findByText(/configuration export\/import/i);
+
+      await user.selectOptions(screen.getAllByRole("combobox")[1], "DEBUG");
+      await user.click(screen.getByText(/enable prometheus metrics/i).closest(".form-check").querySelector("input"));
+      await user.click(screen.getByRole("button", { name: /save observability settings/i }));
+
+      await waitForCalled(updateObservabilityConfig, {
+        ...config.observability,
+        log_level: "DEBUG",
+        prometheus_enabled: true,
+      });
+    });
+
+    it("uses the edited Uptime Kuma server URL when testing the connection", async () => {
+      const user = userEvent.setup();
+      getConfig.mockResolvedValue({ data: kumaReadyConfig });
+      api.post.mockResolvedValue({ data: { success: true, monitor_count: 1 } });
+
+      render(<ConfigPage />);
+      const url = await screen.findByPlaceholderText("http://localhost:3001");
+
+      await user.clear(url);
+      await user.type(url, "http://other.local");
+      await user.click(screen.getByRole("button", { name: /test connection/i }));
+
+      await waitFor(() =>
+        expect(api.post).toHaveBeenCalledWith(
+          "/uptime-kuma/test-connection",
+          expect.objectContaining({ server_url: "http://other.local" }),
+        ),
+      );
     });
   });
 
