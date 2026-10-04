@@ -59,6 +59,11 @@ class MonitoringEngine:
 
         Returns:
             Stable identifier string
+
+        Note:
+            An empty ``monitoring.id`` label is returned as-is. Container
+            discovery must not use this method for that reason; it uses
+            ``_auto_monitor_stable_id``, which ignores an empty label.
         """
         labels = info.get("labels", {})
 
@@ -74,6 +79,32 @@ class MonitoringEngine:
 
         # Priority 3: Container name (fallback)
         return info.get("name")
+
+    @staticmethod
+    def _auto_monitor_stable_id(labels: dict, container_name: str) -> str:
+        """
+        Stable ID stored in the selected list when a container is auto-monitored.
+
+        Unlike ``get_stable_identifier``, an empty ``monitoring.id`` label is
+        ignored here, so it falls back to the Compose identity or the name rather
+        than storing an empty key that every other empty-label container would match.
+
+        Args:
+            labels: Container labels
+            container_name: Container name
+
+        Returns:
+            Stable identifier string
+        """
+        if labels.get("monitoring.id"):
+            return labels["monitoring.id"]
+
+        compose_project = labels.get("com.docker.compose.project")
+        compose_service = labels.get("com.docker.compose.service")
+        if compose_project and compose_service:
+            return f"{compose_project}_{compose_service}"
+
+        return container_name
 
     async def start(self) -> None:
         """Start the monitoring engine"""
@@ -615,33 +646,7 @@ class MonitoringEngine:
         }
 
     @staticmethod
-    def _auto_monitor_stable_id(labels: dict, container_name: str) -> str:
-        """
-        Stable ID stored in the selected list when a container is auto-monitored.
-
-        Unlike ``get_stable_identifier``, an empty ``monitoring.id`` label is
-        ignored here, so it falls back to the Compose identity or the name rather
-        than storing an empty key that every other empty-label container would match.
-
-        Args:
-            labels: Container labels
-            container_name: Container name
-
-        Returns:
-            Stable identifier string
-        """
-        if labels.get("monitoring.id"):
-            return labels["monitoring.id"]
-
-        compose_project = labels.get("com.docker.compose.project")
-        compose_service = labels.get("com.docker.compose.service")
-        if compose_project and compose_service:
-            return f"{compose_project}_{compose_service}"
-
-        return container_name
-
     def _auto_monitor_container(
-        self,
         config: AutoHealConfig,
         *,
         stable_id: str,

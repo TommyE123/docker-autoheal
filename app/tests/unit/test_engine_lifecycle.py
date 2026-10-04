@@ -424,6 +424,7 @@ class TestProcessContainerStartEvent:
 
         await engine._process_container_start_event(start_event(container.id, "web"))
 
+        assert config_manager.get_config().containers.selected == []
         assert config_manager.get_events() == []
         mock_notification_manager.send_event_notification.assert_not_awaited()
 
