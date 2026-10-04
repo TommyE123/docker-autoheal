@@ -3,7 +3,8 @@
   "bootstrap-sha": "437dd523de66735bedf72d1e90d325fde88fff46",
   "packages": {
     ".": {
-      "release-type": "simple"
+      "release-type": "simple",
+      "extra-files": ["app/api/api.py"]
     }
   },
   "skip-changelog": true,

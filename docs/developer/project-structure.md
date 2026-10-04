@@ -53,8 +53,10 @@ docker-autoheal/
 ├── mise.toml / mise.lock         # Pinned developer CLI tools, installed by mise (with .mise/locks/)
 │
 ├── requirements.txt              # Runtime Python dependencies
-├── requirements-dev.txt          # Test dependencies (pytest, coverage)
+├── requirements-dev.txt          # Test dependencies (pytest, coverage, mutmut)
 ├── pytest.ini / .coveragerc
+├── pyproject.toml                # Mutmut configuration only
+├── mutation.sh                   # Mutation-testing entry point (see docs/developer/mutation-testing.md)
 ├── Dockerfile                    # Multi-stage build: Node (frontend) → Python (backend)
 └── docker-compose.yml            # Runs the published image; `up --build` builds from this checkout
 ```
@@ -68,7 +70,7 @@ suites (see [Testing](testing.md#legacy-script-triage) for what happened to each
 - **`app/main.py`** — process entry point: logging setup, Docker client and monitoring
   engine construction, Prometheus metrics server startup, signal handling, and running
   the FastAPI server and monitoring engine concurrently via `asyncio.gather`.
-- **`app/api/api.py`** — FastAPI app construction (CORS, static asset mount) and wiring
+- **`app/api/api.py`** — FastAPI app construction (static asset mount) and wiring
   each router from `app/api/routes/` into the app; holds no endpoints itself.
 - **`app/api/state.py`** — the shared `docker_client`/`monitoring_engine` instances every
   route module reads, plus `init_api()`.

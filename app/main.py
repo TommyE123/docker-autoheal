@@ -95,7 +95,7 @@ class AutoHealService:
     async def start(self):
         """Start the auto-heal service"""
         try:
-            logger.info("Starting Docker Auto-Heal Service v1.1")
+            logger.info("Starting Docker Auto-Heal Service v%s", app.version)
 
             # Load configuration
             config = config_manager.get_config()

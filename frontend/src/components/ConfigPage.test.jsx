@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within, waitFor } from "@testing-library/react";
+import { render, screen, within, waitFor, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../services/api", () => ({
@@ -141,6 +141,57 @@ describe("ConfigPage", () => {
       expect(screen.getByText(/loading configuration/i)).toBeInTheDocument();
     });
 
+    it("loads the configuration exactly once on mount", async () => {
+      getConfig.mockResolvedValue({ data: config });
+
+      render(<ConfigPage />);
+      await screen.findByText("Monitor Settings");
+      await act(async () => {});
+
+      expect(getConfig).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the page usable and logs an error when the Uptime Kuma data fails to load", async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        getConfig.mockResolvedValue({ data: kumaEnabledConfig });
+        api.get.mockRejectedValue(new Error("kuma down"));
+
+        render(<ConfigPage />);
+
+        expect(await screen.findByText("Monitor Settings")).toBeInTheDocument();
+        await waitFor(() =>
+          expect(consoleError).toHaveBeenCalledWith(
+            "Failed to load Uptime Kuma data:",
+            expect.any(Error),
+          ),
+        );
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
+
+    it("renders the Uptime Kuma section when its endpoints return empty payloads", async () => {
+      getConfig.mockResolvedValue({ data: kumaEnabledConfig });
+      api.get.mockImplementation((url) => {
+        if (url === "/uptime-kuma/monitors") return Promise.resolve({ data: {} });
+        if (url === "/uptime-kuma/mappings") return Promise.resolve({ data: {} });
+        if (url === "/containers") return Promise.resolve({ data: null });
+        return Promise.reject(new Error(`Unexpected GET ${url}`));
+      });
+
+      render(<ConfigPage />);
+
+      await waitFor(() => expect(api.get).toHaveBeenCalledTimes(3));
+      await act(async () => {});
+
+      expect(screen.getByText(/uptime-kuma integration/i)).toBeInTheDocument();
+      expect(screen.getByText("Active")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /disable integration/i }),
+      ).toBeInTheDocument();
+    });
+
     it("shows a failure message when the initial configuration request rejects", async () => {
       getConfig.mockRejectedValue(new Error("network down"));
 
@@ -159,6 +210,76 @@ describe("ConfigPage", () => {
       expect(
         await screen.findByText(/failed to load configuration/i),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("editing settings before saving", () => {
+    it("saves the edited monitor interval", async () => {
+      const user = userEvent.setup();
+      getConfig.mockResolvedValue({ data: config });
+      updateMonitorConfig.mockResolvedValue({});
+
+      render(<ConfigPage />);
+      await screen.findByText("Monitor Settings");
+
+      const interval = screen.getAllByRole("spinbutton")[0];
+      fireEvent.change(interval, { target: { value: "45" } });
+      await user.click(screen.getByRole("button", { name: /save monitor settings/i }));
+
+      await waitForCalled(updateMonitorConfig, { ...config.monitor, interval_seconds: 45 });
+    });
+
+    it("saves the edited restart mode", async () => {
+      const user = userEvent.setup();
+      getConfig.mockResolvedValue({ data: config });
+      updateRestartConfig.mockResolvedValue({});
+
+      render(<ConfigPage />);
+      await screen.findByText("Restart Policy");
+
+      await user.selectOptions(screen.getAllByRole("combobox")[0], "health");
+      await user.click(screen.getByRole("button", { name: /save restart policy/i }));
+
+      await waitForCalled(updateRestartConfig, { ...config.restart, mode: "health" });
+    });
+
+    it("saves the edited observability settings", async () => {
+      const user = userEvent.setup();
+      getConfig.mockResolvedValue({ data: config });
+      updateObservabilityConfig.mockResolvedValue({});
+
+      render(<ConfigPage />);
+      await screen.findByText(/configuration export\/import/i);
+
+      await user.selectOptions(screen.getAllByRole("combobox")[1], "DEBUG");
+      await user.click(screen.getByText(/enable prometheus metrics/i).closest(".form-check").querySelector("input"));
+      await user.click(screen.getByRole("button", { name: /save observability settings/i }));
+
+      await waitForCalled(updateObservabilityConfig, {
+        ...config.observability,
+        log_level: "DEBUG",
+        prometheus_enabled: true,
+      });
+    });
+
+    it("uses the edited Uptime Kuma server URL when testing the connection", async () => {
+      const user = userEvent.setup();
+      getConfig.mockResolvedValue({ data: kumaReadyConfig });
+      api.post.mockResolvedValue({ data: { success: true, monitor_count: 1 } });
+
+      render(<ConfigPage />);
+      const url = await screen.findByPlaceholderText("http://localhost:3001");
+
+      await user.clear(url);
+      await user.type(url, "http://other.local");
+      await user.click(screen.getByRole("button", { name: /test connection/i }));
+
+      await waitFor(() =>
+        expect(api.post).toHaveBeenCalledWith(
+          "/uptime-kuma/test-connection",
+          expect.objectContaining({ server_url: "http://other.local" }),
+        ),
+      );
     });
   });
 
