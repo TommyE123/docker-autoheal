@@ -33,10 +33,10 @@ Release PR when you're ready to ship.
 
 The project's real release history (`v2.0.0` through `v2.0.16`) predates Release Please and is
 preserved, not restarted. `release-please-config.json` sets `bootstrap-sha` to the commit
-tagged `v2.0.16`, and `.release-please-manifest.json` records `2.0.16` as the current version —
-so Release Please's first Release PR only proposes a bump from `2.0.16` onward, using commits
-merged after that point. `version.txt` is seeded to match — `2.0.16` — and Release Please
-maintains it going forward.
+tagged `v2.0.16`, so Release Please's first Release PR only proposed a bump from `2.0.16`
+onward, using commits merged after that point. `.release-please-manifest.json` and `version.txt`
+record the current version (read them rather than this page) and Release Please maintains both
+on every release.
 
 The repository also has a legacy bare `v2` tag from before this project used per-commit SemVer
 tags. Release Please's own tag parser only recognises `vMAJOR.MINOR.PATCH`-shaped tags; a bare
