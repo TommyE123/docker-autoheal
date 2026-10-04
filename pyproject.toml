@@ -9,7 +9,12 @@ source_paths = ["app"]
 # including the integration suite). Scope choice: .coveragerc also omits app/tests/*.
 do_not_mutate = ["app/tests/*"]
 
-# This module reads .github/workflows/*.yml via parents[3], which does not
-# exist inside mutants/, so stats collection aborts if it is collected. It
-# imports nothing from app/, so it cannot kill an application mutant.
-pytest_add_cli_args_test_selection = ["--ignore=app/tests/unit/test_release_please_workflow.py"]
+# These modules read repository files (.github/workflows/*.yml, .vscode/tasks.json,
+# docker-compose.dev.yml)
+# via parents[3], which do not exist inside mutants/, so stats collection aborts if
+# they are collected. They import nothing from app/, so they cannot kill an
+# application mutant.
+pytest_add_cli_args_test_selection = [
+    "--ignore=app/tests/unit/test_release_please_workflow.py",
+    "--ignore=app/tests/unit/test_dev_stack_files.py",
+]

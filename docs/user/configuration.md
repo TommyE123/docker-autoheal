@@ -79,8 +79,13 @@ These filters are applied after container selection is otherwise determined, in 
 4. Only containers that reach this point are checked against the filters: blacklists (names,
    then labels) before whitelists (names, then labels).
 
-The `autoheal` label is not an explicit selection/exclusion mechanism and does not override
-these filters — see [Labels](labels.md#include_all-mode) for the full precedence.
+The configured monitoring label (`monitor.label_key` / `monitor.label_value`) is not itself
+an explicit selection/exclusion mechanism and does not override these filters. However,
+automatic discovery of a container carrying that label adds its stable identifier to
+`containers.selected`, which then acts as an explicit selection (step 2 above): it takes
+precedence over the filters, and removing the label later does not remove the selection —
+remove it explicitly via the UI/API. See [Labels](labels.md#include_all-mode) for the full
+precedence.
 
 ### `ui`
 

@@ -1,8 +1,9 @@
 """Event log endpoints."""
 
 import logging
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.config.config_manager import AutoHealEvent, config_manager
 
@@ -12,10 +13,26 @@ router = APIRouter()
 
 
 @router.get("/api/events")
-async def get_events(limit: int = 100):
-    """Get recent auto-heal events"""
+async def get_events(
+    limit: Annotated[int, Query(ge=1)] = 100,
+    event_type: str | None = None,
+    container: str | None = None,
+):
+    """
+    Get recent auto-heal events.
+
+    ``event_type`` keeps only events of that exact type and ``container`` keeps
+    events whose container name contains the text (case-insensitive). Both are
+    applied before ``limit``, which then keeps the most recent matches.
+    """
     try:
-        events = config_manager.get_events(limit)
+        events = config_manager.get_events()
+        if event_type is not None:
+            events = [event for event in events if event.event_type == event_type]
+        if container is not None:
+            needle = container.lower()
+            events = [event for event in events if needle in event.container_name.lower()]
+        events = events[-limit:]
         return [
             {
                 "timestamp": (

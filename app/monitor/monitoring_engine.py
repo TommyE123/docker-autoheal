@@ -114,13 +114,17 @@ class MonitoringEngine:
 
         self._running = True
 
-        # Proactively scan for existing containers with autoheal=true label
+        # Proactively scan for existing containers with the configured monitoring label
         await self._scan_existing_containers()
 
         self._task = asyncio.create_task(self._monitor_loop())
         self._event_task = asyncio.create_task(self._event_listener_loop())
         logger.info("Monitoring engine started")
-        logger.info("Event listener started for auto-monitoring containers with autoheal=true label")
+        monitor_config = config_manager.get_config().monitor
+        logger.info(
+            "Event listener started for auto-monitoring containers with "
+            f"{monitor_config.label_key}={monitor_config.label_value} label"
+        )
 
     async def stop(self) -> None:
         """Stop the monitoring engine"""
@@ -653,6 +657,7 @@ class MonitoringEngine:
         container_id: str,
         container_name: str,
         startup: bool,
+        label: str,
     ) -> AutoHealEvent | None:
         """
         Add a container carrying the autoheal label to the monitored list.
@@ -667,6 +672,7 @@ class MonitoringEngine:
             stable_id: Stable identifier to store in the selected list
             container_id: Container ID used for the checks and recorded on the event
             container_name: Container name used for the checks and the event label
+            label: Configured monitoring label as ``key=value``, used in log and event text
             startup: True when called from the startup scan, which saves ``config``
                 once at the end and words its log and event for startup. Otherwise
                 ``config`` is saved right after the selection, before the event is
@@ -686,7 +692,7 @@ class MonitoringEngine:
         if (stable_id in config.containers.excluded or
             container_name in config.containers.excluded or
             container_id in config.containers.excluded):
-            logger.info(f"Container {container_name} (stable_id: {stable_id}) has autoheal=true but is in excluded list, skipping")
+            logger.info(f"Container {container_name} (stable_id: {stable_id}) has {label} but is in excluded list, skipping")
             return None
 
         # Add to monitored list using STABLE ID
@@ -694,7 +700,7 @@ class MonitoringEngine:
         if not startup:
             config_manager.update_config(config)
 
-        logger.info(f"Auto-monitoring enabled for container '{container_name}' ({container_id[:12]}) with stable_id '{stable_id}' - detected autoheal=true label{' on startup' if startup else ''}")
+        logger.info(f"Auto-monitoring enabled for container '{container_name}' ({container_id[:12]}) with stable_id '{stable_id}' - detected {label} label{' on startup' if startup else ''}")
 
         event = AutoHealEvent(
             timestamp=datetime.now(UTC),
@@ -703,18 +709,21 @@ class MonitoringEngine:
             event_type="auto_monitor",
             restart_count=0,
             status="enabled",
-            message=f"Automatically added to monitoring{' on startup' if startup else ''} due to autoheal=true label (stable_id: {stable_id})"
+            message=f"Automatically added to monitoring{' on startup' if startup else ''} due to {label} label (stable_id: {stable_id})"
         )
         config_manager.add_event(event)
         return event
 
     async def _scan_existing_containers(self) -> None:
         """
-        Proactively scan all existing containers on startup and auto-add those with autoheal=true label
+        Proactively scan all existing containers on startup and auto-add those with the configured
+        monitoring label (autoheal=true by default)
         This ensures containers that are already running when the service starts are added to config.json
         """
         try:
-            logger.info("Scanning existing containers for autoheal=true label...")
+            config = config_manager.get_config()
+            label = f"{config.monitor.label_key}={config.monitor.label_value}"
+            logger.info(f"Scanning existing containers for {label} label...")
 
             # Ensure Docker connection is active
             if not self.docker_client.is_connected():
@@ -725,7 +734,6 @@ class MonitoringEngine:
             containers = await asyncio.to_thread(self.docker_client.list_containers, all_containers=False)
 
             added_count = 0
-            config = config_manager.get_config()
 
             for container in containers:
                 try:
@@ -740,8 +748,8 @@ class MonitoringEngine:
 
                     labels = info.get("labels", {})
 
-                    # Check if container has autoheal=true label
-                    if labels.get("autoheal") != "true":
+                    # Check if container has the configured monitoring label (autoheal=true by default)
+                    if labels.get(config.monitor.label_key) != config.monitor.label_value:
                         continue
 
                     selected_before = len(config.containers.selected)
@@ -752,6 +760,7 @@ class MonitoringEngine:
                             container_id=info.get("full_id"),
                             container_name=info.get("name"),
                             startup=True,
+                            label=label,
                         )
                     finally:
                         # Count the selection as soon as it is made, so it is still saved
@@ -777,7 +786,8 @@ class MonitoringEngine:
 
     async def _event_listener_loop(self) -> None:
         """
-        Listen for Docker events and auto-add containers with autoheal=true label
+        Listen for Docker events and auto-add containers with the configured monitoring label
+        (autoheal=true by default)
         """
         import queue
         import threading
@@ -839,7 +849,8 @@ class MonitoringEngine:
 
     async def _process_container_start_event(self, event: dict) -> None:
         """
-        Process a container start event and add to monitoring if it has autoheal=true label
+        Process a container start event and add to monitoring if it has the configured monitoring
+        label (autoheal=true by default)
         Args:
             event: Docker event dictionary
         """
@@ -875,9 +886,9 @@ class MonitoringEngine:
 
             labels = info.get("labels", {})
 
-            # Check if container has autoheal=true label
-            if labels.get("autoheal") == "true":
-                config = config_manager.get_config()
+            # Check if container has the configured monitoring label (autoheal=true by default)
+            config = config_manager.get_config()
+            if labels.get(config.monitor.label_key) == config.monitor.label_value:
                 event_obj = self._auto_monitor_container(
                     config,
                     # The event's own ID and name label the container here, as before
@@ -885,6 +896,7 @@ class MonitoringEngine:
                     container_id=container_id,
                     container_name=container_name,
                     startup=False,
+                    label=f"{config.monitor.label_key}={config.monitor.label_value}",
                 )
                 if event_obj:
                     await notification_manager.send_event_notification(event_obj)
