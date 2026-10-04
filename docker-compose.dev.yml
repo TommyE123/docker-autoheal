@@ -1,8 +1,8 @@
-name: docker-autoheal-dev # Separate Compose project, so dev `up`/`down` never touch the deployment's project
+name: docker-autoheal-dev # Default project name only; COMPOSE_PROJECT_NAME overrides it, so always pass -p docker-autoheal-dev
 
 # Development/testing override: runs this checkout beside an existing Autoheal deployment.
 #
-#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
+#   docker compose -p docker-autoheal-dev -f docker-compose.yml -f docker-compose.dev.yml up --build -d
 #
 # Uses a distinct image tag, container name, host ports, data directory and monitoring
 # label, so the deployment named `docker-autoheal` is left untouched. Only containers

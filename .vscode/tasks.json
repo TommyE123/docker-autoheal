@@ -390,13 +390,13 @@
     {
       "label": "Autoheal: Run Docker Stack",
       "type": "shell",
-      "command": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build autoheal",
+      "command": "docker compose -p docker-autoheal-dev -f docker-compose.yml -f docker-compose.dev.yml up --build autoheal",
       "problemMatcher": []
     },
     {
       "label": "Autoheal: Stop Docker Stack",
       "type": "shell",
-      "command": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down",
+      "command": "docker compose -p docker-autoheal-dev -f docker-compose.yml -f docker-compose.dev.yml down",
       "problemMatcher": []
     },
     {

@@ -80,8 +80,8 @@ Scripts**, **Check Workflows**, **Check Markup and Data**, **Check Repository
 Conventions** and **Run Security Scanners**.
 
 **Autoheal: Run Docker Stack** builds the app from your checkout and runs it with
-`docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build autoheal` (see
-[Running beside an existing deployment](#running-beside-an-existing-deployment)). The
+`docker compose -p docker-autoheal-dev -f docker-compose.yml -f docker-compose.dev.yml up --build autoheal`
+(see [Running beside an existing deployment](#running-beside-an-existing-deployment)). The
 `--build` flag is what makes `docker-compose.yml` build your changes instead of using the
 published image. The result is tagged `docker-autoheal:dev` locally, so it does not replace
 `tommye123/docker-autoheal:latest`.
@@ -93,7 +93,7 @@ Codespaces token) first, replaces any installed copy, and is not part of any agg
 task. The extension lives in the `gh` volume, so it survives rebuilds; run the task again
 after the lock file is recompiled with a newer version.
 
-**Autoheal: Stop Docker Stack** runs `docker compose down` with the same two `-f` files.
+**Autoheal: Stop Docker Stack** runs `docker compose down` with the same `-p` and `-f` options.
 Stacks started with **Run Docker Stack** run on the host's Docker daemon (see below), so
 they keep running when the Dev Container stops or is rebuilt until you stop them.
 
@@ -160,14 +160,20 @@ This builds the frontend and backend into a single image (see
 Add the dev override to run your checkout alongside it without touching the deployment:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
+docker compose -p docker-autoheal-dev -f docker-compose.yml -f docker-compose.dev.yml up --build -d
 ```
 
 This uses the image `docker-autoheal:dev` (so `tommye123/docker-autoheal:latest` is not
 replaced), the container name `docker-autoheal-dev`, the UI on `3132`, metrics on `9091`,
 `./data-dev` for data, and its own Compose project, `docker-autoheal-dev`. Set
 `AUTOHEAL_DEV_PORT` and `AUTOHEAL_DEV_METRICS_PORT` to change the ports. The override needs
-Docker Compose v2.24.4 or later. Pass the same `-f` flags to `docker compose down` to stop it.
+Docker Compose v2.24.4 or later. Pass the same `-p` and `-f` options to `docker compose down`
+to stop it.
+
+Always pass `-p docker-autoheal-dev`. The `name:` in `docker-compose.dev.yml` is only a default:
+Compose gives the `COMPOSE_PROJECT_NAME` environment variable precedence over it, so with that
+variable set the stack would otherwise land in another project, and `docker compose down` could
+remove that project's containers and networks. `-p` takes precedence over both.
 
 By default the startup log reports the published host port (`3132`) and the container port
 (`3131`), for example `Web UI published on host port 3132 (container port 3131)`, because the
