@@ -6,9 +6,10 @@ import { format } from "date-fns";
 vi.mock("../services/api", () => ({
   getEvents: vi.fn(),
   clearEvents: vi.fn(),
+  getContainers: vi.fn(),
 }));
 
-import { getEvents, clearEvents } from "../services/api";
+import { getEvents, clearEvents, getContainers } from "../services/api";
 import EventsPage from "./EventsPage";
 
 const sampleEvents = [
@@ -55,6 +56,7 @@ const multipleEvents = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  getContainers.mockResolvedValue({ data: [] });
 });
 
 describe("EventsPage", () => {
@@ -110,7 +112,7 @@ describe("EventsPage", () => {
     expect(screen.getByText("quarantined")).toBeInTheDocument();
     expect(screen.getByText("failure")).toBeInTheDocument();
 
-    expect(screen.getByText(/health check failed/i)).toBeInTheDocument();
+    expect(screen.getByText("Health check failed")).toBeInTheDocument();
     expect(screen.getByText("abc123")).toBeInTheDocument();
     expect(screen.getByText("Restarts: 3")).toBeInTheDocument();
 
@@ -196,5 +198,175 @@ describe("EventsPage", () => {
 
     await screen.findByText("web-app");
     expect(getEvents).toHaveBeenCalledTimes(2);
+  });
+
+  describe("filters and limit", () => {
+    const lastCall = () => getEvents.mock.calls[getEvents.mock.calls.length - 1];
+
+    const renderPage = async () => {
+      getEvents.mockResolvedValue({ data: sampleEvents });
+      getContainers.mockResolvedValue({
+        data: [
+          { id: "abc123", name: "web-app" },
+          { id: "def456", name: "db" },
+        ],
+      });
+      render(<EventsPage />);
+      await screen.findByRole("heading", { name: "web-app" });
+      await screen.findByRole("option", { name: "db" });
+    };
+
+    it("renders the three controls", async () => {
+      await renderPage();
+
+      expect(screen.getByLabelText("Event Type")).toBeInTheDocument();
+      expect(screen.getByLabelText("Container")).toBeInTheDocument();
+      expect(screen.getByLabelText("Limit")).toBeInTheDocument();
+    });
+
+    it("requests limit 50 with no filters by default", async () => {
+      await renderPage();
+
+      expect(getEvents).toHaveBeenCalledWith(50, {
+        eventType: "",
+        container: "",
+      });
+      expect(
+        screen.queryByRole("button", { name: /clear filters/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("sends event_type when an event type is selected and omits it for All", async () => {
+      const user = userEvent.setup();
+      await renderPage();
+
+      await user.selectOptions(screen.getByLabelText("Event Type"), "quarantine");
+      await waitFor(() =>
+        expect(lastCall()).toEqual([50, { eventType: "quarantine", container: "" }]),
+      );
+
+      await user.selectOptions(screen.getByLabelText("Event Type"), "");
+      await waitFor(() =>
+        expect(lastCall()).toEqual([50, { eventType: "", container: "" }]),
+      );
+    });
+
+    it("sends container when a container is selected and omits it for All", async () => {
+      const user = userEvent.setup();
+      await renderPage();
+
+      await user.selectOptions(screen.getByLabelText("Container"), "db");
+      await waitFor(() =>
+        expect(lastCall()).toEqual([50, { eventType: "", container: "db" }]),
+      );
+
+      await user.selectOptions(screen.getByLabelText("Container"), "");
+      await waitFor(() =>
+        expect(lastCall()).toEqual([50, { eventType: "", container: "" }]),
+      );
+    });
+
+    it("sends both filters together", async () => {
+      const user = userEvent.setup();
+      await renderPage();
+
+      await user.selectOptions(screen.getByLabelText("Event Type"), "restart");
+      await user.selectOptions(screen.getByLabelText("Container"), "web-app");
+
+      await waitFor(() =>
+        expect(lastCall()).toEqual([
+          50,
+          { eventType: "restart", container: "web-app" },
+        ]),
+      );
+    });
+
+    it.each([25, 50, 100])("sends limit %i when selected", async (limit) => {
+      const user = userEvent.setup();
+      await renderPage();
+
+      await user.selectOptions(screen.getByLabelText("Limit"), String(limit));
+
+      await waitFor(() => expect(lastCall()[0]).toBe(limit));
+    });
+
+    it("Clear Filters resets filters but keeps the selected limit", async () => {
+      const user = userEvent.setup();
+      await renderPage();
+
+      await user.selectOptions(screen.getByLabelText("Limit"), "100");
+      await user.selectOptions(screen.getByLabelText("Event Type"), "restart");
+      await user.selectOptions(screen.getByLabelText("Container"), "db");
+
+      await user.click(screen.getByRole("button", { name: /clear filters/i }));
+
+      expect(screen.getByLabelText("Event Type")).toHaveValue("");
+      expect(screen.getByLabelText("Container")).toHaveValue("");
+      expect(screen.getByLabelText("Limit")).toHaveValue("100");
+      await waitFor(() =>
+        expect(lastCall()).toEqual([100, { eventType: "", container: "" }]),
+      );
+      expect(
+        screen.queryByRole("button", { name: /clear filters/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it("Refresh preserves the selected controls", async () => {
+      const user = userEvent.setup();
+      await renderPage();
+
+      await user.selectOptions(screen.getByLabelText("Limit"), "25");
+      await user.selectOptions(screen.getByLabelText("Event Type"), "restart");
+      await user.selectOptions(screen.getByLabelText("Container"), "db");
+      getEvents.mockClear();
+
+      await user.click(screen.getByRole("button", { name: /refresh/i }));
+
+      await waitFor(() =>
+        expect(getEvents).toHaveBeenCalledWith(25, {
+          eventType: "restart",
+          container: "db",
+        }),
+      );
+    });
+
+    it("the 5-second auto-refresh preserves the selected controls", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+        await renderPage();
+
+        await user.selectOptions(screen.getByLabelText("Limit"), "100");
+        await user.selectOptions(screen.getByLabelText("Event Type"), "restart");
+        await user.selectOptions(screen.getByLabelText("Container"), "db");
+        await waitFor(() =>
+          expect(lastCall()).toEqual([100, { eventType: "restart", container: "db" }]),
+        );
+
+        getEvents.mockClear();
+        await vi.advanceTimersByTimeAsync(5000);
+
+        expect(getEvents).toHaveBeenCalledWith(100, {
+          eventType: "restart",
+          container: "db",
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("does not filter the returned events client-side", async () => {
+      const user = userEvent.setup();
+      getEvents.mockResolvedValue({ data: multipleEvents });
+      render(<EventsPage />);
+      await screen.findByRole("heading", { name: "cache" });
+
+      await user.selectOptions(screen.getByLabelText("Event Type"), "restart");
+
+      // The mocked API still returns all events; the page shows what it gets.
+      await waitFor(() => expect(lastCall()[1].eventType).toBe("restart"));
+      expect(screen.getByRole("heading", { name: "db" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "cache" })).toBeInTheDocument();
+    });
   });
 });

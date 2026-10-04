@@ -20,6 +20,7 @@ import {
   deleteNotificationService,
   testNotificationService
 } from '../services/api';
+import { EVENT_TYPES } from '../constants/eventTypes';
 
 // Fields required for each service type, beyond the always-required name.
 // Mirrors the "*"-marked fields rendered by renderServiceFields() below.
@@ -56,14 +57,6 @@ function NotificationsPage() {
     { value: 'ntfy', label: 'Ntfy' },
     { value: 'gotify', label: 'Gotify' },
     { value: 'pushover', label: 'Pushover' }
-  ];
-
-  const eventTypes = [
-    { value: 'restart', label: 'Container Restart' },
-    { value: 'quarantine', label: 'Container Quarantine' },
-    { value: 'health_check_failed', label: 'Health Check Failed' },
-    { value: 'auto_monitor', label: 'Auto Monitor' },
-    { value: 'unquarantine', label: 'Unquarantine' }
   ];
 
   const [formData, setFormData] = useState({
@@ -509,7 +502,7 @@ function NotificationsPage() {
             <Card.Body>
               <p className="text-muted">Select which event types should trigger notifications</p>
               <div className="d-flex flex-wrap gap-2">
-                {eventTypes.map((eventType) => (
+                {EVENT_TYPES.map((eventType) => (
                   <Badge
                     key={eventType.value}
                     bg={config?.event_filters?.includes(eventType.value) ? 'primary' : 'secondary'}
