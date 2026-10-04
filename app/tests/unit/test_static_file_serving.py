@@ -287,7 +287,7 @@ def test_serve_react_app_fallback_page_is_exact(tmp_path, monkeypatch):
 
     response = api_module.serve_react_app()
 
-    assert response.body.decode() == (
+    assert bytes(response.body).decode() == (
         "<h1>Docker Auto-Heal Service</h1>"
         "<p>React UI not found. Please build the frontend first:</p>"
         "<pre>cd frontend && npm install && npm run build</pre>"
