@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
 /**
  * Custom hook for managing alerts with auto-dismiss functionality
@@ -17,7 +17,7 @@ export function useAlert() {
     };
   }, []);
 
-  const showAlert = (variant, message) => {
+  const showAlert = useCallback((variant, message) => {
     // Clear any existing timeout
     if (alertTimeoutRef.current) {
       clearTimeout(alertTimeoutRef.current);
@@ -31,7 +31,7 @@ export function useAlert() {
       setAlert(null);
       alertTimeoutRef.current = null;
     }, timeout);
-  };
+  }, []);
 
   const clearAlert = () => {
     if (alertTimeoutRef.current) {

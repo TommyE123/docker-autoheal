@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Container,
   Row,
@@ -83,11 +83,12 @@ function NotificationsPage() {
     api_token: ''
   });
 
-  useEffect(() => {
-    fetchConfig();
+  const showAlert = useCallback((message, variant = 'success') => {
+    setAlert({ show: true, message, variant });
+    setTimeout(() => setAlert({ show: false, message: '', variant: 'success' }), 5000);
   }, []);
 
-  const fetchConfig = async () => {
+  const fetchConfig = useCallback(async () => {
     try {
       setLoading(true);
       const response = await getNotificationsConfig();
@@ -98,12 +99,11 @@ function NotificationsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showAlert]);
 
-  const showAlert = (message, variant = 'success') => {
-    setAlert({ show: true, message, variant });
-    setTimeout(() => setAlert({ show: false, message: '', variant: 'success' }), 5000);
-  };
+  useEffect(() => {
+    fetchConfig();
+  }, [fetchConfig]);
 
   const handleToggleNotifications = async (enabled) => {
     try {
@@ -535,7 +535,7 @@ function NotificationsPage() {
             <Card.Body>
               {config?.services?.length === 0 ? (
                 <Alert variant="info" className="mb-0">
-                  No notification services configured. Click "Add Service" to get started.
+                  No notification services configured. Click &quot;Add Service&quot; to get started.
                 </Alert>
               ) : (
                 <Table responsive striped hover>

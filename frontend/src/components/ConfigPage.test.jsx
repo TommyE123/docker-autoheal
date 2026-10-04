@@ -171,6 +171,27 @@ describe("ConfigPage", () => {
       }
     });
 
+    it("renders the Uptime Kuma section when its endpoints return empty payloads", async () => {
+      getConfig.mockResolvedValue({ data: kumaEnabledConfig });
+      api.get.mockImplementation((url) => {
+        if (url === "/uptime-kuma/monitors") return Promise.resolve({ data: {} });
+        if (url === "/uptime-kuma/mappings") return Promise.resolve({ data: {} });
+        if (url === "/containers") return Promise.resolve({ data: null });
+        return Promise.reject(new Error(`Unexpected GET ${url}`));
+      });
+
+      render(<ConfigPage />);
+
+      await waitFor(() => expect(api.get).toHaveBeenCalledTimes(3));
+      await act(async () => {});
+
+      expect(screen.getByText(/uptime-kuma integration/i)).toBeInTheDocument();
+      expect(screen.getByText("Active")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /disable integration/i }),
+      ).toBeInTheDocument();
+    });
+
     it("shows a failure message when the initial configuration request rejects", async () => {
       getConfig.mockRejectedValue(new Error("network down"));
 

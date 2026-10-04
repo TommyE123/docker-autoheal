@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Row, Col, Alert, Spinner } from 'react-bootstrap';
 import {
   getConfig,
@@ -58,28 +58,7 @@ function ConfigPage() {
   const { alert, showAlert, clearAlert } = useAlert();
   const { validateTimingConfiguration } = useConfigValidation(config || {});
 
-  // Fetch configuration on mount
-  useEffect(() => {
-    fetchConfig();
-  }, []);
-
-  const fetchConfig = async () => {
-    try {
-      const response = await getConfig();
-      setConfig(response.data);
-
-      // Load Uptime Kuma data if enabled
-      if (response.data.uptime_kuma?.enabled) {
-        loadUptimeKumaData();
-      }
-    } catch (error) {
-      showAlert('danger', 'Failed to load configuration');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadUptimeKumaData = async () => {
+  const loadUptimeKumaData = useCallback(async () => {
     try {
       const [monitorsRes, mappingsRes, containersRes] = await Promise.all([
         api.get('/uptime-kuma/monitors'),
@@ -93,7 +72,28 @@ function ConfigPage() {
     } catch (error) {
       console.error('Failed to load Uptime Kuma data:', error);
     }
-  };
+  }, []);
+
+  const fetchConfig = useCallback(async () => {
+    try {
+      const response = await getConfig();
+      setConfig(response.data);
+
+      // Load Uptime Kuma data if enabled
+      if (response.data.uptime_kuma?.enabled) {
+        loadUptimeKumaData();
+      }
+    } catch {
+      showAlert('danger', 'Failed to load configuration');
+    } finally {
+      setLoading(false);
+    }
+  }, [showAlert, loadUptimeKumaData]);
+
+  // Fetch configuration on mount
+  useEffect(() => {
+    fetchConfig();
+  }, [fetchConfig]);
 
   // Monitor Settings Handlers
   const handleMonitorConfigChange = (newMonitorConfig) => {
@@ -117,7 +117,7 @@ function ConfigPage() {
       await updateMonitorConfig(config.monitor);
       showAlert('success', 'Monitor configuration updated');
       fetchConfig();
-    } catch (error) {
+    } catch {
       showAlert('danger', 'Failed to update monitor configuration');
     }
   };
@@ -144,7 +144,7 @@ function ConfigPage() {
       await updateRestartConfig(config.restart);
       showAlert('success', 'Restart policy updated');
       fetchConfig();
-    } catch (error) {
+    } catch {
       showAlert('danger', 'Failed to update restart policy');
     }
   };
@@ -159,7 +159,7 @@ function ConfigPage() {
       await updateObservabilityConfig(config.observability);
       showAlert('success', `Settings Saved Successfully! Log level changed to ${config.observability.log_level}. Changes are now active.`);
       fetchConfig();
-    } catch (error) {
+    } catch {
       showAlert('danger', 'Failed to update observability settings. Please try again.');
     }
   };
@@ -178,7 +178,7 @@ function ConfigPage() {
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
       showAlert('success', 'Configuration exported successfully');
-    } catch (error) {
+    } catch {
       showAlert('danger', 'Failed to export configuration');
     }
   };
@@ -192,7 +192,7 @@ function ConfigPage() {
       showAlert('success', 'Configuration imported successfully');
       fetchConfig();
       e.target.value = '';
-    } catch (error) {
+    } catch {
       showAlert('danger', 'Failed to import configuration');
     }
   };
@@ -376,7 +376,6 @@ function ConfigPage() {
             onConfigChange={handleUptimeKumaConfigChange}
             onTestConnection={handleTestUptimeKumaConnection}
             onEnableIntegration={handleEnableUptimeKuma}
-            onDisableIntegration={handleDisableUptimeKuma}
             onAddMapping={handleAddMapping}
             onDeleteMapping={handleDeleteMapping}
             onShowDisableModal={handleDisableUptimeKuma}
