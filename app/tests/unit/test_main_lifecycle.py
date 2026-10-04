@@ -17,7 +17,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 import app.main as main_module
-from app.main import AutoHealService, CancelledErrorFilter, get_ui_url, signal_handler
+from app.main import (
+    AutoHealService,
+    CancelledErrorFilter,
+    get_public_port,
+    get_ui_url,
+    signal_handler,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -292,6 +298,35 @@ class TestUiUrl:
         assert "Web UI available at http://192.0.2.10:3132" in log
         assert "API documentation available at http://192.0.2.10:3132/docs" in log
         assert "0.0.0.0" not in log
+
+    def test_public_port_is_the_trimmed_value_or_none(self, monkeypatch):
+        monkeypatch.delenv("AUTOHEAL_PUBLIC_PORT", raising=False)
+        assert get_public_port() is None
+
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_PORT", "  ")
+        assert get_public_port() is None
+
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_PORT", "3132")
+        assert get_public_port() == "3132"
+
+    @pytest.mark.asyncio
+    async def test_startup_log_reports_the_published_port_when_no_host_is_supplied(
+        self, monkeypatch, caplog
+    ):
+        # The dev Compose override: published port known, host address deliberately not.
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_HOST", "")
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_PORT", "3132")
+
+        log = await self._start_and_capture_log(self._config(), caplog)
+
+        assert "Web UI published on host port 3132 (container port 3131)" in log
+        assert (
+            "API documentation published on host port 3132 at /docs (container port 3131)"
+            in log
+        )
+        assert "0.0.0.0" not in log
+        assert "http://" not in log
+        assert "listening on" not in log
 
     @pytest.mark.asyncio
     async def test_startup_log_does_not_present_the_bind_address_as_a_url(

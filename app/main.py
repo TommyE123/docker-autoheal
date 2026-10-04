@@ -152,9 +152,19 @@ class AutoHealService:
             self.running = True
             logger.info("Docker Auto-Heal Service started successfully")
             ui_url = get_ui_url(config)
+            public_port = get_public_port()
             if ui_url:
                 logger.info(f"Web UI available at {ui_url}")
                 logger.info(f"API documentation available at {ui_url}/docs")
+            elif public_port:
+                container_port = config.ui.listen_port
+                logger.info(
+                    f"Web UI published on host port {public_port} (container port {container_port})"
+                )
+                logger.info(
+                    f"API documentation published on host port {public_port} at /docs "
+                    f"(container port {container_port})"
+                )
             else:
                 listen = f"{config.ui.listen_address}:{config.ui.listen_port}"
                 logger.info(f"Web UI listening on {listen}")
@@ -211,20 +221,25 @@ class AutoHealService:
 service: AutoHealService | None = None
 
 
+def get_public_port() -> str | None:
+    """Return the host port the UI is published on (``AUTOHEAL_PUBLIC_PORT``), if supplied."""
+    return os.environ.get("AUTOHEAL_PUBLIC_PORT", "").strip() or None
+
+
 def get_ui_url(config) -> str | None:
     """
-    Build the user-facing URL for the startup messages, or None if none was supplied.
+    Build the user-facing URL for the startup messages, or None if no host was supplied.
 
     Display only: the server still binds to ``config.ui.listen_address`` and
     ``config.ui.listen_port``. A bind address such as 0.0.0.0 is not a URL a user can open,
-    so a URL is only built when ``AUTOHEAL_PUBLIC_HOST`` is set. ``AUTOHEAL_PUBLIC_PORT``
-    is the published port and falls back to the listen port when unset or empty.
+    and the application cannot know which address other machines reach the host at, so a
+    URL is only built when ``AUTOHEAL_PUBLIC_HOST`` is set. The port is the published one
+    (``AUTOHEAL_PUBLIC_PORT``), falling back to the listen port when unset or empty.
     """
     host = os.environ.get("AUTOHEAL_PUBLIC_HOST", "").strip()
     if not host:
         return None
-    port = os.environ.get("AUTOHEAL_PUBLIC_PORT", "").strip() or config.ui.listen_port
-    return f"http://{host}:{port}"
+    return f"http://{host}:{get_public_port() or config.ui.listen_port}"
 
 
 def signal_handler(signum, _frame):
