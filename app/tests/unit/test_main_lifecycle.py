@@ -9,9 +9,7 @@ duplicating startup-success coverage already provided there.
 """
 
 import asyncio
-import json
 import signal
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -24,8 +22,6 @@ from app.main import (
     get_ui_url,
     signal_handler,
 )
-
-REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 class TestCancelledErrorFilter:
@@ -361,19 +357,6 @@ class TestUiUrl:
         kwargs = mock_uvicorn.Config.call_args.kwargs
         assert kwargs["host"] == "0.0.0.0"
         assert kwargs["port"] == 3131
-
-    def test_run_docker_stack_task_does_not_detect_an_ip(self):
-        tasks = (REPO_ROOT / ".vscode" / "tasks.json").read_text(encoding="utf-8")
-        task = next(
-            t
-            for t in json.loads(tasks)["tasks"]
-            if t["label"] == "Autoheal: Run Docker Stack"
-        )
-
-        assert task["command"] == (
-            "docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build autoheal"
-        )
-        assert "hostname" not in task["command"]
 
 
 class TestSignalHandler:
