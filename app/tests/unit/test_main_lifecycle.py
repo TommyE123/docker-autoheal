@@ -15,7 +15,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 import app.main as main_module
-from app.main import AutoHealService, CancelledErrorFilter, signal_handler
+from app.main import (
+    AutoHealService,
+    CancelledErrorFilter,
+    get_public_port,
+    get_ui_url,
+    signal_handler,
+)
 
 
 class TestCancelledErrorFilter:
@@ -211,6 +217,146 @@ class TestAutoHealServiceStartFailure:
 
             assert service.running is True
             mock_notif.stop.assert_not_called()
+
+
+class TestUiUrl:
+    """Startup URL reporting: a real URL only when a public host is supplied; bind unaffected."""
+
+    @staticmethod
+    def _config(address="0.0.0.0", port=3131):
+        config = MagicMock()
+        config.ui.listen_address = address
+        config.ui.listen_port = port
+        config.observability.log_level = "INFO"
+        config.observability.prometheus_enabled = False
+        config.monitor.interval_seconds = 30
+        config.notifications.enabled = False
+        config.uptime_kuma.enabled = False
+        return config
+
+    @staticmethod
+    async def _start_and_capture_log(config, caplog):
+        with (
+            patch("app.main.config_manager") as mock_cm,
+            patch("app.main.DockerClientWrapper"),
+            patch("app.main.MonitoringEngine") as mock_engine_cls,
+            patch("app.main.UptimeKumaMonitor"),
+            patch("app.main.init_api"),
+            patch("app.main.notification_manager") as mock_notif,
+            caplog.at_level("INFO", logger="app.main"),
+        ):
+            mock_cm.get_config.return_value = config
+            mock_engine_cls.return_value.start = AsyncMock()
+            mock_notif.start = AsyncMock()
+
+            await AutoHealService().start()
+
+        return caplog.text
+
+    def test_no_url_without_a_public_host(self, monkeypatch):
+        monkeypatch.delenv("AUTOHEAL_PUBLIC_HOST", raising=False)
+        monkeypatch.delenv("AUTOHEAL_PUBLIC_PORT", raising=False)
+
+        assert get_ui_url(self._config()) is None
+
+    def test_a_port_alone_does_not_make_a_url(self, monkeypatch):
+        monkeypatch.delenv("AUTOHEAL_PUBLIC_HOST", raising=False)
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_PORT", "3132")
+
+        assert get_ui_url(self._config()) is None
+
+    def test_public_host_and_port_make_the_user_facing_url(self, monkeypatch):
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_HOST", "192.0.2.10")
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_PORT", "3132")
+
+        assert get_ui_url(self._config()) == "http://192.0.2.10:3132"
+
+    def test_blank_public_values_fall_back(self, monkeypatch):
+        # Blank host (what an unset Compose variable becomes) means no URL.
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_HOST", "  ")
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_PORT", "3132")
+        assert get_ui_url(self._config()) is None
+
+        # Blank port falls back to the listen port.
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_HOST", "192.0.2.10")
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_PORT", "")
+        assert get_ui_url(self._config()) == "http://192.0.2.10:3131"
+
+    @pytest.mark.asyncio
+    async def test_startup_log_reports_the_public_url_when_supplied(
+        self, monkeypatch, caplog
+    ):
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_HOST", "192.0.2.10")
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_PORT", "3132")
+
+        log = await self._start_and_capture_log(self._config(), caplog)
+
+        assert "Web UI available at http://192.0.2.10:3132" in log
+        assert "API documentation available at http://192.0.2.10:3132/docs" in log
+        assert "0.0.0.0" not in log
+
+    def test_public_port_is_the_trimmed_value_or_none(self, monkeypatch):
+        monkeypatch.delenv("AUTOHEAL_PUBLIC_PORT", raising=False)
+        assert get_public_port() is None
+
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_PORT", "  ")
+        assert get_public_port() is None
+
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_PORT", "3132")
+        assert get_public_port() == "3132"
+
+    @pytest.mark.asyncio
+    async def test_startup_log_reports_the_published_port_when_no_host_is_supplied(
+        self, monkeypatch, caplog
+    ):
+        # The dev Compose override: published port known, host address deliberately not.
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_HOST", "")
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_PORT", "3132")
+
+        log = await self._start_and_capture_log(self._config(), caplog)
+
+        assert "Web UI published on host port 3132 (container port 3131)" in log
+        assert (
+            "API documentation published on host port 3132 at /docs (container port 3131)"
+            in log
+        )
+        assert "0.0.0.0" not in log
+        assert "http://" not in log
+        assert "listening on" not in log
+
+    @pytest.mark.asyncio
+    async def test_startup_log_does_not_present_the_bind_address_as_a_url(
+        self, monkeypatch, caplog
+    ):
+        monkeypatch.delenv("AUTOHEAL_PUBLIC_HOST", raising=False)
+        monkeypatch.delenv("AUTOHEAL_PUBLIC_PORT", raising=False)
+
+        log = await self._start_and_capture_log(self._config(), caplog)
+
+        assert "Web UI listening on 0.0.0.0:3131" in log
+        assert "API documentation listening on 0.0.0.0:3131/docs" in log
+        assert "http://0.0.0.0" not in log
+        assert "available at" not in log
+
+    @pytest.mark.asyncio
+    async def test_server_still_binds_to_all_interfaces_with_a_public_host_set(
+        self, monkeypatch
+    ):
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_HOST", "192.0.2.10")
+        monkeypatch.setenv("AUTOHEAL_PUBLIC_PORT", "3132")
+
+        with (
+            patch("app.main.config_manager") as mock_cm,
+            patch("app.main.uvicorn") as mock_uvicorn,
+        ):
+            mock_cm.get_config.return_value = self._config()
+            mock_uvicorn.Server.return_value.serve = AsyncMock()
+
+            await main_module.run_api_server()
+
+        kwargs = mock_uvicorn.Config.call_args.kwargs
+        assert kwargs["host"] == "0.0.0.0"
+        assert kwargs["port"] == 3131
 
 
 class TestSignalHandler:
