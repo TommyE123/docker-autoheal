@@ -15,6 +15,16 @@ from app.config.config_manager import config_manager
 from app.tests.unit.conftest import make_container
 
 
+def monitor_label(key: str, value: str):
+    """Return a config mutator that sets the monitor label key and value."""
+
+    def mutate(config):
+        config.monitor.label_key = key
+        config.monitor.label_value = value
+
+    return mutate
+
+
 def start_event(container_id: str, name: str) -> dict:
     """
     Build a Docker ``container start`` event payload.
@@ -151,6 +161,19 @@ class TestScanExistingContainers:
         await engine._scan_existing_containers()
 
         assert config_manager.get_config().containers.selected == []
+
+    async def test_empty_custom_label_value_matches_only_an_empty_label_value(
+        self, engine, docker_client, update_config
+    ):
+        update_config(monitor_label("heal", ""))
+        empty_value, empty_info = make_container(name="empty", container_id="e" * 64, labels={"heal": ""})
+        other_value, other_info = make_container(name="other", container_id="f" * 64, labels={"heal": "yes"})
+        docker_client.add_container(empty_value, empty_info)
+        docker_client.add_container(other_value, other_info)
+
+        await engine._scan_existing_containers()
+
+        assert config_manager.get_config().containers.selected == ["empty"]
 
     async def test_event_message_names_the_default_label(self, engine, docker_client):
         container, info = make_container(name="web", labels={"autoheal": "true"})
@@ -361,6 +384,20 @@ class TestProcessContainerStartEvent:
         await engine._process_container_start_event(start_event(container.id, "web"))
 
         assert config_manager.get_config().containers.selected == []
+
+    async def test_empty_custom_label_value_matches_only_an_empty_label_value(
+        self, engine, docker_client, update_config
+    ):
+        update_config(monitor_label("heal", ""))
+        empty_value, empty_info = make_container(name="empty", container_id="e" * 64, labels={"heal": ""})
+        other_value, other_info = make_container(name="other", container_id="f" * 64, labels={"heal": "yes"})
+        docker_client.add_container(empty_value, empty_info)
+        docker_client.add_container(other_value, other_info)
+
+        await engine._process_container_start_event(start_event(empty_value.id, "empty"))
+        await engine._process_container_start_event(start_event(other_value.id, "other"))
+
+        assert config_manager.get_config().containers.selected == ["empty"]
 
     async def test_event_message_names_the_default_label(self, engine, docker_client):
         container, info = make_container(name="web", labels={"autoheal": "true"})
