@@ -73,6 +73,22 @@ def test_version_file_matches_the_manifest():
     assert (REPO_ROOT / "version.txt").read_text(encoding="utf-8").strip() == manifest["."]
 
 
+def test_api_version_is_bumped_by_release_please_and_matches_the_manifest():
+    config = json.loads((REPO_ROOT / "release-please-config.json").read_text())
+    manifest = json.loads((REPO_ROOT / ".release-please-manifest.json").read_text())
+
+    # Release Please only rewrites a file listed in extra-files, and only on
+    # lines carrying the x-release-please-version annotation. Both halves are
+    # needed, or the version shown in /docs and /openapi.json silently goes
+    # stale again at the next release.
+    assert "app/api/api.py" in config["packages"]["."]["extra-files"]
+
+    api_source = (REPO_ROOT / "app" / "api" / "api.py").read_text(encoding="utf-8")
+    annotated = [line for line in api_source.splitlines() if "x-release-please-version" in line]
+    assert len(annotated) == 1
+    assert f'version="{manifest["."]}"' in annotated[0]
+
+
 def test_docker_job_only_runs_when_a_release_was_actually_created():
     assert "needs.release-please.outputs.release_created == 'true'" in WORKFLOW
 

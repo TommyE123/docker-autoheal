@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../services/api", () => ({
@@ -75,6 +75,28 @@ describe("NotificationsPage", () => {
     expect(
       await screen.findByText(/no notification services configured/i),
     ).toBeInTheDocument();
+  });
+
+  it("quotes the Add Service button name in the empty-state message", async () => {
+    getNotificationsConfig.mockResolvedValue({ data: config });
+
+    render(<NotificationsPage />);
+
+    expect(
+      await screen.findByText(
+        'No notification services configured. Click "Add Service" to get started.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("loads the configuration exactly once on mount", async () => {
+    getNotificationsConfig.mockResolvedValue({ data: config });
+
+    render(<NotificationsPage />);
+    await screen.findByText(/notifications are disabled/i);
+    await act(async () => {});
+
+    expect(getNotificationsConfig).toHaveBeenCalledTimes(1);
   });
 
   it("shows an alert when loading the configuration fails", async () => {
@@ -562,4 +584,199 @@ describe("NotificationsPage", () => {
 
     expect(await screen.findByText(/test send failed/i)).toBeInTheDocument();
   });
+
+  it("shows an alert and leaves the state unchanged when toggling notifications fails", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({ data: config });
+    updateNotificationsConfig.mockRejectedValue(new Error("nope"));
+
+    render(<NotificationsPage />);
+
+    await screen.findByText(/notifications are disabled/i);
+    await user.click(screen.getByRole("checkbox"));
+
+    expect(await screen.findByText(/failed to update notifications/i)).toBeInTheDocument();
+    expect(screen.getByText(/notifications are disabled/i)).toBeInTheDocument();
+  });
+
+  describe("event filters", () => {
+    it("explains that all events notify when no filter is selected", async () => {
+      getNotificationsConfig.mockResolvedValue({ data: config });
+
+      render(<NotificationsPage />);
+
+      expect(
+        await screen.findByText(/no filters selected - all events will trigger notifications/i),
+      ).toBeInTheDocument();
+    });
+
+    it("adds an event type to the filters when its badge is clicked", async () => {
+      const user = userEvent.setup();
+      getNotificationsConfig.mockResolvedValue({ data: { ...config, event_filters: ["restart"] } });
+      updateNotificationsConfig.mockResolvedValue({});
+
+      render(<NotificationsPage />);
+
+      await user.click(await screen.findByText("Container Quarantine"));
+
+      await waitFor(() =>
+        expect(updateNotificationsConfig).toHaveBeenCalledWith({
+          event_filters: ["restart", "quarantine"],
+        }),
+      );
+      expect(await screen.findByText(/event filters updated/i)).toBeInTheDocument();
+      expect(screen.getByText(/container quarantine ✓/i)).toBeInTheDocument();
+      expect(
+        screen.queryByText(/no filters selected/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it("removes an already selected event type from the filters", async () => {
+      const user = userEvent.setup();
+      getNotificationsConfig.mockResolvedValue({
+        data: { ...config, event_filters: ["restart", "quarantine"] },
+      });
+      updateNotificationsConfig.mockResolvedValue({});
+
+      render(<NotificationsPage />);
+
+      await user.click(await screen.findByText(/container restart/i));
+
+      await waitFor(() =>
+        expect(updateNotificationsConfig).toHaveBeenCalledWith({ event_filters: ["quarantine"] }),
+      );
+    });
+
+    it("shows an alert and keeps the previous filters when updating fails", async () => {
+      const user = userEvent.setup();
+      getNotificationsConfig.mockResolvedValue({ data: config });
+      updateNotificationsConfig.mockRejectedValue(new Error("nope"));
+
+      render(<NotificationsPage />);
+
+      await user.click(await screen.findByText("Auto Monitor"));
+
+      expect(await screen.findByText(/failed to update event filters/i)).toBeInTheDocument();
+      expect(screen.queryByText(/auto monitor ✓/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("type-specific service payloads", () => {
+    async function openAddModal(type, name) {
+      const user = userEvent.setup();
+      getNotificationsConfig.mockResolvedValue({ data: config });
+      addNotificationService.mockResolvedValue({});
+
+      render(<NotificationsPage />);
+      await screen.findByText(/notifications are disabled/i);
+
+      await user.click(screen.getByRole("button", { name: /add service/i }));
+      await user.type(screen.getByPlaceholderText(/my discord server/i), name);
+      await user.selectOptions(screen.getByRole("combobox"), type);
+      return user;
+    }
+
+    async function submitAndGetPayload(user) {
+      await user.click(screen.getByRole("button", { name: /^add service$/i }));
+      await waitFor(() => expect(addNotificationService).toHaveBeenCalledTimes(1));
+      return addNotificationService.mock.calls[0][0];
+    }
+
+    it("sends the url and optional username for a discord service", async () => {
+      const user = await openAddModal("discord", "Discord");
+      await user.type(
+        screen.getByPlaceholderText(/discord\.com\/api\/webhooks/i),
+        "https://discord.com/api/webhooks/1",
+      );
+      await user.type(screen.getByPlaceholderText("Docker Auto-Heal"), "autoheal-bot");
+
+      expect(await submitAndGetPayload(user)).toEqual({
+        name: "Discord",
+        type: "discord",
+        enabled: true,
+        url: "https://discord.com/api/webhooks/1",
+        username: "autoheal-bot",
+      });
+    });
+
+    it("sends only the url for a slack service", async () => {
+      const user = await openAddModal("slack", "Slack");
+      await user.type(
+        screen.getByPlaceholderText(/hooks\.slack\.com/i),
+        "https://hooks.slack.com/services/x",
+      );
+
+      expect(await submitAndGetPayload(user)).toEqual({
+        name: "Slack",
+        type: "slack",
+        enabled: true,
+        url: "https://hooks.slack.com/services/x",
+      });
+    });
+
+    it("sends the bot token and chat id for a telegram service", async () => {
+      const user = await openAddModal("telegram", "Telegram");
+      await user.type(screen.getByPlaceholderText(/123456789:abc/i), "123:abc");
+      await user.type(screen.getByPlaceholderText("-1001234567890"), "456");
+
+      expect(await submitAndGetPayload(user)).toEqual({
+        name: "Telegram",
+        type: "telegram",
+        enabled: true,
+        bot_token: "123:abc",
+        chat_id: "456",
+      });
+    });
+
+    it("sends the topic and optional credentials for an ntfy service", async () => {
+      const user = await openAddModal("ntfy", "Ntfy");
+      await user.type(screen.getByPlaceholderText("docker-autoheal"), "alerts");
+      await user.type(screen.getByPlaceholderText(/ntfy\.sh/i), "https://ntfy.example.com");
+      const [username] = screen.getAllByRole("textbox").slice(-1);
+      await user.type(username, "me");
+      await user.type(document.querySelector('input[type="password"]'), "secret");
+
+      expect(await submitAndGetPayload(user)).toEqual({
+        name: "Ntfy",
+        type: "ntfy",
+        enabled: true,
+        topic: "alerts",
+        server_url: "https://ntfy.example.com",
+        username: "me",
+        password: "secret",
+      });
+    });
+
+    it("sends the server url and app token for a gotify service", async () => {
+      const user = await openAddModal("gotify", "Gotify");
+      await user.type(
+        screen.getByPlaceholderText("https://gotify.example.com"),
+        "https://gotify.local",
+      );
+      await user.type(screen.getByPlaceholderText("AaBbCcDdEeFf"), "apptok");
+
+      expect(await submitAndGetPayload(user)).toEqual({
+        name: "Gotify",
+        type: "gotify",
+        enabled: true,
+        server_url: "https://gotify.local",
+        app_token: "apptok",
+      });
+    });
+
+    it("sends the user key and api token for a pushover service", async () => {
+      const user = await openAddModal("pushover", "Pushover");
+      await user.type(screen.getByPlaceholderText("uQiRzpo4DXghDmr9QzzfQu27cmVRsG"), "ukey");
+      await user.type(screen.getByPlaceholderText("azGDORePK8gMaC0QOYAMyEEuzJnyUi"), "atok");
+
+      expect(await submitAndGetPayload(user)).toEqual({
+        name: "Pushover",
+        type: "pushover",
+        enabled: true,
+        user_key: "ukey",
+        api_token: "atok",
+      });
+    });
+  });
 });
+
