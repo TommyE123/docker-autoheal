@@ -152,8 +152,13 @@ class AutoHealService:
             self.running = True
             logger.info("Docker Auto-Heal Service started successfully")
             ui_url = get_ui_url(config)
-            logger.info(f"Web UI available at {ui_url}")
-            logger.info(f"API documentation available at {ui_url}/docs")
+            if ui_url:
+                logger.info(f"Web UI available at {ui_url}")
+                logger.info(f"API documentation available at {ui_url}/docs")
+            else:
+                listen = f"{config.ui.listen_address}:{config.ui.listen_port}"
+                logger.info(f"Web UI listening on {listen}")
+                logger.info(f"API documentation listening on {listen}/docs")
 
         except Exception as e:
             logger.error(f"Failed to start service: {e}", exc_info=True)
@@ -206,17 +211,18 @@ class AutoHealService:
 service: AutoHealService | None = None
 
 
-def get_ui_url(config) -> str:
+def get_ui_url(config) -> str | None:
     """
-    Build the URL shown in the startup messages for reaching the web UI.
+    Build the user-facing URL for the startup messages, or None if none was supplied.
 
     Display only: the server still binds to ``config.ui.listen_address`` and
-    ``config.ui.listen_port``. Inside a container those are the bind address and the
-    container port, which are not what a user connects to. ``AUTOHEAL_PUBLIC_HOST`` and
-    ``AUTOHEAL_PUBLIC_PORT`` let a deployment supply the host address and published port
-    instead; each falls back to the configured value when unset or empty.
+    ``config.ui.listen_port``. A bind address such as 0.0.0.0 is not a URL a user can open,
+    so a URL is only built when ``AUTOHEAL_PUBLIC_HOST`` is set. ``AUTOHEAL_PUBLIC_PORT``
+    is the published port and falls back to the listen port when unset or empty.
     """
-    host = os.environ.get("AUTOHEAL_PUBLIC_HOST", "").strip() or config.ui.listen_address
+    host = os.environ.get("AUTOHEAL_PUBLIC_HOST", "").strip()
+    if not host:
+        return None
     port = os.environ.get("AUTOHEAL_PUBLIC_PORT", "").strip() or config.ui.listen_port
     return f"http://{host}:{port}"
 

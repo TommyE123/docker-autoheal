@@ -169,12 +169,13 @@ replaced), the container name `docker-autoheal-dev`, the UI on `3132`, metrics o
 `AUTOHEAL_DEV_PORT` and `AUTOHEAL_DEV_METRICS_PORT` to change the ports. The override needs
 Docker Compose v2.24.4 or later. Pass the same `-f` flags to `docker compose down` to stop it.
 
-The startup log reports the URL to open, built from `AUTOHEAL_DEV_HOST` and the published
-port. The **Run Docker Stack** task fills in the host's first IP address from
-`hostname -I`; when running the command by hand, or if that picks the wrong address, set
-`AUTOHEAL_DEV_HOST` yourself (it defaults to `localhost`). This only changes the logged URLs.
-The server still listens on `0.0.0.0` inside the container. Outside this override, the logged
-URL can be set with `AUTOHEAL_PUBLIC_HOST` and `AUTOHEAL_PUBLIC_PORT`.
+By default the startup log only says what the server is listening on (`0.0.0.0:3131`
+inside the container), because that is not an address you can open. To have it log a real
+URL, set `AUTOHEAL_DEV_HOST` to the address you reach this host at before starting the
+stack, for example `AUTOHEAL_DEV_HOST=192.0.2.10`; it is combined with the published port
+(`3132` by default). Nothing detects the address for you. This only changes the logged
+messages. The server still listens on `0.0.0.0` inside the container. Outside this
+override, `AUTOHEAL_PUBLIC_HOST` and `AUTOHEAL_PUBLIC_PORT` do the same job.
 
 The dev instance shares the host's Docker socket, so it can see every container on the
 daemon. To keep it away from production containers, the override seeds

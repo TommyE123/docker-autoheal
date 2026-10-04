@@ -390,13 +390,7 @@
     {
       "label": "Autoheal: Run Docker Stack",
       "type": "shell",
-      "command": "AUTOHEAL_DEV_HOST=\"${AUTOHEAL_DEV_HOST:-$(hostname -I 2>/dev/null | cut -d' ' -f1)}\" docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build autoheal",
-      "options": {
-        "shell": {
-          "executable": "bash",
-          "args": ["-c"]
-        }
-      },
+      "command": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build autoheal",
       "problemMatcher": []
     },
     {
