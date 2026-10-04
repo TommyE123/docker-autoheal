@@ -182,9 +182,14 @@ describe("ConfigPage", () => {
 
       render(<ConfigPage />);
 
-      expect(await screen.findByText("Monitor Settings")).toBeInTheDocument();
       await waitFor(() => expect(api.get).toHaveBeenCalledTimes(3));
-      expect(screen.getByText("Monitor Settings")).toBeInTheDocument();
+      await act(async () => {});
+
+      expect(screen.getByText(/uptime-kuma integration/i)).toBeInTheDocument();
+      expect(screen.getByText("Active")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /disable integration/i }),
+      ).toBeInTheDocument();
     });
 
     it("shows a failure message when the initial configuration request rejects", async () => {
