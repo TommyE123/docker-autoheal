@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Container,
   Row,
@@ -83,9 +83,13 @@ function NotificationsPage() {
     api_token: ''
   });
 
+  const alertTimeoutRef = useRef(null);
+
   useEffect(() => {
     fetchConfig();
   }, []);
+
+  useEffect(() => () => clearTimeout(alertTimeoutRef.current), []);
 
   const fetchConfig = async () => {
     try {
@@ -102,7 +106,11 @@ function NotificationsPage() {
 
   const showAlert = (message, variant = 'success') => {
     setAlert({ show: true, message, variant });
-    setTimeout(() => setAlert({ show: false, message: '', variant: 'success' }), 5000);
+    clearTimeout(alertTimeoutRef.current);
+    alertTimeoutRef.current = setTimeout(
+      () => setAlert({ show: false, message: '', variant: 'success' }),
+      5000
+    );
   };
 
   const handleToggleNotifications = async (enabled) => {
