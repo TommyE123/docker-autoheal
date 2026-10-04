@@ -60,6 +60,7 @@ or added.
 | Dependency updates                                                | Yes, via Renovate (see [Dependency Management](dependency-management.md)) |
 | Release notes                                                     | Yes — published to GitHub Releases, no committed changelog file           |
 | Version file                                                      | Yes — `version.txt`, maintained by Release Please                         |
+| API version shown in `/docs` and `/openapi.json`                  | Yes — `app/api/api.py`, updated by Release Please (`extra-files`)         |
 
 ## See also
 
