@@ -167,7 +167,7 @@ This uses the image `docker-autoheal:dev` (so `tommye123/docker-autoheal:latest`
 replaced), the container name `docker-autoheal-dev`, the UI on `3132`, metrics on `9091`,
 `./data-dev` for data, and its own Compose project, `docker-autoheal-dev`. Set
 `AUTOHEAL_DEV_PORT` and `AUTOHEAL_DEV_METRICS_PORT` to change the ports. The override needs
-Docker Compose v2.24 or later. Pass the same `-f` flags to `docker compose down` to stop it.
+Docker Compose v2.24.4 or later. Pass the same `-f` flags to `docker compose down` to stop it.
 
 The dev instance shares the host's Docker socket, so it can see every container on the
 daemon. To keep it away from production containers, the override seeds

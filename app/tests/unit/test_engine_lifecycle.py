@@ -107,6 +107,7 @@ class TestScanExistingContainers:
 
         assert config_manager.get_config().containers.selected == ["web"]
         assert [e.event_type for e in config_manager.get_events()] == ["auto_monitor"]
+        assert "autoheal=true" in config_manager.get_events()[0].message
 
     async def test_compose_container_is_added_under_its_stable_id(self, engine, docker_client):
         container, info = make_container(
@@ -622,6 +623,9 @@ class TestCustomMonitorLabel:
         await engine._scan_existing_containers()
 
         assert config_manager.get_config().containers.selected == ["dev"]
+        [event] = config_manager.get_events()
+        assert f"{DEV_LABEL}=true" in event.message
+        assert "autoheal=true" not in event.message
 
     async def test_start_event_selects_only_custom_labelled_containers(
         self, engine, docker_client, dev_label_config
@@ -636,6 +640,9 @@ class TestCustomMonitorLabel:
 
         await engine._process_container_start_event(start_event(dev.id, "dev"))
         assert config_manager.get_config().containers.selected == ["dev"]
+        [event] = config_manager.get_events()
+        assert f"{DEV_LABEL}=true" in event.message
+        assert "autoheal=true" not in event.message
 
     async def test_dev_config_never_monitors_production_labelled_container(
         self, engine, docker_client, update_config

@@ -9,7 +9,7 @@ name: docker-autoheal-dev # Separate Compose project, so dev `up`/`down` never t
 # labelled `autoheal.dev=true` are monitored; `autoheal=true` containers (the production
 # label) are ignored even though the Docker socket is shared. Override the ports with
 # AUTOHEAL_DEV_PORT and AUTOHEAL_DEV_METRICS_PORT. `!override` replaces the base lists
-# instead of appending to them (needs Docker Compose v2.24+).
+# instead of appending to them (needs Docker Compose v2.24.4 or later).
 services:
   autoheal:
     # Keeps the dev build from replacing the published `tommye123/docker-autoheal:latest`.
