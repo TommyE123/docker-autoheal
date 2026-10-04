@@ -37,12 +37,11 @@ Autoheal monitors Docker containers, checks their health, and can restart or qua
 ## Branches, commits and PRs
 
 - Name task branches `<type>/<issue-number>-<short-slug>`, e.g. `fix/353-restart-handling`. If there's no issue, use `<type>/<short-slug>`, e.g. `docs/update-readme`.
-  - Types: `feat`, `fix`, `chore`, `refactor`, `test`, `ci`, `docs`, `perf`, `build`, `style`. Pick the one that matches the work.
+  - Types: `feat`, `fix`, `chore`, `refactor`, `test`, `ci`, `docs`, `perf`, `build`, `style`. Pick the one that matches the work; don't default to `feat`/`chore`.
   - Issue number: digits only, no `#`. If an issue exists but you can't find its number, **stop and ask**; never invent one.
-  - Slug: **2–5 meaningful words**, lowercase kebab-case, ideally ≤40 characters (the word count wins if they conflict).
-  - Never use random or generated names, UUIDs, timestamps, or usernames.
-  - **Validate before committing or opening a PR** against `^(feat|fix|chore|refactor|test|ci|docs|perf|build|style)/([0-9]+-)?[a-z0-9]+(-[a-z0-9]+){1,4}$`. If it doesn't match and the branch hasn't been pushed, rename it with `git branch -m`.
-  - If the branch is already pushed, don't rename it or force-push. Keep the name and tell the user it doesn't conform.
+  - Slug: **2–5 meaningful words**, lowercase kebab-case, ideally ≤40 characters.
+  - Never use random or generated names, UUIDs, timestamps, usernames, or similar non-descriptive names.
+  - **Validate the branch name before committing or opening a PR.** If it doesn't comply, rename it before continuing. If already pushed, follow the existing safe branch-rename guidance.
 - Commit, push, and open a PR on a feature branch unless the user says not to. Respect local-only, no-commit, no-push, and no-PR requests.
 - Never push to a protected branch, force-push, or bypass hooks. Don't overwrite unrelated local changes.
 - When branch currency matters, merge `origin/main` as directed by `.claude/rules/branch-currency.md`. Don't update merely because `main` moved.
