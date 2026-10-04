@@ -36,7 +36,7 @@ try:
     app.mount("/assets", StaticFiles(directory="static/assets"), name="assets")
     logger.debug("Static assets mounted")
 except Exception as e:
-    logger.warning(f"Assets directory not found: {e}")
+    logger.warning("Assets directory not found: %s", e)
 
 from app.api.routes import (  # noqa: E402
     config,

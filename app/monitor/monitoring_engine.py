@@ -86,8 +86,9 @@ class MonitoringEngine:
         logger.info("Monitoring engine started")
         monitor_config = config_manager.get_config().monitor
         logger.info(
-            "Event listener started for auto-monitoring containers with "
-            f"{monitor_config.label_key}={monitor_config.label_value} label"
+            "Event listener started for auto-monitoring containers with %s=%s label",
+            monitor_config.label_key,
+            monitor_config.label_value,
         )
 
     async def stop(self) -> None:
@@ -105,7 +106,7 @@ class MonitoringEngine:
             except asyncio.CancelledError:
                 pass  # Expected during shutdown
             except Exception as e:
-                logger.warning(f"Error stopping monitor loop: {e}")
+                logger.warning("Error stopping monitor loop: %s", e)
 
         if self._event_task:
             self._event_task.cancel()
@@ -114,7 +115,7 @@ class MonitoringEngine:
             except asyncio.CancelledError:
                 pass  # Expected during shutdown
             except Exception as e:
-                logger.warning(f"Error stopping event listener: {e}")
+                logger.warning("Error stopping event listener: %s", e)
 
         logger.info("Monitoring engine stopped")
         logger.info("Event listener stopped")
@@ -135,7 +136,7 @@ class MonitoringEngine:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Error in monitoring loop: {e}", exc_info=True)
+                logger.exception("Error in monitoring loop: %s", e)
                 await asyncio.sleep(5)  # Brief pause before retry
 
     async def _check_containers(self) -> None:
@@ -155,10 +156,10 @@ class MonitoringEngine:
                 try:
                     await self._check_single_container(container)
                 except Exception as e:
-                    logger.error(f"Error checking container {container.name}: {e}")
+                    logger.error("Error checking container %s: %s", container.name, e)
 
         except Exception as e:
-            logger.error(f"Error checking containers: {e}", exc_info=True)
+            logger.exception("Error checking containers: %s", e)
 
     async def _check_single_container(self, container: Container) -> None:
         """
@@ -208,7 +209,11 @@ class MonitoringEngine:
                     await self._auto_unquarantine_container(quarantine_id, stable_id, container_name, container_id)
                     return
 
-            logger.debug(f"Container {container_name} (stable_id: {stable_id}) is quarantined and still unhealthy, skipping")
+            logger.debug(
+                "Container %s (stable_id: %s) is quarantined and still unhealthy, skipping",
+                container_name,
+                stable_id,
+            )
             return
 
 
@@ -251,7 +256,11 @@ class MonitoringEngine:
             short_id in config.containers.selected or
             container_name in config.containers.selected or
             (compose_service and compose_service in config.containers.selected)):
-            logger.debug(f"Container {container_name} (stable_id: {stable_id}) explicitly selected for monitoring")
+            logger.debug(
+                "Container %s (stable_id: %s) explicitly selected for monitoring",
+                container_name,
+                stable_id,
+            )
             return True
 
         # Check include_all flag
@@ -323,7 +332,9 @@ class MonitoringEngine:
         status = state.get("Status", "").lower()
 
         if status == "starting":
-            logger.debug(f"Container {info.get('name')} is still starting, skipping health evaluation")
+            logger.debug(
+                "Container %s is still starting, skipping health evaluation", info.get("name")
+            )
             return False, "Container is starting"
 
         if status in ["exited", "stopped", "dead"]:
@@ -333,7 +344,10 @@ class MonitoringEngine:
             if restart_mode in ["on-failure", "both"]:
                 # If exit code is 0 (clean stop) and we respect manual stops, don't restart
                 if exit_code == 0 and config.restart.respect_manual_stop:
-                    logger.debug(f"Container {info.get('name')} stopped cleanly (exit 0), respecting manual stop")
+                    logger.debug(
+                        "Container %s stopped cleanly (exit 0), respecting manual stop",
+                        info.get("name"),
+                    )
                     return False, "Manual stop (exit 0)"
 
                 # For non-zero exit codes or if we don't respect manual stops, restart
@@ -412,10 +426,10 @@ class MonitoringEngine:
                     container
                 )
                 return status == "healthy" if status else True  # Assume healthy if no check
-            logger.warning(f"Unknown health check type: {check_type}")
+            logger.warning("Unknown health check type: %s", check_type)
             return True
         except Exception as e:
-            logger.error(f"Error performing health check: {e}")
+            logger.error("Error performing health check: %s", e)
             return False
 
     async def _auto_unquarantine_container(self, quarantine_id: str, stable_id: str,
@@ -455,10 +469,14 @@ class MonitoringEngine:
             # Send notification
             await notification_manager.send_event_notification(event)
 
-            logger.info(f"Container {container_name} (stable_id: {stable_id}) automatically removed from quarantine - container auto-healed")
+            logger.info(
+                "Container %s (stable_id: %s) automatically removed from quarantine - container auto-healed",
+                container_name,
+                stable_id,
+            )
 
         except Exception as e:
-            logger.error(f"Error auto-unquarantining container {container_name}: {e}")
+            logger.error("Error auto-unquarantining container %s: %s", container_name, e)
 
     async def _handle_container_restart(self, container: Container, info: dict, reason: str) -> None:
         """
@@ -482,14 +500,19 @@ class MonitoringEngine:
         # 2. Auto-generated names (uses compose service name)
         # 3. Name conflicts (uses compose project + service)
 
-        logger.debug(f"Using stable_id '{stable_id}' for container {container_name}")
+        logger.debug("Using stable_id '%s' for container %s", stable_id, container_name)
 
         # Check cooldown (using stable_id)
         last_restart = self._last_restart_times.get(stable_id)
         if last_restart:
             elapsed = (datetime.now(UTC) - last_restart).total_seconds()
             if elapsed < config.restart.cooldown_seconds:
-                logger.debug(f"Container {container_name} (stable_id: {stable_id}) in cooldown period ({elapsed:.1f}s)")
+                logger.debug(
+                    "Container %s (stable_id: %s) in cooldown period (%.1fs)",
+                    container_name,
+                    stable_id,
+                    elapsed,
+                )
                 return
 
         # Check restart threshold (using stable_id for persistence)
@@ -517,7 +540,12 @@ class MonitoringEngine:
             # Send notification for quarantine event
             await notification_manager.send_event_notification(event)
 
-            logger.warning(f"Container {container_name} (stable_id: {stable_id}) quarantined after {restart_count} restarts")
+            logger.warning(
+                "Container %s (stable_id: %s) quarantined after %s restarts",
+                container_name,
+                stable_id,
+                restart_count,
+            )
 
             # Send alert if configured
             if config.alerts.enabled and config.alerts.notify_on_quarantine:
@@ -528,7 +556,12 @@ class MonitoringEngine:
         # Apply backoff if enabled (using stable_id)
         if config.restart.backoff.enabled:
             backoff_delay = self._backoff_delays.get(stable_id, config.restart.backoff.initial_seconds)
-            logger.debug(f"Applying backoff delay of {backoff_delay}s for {container_name} (stable_id: {stable_id})")
+            logger.debug(
+                "Applying backoff delay of %ss for %s (stable_id: %s)",
+                backoff_delay,
+                container_name,
+                stable_id,
+            )
             await asyncio.sleep(backoff_delay)
 
             # Update backoff for next time
@@ -536,7 +569,9 @@ class MonitoringEngine:
             self._backoff_delays[stable_id] = next_backoff
 
         # Perform restart
-        logger.info(f"Restarting container {container_name} (stable_id: {stable_id}, reason: {reason})")
+        logger.info(
+            "Restarting container %s (stable_id: %s, reason: %s)", container_name, stable_id, reason
+        )
         success = await asyncio.to_thread(self.docker_client.restart_container, container)
 
         # Record restart (using stable_id - persists across ID changes and handles all edge cases)
@@ -559,11 +594,15 @@ class MonitoringEngine:
         await notification_manager.send_event_notification(event)
 
         if success:
-            logger.info(f"Successfully restarted container {container_name} (stable_id: {stable_id})")
+            logger.info(
+                "Successfully restarted container %s (stable_id: %s)", container_name, stable_id
+            )
             # Reset backoff on successful restart
             self._backoff_delays[stable_id] = config.restart.backoff.initial_seconds
         else:
-            logger.error(f"Failed to restart container {container_name} (stable_id: {stable_id})")
+            logger.error(
+                "Failed to restart container %s (stable_id: %s)", container_name, stable_id
+            )
 
     async def _send_alert(self, event: AutoHealEvent) -> None:
         """
@@ -598,12 +637,12 @@ class MonitoringEngine:
             )
 
             if response.status_code == 200:
-                logger.info(f"Alert sent successfully for {event.container_name}")
+                logger.info("Alert sent successfully for %s", event.container_name)
             else:
-                logger.warning(f"Alert webhook returned status {response.status_code}")
+                logger.warning("Alert webhook returned status %s", response.status_code)
 
         except Exception as e:
-            logger.error(f"Failed to send alert: {e}")
+            logger.error("Failed to send alert: %s", e)
 
     def get_status(self) -> dict:
         """Get monitoring engine status"""
@@ -622,7 +661,7 @@ class MonitoringEngine:
         try:
             config = config_manager.get_config()
             label = f"{config.monitor.label_key}={config.monitor.label_value}"
-            logger.info(f"Scanning existing containers for {label} label...")
+            logger.info("Scanning existing containers for %s label...", label)
 
             # Ensure Docker connection is active
             if not self.docker_client.is_connected():
@@ -670,14 +709,23 @@ class MonitoringEngine:
                     if (stable_id in config.containers.selected or
                         container_name in config.containers.selected or
                         container_id in config.containers.selected):
-                        logger.debug(f"Container {container_name} (stable_id: {stable_id}) already in monitored list")
+                        logger.debug(
+                            "Container %s (stable_id: %s) already in monitored list",
+                            container_name,
+                            stable_id,
+                        )
                         continue
 
                     # Check if in excluded list
                     if (stable_id in config.containers.excluded or
                         container_name in config.containers.excluded or
                         container_id in config.containers.excluded):
-                        logger.info(f"Container {container_name} (stable_id: {stable_id}) has {label} but is in excluded list, skipping")
+                        logger.info(
+                            "Container %s (stable_id: %s) has %s but is in excluded list, skipping",
+                            container_name,
+                            stable_id,
+                            label,
+                        )
                         continue
 
                     # Add to monitored list using STABLE ID
@@ -685,7 +733,13 @@ class MonitoringEngine:
                     added_count += 1
 
                     # Log the auto-monitoring
-                    logger.info(f"Auto-monitoring enabled for container '{container_name}' ({container_id[:12]}) with stable_id '{stable_id}' - detected {label} label on startup")
+                    logger.info(
+                        "Auto-monitoring enabled for container '%s' (%s) with stable_id '%s' - detected %s label on startup",
+                        container_name,
+                        container_id[:12],
+                        stable_id,
+                        label,
+                    )
 
                     # Create an event for this
                     event_obj = AutoHealEvent(
@@ -703,18 +757,20 @@ class MonitoringEngine:
                     await notification_manager.send_event_notification(event_obj)
 
                 except Exception as e:
-                    logger.error(f"Error processing container during initial scan: {e}", exc_info=True)
+                    logger.exception("Error processing container during initial scan: %s", e)
                     continue
 
             # Save configuration if any containers were added
             if added_count > 0:
                 config_manager.update_config(config)
-                logger.info(f"Initial scan complete: {added_count} container(s) auto-added to monitoring")
+                logger.info(
+                    "Initial scan complete: %s container(s) auto-added to monitoring", added_count
+                )
             else:
                 logger.info("Initial scan complete: no new containers to add")
 
         except Exception as e:
-            logger.error(f"Error during initial container scan: {e}", exc_info=True)
+            logger.exception("Error during initial container scan: %s", e)
 
     async def _event_listener_loop(self) -> None:
         """
@@ -752,7 +808,7 @@ class MonitoringEngine:
                         event_queue.put(event)
 
                 except Exception as e:
-                    logger.error(f"Error in event listener thread: {e}", exc_info=True)
+                    logger.exception("Error in event listener thread: %s", e)
                     import time
                     time.sleep(10)
 
@@ -776,7 +832,7 @@ class MonitoringEngine:
                 logger.debug("Event listener cancelled")
                 break
             except Exception as e:
-                logger.error(f"Error processing event from queue: {e}", exc_info=True)
+                logger.exception("Error processing event from queue: %s", e)
                 await asyncio.sleep(1)
 
     async def _process_container_start_event(self, event: dict) -> None:
@@ -798,7 +854,9 @@ class MonitoringEngine:
             if not container_id:
                 return
 
-            logger.debug(f"Container start event detected: {container_name} ({container_id[:12]})")
+            logger.debug(
+                "Container start event detected: %s (%s)", container_name, container_id[:12]
+            )
 
             # Get the container object
             container = await asyncio.to_thread(
@@ -807,7 +865,7 @@ class MonitoringEngine:
             )
 
             if not container:
-                logger.warning(f"Could not retrieve container {container_name} after start event")
+                logger.warning("Could not retrieve container %s after start event", container_name)
                 return
 
             # Get container info including labels
@@ -840,14 +898,23 @@ class MonitoringEngine:
                 if (stable_id in config.containers.selected or
                     container_name in config.containers.selected or
                     container_id in config.containers.selected):
-                    logger.debug(f"Container {container_name} (stable_id: {stable_id}) already in monitored list")
+                    logger.debug(
+                        "Container %s (stable_id: %s) already in monitored list",
+                        container_name,
+                        stable_id,
+                    )
                     return
 
                 # Check if in excluded list (by stable_id, name, or ID for backwards compatibility)
                 if (stable_id in config.containers.excluded or
                     container_name in config.containers.excluded or
                     container_id in config.containers.excluded):
-                    logger.info(f"Container {container_name} (stable_id: {stable_id}) has {label} but is in excluded list, skipping")
+                    logger.info(
+                        "Container %s (stable_id: %s) has %s but is in excluded list, skipping",
+                        container_name,
+                        stable_id,
+                        label,
+                    )
                     return
 
                 # Add to monitored list using STABLE ID (solves all edge cases)
@@ -855,7 +922,13 @@ class MonitoringEngine:
                 config_manager.update_config(config)
 
                 # Log the auto-monitoring
-                logger.info(f"Auto-monitoring enabled for container '{container_name}' ({container_id[:12]}) with stable_id '{stable_id}' - detected {label} label")
+                logger.info(
+                    "Auto-monitoring enabled for container '%s' (%s) with stable_id '%s' - detected %s label",
+                    container_name,
+                    container_id[:12],
+                    stable_id,
+                    label,
+                )
 
                 # Create an event for this
                 event_obj = AutoHealEvent(
@@ -873,5 +946,5 @@ class MonitoringEngine:
                 await notification_manager.send_event_notification(event_obj)
 
         except Exception as e:
-            logger.error(f"Error processing container start event: {e}", exc_info=True)
+            logger.exception("Error processing container start event: %s", e)
 

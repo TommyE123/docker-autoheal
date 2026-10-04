@@ -110,17 +110,17 @@ def init_data_file(file_path: Path, default_data: Any, description: str) -> bool
         True if file was created, False if it already existed
     """
     if file_path.exists():
-        logger.debug(f"{description} already exists at {file_path}")
+        logger.debug("%s already exists at %s", description, file_path)
         return False
 
     try:
         file_path.parent.mkdir(parents=True, exist_ok=True)
         with file_path.open('w') as f:
             json.dump(default_data, f, indent=2)
-        logger.info(f"Created default {description} at {file_path}")
+        logger.info("Created default %s at %s", description, file_path)
         return True
     except Exception as e:
-        logger.error(f"Failed to create {description} at {file_path}: {e}")
+        logger.error("Failed to create %s at %s: %s", description, file_path, e)
         return False
 
 
@@ -136,21 +136,21 @@ def initialize_defaults(data_dir: Path = Path("/data")) -> None:
     # Ensure data directory exists
     try:
         data_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Data directory ready at: {data_dir}")
+        logger.info("Data directory ready at: %s", data_dir)
     except Exception as e:
-        logger.error(f"Failed to create data directory {data_dir}: {e}")
+        logger.error("Failed to create data directory %s: %s", data_dir, e)
         # Fallback to local directory
         data_dir = Path("./data")
         data_dir.mkdir(parents=True, exist_ok=True)
-        logger.warning(f"Using fallback data directory: {data_dir}")
+        logger.warning("Using fallback data directory: %s", data_dir)
 
     # Ensure logs subdirectory exists
     logs_dir = data_dir / "logs"
     try:
         logs_dir.mkdir(parents=True, exist_ok=True)
-        logger.debug(f"Logs directory ready at: {logs_dir}")
+        logger.debug("Logs directory ready at: %s", logs_dir)
     except Exception as e:
-        logger.error(f"Failed to create logs directory: {e}")
+        logger.error("Failed to create logs directory: %s", e)
 
     # Initialize each data file
     files_created = 0
@@ -176,7 +176,7 @@ def initialize_defaults(data_dir: Path = Path("/data")) -> None:
         files_created += 1
 
     if files_created > 0:
-        logger.info(f"Initialization complete: {files_created} default file(s) created")
+        logger.info("Initialization complete: %s default file(s) created", files_created)
     else:
         logger.info("All data files already exist, no initialization needed")
 
@@ -204,9 +204,9 @@ def reset_to_defaults(data_dir: Path = Path("/data")) -> None:
         try:
             with file_path.open('w') as f:
                 json.dump(default_data, f, indent=2)
-            logger.info(f"Reset {filename} to defaults")
+            logger.info("Reset %s to defaults", filename)
         except Exception as e:
-            logger.error(f"Failed to reset {filename}: {e}")
+            logger.error("Failed to reset %s: %s", filename, e)
 
     logger.info("Reset to defaults complete")
 
