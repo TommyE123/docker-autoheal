@@ -16,6 +16,7 @@ Requests are sent with a tiny in-process ASGI caller rather than
 reached here touches Docker.
 """
 
+import json
 from typing import Any
 
 import pytest
@@ -217,10 +218,13 @@ class TestRoutingThroughTheAsgiApp:
         assert b"<html" not in body.lower()
 
     async def test_docs_paths_are_not_swallowed_by_the_catch_all(self):
-        status, _, headers = await _request("GET", "/openapi.json")
+        status, body, headers = await _request("GET", "/openapi.json")
 
         assert status == 200
         assert headers["content-type"].startswith("application/json")
+        # The version served to API consumers is the declared app version, which
+        # test_release_please_workflow.py ties to the Release Please manifest.
+        assert json.loads(body)["info"]["version"] == app.version
 
 
 @pytest.mark.asyncio

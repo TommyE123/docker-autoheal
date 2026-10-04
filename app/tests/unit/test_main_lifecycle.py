@@ -178,6 +178,21 @@ class TestAutoHealServiceStartFailure:
             assert service.docker_client is None
 
     @pytest.mark.asyncio
+    async def test_startup_log_reports_the_api_version(self, caplog):
+        # The version comes from the FastAPI app (kept current by Release Please),
+        # not a literal in main.py that can go stale.
+        with patch('app.main.config_manager') as mock_cm, \
+             patch('app.main.notification_manager') as mock_notif, \
+             caplog.at_level("INFO", logger="app.main"):
+            mock_cm.get_config.side_effect = RuntimeError("config broke")
+            mock_notif.stop = AsyncMock()
+
+            with pytest.raises(RuntimeError):
+                await AutoHealService().start()
+
+        assert f"Starting Docker Auto-Heal Service v{main_module.app.version}" in caplog.text
+
+    @pytest.mark.asyncio
     async def test_uptime_kuma_start_failure_does_not_abort_startup(self):
         with patch('app.main.config_manager') as mock_cm, \
              patch('app.main.DockerClientWrapper'), \
