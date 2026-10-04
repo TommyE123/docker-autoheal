@@ -67,6 +67,23 @@ describe("NotificationsPage", () => {
     );
   });
 
+  it("clears the pending alert timer when unmounted", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({ data: config });
+    updateNotificationsConfig.mockResolvedValue({});
+
+    const { unmount } = render(<NotificationsPage />);
+    await screen.findByText(/notifications are disabled/i);
+    await user.click(screen.getByRole("checkbox"));
+    await screen.findByText(/notifications enabled/i);
+
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+    unmount();
+
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+    clearTimeoutSpy.mockRestore();
+  });
+
   it("shows a message when no notification services are configured", async () => {
     getNotificationsConfig.mockResolvedValue({ data: config });
 
