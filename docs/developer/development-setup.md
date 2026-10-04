@@ -216,18 +216,18 @@ CSS uses Stylelint fixes on explicit save, while CI has no CSS formatter. Markdo
 markdownlint fixes on explicit save; format-on-save is disabled because CI's table
 formatter is CLI-only.
 
-| File type       | Linters (CI)              | Formatter (CI)           | Fails the build? |
-|-----------------|---------------------------|--------------------------|------------------|
-| `.py`, `.pyi`   | pyright, ruff             | ruff-format              | No, report-only  |
-| `.js`, `.jsx`   | eslint                    | prettier                 | No, report-only  |
-| `.css`          | stylelint                 | none                     | No, report-only  |
-| `.json`         | jsonlint, v8r             | prettier                 | Yes              |
-| `.yml`, `.yaml` | yamllint, v8r, actionlint | prettier                 | Yes              |
-| `.md`           | markdownlint              | markdown-table-formatter | Yes              |
-| `.html`, `.htm` | djlint, htmlhint          | none                     | Yes              |
-| `.sh`           | shellcheck, bash-exec     | shfmt                    | Yes              |
-| `Dockerfile*`   | hadolint                  | none                     | Yes              |
-| Every file      | editorconfig-checker      | —                        | Yes              |
+| File type       | Linters (CI)              | Formatter (CI)           | Fails the build?                       |
+|-----------------|---------------------------|--------------------------|----------------------------------------|
+| `.py`, `.pyi`   | pyright, ruff             | ruff-format              | No, report-only                        |
+| `.js`, `.jsx`   | eslint                    | prettier                 | eslint: Yes; prettier: No, report-only |
+| `.css`          | stylelint                 | none                     | No, report-only                        |
+| `.json`         | jsonlint, v8r             | prettier                 | Yes                                    |
+| `.yml`, `.yaml` | yamllint, v8r, actionlint | prettier                 | Yes                                    |
+| `.md`           | markdownlint              | markdown-table-formatter | Yes                                    |
+| `.html`, `.htm` | djlint, htmlhint          | none                     | Yes                                    |
+| `.sh`           | shellcheck, bash-exec     | shfmt                    | Yes                                    |
+| `Dockerfile*`   | hadolint                  | none                     | Yes                                    |
+| Every file      | editorconfig-checker      | —                        | Yes                                    |
 
 Workflow files are additionally scanned by zizmor, which is report-only. Repository-wide
 scanners (checkov, semgrep, osv-scanner, trivy, trufflehog, betterleaks, secretlint,
