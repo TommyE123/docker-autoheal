@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, Table, Button, Badge, Form, Spinner, Modal, Alert } from 'react-bootstrap';
 import {
   getContainers,
@@ -17,16 +17,21 @@ function ContainersPage() {
   const [alert, setAlert] = useState(null);
   const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null });
 
-  const fetchContainers = async () => {
+  const showAlert = useCallback((variant, message) => {
+    setAlert({ variant, message });
+    setTimeout(() => setAlert(null), 5000);
+  }, []);
+
+  const fetchContainers = useCallback(async () => {
     try {
       const response = await getContainers(true); // Include stopped containers
       setContainers(response.data);
-    } catch (error) {
+    } catch {
       showAlert('danger', 'Failed to load containers');
     } finally {
       setLoading(false);
     }
-  };
+  }, [showAlert]);
 
   useEffect(() => {
     fetchContainers();
@@ -47,12 +52,7 @@ function ContainersPage() {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
-
-  const showAlert = (variant, message) => {
-    setAlert({ variant, message });
-    setTimeout(() => setAlert(null), 5000);
-  };
+  }, [fetchContainers]);
 
   const showConfirm = (title, message, onConfirm) => {
     setConfirmModal({ show: true, title, message, onConfirm });
@@ -93,7 +93,7 @@ function ContainersPage() {
       showAlert('success', `Enabled auto-heal for ${selectedContainers.size} container(s)`);
       setSelectedContainers(new Set());
       fetchContainers();
-    } catch (error) {
+    } catch {
       showAlert('danger', 'Failed to enable auto-heal');
     }
   };
@@ -104,7 +104,7 @@ function ContainersPage() {
       showAlert('success', `Disabled auto-heal for ${selectedContainers.size} container(s)`);
       setSelectedContainers(new Set());
       fetchContainers();
-    } catch (error) {
+    } catch {
       showAlert('danger', 'Failed to disable auto-heal');
     }
   };
@@ -118,7 +118,7 @@ function ContainersPage() {
           await restartContainer(containerId);
           showAlert('success', `Container "${containerName}" restarted`);
           fetchContainers();
-        } catch (error) {
+        } catch {
           showAlert('danger', 'Failed to restart container');
         }
       }
@@ -134,7 +134,7 @@ function ContainersPage() {
           await unquarantineContainer(containerId);
           showAlert('success', `Container "${containerName}" removed from quarantine`);
           fetchContainers();
-        } catch (error) {
+        } catch {
           showAlert('danger', 'Failed to unquarantine container');
         }
       }
@@ -146,7 +146,7 @@ function ContainersPage() {
       const response = await getContainerDetails(containerId);
       setModalContainer(response.data);
       setShowModal(true);
-    } catch (error) {
+    } catch {
       showAlert('danger', 'Failed to load container details');
     }
   };
