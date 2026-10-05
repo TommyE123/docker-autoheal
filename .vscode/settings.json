@@ -25,7 +25,7 @@
   },
 
   "[css]": {
-    "editor.defaultFormatter": "stylelint.vscode-stylelint",
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.codeActionsOnSave": {
       "source.fixAll.stylelint": "explicit"
     }
@@ -68,14 +68,13 @@
   "python.testing.unittestEnabled": false,
   "python.testing.pytestArgs": ["app/tests/unit"],
 
-  "editorconfig.enable": true,
-
+  "ruff.path": ["${workspaceFolder}/.devcontainer/bin/ruff"],
   "ruff.configuration": "${workspaceFolder}/.linter-rules/.ruff.toml",
   "markdownlint.configFile": ".linter-rules/.markdownlint.jsonc",
 
-  "stylelint.stylelintPath": "${workspaceFolder}/.devcontainer/node_modules/stylelint",
-  "stylelint.configFile": "${workspaceFolder}/.linter-rules/.stylelintrc.json",
-  "stylelint.configBasedir": "${workspaceFolder}/.devcontainer/node_modules",
+  "stylelint.stylelintPath": "/workspaces/docker-autoheal/.devcontainer/node_modules/stylelint",
+  "stylelint.configFile": "/workspaces/docker-autoheal/.linter-rules/.stylelintrc.json",
+  "stylelint.configBasedir": "/workspaces/docker-autoheal/.devcontainer/node_modules",
 
   "files.exclude": {
     "**/__pycache__": true,
