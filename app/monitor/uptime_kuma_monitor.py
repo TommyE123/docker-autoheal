@@ -127,6 +127,7 @@ class UptimeKumaMonitor:
         config = config_manager.get_config()
 
         if not config.uptime_kuma_mappings:
+            self._container_status_cache.clear()
             return
 
         try:
@@ -139,10 +140,19 @@ class UptimeKumaMonitor:
 
         status_by_name = {m['friendly_name']: m['status'] for m in monitors}
 
+        # Drop statuses for containers that are no longer mapped
+        mapped_ids = {mapping.container_id for mapping in config.uptime_kuma_mappings}
+        for container_id in list(self._container_status_cache):
+            if container_id not in mapped_ids:
+                del self._container_status_cache[container_id]
+
         for mapping in config.uptime_kuma_mappings:
             status = status_by_name.get(mapping.monitor_friendly_name)
 
             if status is None:
+                # A vanished monitor must not leave a stale status (e.g. DOWN)
+                # behind, or the container would keep being restarted.
+                self._container_status_cache.pop(mapping.container_id, None)
                 logger.debug(
                     "Monitor '%s' not found or could not fetch status",
                     mapping.monitor_friendly_name,
