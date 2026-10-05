@@ -93,7 +93,8 @@ app rather than the Vite dev server. It reads the published port back from Compo
 (`3132` unless `AUTOHEAL_DEV_PORT` is set) and reaches it as `host.docker.internal`,
 because the stack runs on the host's daemon, not inside the Dev Container
 (`devcontainer.json` maps that name with `--add-host`). It leaves your deployment alone and
-leaves the dev stack running afterwards; use **Stop Docker Stack** to remove it. Chromium
+removes the dev stack afterwards (printing its last logs first if the run failed), unless it was already running
+when the task started, in which case it is left alone. Chromium
 and its system libraries are installed by `post-create.sh`; after pulling this change into
 an existing Dev Container, run **Dev Containers: Rebuild Container** once.
 
