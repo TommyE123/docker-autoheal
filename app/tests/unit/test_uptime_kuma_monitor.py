@@ -274,6 +274,19 @@ class TestUpdateStatusCache:
 
         assert monitor._container_status_cache == {"web": 1}
 
+    async def test_duplicate_mappings_keep_status_from_present_monitor(self):
+        _add_mapping("web", "Web Monitor")
+        _add_mapping("web", "Deleted Monitor")
+        monitor = UptimeKumaMonitor()
+        _install_client(
+            monitor,
+            FakeUptimeKumaClient(monitors=[{"friendly_name": "Web Monitor", "status": 0}]),
+        )
+
+        await monitor._update_status_cache()
+
+        assert monitor._container_status_cache == {"web": 0}
+
     async def test_error_fetching_metrics_is_logged_and_leaves_cache_unchanged(
         self, caplog
     ):

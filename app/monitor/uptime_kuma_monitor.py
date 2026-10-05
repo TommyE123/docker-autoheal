@@ -140,19 +140,12 @@ class UptimeKumaMonitor:
 
         status_by_name = {m['friendly_name']: m['status'] for m in monitors}
 
-        # Drop statuses for containers that are no longer mapped
-        mapped_ids = {mapping.container_id for mapping in config.uptime_kuma_mappings}
-        for container_id in list(self._container_status_cache):
-            if container_id not in mapped_ids:
-                del self._container_status_cache[container_id]
+        refreshed_ids: set[str] = set()
 
         for mapping in config.uptime_kuma_mappings:
             status = status_by_name.get(mapping.monitor_friendly_name)
 
             if status is None:
-                # A vanished monitor must not leave a stale status (e.g. DOWN)
-                # behind, or the container would keep being restarted.
-                self._container_status_cache.pop(mapping.container_id, None)
                 logger.debug(
                     "Monitor '%s' not found or could not fetch status",
                     mapping.monitor_friendly_name,
@@ -162,6 +155,7 @@ class UptimeKumaMonitor:
             # Cache the status (0=down, 1=up, 2=pending, 3=maintenance)
             # mapping.container_id now stores stable_id
             self._container_status_cache[mapping.container_id] = status
+            refreshed_ids.add(mapping.container_id)
 
             logger.debug(
                 "Cached status for %s: %s (monitor: %s)",
@@ -169,6 +163,14 @@ class UptimeKumaMonitor:
                 status,
                 mapping.monitor_friendly_name,
             )
+
+        # Drop statuses that were not refreshed (monitor vanished or container no
+        # longer mapped) so a stale DOWN cannot keep triggering restarts. Done after
+        # the loop so a container with several mappings keeps any status that is
+        # still present.
+        for container_id in list(self._container_status_cache):
+            if container_id not in refreshed_ids:
+                del self._container_status_cache[container_id]
 
     def get_container_status(self, stable_id: str) -> int | None:
         return self._container_status_cache.get(stable_id)
