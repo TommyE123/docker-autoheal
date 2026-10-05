@@ -35,7 +35,14 @@ export default defineConfig({
       // v8 coverage instrumentation never sees it execute; excluding it
       // keeps coverage % from being diluted by a file that can never show
       // as covered no matter how it's tested.
-      exclude: [...coverageConfigDefaults.exclude, 'src/test/globalSetup.js'],
+      // Playwright config and specs run in a browser against the Docker image,
+      // not under Vitest, so they can never show as covered here either.
+      exclude: [
+        ...coverageConfigDefaults.exclude,
+        'src/test/globalSetup.js',
+        'playwright.config.js',
+        'e2e/**',
+      ],
     },
   },
 })

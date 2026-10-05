@@ -36,7 +36,7 @@ export default [
     },
   },
   {
-    files: ["playwright.config.js"],
+    files: ["**/playwright.config.js"],
     languageOptions: { globals: globals.node },
   },
   eslintConfigPrettier,
