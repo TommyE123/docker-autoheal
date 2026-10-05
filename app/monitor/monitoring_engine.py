@@ -10,7 +10,12 @@ from datetime import UTC, datetime
 
 from docker.models.containers import Container
 
-from app.config.config_manager import AutoHealEvent, HealthCheckConfig, config_manager
+from app.config.config_manager import (
+    AutoHealConfig,
+    AutoHealEvent,
+    HealthCheckConfig,
+    config_manager,
+)
 from app.docker_client.docker_client_wrapper import DockerClientWrapper
 from app.notifications.notification_manager import notification_manager
 
@@ -54,6 +59,11 @@ class MonitoringEngine:
 
         Returns:
             Stable identifier string
+
+        Note:
+            An empty ``monitoring.id`` label is returned as-is. Container
+            discovery must not use this method for that reason; it uses
+            ``_auto_monitor_stable_id``, which ignores an empty label.
         """
         labels = info.get("labels", {})
 
@@ -69,6 +79,32 @@ class MonitoringEngine:
 
         # Priority 3: Container name (fallback)
         return info.get("name")
+
+    @staticmethod
+    def _auto_monitor_stable_id(labels: dict, container_name: str) -> str:
+        """
+        Stable ID stored in the selected list when a container is auto-monitored.
+
+        Unlike ``get_stable_identifier``, an empty ``monitoring.id`` label is
+        ignored here, so it falls back to the Compose identity or the name rather
+        than storing an empty key that every other empty-label container would match.
+
+        Args:
+            labels: Container labels
+            container_name: Container name
+
+        Returns:
+            Stable identifier string
+        """
+        if labels.get("monitoring.id"):
+            return labels["monitoring.id"]
+
+        compose_project = labels.get("com.docker.compose.project")
+        compose_service = labels.get("com.docker.compose.service")
+        if compose_project and compose_service:
+            return f"{compose_project}_{compose_service}"
+
+        return container_name
 
     async def start(self) -> None:
         """Start the monitoring engine"""
@@ -652,6 +688,87 @@ class MonitoringEngine:
             "quarantined_containers": len(config_manager.get_quarantined_containers())
         }
 
+    @staticmethod
+    def _auto_monitor_container(
+        config: AutoHealConfig,
+        *,
+        stable_id: str,
+        container_id: str,
+        container_name: str,
+        startup: bool,
+        label: str,
+    ) -> AutoHealEvent | None:
+        """
+        Add a container carrying the autoheal label to the monitored list.
+
+        Skips containers that are already selected or explicitly excluded.
+        Mutates ``config`` and records an ``auto_monitor`` event when added. The
+        caller sends the notification afterwards, so a failing notification
+        cannot lose the selection.
+
+        Args:
+            config: Configuration to update (a working copy from ``get_config()``)
+            stable_id: Stable identifier to store in the selected list
+            container_id: Container ID used for the checks and recorded on the event
+            container_name: Container name used for the checks and the event label
+            label: Configured monitoring label as ``key=value``, used in log and event text
+            startup: True when called from the startup scan, which saves ``config``
+                once at the end and words its log and event for startup. Otherwise
+                ``config`` is saved right after the selection, before the event is
+                recorded.
+
+        Returns:
+            The recorded event if the container was added, None if it was skipped
+        """
+        # Check if already in selected list (by stable_id, name, or ID for backwards compatibility)
+        if (stable_id in config.containers.selected or
+            container_name in config.containers.selected or
+            container_id in config.containers.selected):
+            logger.debug(
+                "Container %s (stable_id: %s) already in monitored list",
+                container_name,
+                stable_id,
+            )
+            return None
+
+        # Check if in excluded list
+        if (stable_id in config.containers.excluded or
+            container_name in config.containers.excluded or
+            container_id in config.containers.excluded):
+            logger.info(
+                "Container %s (stable_id: %s) has %s but is in excluded list, skipping",
+                container_name,
+                stable_id,
+                label,
+            )
+            return None
+
+        # Add to monitored list using STABLE ID
+        config.containers.selected.append(stable_id)
+        if not startup:
+            config_manager.update_config(config)
+
+        logger.info(
+            "Auto-monitoring enabled for container '%s' (%s) with stable_id '%s' - detected %s label%s",
+            container_name,
+            container_id[:12],
+            stable_id,
+            label,
+            " on startup" if startup else "",
+        )
+
+        event = AutoHealEvent(
+            timestamp=datetime.now(UTC),
+            container_name=f"{container_name} ({stable_id})",
+            container_id=container_id,  # Store current ID for reference
+            event_type="auto_monitor",
+            restart_count=0,
+            status="enabled",
+            message=f"Automatically added to monitoring{' on startup' if startup else ''} due to {label} label (stable_id: {stable_id})"
+        )
+        config_manager.add_event(event)
+        return event
+
     async def _scan_existing_containers(self) -> None:
         """
         Proactively scan all existing containers on startup and auto-add those with the configured
@@ -685,76 +802,28 @@ class MonitoringEngine:
                         continue
 
                     labels = info.get("labels", {})
-                    container_id = info.get("full_id")
-                    container_name = info.get("name")
 
                     # Check if container has the configured monitoring label (autoheal=true by default)
                     if labels.get(config.monitor.label_key) != config.monitor.label_value:
                         continue
 
-                    # Get stable identifier (handles auto-generated names, compose services)
-                    compose_project = labels.get("com.docker.compose.project")
-                    compose_service = labels.get("com.docker.compose.service")
-                    monitoring_id = labels.get("monitoring.id")
-
-                    # Determine best identifier (same logic as event listener)
-                    if monitoring_id:
-                        stable_id = monitoring_id
-                    elif compose_project and compose_service:
-                        stable_id = f"{compose_project}_{compose_service}"
-                    else:
-                        stable_id = container_name
-
-                    # Check if already in selected list (by stable_id, name, or ID for backwards compatibility)
-                    if (stable_id in config.containers.selected or
-                        container_name in config.containers.selected or
-                        container_id in config.containers.selected):
-                        logger.debug(
-                            "Container %s (stable_id: %s) already in monitored list",
-                            container_name,
-                            stable_id,
+                    selected_before = len(config.containers.selected)
+                    try:
+                        event_obj = self._auto_monitor_container(
+                            config,
+                            stable_id=self._auto_monitor_stable_id(labels, info.get("name")),
+                            container_id=info.get("full_id"),
+                            container_name=info.get("name"),
+                            startup=True,
+                            label=label,
                         )
-                        continue
-
-                    # Check if in excluded list
-                    if (stable_id in config.containers.excluded or
-                        container_name in config.containers.excluded or
-                        container_id in config.containers.excluded):
-                        logger.info(
-                            "Container %s (stable_id: %s) has %s but is in excluded list, skipping",
-                            container_name,
-                            stable_id,
-                            label,
-                        )
-                        continue
-
-                    # Add to monitored list using STABLE ID
-                    config.containers.selected.append(stable_id)
-                    added_count += 1
-
-                    # Log the auto-monitoring
-                    logger.info(
-                        "Auto-monitoring enabled for container '%s' (%s) with stable_id '%s' - detected %s label on startup",
-                        container_name,
-                        container_id[:12],
-                        stable_id,
-                        label,
-                    )
-
-                    # Create an event for this
-                    event_obj = AutoHealEvent(
-                        timestamp=datetime.now(UTC),
-                        container_name=f"{container_name} ({stable_id})",
-                        container_id=container_id,
-                        event_type="auto_monitor",
-                        restart_count=0,
-                        status="enabled",
-                        message=f"Automatically added to monitoring on startup due to {label} label (stable_id: {stable_id})"
-                    )
-                    config_manager.add_event(event_obj)
-
-                    # Send notification for auto-monitor event
-                    await notification_manager.send_event_notification(event_obj)
+                    finally:
+                        # Count the selection as soon as it is made, so it is still saved
+                        # if recording the event fails afterwards.
+                        if len(config.containers.selected) > selected_before:
+                            added_count += 1
+                    if event_obj:
+                        await notification_manager.send_event_notification(event_obj)
 
                 except Exception as e:
                     logger.exception("Error processing container during initial scan: %s", e)
@@ -878,72 +947,18 @@ class MonitoringEngine:
 
             # Check if container has the configured monitoring label (autoheal=true by default)
             config = config_manager.get_config()
-            label = f"{config.monitor.label_key}={config.monitor.label_value}"
             if labels.get(config.monitor.label_key) == config.monitor.label_value:
-
-                # Get stable identifier (handles auto-generated names, compose services)
-                compose_project = labels.get("com.docker.compose.project")
-                compose_service = labels.get("com.docker.compose.service")
-                monitoring_id = labels.get("monitoring.id")
-
-                # Determine best identifier
-                if monitoring_id:
-                    stable_id = monitoring_id
-                elif compose_project and compose_service:
-                    stable_id = f"{compose_project}_{compose_service}"
-                else:
-                    stable_id = container_name
-
-                # Check if already in selected list (by stable_id, name, or ID for backwards compatibility)
-                if (stable_id in config.containers.selected or
-                    container_name in config.containers.selected or
-                    container_id in config.containers.selected):
-                    logger.debug(
-                        "Container %s (stable_id: %s) already in monitored list",
-                        container_name,
-                        stable_id,
-                    )
-                    return
-
-                # Check if in excluded list (by stable_id, name, or ID for backwards compatibility)
-                if (stable_id in config.containers.excluded or
-                    container_name in config.containers.excluded or
-                    container_id in config.containers.excluded):
-                    logger.info(
-                        "Container %s (stable_id: %s) has %s but is in excluded list, skipping",
-                        container_name,
-                        stable_id,
-                        label,
-                    )
-                    return
-
-                # Add to monitored list using STABLE ID (solves all edge cases)
-                config.containers.selected.append(stable_id)
-                config_manager.update_config(config)
-
-                # Log the auto-monitoring
-                logger.info(
-                    "Auto-monitoring enabled for container '%s' (%s) with stable_id '%s' - detected %s label",
-                    container_name,
-                    container_id[:12],
-                    stable_id,
-                    label,
+                event_obj = self._auto_monitor_container(
+                    config,
+                    # The event's own ID and name label the container here, as before
+                    stable_id=self._auto_monitor_stable_id(labels, container_name),
+                    container_id=container_id,
+                    container_name=container_name,
+                    startup=False,
+                    label=f"{config.monitor.label_key}={config.monitor.label_value}",
                 )
-
-                # Create an event for this
-                event_obj = AutoHealEvent(
-                    timestamp=datetime.now(UTC),
-                    container_name=f"{container_name} ({stable_id})",
-                    container_id=container_id,  # Store current ID for reference
-                    event_type="auto_monitor",
-                    restart_count=0,
-                    status="enabled",
-                    message=f"Automatically added to monitoring due to {label} label (stable_id: {stable_id})"
-                )
-                config_manager.add_event(event_obj)
-
-                # Send notification for auto-monitor event
-                await notification_manager.send_event_notification(event_obj)
+                if event_obj:
+                    await notification_manager.send_event_notification(event_obj)
 
         except Exception as e:
             logger.exception("Error processing container start event: %s", e)
