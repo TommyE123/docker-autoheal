@@ -274,14 +274,14 @@ class ConfigManager:
         """Create data directory and subdirectories if they don't exist"""
         try:
             self.DATA_DIR.mkdir(parents=True, exist_ok=True)
-            logger.info(f"Data directory ensured at: {self.DATA_DIR}")
+            logger.info("Data directory ensured at: %s", self.DATA_DIR)
         except Exception as e:
-            logger.error(f"Failed to create data directory: {e}")
+            logger.error("Failed to create data directory: %s", e)
             # Fallback to current directory if /data is not writable
             self.DATA_DIR = Path("./data")
             self.DATA_DIR.mkdir(parents=True, exist_ok=True)
             self._update_file_paths()
-            logger.warning(f"Using fallback data directory: {self.DATA_DIR}")
+            logger.warning("Using fallback data directory: %s", self.DATA_DIR)
 
     def _update_file_paths(self) -> None:
         """Update all file paths when data directory changes"""
@@ -309,12 +309,14 @@ class ConfigManager:
             with self.CONFIG_FILE.open('r') as f:
                 data = json.load(f)
         except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
-            logger.warning(f"Config file {self.CONFIG_FILE} is not valid JSON: {e}, using defaults")
+            logger.warning(
+                "Config file %s is not valid JSON: %s, using defaults", self.CONFIG_FILE, e
+            )
             return AutoHealConfig()
 
         if not isinstance(data, dict):
             logger.warning(
-                f"Config file {self.CONFIG_FILE} did not contain a JSON object, using defaults"
+                "Config file %s did not contain a JSON object, using defaults", self.CONFIG_FILE
             )
             return AutoHealConfig()
 
@@ -334,7 +336,9 @@ class ConfigManager:
         try:
             return {cid: HealthCheckConfig(**hc) for cid, hc in raw.items()}
         except (ValidationError, TypeError, AttributeError) as error:
-            logger.warning(f"Failed to load custom_health_checks from disk: {error}, using defaults")
+            logger.warning(
+                "Failed to load custom_health_checks from disk: %s, using defaults", error
+            )
             return {}
 
     def _build_config_from_sections(self, data: dict) -> AutoHealConfig:
@@ -352,7 +356,7 @@ class ConfigManager:
             try:
                 sections[name] = model(**data[name])
             except (ValidationError, TypeError) as error:
-                logger.warning(f"Resetting config section '{name}' to defaults: {error}")
+                logger.warning("Resetting config section '%s' to defaults: %s", name, error)
 
         if 'uptime_kuma_mappings' in data:
             try:
@@ -361,7 +365,7 @@ class ConfigManager:
                 ]
             except (ValidationError, TypeError) as error:
                 logger.warning(
-                    f"Resetting config section 'uptime_kuma_mappings' to defaults: {error}"
+                    "Resetting config section 'uptime_kuma_mappings' to defaults: %s", error
                 )
 
         return AutoHealConfig(**sections)
@@ -377,7 +381,7 @@ class ConfigManager:
                 json.dump(config_dict, f, indent=2, default=str)
             logger.debug("Configuration saved to disk")
         except Exception as e:
-            logger.error(f"Failed to save config to disk: {e}")
+            logger.error("Failed to save config to disk: %s", e)
 
     def _load_events(self) -> list[StoredAutoHealEvent]:
         """Load current and legacy events without losing valid history."""
@@ -402,10 +406,10 @@ class ConfigManager:
                                 logger.warning(
                                     "Skipping invalid event %d from disk: %s", index, error
                                 )
-                    logger.info(f"Loaded {len(events)} events from disk")
+                    logger.info("Loaded %s events from disk", len(events))
                     return events
         except Exception as e:
-            logger.warning(f"Failed to load events from disk: {e}")
+            logger.warning("Failed to load events from disk: %s", e)
         return []
 
     def _save_events(self) -> None:
@@ -414,9 +418,9 @@ class ConfigManager:
             events_data = [event.model_dump(mode='json') for event in self._event_log]
             with self.EVENTS_FILE.open('w') as f:
                 json.dump(events_data, f, indent=2, default=str)
-            logger.debug(f"Saved {len(self._event_log)} events to disk")
+            logger.debug("Saved %s events to disk", len(self._event_log))
         except Exception as e:
-            logger.error(f"Failed to save events to disk: {e}")
+            logger.error("Failed to save events to disk: %s", e)
 
     def _load_custom_health_checks(self) -> dict[str, HealthCheckConfig]:
         """Load custom health checks (already loaded in _load_config)"""
@@ -431,10 +435,10 @@ class ConfigManager:
                 with self.QUARANTINE_FILE.open('r') as f:
                     data = json.load(f)
                     quarantine = set(data)
-                    logger.info(f"Loaded {len(quarantine)} quarantined containers from disk")
+                    logger.info("Loaded %s quarantined containers from disk", len(quarantine))
                     return quarantine
         except Exception as e:
-            logger.warning(f"Failed to load quarantine list from disk: {e}")
+            logger.warning("Failed to load quarantine list from disk: %s", e)
         return set()
 
     def _save_quarantine(self) -> None:
@@ -442,9 +446,11 @@ class ConfigManager:
         try:
             with self.QUARANTINE_FILE.open('w') as f:
                 json.dump(list(self._quarantined_containers), f, indent=2)
-            logger.debug(f"Saved {len(self._quarantined_containers)} quarantined containers to disk")
+            logger.debug(
+                "Saved %s quarantined containers to disk", len(self._quarantined_containers)
+            )
         except Exception as e:
-            logger.error(f"Failed to save quarantine list to disk: {e}")
+            logger.error("Failed to save quarantine list to disk: %s", e)
 
     def _load_maintenance_mode(self) -> None:
         """Load maintenance mode state from file"""
@@ -458,9 +464,9 @@ class ConfigManager:
 
                     self._maintenance_mode = enabled
                     self._maintenance_start_time = parsed_start_time
-                    logger.info(f"Loaded maintenance mode state: {self._maintenance_mode}")
+                    logger.info("Loaded maintenance mode state: %s", self._maintenance_mode)
         except Exception as e:
-            logger.warning(f"Failed to load maintenance mode from disk: {e}")
+            logger.warning("Failed to load maintenance mode from disk: %s", e)
 
     def _save_maintenance_mode(self) -> None:
         """Save maintenance mode state to file"""
@@ -471,9 +477,9 @@ class ConfigManager:
             }
             with self.MAINTENANCE_FILE.open('w') as f:
                 json.dump(data, f, indent=2)
-            logger.debug(f"Saved maintenance mode state: {self._maintenance_mode}")
+            logger.debug("Saved maintenance mode state: %s", self._maintenance_mode)
         except Exception as e:
-            logger.error(f"Failed to save maintenance mode to disk: {e}")
+            logger.error("Failed to save maintenance mode to disk: %s", e)
 
     def get_config(self) -> AutoHealConfig:
         """Get current configuration (thread-safe)"""
