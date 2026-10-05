@@ -23,7 +23,7 @@ async def get_notifications_config():
             "event_filters": config.notifications.event_filters
         }
     except Exception as e:
-        logger.error(f"Error getting notifications config: {e}")
+        logger.error("Error getting notifications config: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -59,7 +59,7 @@ async def update_notifications_config(notifications_config: dict):
             }
         }
     except Exception as e:
-        logger.error(f"Error updating notifications config: {e}")
+        logger.error("Error updating notifications config: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -88,7 +88,7 @@ async def add_notification_service(service: dict):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error adding notification service: {e}")
+        logger.error("Error adding notification service: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -124,7 +124,7 @@ async def update_notification_service(service_name: str, service: dict):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error updating notification service: {e}")
+        logger.error("Error updating notification service: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -152,7 +152,7 @@ async def delete_notification_service(service_name: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error deleting notification service: {e}")
+        logger.error("Error deleting notification service: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -172,5 +172,5 @@ async def test_notification_service(service_name: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error testing notification: {e}")
+        logger.error("Error testing notification: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
