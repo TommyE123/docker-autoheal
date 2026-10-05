@@ -161,15 +161,16 @@ build, the container and the real `/api` backend. It currently holds one smoke t
 open `/` and check the Dashboard renders. Vitest remains the unit-test runner and
 excludes `e2e/`.
 
-```bash
-# Build and start the real image (serves the UI and API on :3131)
-docker compose up -d --build
+In the Dev Container, run **Terminal → Run Task → Autoheal: Run Playwright E2E Tests**. It
+builds and starts the dev stack from `docker-compose.dev.yml` (so it never touches a real
+deployment on `3131`), then runs `npm run test:e2e` against it; see
+[Tasks](development-setup.md#tasks). To run it by hand against any running instance:
 
-# Run the suite (first time only: install the browser)
+```bash
 cd frontend
 npm ci
-npx playwright install chromium
-npm run test:e2e
+npx playwright install chromium   # first time only
+E2E_BASE_URL=http://localhost:3132 npm run test:e2e
 ```
 
 `E2E_BASE_URL` defaults to `http://localhost:3131`; set it to test a different

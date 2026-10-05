@@ -86,6 +86,17 @@ Conventions** and **Run Security Scanners**.
 published image. The result is tagged `docker-autoheal:dev` locally, so it does not replace
 `tommye123/docker-autoheal:latest`.
 
+**Autoheal: Run Playwright E2E Tests** starts the same dev stack in the background
+(`up --build -d --wait`, which waits for the image's healthcheck), then runs
+`npm run test:e2e` from `frontend/` against it, so the browser tests the Docker-served
+app rather than the Vite dev server. It reads the published port back from Compose
+(`3132` unless `AUTOHEAL_DEV_PORT` is set) and reaches it as `host.docker.internal`,
+because the stack runs on the host's daemon, not inside the Dev Container
+(`devcontainer.json` maps that name with `--add-host`). It leaves your deployment alone and
+leaves the dev stack running afterwards; use **Stop Docker Stack** to remove it. Chromium
+and its system libraries are installed by `post-create.sh`; after pulling this change into
+an existing Dev Container, run **Dev Containers: Rebuild Container** once.
+
 **Autoheal: Install gh-aw** installs the `github/gh-aw` extension pinned to the
 `compiler_version` recorded in the header of `.github/workflows/issue-triage.lock.yml`, so
 recompiling the workflows doesn't churn the lock file. It needs `gh auth login` (or a

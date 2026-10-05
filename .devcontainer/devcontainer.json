@@ -1,6 +1,10 @@
 {
   "name": "Docker Auto-Heal",
-  "runArgs": ["--name", "docker-autoheal-devcontainer"],
+  "runArgs": [
+    "--name",
+    "docker-autoheal-devcontainer",
+    "--add-host=host.docker.internal:host-gateway"
+  ],
   "build": {
     "dockerfile": "Dockerfile"
   },
