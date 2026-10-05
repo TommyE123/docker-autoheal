@@ -355,6 +355,33 @@ describe("EventsPage", () => {
       }
     });
 
+    it("ignores a stale response that resolves after a newer selection's response", async () => {
+      const user = userEvent.setup();
+      let resolveStale;
+      getEvents.mockResolvedValueOnce({ data: [] });
+      getContainers.mockResolvedValue({ data: [{ id: "abc123", name: "web-app" }] });
+      render(<EventsPage />);
+      await screen.findByText(/no events recorded yet/i);
+
+      // Request for the first selection stays pending...
+      getEvents.mockImplementationOnce(
+        () => new Promise((resolve) => (resolveStale = resolve)),
+      );
+      await user.selectOptions(screen.getByLabelText("Event Type"), "quarantine");
+
+      // ...while a newer selection resolves first.
+      getEvents.mockResolvedValueOnce({ data: sampleEvents });
+      await user.selectOptions(screen.getByLabelText("Event Type"), "restart");
+      await screen.findByRole("heading", { name: "web-app" });
+
+      resolveStale({ data: multipleEvents });
+      await waitFor(() => expect(resolveStale).toBeDefined());
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(screen.getByRole("heading", { name: "web-app" })).toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "cache" })).not.toBeInTheDocument();
+    });
+
     it("does not filter the returned events client-side", async () => {
       const user = userEvent.setup();
       getEvents.mockResolvedValue({ data: multipleEvents });

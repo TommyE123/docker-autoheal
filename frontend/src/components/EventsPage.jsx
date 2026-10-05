@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, Button, Spinner, Badge, Alert, Modal, Form } from 'react-bootstrap';
 import { getEvents, clearEvents, getContainers } from '../services/api';
 import { EVENT_TYPES } from '../constants/eventTypes';
@@ -14,12 +14,19 @@ function EventsPage() {
   const [limit, setLimit] = useState(50);
   const [containers, setContainers] = useState([]);
 
+  const latestRequestId = useRef(0);
+
   const filtersActive = eventType !== '' || container !== '';
 
   const fetchEvents = async () => {
+    // Only the most recently issued request may update state, so a slow
+    // response for an earlier selection cannot overwrite newer results.
+    const requestId = ++latestRequestId.current;
     try {
       const response = await getEvents(limit, { eventType, container });
-      setEvents(response.data);
+      if (requestId === latestRequestId.current) {
+        setEvents(response.data);
+      }
     } catch (error) {
       console.error('Failed to load events:', error);
     } finally {
