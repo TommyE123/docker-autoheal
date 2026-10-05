@@ -193,6 +193,29 @@ class TestGetAllMonitors:
 
         assert await client.get_all_monitors() == []
 
+    async def test_fetch_monitors_returns_empty_list_on_successful_empty_response(
+        self, monkeypatch
+    ):
+        """A successful response with no monitors is a valid result, not a failure."""
+        _patch_session(monkeypatch, response=_FakeResponse(200, "some_other_metric 1\n"))
+        client = UptimeKumaClient("http://kuma.example", "token")
+
+        assert await client.fetch_monitors() == []
+
+    async def test_fetch_monitors_raises_on_non_200_status(self, monkeypatch):
+        _patch_session(monkeypatch, response=_FakeResponse(500, ""))
+        client = UptimeKumaClient("http://kuma.example", "token")
+
+        with pytest.raises(RuntimeError, match="HTTP 500"):
+            await client.fetch_monitors()
+
+    async def test_fetch_monitors_raises_on_request_failure(self, monkeypatch):
+        _patch_session(monkeypatch, exc=TimeoutError("timed out"))
+        client = UptimeKumaClient("http://kuma.example", "token")
+
+        with pytest.raises(TimeoutError):
+            await client.fetch_monitors()
+
     async def test_parses_monitors_with_monitor_id_label_before_name(self, monkeypatch):
         """Regression test for #26 through the get_all_monitors() path used by
         the Uptime-Kuma monitor refresh loop."""

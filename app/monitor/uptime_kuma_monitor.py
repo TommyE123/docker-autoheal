@@ -133,16 +133,11 @@ class UptimeKumaMonitor:
         try:
             # Fetch /metrics once per refresh and reuse it for every mapped container,
             # instead of re-fetching the full endpoint once per mapping (see #94)
-            monitors = await self.client.get_all_monitors()
+            # fetch_monitors() raises on a failed request, so a failure keeps the cached
+            # statuses while a successful empty list is a valid refresh that clears them
+            monitors = await self.client.fetch_monitors()
         except Exception as e:
             logger.error("Error fetching Uptime-Kuma monitor statuses: %s", e)
-            return
-
-        if not monitors:
-            # get_all_monitors() returns [] when the fetch fails instead of raising, so
-            # an empty result cannot be told apart from an outage. Keep the last known
-            # statuses rather than pruning them all.
-            logger.debug("No monitors returned; leaving cached statuses unchanged")
             return
 
         status_by_name = {m['friendly_name']: m['status'] for m in monitors}

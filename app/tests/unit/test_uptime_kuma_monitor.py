@@ -203,7 +203,7 @@ class TestUpdateStatusCache:
         await monitor._update_status_cache()
 
         assert monitor._container_status_cache == {}
-        assert fake_client.get_all_monitors_calls == 0
+        assert fake_client.fetch_monitors_calls == 0
 
     async def test_caches_status_for_each_mapping(self):
         _add_mapping("web", "Web Monitor")
@@ -220,7 +220,7 @@ class TestUpdateStatusCache:
         await monitor._update_status_cache()
 
         assert monitor._container_status_cache == {"web": 1, "db": 0}
-        assert fake_client.get_all_monitors_calls == 1
+        assert fake_client.fetch_monitors_calls == 1
 
     async def test_fetches_metrics_once_regardless_of_mapping_count(self):
         """Regression test for #94: N mapped containers must not cause N /metrics fetches."""
@@ -240,7 +240,7 @@ class TestUpdateStatusCache:
         await monitor._update_status_cache()
 
         assert monitor._container_status_cache == {"web": 1, "db": 0, "cache": 1}
-        assert fake_client.get_all_monitors_calls == 1
+        assert fake_client.fetch_monitors_calls == 1
 
     async def test_missing_monitor_status_is_skipped(self):
         _add_mapping("web", "Unknown Monitor")
@@ -264,9 +264,8 @@ class TestUpdateStatusCache:
 
         assert monitor._container_status_cache == {}
 
-    async def test_empty_monitor_result_keeps_cached_statuses(self):
-        # get_all_monitors() returns [] on a failed fetch, so an empty result must
-        # not be treated as "every monitor vanished".
+    async def test_successful_empty_monitor_list_clears_cached_status(self):
+        # A successful fetch with no monitors means the mapped monitors are gone.
         _add_mapping("web", "Web Monitor")
         monitor = UptimeKumaMonitor()
         monitor._container_status_cache["web"] = 0
@@ -274,7 +273,7 @@ class TestUpdateStatusCache:
 
         await monitor._update_status_cache()
 
-        assert monitor._container_status_cache == {"web": 0}
+        assert monitor._container_status_cache == {}
 
     async def test_status_for_unmapped_container_is_dropped(self):
         _add_mapping("web", "Web Monitor")
@@ -307,7 +306,7 @@ class TestUpdateStatusCache:
     ):
         _add_mapping("web", "Web Monitor")
         monitor = UptimeKumaMonitor()
-        monitor._container_status_cache["web"] = 1
+        monitor._container_status_cache["web"] = 0
         fake_client = FakeUptimeKumaClient(
             get_all_monitors_error=RuntimeError("upstream error")
         )
@@ -316,8 +315,8 @@ class TestUpdateStatusCache:
         with caplog.at_level(logging.ERROR):
             await monitor._update_status_cache()
 
-        assert monitor._container_status_cache == {"web": 1}
-        assert fake_client.get_all_monitors_calls == 1
+        assert monitor._container_status_cache == {"web": 0}
+        assert fake_client.fetch_monitors_calls == 1
         assert any(
             record.levelno == logging.ERROR and "upstream error" in record.getMessage()
             for record in caplog.records
@@ -370,7 +369,7 @@ class TestShouldRestartFromUptimeKuma:
         result = await monitor.should_restart_from_uptime_kuma("web")
 
         assert result is False
-        assert fake_client.get_all_monitors_calls == 0  # cache refresh skipped entirely
+        assert fake_client.fetch_monitors_calls == 0  # cache refresh skipped entirely
 
     async def test_false_when_container_not_mapped(self):
         _enable_uptime_kuma(auto_restart_on_down=True)
