@@ -255,11 +255,26 @@ class TestUpdateStatusCache:
         _add_mapping("web", "Web Monitor")
         monitor = UptimeKumaMonitor()
         monitor._container_status_cache["web"] = 0
-        _install_client(monitor, FakeUptimeKumaClient(monitors=[]))
+        _install_client(
+            monitor,
+            FakeUptimeKumaClient(monitors=[{"friendly_name": "Other Monitor", "status": 1}]),
+        )
 
         await monitor._update_status_cache()
 
         assert monitor._container_status_cache == {}
+
+    async def test_empty_monitor_result_keeps_cached_statuses(self):
+        # get_all_monitors() returns [] on a failed fetch, so an empty result must
+        # not be treated as "every monitor vanished".
+        _add_mapping("web", "Web Monitor")
+        monitor = UptimeKumaMonitor()
+        monitor._container_status_cache["web"] = 0
+        _install_client(monitor, FakeUptimeKumaClient(monitors=[]))
+
+        await monitor._update_status_cache()
+
+        assert monitor._container_status_cache == {"web": 0}
 
     async def test_status_for_unmapped_container_is_dropped(self):
         _add_mapping("web", "Web Monitor")
@@ -403,7 +418,7 @@ class TestShouldRestartFromUptimeKuma:
         _install_client(monitor, fake_client)
         assert await monitor.should_restart_from_uptime_kuma("web") is True
 
-        fake_client.monitors = []
+        fake_client.monitors = [{"friendly_name": "Other Monitor", "status": 1}]
 
         assert await monitor.should_restart_from_uptime_kuma("web") is False
 

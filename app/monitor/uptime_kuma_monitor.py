@@ -138,6 +138,13 @@ class UptimeKumaMonitor:
             logger.error("Error fetching Uptime-Kuma monitor statuses: %s", e)
             return
 
+        if not monitors:
+            # get_all_monitors() returns [] when the fetch fails instead of raising, so
+            # an empty result cannot be told apart from an outage. Keep the last known
+            # statuses rather than pruning them all.
+            logger.debug("No monitors returned; leaving cached statuses unchanged")
+            return
+
         status_by_name = {m['friendly_name']: m['status'] for m in monitors}
 
         refreshed_ids: set[str] = set()
