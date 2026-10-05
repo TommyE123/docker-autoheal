@@ -386,9 +386,7 @@ class TestShouldRestartFromUptimeKuma:
         _enable_uptime_kuma(auto_restart_on_down=True)
         _add_mapping("web", "Web Monitor")
         monitor = UptimeKumaMonitor()
-        fake_client = FakeUptimeKumaClient(
-            monitors=[{"friendly_name": "Web Monitor", "status": 0}]
-        )
+        fake_client = FakeUptimeKumaClient(monitors=[{"friendly_name": "Web Monitor", "status": 0}])
         _install_client(monitor, fake_client)
         assert await monitor.should_restart_from_uptime_kuma("web") is True
 
