@@ -592,7 +592,7 @@ class TestProcessContainerStartEvent:
         (event,) = config_manager.get_events()
         assert event.container_name == "event-name (event-name)"
 
-    async def test_selection_is_saved_before_the_event_is_recorded(
+    async def test_update_config_raising_skips_the_event_and_notification(
         self, engine, docker_client, mock_notification_manager, monkeypatch
     ):
         container, info = make_container(name="web", labels={"autoheal": "true"})
@@ -608,6 +608,24 @@ class TestProcessContainerStartEvent:
         assert config_manager.get_config().containers.selected == []
         assert config_manager.get_events() == []
         mock_notification_manager.send_event_notification.assert_not_awaited()
+
+    async def test_config_file_write_failure_keeps_selection_event_and_notification(
+        self, engine, docker_client, mock_notification_manager, monkeypatch
+    ):
+        container, info = make_container(name="web", labels={"autoheal": "true"})
+        docker_client.add_container(container, info)
+        config_path = config_manager.CONFIG_FILE
+        monkeypatch.setattr(
+            config_manager,
+            "CONFIG_FILE",
+            config_path.parent / "missing-parent" / config_path.name,
+        )
+
+        await engine._process_container_start_event(start_event(container.id, "web"))
+
+        assert config_manager.get_config().containers.selected == ["web"]
+        assert len(config_manager.get_events()) == 1
+        mock_notification_manager.send_event_notification.assert_awaited_once()
 
     async def test_event_without_container_id_is_ignored(self, engine):
         await engine._process_container_start_event({"Actor": {"Attributes": {"name": "web"}}})
