@@ -97,13 +97,13 @@ async def serve_static_file(filename: str, media_type: str | None = None) -> Fil
         if media_type is None:
             media_type = get_media_type(filename)
 
-        logger.debug(f"Serving static file: {filename} ({media_type})")
+        logger.debug("Serving static file: %s (%s)", filename, media_type)
         return FileResponse(file_path, media_type=media_type)
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error serving static file {filename}: {e}")
+        logger.error("Error serving static file %s: %s", filename, e)
         raise HTTPException(status_code=500, detail=f"Error serving file: {e!s}")
 
 
@@ -242,7 +242,7 @@ async def serve_ui_catchall(full_path: str):
     This allows client-side routing to work properly.
     """
     if should_serve_react_app(full_path):
-        logger.debug(f"Serving React app for path: {full_path}")
+        logger.debug("Serving React app for path: %s", full_path)
         return serve_react_app()
-    logger.debug(f"Returning 404 for excluded path: {full_path}")
+    logger.debug("Returning 404 for excluded path: %s", full_path)
     raise HTTPException(status_code=404, detail="Not Found")

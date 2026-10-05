@@ -63,5 +63,5 @@ async def get_system_status():
             config=config
         )
     except Exception as e:
-        logger.error(f"Error getting system status: {e}")
+        logger.error("Error getting system status: %s", e)
         raise HTTPException(status_code=500, detail=str(e))

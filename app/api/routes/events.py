@@ -50,7 +50,7 @@ async def get_events(
             for event in events
         ]
     except Exception as e:
-        logger.error(f"Error getting events: {e}")
+        logger.error("Error getting events: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -61,5 +61,5 @@ async def clear_events():
         config_manager.clear_events()
         return {"status": "success", "message": "All events cleared"}
     except Exception as e:
-        logger.error(f"Error clearing events: {e}")
+        logger.error("Error clearing events: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
