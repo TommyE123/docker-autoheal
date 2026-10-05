@@ -555,7 +555,9 @@ describe("ConfigPage", () => {
       const dialog = await screen.findByRole("dialog");
       await user.click(within(dialog).getByRole("button", { name: /cancel/i }));
 
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      });
       expect(api.post).not.toHaveBeenCalledWith("/uptime-kuma/disable");
     });
 
@@ -659,7 +661,9 @@ describe("ConfigPage", () => {
       const dialog = await screen.findByRole("dialog");
       await user.click(within(dialog).getByRole("button", { name: /cancel/i }));
 
-      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      });
       expect(api.delete).not.toHaveBeenCalled();
     });
 

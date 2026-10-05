@@ -92,7 +92,7 @@ async def list_containers(include_stopped: bool = False):
 
         return result
     except Exception as e:
-        logger.error(f"Error listing containers: {e}")
+        logger.error("Error listing containers: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -152,7 +152,7 @@ async def get_container_details(container_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting container details: {e}")
+        logger.error("Error getting container details: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -161,7 +161,9 @@ async def update_container_selection(request: ContainerSelectionRequest):
     """Enable or disable auto-heal for specific containers"""
     try:
         logger.debug(
-            f"Container selection request: containers={request.container_ids}, enabled={request.enabled}"
+            "Container selection request: containers=%s, enabled=%s",
+            request.container_ids,
+            request.enabled,
         )
         config = config_manager.get_config()
 
@@ -191,19 +193,24 @@ async def update_container_selection(request: ContainerSelectionRequest):
                     if stable_id not in config.containers.selected:
                         config.containers.selected.append(stable_id)
                         logger.debug(
-                            f"Added container '{container_name}' with stable_id '{stable_id}' to selected list (ID: {cid})"
+                            "Added container '%s' with stable_id '%s' to selected list (ID: %s)",
+                            container_name,
+                            stable_id,
+                            cid,
                         )
 
                     # Remove from excluded if present (check stable_id, name, and ID)
                     for identifier in [stable_id, container_name, cid]:
                         if identifier in config.containers.excluded:
                             config.containers.excluded.remove(identifier)
-                            logger.debug(f"Removed '{identifier}' from excluded list")
+                            logger.debug("Removed '%s' from excluded list", identifier)
                 else:
                     # Fallback: store the identifier as-is
                     if cid not in config.containers.selected:
                         config.containers.selected.append(cid)
-                        logger.debug(f"Added container {cid} to selected list (container not resolved)")
+                        logger.debug(
+                            "Added container %s to selected list (container not resolved)", cid
+                        )
                     if cid in config.containers.excluded:
                         config.containers.excluded.remove(cid)
         else:
@@ -232,32 +239,38 @@ async def update_container_selection(request: ContainerSelectionRequest):
                     if stable_id not in config.containers.excluded:
                         config.containers.excluded.append(stable_id)
                         logger.debug(
-                            f"Added container '{container_name}' with stable_id '{stable_id}' to excluded list (ID: {cid})"
+                            "Added container '%s' with stable_id '%s' to excluded list (ID: %s)",
+                            container_name,
+                            stable_id,
+                            cid,
                         )
 
                     # Remove from selected if present (check stable_id, name, and ID)
                     for identifier in [stable_id, container_name, cid]:
                         if identifier in config.containers.selected:
                             config.containers.selected.remove(identifier)
-                            logger.debug(f"Removed '{identifier}' from selected list")
+                            logger.debug("Removed '%s' from selected list", identifier)
                 else:
                     # Fallback: store the identifier as-is
                     if cid not in config.containers.excluded:
                         config.containers.excluded.append(cid)
-                        logger.debug(f"Added container {cid} to excluded list (container not resolved)")
+                        logger.debug(
+                            "Added container %s to excluded list (container not resolved)", cid
+                        )
                     if cid in config.containers.selected:
                         config.containers.selected.remove(cid)
 
         config_manager.update_config(config)
 
         logger.info(
-            f"Container selection updated: {len(request.container_ids)} container(s) "
-            f"{'enabled' if request.enabled else 'disabled'}"
+            "Container selection updated: %s container(s) %s",
+            len(request.container_ids),
+            "enabled" if request.enabled else "disabled",
         )
 
         return {"status": "success", "message": f"Updated {len(request.container_ids)} containers"}
     except Exception as e:
-        logger.error(f"Error updating container selection: {e}", exc_info=True)
+        logger.exception("Error updating container selection: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -281,7 +294,7 @@ async def restart_container_manual(container_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error restarting container: {e}")
+        logger.error("Error restarting container: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -326,5 +339,5 @@ async def unquarantine_container(container_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error unquarantining container: {e}")
+        logger.error("Error unquarantining container: %s", e)
         raise HTTPException(status_code=500, detail=str(e))

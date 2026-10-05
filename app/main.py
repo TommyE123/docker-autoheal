@@ -41,7 +41,7 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-logger.info(f"Logging to: {LOG_FILE}")
+logger.info("Logging to: %s", LOG_FILE)
 
 
 class CancelledErrorFilter(logging.Filter):
@@ -73,7 +73,7 @@ def update_log_level(level_name: str):
     # Add filter to suppress CancelledError tracebacks
     logging.getLogger("uvicorn.error").addFilter(CancelledErrorFilter())
 
-    logger.info(f"Log level set to: {level_name}")
+    logger.info("Log level set to: %s", level_name)
 
 # Prometheus metrics
 container_restarts = Counter('autoheal_container_restarts_total', 'Total container restarts', ['container_name'])
@@ -104,7 +104,9 @@ class AutoHealService:
             # Set log level from config
             update_log_level(config.observability.log_level)
 
-            logger.info(f"Configuration loaded: monitoring interval={config.monitor.interval_seconds}s")
+            logger.info(
+                "Configuration loaded: monitoring interval=%ss", config.monitor.interval_seconds
+            )
 
             # Initialize Docker client
             logger.info("Connecting to Docker daemon...")
@@ -127,51 +129,59 @@ class AutoHealService:
 
             # Start Prometheus metrics server if enabled
             if config.observability.prometheus_enabled:
-                logger.info(f"Starting Prometheus metrics server on port {config.observability.metrics_port}")
+                logger.info(
+                    "Starting Prometheus metrics server on port %s",
+                    config.observability.metrics_port,
+                )
                 start_http_server(config.observability.metrics_port)
 
             # Start notification manager
             logger.info("Starting notification manager...")
             await self.notification_manager.start()
             if config.notifications.enabled:
-                logger.info(f"Notifications enabled with {len(config.notifications.services)} service(s)")
+                logger.info(
+                    "Notifications enabled with %s service(s)", len(config.notifications.services)
+                )
 
             # Start monitoring engine
             logger.info("Starting monitoring engine...")
             await self.monitoring_engine.start()
 
             # Start Uptime-Kuma monitor
-            logger.info(f"Uptime-Kuma enabled status: {config.uptime_kuma.enabled}")
+            logger.info("Uptime-Kuma enabled status: %s", config.uptime_kuma.enabled)
             if config.uptime_kuma.enabled:
                 logger.info("Starting Uptime-Kuma monitor...")
                 try:
                     await self.uptime_kuma_monitor.start()
                 except Exception as e:
-                    logger.warning(f"Uptime-Kuma failed to start: {e}")
+                    logger.warning("Uptime-Kuma failed to start: %s", e)
 
             self.running = True
             logger.info("Docker Auto-Heal Service started successfully")
             ui_url = get_ui_url(config)
             public_port = get_public_port()
             if ui_url:
-                logger.info(f"Web UI available at {ui_url}")
-                logger.info(f"API documentation available at {ui_url}/docs")
+                logger.info("Web UI available at %s", ui_url)
+                logger.info("API documentation available at %s/docs", ui_url)
             elif public_port:
                 container_port = config.ui.listen_port
                 logger.info(
-                    f"Web UI published on host port {public_port} (container port {container_port})"
+                    "Web UI published on host port %s (container port %s)",
+                    public_port,
+                    container_port,
                 )
                 logger.info(
-                    f"API documentation published on host port {public_port} at /docs "
-                    f"(container port {container_port})"
+                    "API documentation published on host port %s at /docs (container port %s)",
+                    public_port,
+                    container_port,
                 )
             else:
                 listen = f"{config.ui.listen_address}:{config.ui.listen_port}"
-                logger.info(f"Web UI listening on {listen}")
-                logger.info(f"API documentation listening on {listen}/docs")
+                logger.info("Web UI listening on %s", listen)
+                logger.info("API documentation listening on %s/docs", listen)
 
         except Exception as e:
-            logger.error(f"Failed to start service: {e}", exc_info=True)
+            logger.exception("Failed to start service: %s", e)
             if self.notification_manager:
                 await self.notification_manager.stop()
             raise
@@ -187,19 +197,19 @@ class AutoHealService:
             try:
                 await self.uptime_kuma_monitor.stop()
             except Exception as e:
-                logger.warning(f"Error stopping Uptime-Kuma monitor: {e}")
+                logger.warning("Error stopping Uptime-Kuma monitor: %s", e)
 
         if self.monitoring_engine:
             try:
                 await self.monitoring_engine.stop()
             except Exception as e:
-                logger.warning(f"Error stopping monitoring engine: {e}")
+                logger.warning("Error stopping monitoring engine: %s", e)
 
         if self.docker_client:
             try:
                 self.docker_client.close()
             except Exception as e:
-                logger.warning(f"Error closing Docker client: {e}")
+                logger.warning("Error closing Docker client: %s", e)
 
         logger.info("Docker Auto-Heal Service stopped")
 
@@ -244,7 +254,7 @@ def get_ui_url(config) -> str | None:
 
 def signal_handler(signum, _frame):
     """Handle shutdown signals"""
-    logger.info(f"Received signal {signum}, initiating shutdown...")
+    logger.info("Received signal %s, initiating shutdown...", signum)
     if service:
         asyncio.create_task(service.stop())
 
@@ -290,7 +300,7 @@ async def main():
     except asyncio.CancelledError:
         logger.info("Application cancelled, shutting down gracefully")
     except Exception as e:
-        logger.error(f"Service error: {e}", exc_info=True)
+        logger.exception("Service error: %s", e)
     finally:
         if service and service.running:
             await service.stop()
