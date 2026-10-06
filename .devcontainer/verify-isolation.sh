@@ -43,20 +43,21 @@ curl -fsS "${base_url}/health" >/dev/null || {
 config="$(curl -fsS "${base_url}/api/config")"
 label_key="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["monitor"]["label_key"])' <<<"${config}")"
 label_value="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["monitor"]["label_value"])' <<<"${config}")"
-if [ "${label_key}" = "autoheal" ]; then
-  echo "::error::${base_url} monitors the production label autoheal=true, not the dev label" >&2
+if [ "${label_key}=${label_value}" != "autoheal.dev=true" ]; then
+  echo "::error::${base_url} monitors ${label_key}=${label_value}, not the dev label autoheal.dev=true" >&2
   exit 1
 fi
 
-# Exits non-zero shortly after starting; --restart no leaves recovery to Autoheal.
-docker run -d --name "${victim}" --restart no --label "${label_key}=${label_value}" \
-  alpine sh -c 'sleep 5; exit 1' >/dev/null
+# Exits non-zero shortly after starting; --restart no leaves recovery to Autoheal. The event log
+# persists in data-dev, so success is matched on this run's container ID, not on the fixed name.
+victim_id="$(docker run -d --name "${victim}" --restart no --label "${label_key}=${label_value}" \
+  alpine sh -c 'sleep 5; exit 1')"
 
 recovered=false
 deadline=$((SECONDS + timeout_seconds))
 while [ "${SECONDS}" -lt "${deadline}" ]; do
   if curl -fsS "${base_url}/api/events?event_type=restart&container=${victim}" |
-    python3 -c 'import json,sys; sys.exit(0 if any(e["status"] == "success" for e in json.load(sys.stdin)) else 1)'; then
+    python3 -c 'import json,sys; sys.exit(0 if any(e["status"] == "success" and e["container_id"] == sys.argv[1] for e in json.load(sys.stdin)) else 1)' "${victim_id}"; then
     recovered=true
     break
   fi
