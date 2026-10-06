@@ -1,5 +1,5 @@
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   background-color: #f5f5f5;
   margin: 0;
   padding: 0;
@@ -13,7 +13,9 @@ body {
 
 /* Dashboard Metrics */
 .metric-card {
-  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  transition:
+    transform 0.2s ease-in-out,
+    box-shadow 0.2s ease-in-out;
 }
 
 .metric-card:hover {
@@ -32,7 +34,9 @@ body {
 
 /* Event Items */
 .event-item {
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
 }
 
 .event-item:hover {
@@ -223,4 +227,3 @@ code {
 .fade-in {
   animation: fade-in 0.3s ease-in;
 }
-
