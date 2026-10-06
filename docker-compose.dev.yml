@@ -1,15 +1,15 @@
 name: docker-autoheal-dev # Default project name only; COMPOSE_PROJECT_NAME overrides it, so always pass -p docker-autoheal-dev
 
-# Development/testing override: runs this checkout beside an existing Autoheal deployment.
+# Development/testing override: runs this checkout inside the Dev Container, where Docker is an
+# isolated daemon (Docker-in-Docker) that cannot see or affect the host's production containers.
+# Host-side `docker compose` with this file still talks to the host daemon and is not isolated.
 #
 #   docker compose -p docker-autoheal-dev -f docker-compose.yml -f docker-compose.dev.yml up --build -d
 #
 # Uses a distinct image tag, container name, host ports, data directory and monitoring
-# label, so the deployment named `docker-autoheal` is left untouched. The label controls
-# automatic discovery: `autoheal=true` containers (the production label) are not discovered
-# or auto-added, but the Docker socket is shared, so anything explicitly selected in the UI
-# or restarted through the API is still reachable. Override the ports with
-# AUTOHEAL_DEV_PORT and AUTOHEAL_DEV_METRICS_PORT. `!override` replaces the base lists
+# label. The label only controls automatic discovery; the isolation boundary is the Dev
+# Container's own Docker daemon, which /var/run/docker.sock refers to inside it. Override the
+# ports with AUTOHEAL_DEV_PORT and AUTOHEAL_DEV_METRICS_PORT. `!override` replaces the base lists
 # instead of appending to them (needs Docker Compose v2.24.4 or later).
 services:
   autoheal:

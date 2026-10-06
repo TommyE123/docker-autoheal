@@ -1,10 +1,10 @@
 {
   "name": "Docker Auto-Heal",
-  "runArgs": [
-    "--name",
-    "docker-autoheal-devcontainer",
-    "--add-host=host.docker.internal:host-gateway"
-  ],
+  "runArgs": ["--name", "docker-autoheal-devcontainer"],
+
+  // Docker-in-Docker needs a privileged container. That is what gives the Dev Container its
+  // own Docker daemon instead of the host's; see docs/developer/development-setup.md.
+  "privileged": true,
   "build": {
     "dockerfile": "Dockerfile"
   },
@@ -13,11 +13,12 @@
     "ghcr.io/devcontainers/features/node:2": {
       "version": "24"
     },
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
 
   "mounts": [
+    "source=docker-autoheal-dind-${devcontainerId},target=/var/lib/docker,type=volume",
     "source=docker-autoheal-cache,target=/home/vscode/.cache,type=volume",
     "source=docker-autoheal-gh-cache,target=/home/vscode/.local/share/gh,type=volume",
     "source=docker-autoheal-mise-data,target=/home/vscode/.local/share/mise,type=volume"
@@ -33,17 +34,17 @@
 
   "waitFor": "postCreateCommand",
 
-  "forwardPorts": [3000, 3131, 9090, 9323],
+  "forwardPorts": [3000, 3132, 9091, 9323],
 
   "portsAttributes": {
     "3000": {
       "label": "Frontend"
     },
-    "3131": {
-      "label": "Autoheal API"
+    "3132": {
+      "label": "Autoheal dev stack (UI and API)"
     },
-    "9090": {
-      "label": "Metrics"
+    "9091": {
+      "label": "Autoheal dev stack metrics"
     },
     "9323": {
       "label": "Playwright UI"
@@ -78,8 +79,7 @@
   },
 
   "remoteEnv": {
-    "PATH": "${containerWorkspaceFolder}/.devcontainer/node_modules/.bin:/home/vscode/.local/share/mise/shims:/home/vscode/.local/bin:${containerEnv:PATH}",
-    "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
+    "PATH": "${containerWorkspaceFolder}/.devcontainer/node_modules/.bin:/home/vscode/.local/share/mise/shims:/home/vscode/.local/bin:${containerEnv:PATH}"
   },
 
   "remoteUser": "vscode",

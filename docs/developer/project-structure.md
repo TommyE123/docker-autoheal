@@ -47,6 +47,7 @@ docker-autoheal/
 │   ├── devcontainer-lock.json    # Pinned digests for the Dev Container features
 │   ├── Dockerfile                # Pinned Python base image plus the mise binary
 │   ├── post-create.sh            # Installs dependencies and tooling on container creation
+│   ├── verify-isolation.sh       # Proves the inner Docker daemon is isolated and Autoheal recovers a probe
 │   ├── prepare-volumes.sh        # Makes the cache, `gh` and mise volumes writable by the container user
 │   └── package.json              # Pinned npm-based linters used by the local tasks
 │
@@ -59,7 +60,7 @@ docker-autoheal/
 ├── mutation.sh                   # Mutation-testing entry point (see docs/developer/mutation-testing.md)
 ├── Dockerfile                    # Multi-stage build: Node (frontend) → Python (backend)
 ├── docker-compose.yml            # Runs the published image; `up --build` builds from this checkout
-└── docker-compose.dev.yml        # Override: distinct name, ports and data dir to run beside a deployment
+└── docker-compose.dev.yml        # Override: distinct name, ports and data dir for the isolated dev stack
 ```
 
 There are no root-level Python test/verification scripts — the manual scripts that used

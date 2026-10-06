@@ -12,7 +12,7 @@ export default defineConfig({
     ? [["list"], ["html", { open: "never", outputFolder: "playwright-report" }]]
     : [["list"]],
   use: {
-    baseURL: process.env.E2E_BASE_URL || "http://localhost:3131",
+    baseURL: process.env.E2E_BASE_URL || "http://localhost:3132",
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
   },
