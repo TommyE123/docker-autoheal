@@ -79,7 +79,7 @@ JAVASCRIPT_ES_PRE_COMMANDS:
     cwd: workspace
     continue_if_failed: false
 
-JAVASCRIPT_PRETTIER_FILE_EXTENSIONS: [".js", ".jsx"]
+JAVASCRIPT_PRETTIER_FILE_EXTENSIONS: [".js", ".jsx", ".css"]
 JAVASCRIPT_PRETTIER_FILTER_REGEX_INCLUDE: "frontend/"
 
 # ---------------------------------------------------------------------------

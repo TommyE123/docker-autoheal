@@ -152,3 +152,7 @@ data/
 
 # Linter reports
 .lint/
+
+# Playwright E2E output
+frontend/test-results/
+frontend/playwright-report/
