@@ -102,17 +102,39 @@ refreshes it:
   new file with the one on `main`. The file holds only the score and its colour (no
   timestamps or run IDs), so an unchanged result is identical and nothing is committed or
   opened.
-  The update is built on the exact `main` commit that was tested; if `main` has moved by
-  the time the run finishes, nothing is published and the workflow must be run again.
+  The result is tied to the exact `main` commit that was tested; if `main` has moved by
+  the time the run finishes, nothing is published or closed and the workflow must be run
+  again.
+- If the result is unchanged and `main` is still current, it closes any update PR left
+  open from an earlier run (deleting its branch) with a comment saying it was superseded.
 - On a change it force-pushes a single commit to `chore/update-mutation-results` and opens
-  a pull request to `main`, or updates the one already open. The title is
+  a pull request to `main`, or updates the one already open. The PR contains only
+  `.github/badges/mutation.json`. The title is
   `chore: update mutation results (65.8% → 66.7%)`; when the score is unchanged or cannot
   be read from either file it is `chore: update mutation results`. If the score dropped,
   the PR body starts with a warning. A drop never fails the workflow.
-- Only its second job holds a write token: the `BADGE_PUSH_TOKEN` repository secret, a
-  fine-grained personal access token with **Contents** and **Pull requests**:
-  read and write. A push or PR made with `GITHUB_TOKEN` would not start the PR's other
-  checks. The updater PR goes through the normal pull request checks like any other.
+- Its `GITHUB_TOKEN` is read-only. Every write uses the `BADGE_PUSH_TOKEN` repository
+  secret, a fine-grained personal access token with **Contents** and **Pull requests**:
+  read and write, which only the steps that push, open, close or merge are given. A push
+  or PR made with `GITHUB_TOKEN` would not start the PR's other checks.
+
+### Why the updater PR auto-merges
+
+The updater is scheduled externally (cron-job.org) shortly before Release Please runs. Its
+PR exists only to persist the generated result safely on `main`, so the workflow enables
+auto-merge (squash) on it and GitHub merges it once the required PR checks pass. No
+approval is required for it. A change in the score is informational: a drop is warned
+about in the PR body but is not a release blocker, does not fail the workflow and does not
+stop the PR merging or delay Release Please. This needs **Allow auto-merge** enabled in
+the repository settings.
+
+### Mutation runs and the updater PR
+
+The Mutation Testing workflow runs on source and test pull requests according to its path
+filters, which do not include `.github/badges/mutation.json`. The updater workflow runs the
+full mutation process itself against `main`, and its PR carries only the resulting JSON, so
+that PR does not trigger another full mutation run. That avoids running the 4-5 minute
+mutation job again for a badge-only change. Its other checks run as for any pull request.
 
 Find results on the workflow run page (for a pull request, the **Mutmut**
 check's details link):

@@ -34,8 +34,7 @@ permissions:
 
 # One run per ref. A new push to a pull request cancels that PR's in-progress
 # run; runs on main and manual runs are never cancelled once running (a newer run
-# can still replace one that is only queued), so the README badge reflects a run
-# that finished.
+# can still replace one that is only queued), so a run on main is never cut short by a newer one.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
