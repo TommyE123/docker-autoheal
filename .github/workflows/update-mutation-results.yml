@@ -219,3 +219,5 @@ jobs:
           else
             gh pr create --base main --head "$UPDATE_BRANCH" --title "$TITLE" --body-file "$RUNNER_TEMP/pr-body.md"
           fi
+
+          gh pr merge "$number" --auto --squash
