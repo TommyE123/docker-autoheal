@@ -113,6 +113,10 @@ refreshes it:
   `chore: update mutation results (65.8% → 66.7%)`; when the score is unchanged or cannot
   be read from either file it is `chore: update mutation results`. If the score dropped,
   the PR body starts with a warning. A drop never fails the workflow.
+- It only touches its own PR: open, into `main`, with `chore/update-mutation-results` as
+  its head branch in this repository (a fork PR using the same branch name is ignored,
+  and more than one match fails the run). Before enabling auto-merge it checks that the PR
+  head is the commit it just pushed and that the PR changes only the badge file.
 - Its `GITHUB_TOKEN` is read-only. Every write uses the `BADGE_PUSH_TOKEN` repository
   secret, a fine-grained personal access token with **Contents** and **Pull requests**:
   read and write, which only the steps that push, open, close or merge are given. A push
