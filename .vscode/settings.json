@@ -25,7 +25,7 @@
   },
 
   "[css]": {
-    "editor.defaultFormatter": "stylelint.vscode-stylelint",
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.codeActionsOnSave": {
       "source.fixAll.stylelint": "explicit"
     }
@@ -73,9 +73,9 @@
   "ruff.configuration": "${workspaceFolder}/.linter-rules/.ruff.toml",
   "markdownlint.configFile": ".linter-rules/.markdownlint.jsonc",
 
-  "stylelint.stylelintPath": "${workspaceFolder}/.devcontainer/node_modules/stylelint",
+  "stylelint.stylelintPath": ".devcontainer/node_modules/stylelint",
   "stylelint.configFile": "${workspaceFolder}/.linter-rules/.stylelintrc.json",
-  "stylelint.configBasedir": "${workspaceFolder}/.devcontainer/node_modules",
+  "stylelint.configBasedir": ".devcontainer/node_modules",
 
   "files.exclude": {
     "**/__pycache__": true,
