@@ -8,11 +8,13 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
-    "format": "prettier --write \"src/**/*.{js,jsx}\"",
-    "format:check": "prettier --check \"src/**/*.{js,jsx}\"",
+    "format": "prettier --write \"src/**/*.{js,jsx,css}\"",
+    "format:check": "prettier --check \"src/**/*.{js,jsx,css}\"",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui-host=0.0.0.0 --ui-port=9323"
   },
   "dependencies": {
     "axios": "^1.6.2",
@@ -26,6 +28,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@playwright/test": "1.63.0",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.1.0",
     "@testing-library/user-event": "^14.5.2",

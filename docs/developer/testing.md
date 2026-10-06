@@ -153,6 +153,38 @@ There is currently no automated frontend test suite. `npm run lint` (ESLint) is 
 `frontend/package.json`, but there's no ESLint configuration file yet, so it doesn't
 currently run successfully — see [Frontend Development](frontend.md#linting).
 
+## End-to-end tests (Playwright)
+
+A small Playwright suite in `frontend/e2e/` drives Chromium against the
+Docker-served application (not the Vite dev server), so it covers the production
+build, the container and the real `/api` backend. It currently holds one smoke test:
+open `/` and check the Dashboard renders. Vitest remains the unit-test runner and
+excludes `e2e/`.
+
+In the Dev Container, run **Terminal → Run Task → Autoheal: Run Playwright E2E Tests**. It
+builds and starts the dev stack from `docker-compose.dev.yml` (so it never touches a real
+deployment on `3131`), then runs `npm run test:e2e` against it. **Run Playwright E2E Tests (UI)** runs
+`npm run test:e2e:ui` instead, to watch the run in Playwright's UI mode; see
+[Tasks](development-setup.md#tasks). To run it by hand against any running instance:
+
+```bash
+cd frontend
+npm ci
+npx playwright install chromium   # first time only
+E2E_BASE_URL=http://localhost:3132 npm run test:e2e
+```
+
+`E2E_BASE_URL` defaults to `http://localhost:3131`; set it to test a different
+instance. Failures write screenshots and traces to `frontend/test-results/` and an HTML
+report to `frontend/playwright-report/` when `CI` is set (both git-ignored).
+
+In CI the suite runs as the last step of the Production Smoke Test job
+(`.github/workflows/production-smoke-test.yml`), against the container that job already
+started from the image built in `docker-build.yml`. It therefore only runs for
+same-repository pull requests, like the rest of that job. On failure the report and
+traces are uploaded as the `playwright-report` artifact, and the job's existing
+diagnostics step prints the container logs.
+
 ## CI
 
 `.github/workflows/tests.yml` runs the unit suite with coverage on every push
