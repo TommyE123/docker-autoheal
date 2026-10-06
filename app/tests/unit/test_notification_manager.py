@@ -300,7 +300,9 @@ async def test_send_ntfy_builds_headers_with_auth(isolated_config_manager, manag
 
 
 @pytest.mark.asyncio
-async def test_send_ntfy_without_credentials_sends_no_authorization(isolated_config_manager, manager):
+async def test_send_ntfy_without_credentials_sends_no_authorization(
+    isolated_config_manager, manager
+):
     _configure_service(
         isolated_config_manager,
         NotificationService(name="Ntfy", type="ntfy", enabled=True, topic="alerts"),
@@ -326,7 +328,9 @@ async def test_send_ntfy_with_access_token_sends_bearer_header(isolated_config_m
 
 
 @pytest.mark.asyncio
-async def test_send_ntfy_access_token_takes_precedence_over_basic_auth(isolated_config_manager, manager):
+async def test_send_ntfy_access_token_takes_precedence_over_basic_auth(
+    isolated_config_manager, manager
+):
     _configure_service(
         isolated_config_manager,
         NotificationService(
@@ -363,7 +367,9 @@ async def test_send_ntfy_access_token_not_logged(caplog, isolated_config_manager
 
 
 @pytest.mark.asyncio
-async def test_send_ntfy_access_token_not_logged_on_exception(caplog, isolated_config_manager, manager):
+async def test_send_ntfy_access_token_not_logged_on_exception(
+    caplog, isolated_config_manager, manager
+):
     class _RaisingSession:
         def post(self, url, **kwargs):
             raise RuntimeError("connection refused")
