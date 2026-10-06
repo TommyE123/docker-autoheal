@@ -44,7 +44,7 @@ async def add_health_check(health_check: HealthCheckConfig):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error adding health check: {e}")
+        logger.error("Error adding health check: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -81,7 +81,7 @@ async def get_health_check(container_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting health check: {e}")
+        logger.error("Error getting health check: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -118,7 +118,7 @@ async def delete_health_check(container_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error deleting health check: {e}")
+        logger.error("Error deleting health check: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 

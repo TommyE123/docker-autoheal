@@ -52,9 +52,9 @@ class UptimeKumaMonitor:
             )
 
             # Test connection
-            logger.info(f"Testing connection to Uptime-Kuma at {config.uptime_kuma.server_url}...")
+            logger.info("Testing connection to Uptime-Kuma at %s...", config.uptime_kuma.server_url)
             if not await self.client.connect():
-                logger.warning(f"Cannot connect to Uptime-Kuma at {config.uptime_kuma.server_url}")
+                logger.warning("Cannot connect to Uptime-Kuma at %s", config.uptime_kuma.server_url)
                 logger.info("Uptime-Kuma monitoring will remain disabled until connection is successful")
                 return
 
@@ -67,7 +67,7 @@ class UptimeKumaMonitor:
             self._running = True
             self._task = asyncio.create_task(self._monitoring_loop())
         except Exception as e:
-            logger.warning(f"Failed to start Uptime-Kuma monitor: {e}")
+            logger.warning("Failed to start Uptime-Kuma monitor: %s", e)
             logger.info("Uptime-Kuma integration is optional - the service will continue without it")
 
     async def stop(self):
@@ -82,7 +82,7 @@ class UptimeKumaMonitor:
             except asyncio.CancelledError:
                 pass  # Expected during shutdown
             except Exception as e:
-                logger.warning(f"Error stopping Uptime-Kuma task: {e}")
+                logger.warning("Error stopping Uptime-Kuma task: %s", e)
 
         logger.info("Uptime-Kuma monitoring stopped")
 
@@ -93,7 +93,7 @@ class UptimeKumaMonitor:
 
         monitors = await self.client.get_all_monitors()
         self._monitor_cache = {m['friendly_name']: m for m in monitors}
-        logger.info(f"Cached {len(self._monitor_cache)} Uptime-Kuma monitors")
+        logger.info("Cached %s Uptime-Kuma monitors", len(self._monitor_cache))
 
     async def _monitoring_loop(self):
         """Main monitoring loop - check Uptime-Kuma statuses and cache them in sync with container checks"""
@@ -118,7 +118,7 @@ class UptimeKumaMonitor:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Error in Uptime-Kuma monitoring loop: {e}")
+                logger.error("Error in Uptime-Kuma monitoring loop: %s", e)
                 # On error, resync to next interval
                 next_check = asyncio.get_event_loop().time() + interval
 
@@ -134,7 +134,7 @@ class UptimeKumaMonitor:
             # instead of re-fetching the full endpoint once per mapping (see #94)
             monitors = await self.client.get_all_monitors()
         except Exception as e:
-            logger.error(f"Error fetching Uptime-Kuma monitor statuses: {e}")
+            logger.error("Error fetching Uptime-Kuma monitor statuses: %s", e)
             return
 
         status_by_name = {m['friendly_name']: m['status'] for m in monitors}
@@ -143,14 +143,22 @@ class UptimeKumaMonitor:
             status = status_by_name.get(mapping.monitor_friendly_name)
 
             if status is None:
-                logger.debug(f"Monitor '{mapping.monitor_friendly_name}' not found or could not fetch status")
+                logger.debug(
+                    "Monitor '%s' not found or could not fetch status",
+                    mapping.monitor_friendly_name,
+                )
                 continue
 
             # Cache the status (0=down, 1=up, 2=pending, 3=maintenance)
             # mapping.container_id now stores stable_id
             self._container_status_cache[mapping.container_id] = status
 
-            logger.debug(f"Cached status for {mapping.container_id}: {status} (monitor: {mapping.monitor_friendly_name})")
+            logger.debug(
+                "Cached status for %s: %s (monitor: %s)",
+                mapping.container_id,
+                status,
+                mapping.monitor_friendly_name,
+            )
 
     def get_container_status(self, stable_id: str) -> int | None:
         return self._container_status_cache.get(stable_id)

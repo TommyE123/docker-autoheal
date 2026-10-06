@@ -30,24 +30,24 @@ class UptimeKumaClient:
     async def connect(self) -> bool:
         """Test connection to Uptime-Kuma server"""
         try:
-            logger.debug(f"Attempting to connect to {self.server_url}/metrics")
+            logger.debug("Attempting to connect to %s/metrics", self.server_url)
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     f"{self.server_url}/metrics",
                     headers={"Authorization": self.auth_header},
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as response:
-                    logger.debug(f"Response status: {response.status}")
+                    logger.debug("Response status: %s", response.status)
                     if response.status == 200:
                         text = await response.text()
                         # Check if we got valid metrics data
                         has_metrics = 'monitor_status' in text or 'app_version' in text
-                        logger.debug(f"Has metrics data: {has_metrics}")
+                        logger.debug("Has metrics data: %s", has_metrics)
                         return has_metrics
-                    logger.warning(f"Unexpected response status: {response.status}")
+                    logger.warning("Unexpected response status: %s", response.status)
                     return False
         except Exception as e:
-            logger.warning(f"Failed to connect to Uptime-Kuma: {e}")
+            logger.warning("Failed to connect to Uptime-Kuma: %s", e)
             return False
 
     async def get_all_monitors(self) -> list[dict]:
@@ -60,15 +60,15 @@ class UptimeKumaClient:
                     timeout=aiohttp.ClientTimeout(total=10)
                 ) as response:
                     if response.status != 200:
-                        logger.error(f"Failed to fetch metrics: HTTP {response.status}")
+                        logger.error("Failed to fetch metrics: HTTP %s", response.status)
                         return []
 
                     text = await response.text()
                     monitors = self._parse_monitors_from_metrics(text)
-                    logger.debug(f"Parsed {len(monitors)} monitors from metrics")
+                    logger.debug("Parsed %s monitors from metrics", len(monitors))
                     return monitors
         except Exception as e:
-            logger.error(f"Failed to fetch monitors: {e}")
+            logger.error("Failed to fetch monitors: %s", e)
             return []
 
     def _parse_monitors_from_metrics(self, metrics_text: str) -> list[dict]:
@@ -134,5 +134,5 @@ class UptimeKumaClient:
                         return int(match.group(1))
                     return None
         except Exception as e:
-            logger.error(f"Failed to get monitor status for '{monitor_name}': {e}")
+            logger.error("Failed to get monitor status for '%s': %s", monitor_name, e)
             return None

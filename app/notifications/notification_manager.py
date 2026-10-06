@@ -87,7 +87,7 @@ class NotificationManager:
             event: The event to send notification for
         """
 
-        logger.info(f"Preparing to send notification for event: {event.event_type}")
+        logger.info("Preparing to send notification for event: %s", event.event_type)
 
         config = config_manager.get_config()
 
@@ -98,12 +98,12 @@ class NotificationManager:
 
         # Check event filters
         if not self._should_notify_for_event(event):
-            logger.debug(f"Event type '{event.event_type}' filtered out, skipping notification")
+            logger.debug("Event type '%s' filtered out, skipping notification", event.event_type)
             return
 
         # Queue the notification
         await self._notification_queue.put(event)
-        logger.debug(f"Queued notification for event: {event.event_type}")
+        logger.debug("Queued notification for event: %s", event.event_type)
 
     def _should_notify_for_event(self, event: AutoHealEvent) -> bool:
         """
@@ -144,7 +144,7 @@ class NotificationManager:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error(f"Error in notification worker: {e}", exc_info=True)
+                logger.exception("Error in notification worker: %s", e)
                 await asyncio.sleep(1)
 
     async def _process_notification(self, event: AutoHealEvent) -> None:
@@ -183,17 +183,17 @@ class NotificationManager:
                 elif service.type == NotificationType.PUSHOVER:
                     tasks.append(self._send_pushover(service, title, message, event, priority))
                 else:
-                    logger.warning(f"Unsupported notification type: {service.type}")
+                    logger.warning("Unsupported notification type: %s", service.type)
 
             except Exception as e:
-                logger.error(f"Error preparing notification for {service.type}: {e}")
+                logger.error("Error preparing notification for %s: %s", service.type, e)
 
         # Send all notifications concurrently
         if tasks:
             results = await asyncio.gather(*tasks, return_exceptions=True)
             for result in results:
                 if isinstance(result, Exception):
-                    logger.error(f"Notification failed: {result}")
+                    logger.error("Notification failed: %s", result)
 
     def _format_notification(self, event: AutoHealEvent) -> tuple[str, str, NotificationPriority]:
         """
@@ -280,11 +280,13 @@ class NotificationManager:
                 headers=headers
             ) as response:
                 if response.status >= 400:
-                    logger.error(f"Webhook failed with status {response.status}: {await response.text()}")
+                    logger.error(
+                        "Webhook failed with status %s: %s", response.status, await response.text()
+                    )
                 else:
-                    logger.info(f"Webhook notification sent successfully to {service.name}")
+                    logger.info("Webhook notification sent successfully to %s", service.name)
         except Exception as e:
-            logger.error(f"Failed to send webhook notification: {e}")
+            logger.error("Failed to send webhook notification: %s", e)
 
     async def _send_discord(
         self,
@@ -325,11 +327,11 @@ class NotificationManager:
         try:
             async with self._session.post(service.url, json=payload) as response:
                 if response.status >= 400:
-                    logger.error(f"Discord webhook failed with status {response.status}")
+                    logger.error("Discord webhook failed with status %s", response.status)
                 else:
-                    logger.info(f"Discord notification sent successfully to {service.name}")
+                    logger.info("Discord notification sent successfully to %s", service.name)
         except Exception as e:
-            logger.error(f"Failed to send Discord notification: {e}")
+            logger.error("Failed to send Discord notification: %s", e)
 
     async def _send_slack(
         self,
@@ -370,11 +372,11 @@ class NotificationManager:
         try:
             async with self._session.post(service.url, json=payload) as response:
                 if response.status >= 400:
-                    logger.error(f"Slack webhook failed with status {response.status}")
+                    logger.error("Slack webhook failed with status %s", response.status)
                 else:
-                    logger.info(f"Slack notification sent successfully to {service.name}")
+                    logger.info("Slack notification sent successfully to %s", service.name)
         except Exception as e:
-            logger.error(f"Failed to send Slack notification: {e}")
+            logger.error("Failed to send Slack notification: %s", e)
 
     async def _send_telegram(
         self,
@@ -402,11 +404,11 @@ class NotificationManager:
         try:
             async with self._session.post(url, json=payload) as response:
                 if response.status >= 400:
-                    logger.error(f"Telegram API failed with status {response.status}")
+                    logger.error("Telegram API failed with status %s", response.status)
                 else:
-                    logger.info(f"Telegram notification sent successfully to {service.name}")
+                    logger.info("Telegram notification sent successfully to %s", service.name)
         except Exception as e:
-            logger.error(f"Failed to send Telegram notification: {e}")
+            logger.error("Failed to send Telegram notification: %s", e)
 
     async def _send_ntfy(
         self,
@@ -454,11 +456,11 @@ class NotificationManager:
                 headers=headers
             ) as response:
                 if response.status >= 400:
-                    logger.error(f"Ntfy failed with status {response.status}")
+                    logger.error("Ntfy failed with status %s", response.status)
                 else:
-                    logger.info(f"Ntfy notification sent successfully to {service.name}")
+                    logger.info("Ntfy notification sent successfully to %s", service.name)
         except Exception as e:
-            logger.error(f"Failed to send Ntfy notification: {e}")
+            logger.error("Failed to send Ntfy notification: %s", e)
 
     async def _send_gotify(
         self,
@@ -495,11 +497,11 @@ class NotificationManager:
         try:
             async with self._session.post(url, json=payload, headers=headers) as response:
                 if response.status >= 400:
-                    logger.error(f"Gotify failed with status {response.status}")
+                    logger.error("Gotify failed with status %s", response.status)
                 else:
-                    logger.info(f"Gotify notification sent successfully to {service.name}")
+                    logger.info("Gotify notification sent successfully to %s", service.name)
         except Exception as e:
-            logger.error(f"Failed to send Gotify notification: {e}")
+            logger.error("Failed to send Gotify notification: %s", e)
 
     async def _send_pushover(
         self,
@@ -534,11 +536,11 @@ class NotificationManager:
         try:
             async with self._session.post(url, data=payload) as response:
                 if response.status >= 400:
-                    logger.error(f"Pushover failed with status {response.status}")
+                    logger.error("Pushover failed with status %s", response.status)
                 else:
-                    logger.info(f"Pushover notification sent successfully to {service.name}")
+                    logger.info("Pushover notification sent successfully to %s", service.name)
         except Exception as e:
-            logger.error(f"Failed to send Pushover notification: {e}")
+            logger.error("Failed to send Pushover notification: %s", e)
 
     async def test_notification(self, service_name: str) -> dict[str, Any]:
         """
@@ -601,7 +603,7 @@ class NotificationManager:
             return {"success": True, "message": "Test notification sent successfully"}
 
         except Exception as e:
-            logger.error(f"Failed to send test notification: {e}")
+            logger.error("Failed to send test notification: %s", e)
             return {"success": False, "message": f"Failed to send test notification: {str(e)}"}
 
 
