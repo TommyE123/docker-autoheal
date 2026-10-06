@@ -31,6 +31,9 @@ jobs:
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # The exact main commit that was tested, so the result is attached to it.
+    outputs:
+      sha: ${{ steps.checkout-sha.outputs.sha }}
 
     steps:
       - name: Checkout main
@@ -38,6 +41,10 @@ jobs:
         with:
           ref: main
           persist-credentials: false
+
+      - name: Record the tested commit
+        id: checkout-sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       # Same Python version the Dockerfile ships, as in mutation-testing.yml.
       - name: Determine Python version from Dockerfile
@@ -90,10 +97,11 @@ jobs:
       GH_TOKEN: ${{ secrets.BADGE_PUSH_TOKEN }}
 
     steps:
-      - name: Checkout main
+      # The commit the mutation job tested, not whatever main is by now.
+      - name: Checkout the tested commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: ${{ needs.mutation-testing.outputs.sha }}
           token: ${{ secrets.BADGE_PUSH_TOKEN }}
 
       - name: Download badge data
@@ -139,8 +147,25 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           cp "$NEW_FILE" "$BADGE_FILE"
 
-      - name: Commit and push the update branch
+      # The mutation run takes a while. If main has moved on, the result describes
+      # an older commit, so publish nothing and leave it to the next run.
+      - name: Verify main has not moved
+        id: fresh
         if: ${{ steps.compare.outputs.changed == 'true' }}
+        env:
+          TESTED_SHA: ${{ needs.mutation-testing.outputs.sha }}
+        run: |
+          current=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$current" = "$TESTED_SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "current=false" >> "$GITHUB_OUTPUT"
+          echo "::warning title=Mutation results are stale::main moved from $TESTED_SHA to $current during the run; nothing was published. Run the workflow again."
+          echo "main moved from \`$TESTED_SHA\` to \`$current\` during the run, so the results were not published. Run this workflow again." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit and push the update branch
+        if: ${{ steps.fresh.outputs.current == 'true' }}
         env:
           TITLE: ${{ steps.compare.outputs.title }}
         run: |
@@ -155,7 +180,7 @@ jobs:
           git push --force-with-lease origin "HEAD:refs/heads/$UPDATE_BRANCH"
 
       - name: Open or update the pull request
-        if: ${{ steps.compare.outputs.changed == 'true' }}
+        if: ${{ steps.fresh.outputs.current == 'true' }}
         env:
           TITLE: ${{ steps.compare.outputs.title }}
           OLD: ${{ steps.compare.outputs.old }}

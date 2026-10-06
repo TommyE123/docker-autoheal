@@ -102,6 +102,8 @@ refreshes it:
   new file with the one on `main`. The file holds only the score and its colour (no
   timestamps or run IDs), so an unchanged result is identical and nothing is committed or
   opened.
+  The update is built on the exact `main` commit that was tested; if `main` has moved by
+  the time the run finishes, nothing is published and the workflow must be run again.
 - On a change it force-pushes a single commit to `chore/update-mutation-results` and opens
   a pull request to `main`, or updates the one already open. The title is
   `chore: update mutation results (65.8% → 66.7%)`; when the score is unchanged or cannot
