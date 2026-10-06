@@ -53,8 +53,9 @@ class UptimeKumaClient:
     async def get_all_monitors(self) -> list[dict] | None:
         """Fetch all monitors from /metrics endpoint.
 
-        Returns None if the request fails, so callers can tell a failed fetch apart
-        from a successful response that contains no monitors (an empty list).
+        Returns None if the request fails or the response is not Uptime-Kuma metrics,
+        so callers can tell a failed fetch apart from a successful response that
+        contains no monitors (an empty list).
         """
         try:
             async with aiohttp.ClientSession() as session:
@@ -68,6 +69,15 @@ class UptimeKumaClient:
                         return None
 
                     text = await response.text()
+                    # Same validity check as connect(): a 200 that is not Uptime-Kuma
+                    # metrics (e.g. a proxy login page) is a failed fetch, not an
+                    # empty monitor list.
+                    if "monitor_status" not in text and "app_version" not in text:
+                        logger.error(
+                            "Failed to fetch monitors: response is not Uptime-Kuma metrics"
+                        )
+                        return None
+
                     monitors = self._parse_monitors_from_metrics(text)
                     logger.debug("Parsed %s monitors from metrics", len(monitors))
                     return monitors

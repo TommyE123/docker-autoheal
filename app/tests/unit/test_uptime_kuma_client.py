@@ -190,10 +190,26 @@ class TestGetAllMonitors:
         assert await client.get_all_monitors() is None
 
     async def test_returns_empty_list_when_no_monitor_lines_match(self, monkeypatch):
-        _patch_session(monkeypatch, response=_FakeResponse(200, "some_other_metric 1\n"))
+        """Valid Uptime-Kuma metrics that list no monitors are a successful empty result."""
+        text = 'app_version{version="1.23.0"} 1\nsome_other_metric 1\n'
+        _patch_session(monkeypatch, response=_FakeResponse(200, text))
         client = UptimeKumaClient("http://kuma.example", "token")
 
         assert await client.get_all_monitors() == []
+
+    @pytest.mark.parametrize(
+        "body",
+        ["<html><body>Please sign in</body></html>", "", "some_other_metric 1\n"],
+        ids=["html-login-page", "empty-body", "unrelated-metrics"],
+    )
+    async def test_returns_none_when_200_response_is_not_uptime_kuma_metrics(
+        self, monkeypatch, body
+    ):
+        """A 200 that is not Uptime-Kuma metrics is a failed fetch, not an empty monitor list."""
+        _patch_session(monkeypatch, response=_FakeResponse(200, body))
+        client = UptimeKumaClient("http://kuma.example", "token")
+
+        assert await client.get_all_monitors() is None
 
     async def test_parses_monitors_with_monitor_id_label_before_name(self, monkeypatch):
         """Regression test for #26 through the get_all_monitors() path used by
