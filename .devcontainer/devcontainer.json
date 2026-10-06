@@ -1,6 +1,10 @@
 {
   "name": "Docker Auto-Heal",
-  "runArgs": ["--name", "docker-autoheal-devcontainer"],
+  "runArgs": [
+    "--name",
+    "docker-autoheal-devcontainer",
+    "--add-host=host.docker.internal:host-gateway"
+  ],
   "build": {
     "dockerfile": "Dockerfile"
   },
@@ -29,7 +33,7 @@
 
   "waitFor": "postCreateCommand",
 
-  "forwardPorts": [3000, 3131, 9090],
+  "forwardPorts": [3000, 3131, 9090, 9323],
 
   "portsAttributes": {
     "3000": {
@@ -40,6 +44,9 @@
     },
     "9090": {
       "label": "Metrics"
+    },
+    "9323": {
+      "label": "Playwright UI"
     }
   },
 
