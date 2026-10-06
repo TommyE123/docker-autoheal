@@ -217,7 +217,7 @@ jobs:
             gh pr edit "$number" --title "$TITLE" --body-file "$RUNNER_TEMP/pr-body.md"
             echo "Updated pull request #$number."
           else
-            gh pr create --base main --head "$UPDATE_BRANCH" --title "$TITLE" --body-file "$RUNNER_TEMP/pr-body.md"
+            number=$(gh pr create --base main --head "$UPDATE_BRANCH" --title "$TITLE" --body-file "$RUNNER_TEMP/pr-body.md" | sed 's|.*/||')
           fi
 
           gh pr merge "$number" --auto --squash
