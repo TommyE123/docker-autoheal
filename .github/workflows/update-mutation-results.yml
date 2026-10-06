@@ -1,0 +1,189 @@
+name: Update Mutation Results
+
+# Refreshes the tracked .github/badges/mutation.json (the README mutation badge
+# data) from a full mutation run on main, and opens or updates a pull request when
+# the result meaningfully changed. Pull request mutation runs (mutation-testing.yml)
+# never touch that file.
+#
+# Informational only: a lower score is flagged in the PR but never fails this
+# workflow. Triggered by workflow_dispatch only, run manually from the Actions tab
+# or by an external scheduler (cron-job.org) calling the workflow_dispatch API on
+# main. There is deliberately no GitHub schedule. The caller's token is not stored
+# in this repository.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-mutation-results
+  cancel-in-progress: false
+
+env:
+  BADGE_FILE: .github/badges/mutation.json
+  UPDATE_BRANCH: chore/update-mutation-results
+
+jobs:
+  mutation-testing:
+    name: Mutmut on main
+    # Always main: a dispatch against any other ref does nothing.
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      # Same Python version the Dockerfile ships, as in mutation-testing.yml.
+      - name: Determine Python version from Dockerfile
+        id: python-version
+        run: |
+          VERSION=$(sed -n 's/^FROM python:\([0-9]\+\.[0-9]\+\)-slim.*/\1/p' Dockerfile | head -n1)
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not find a 'FROM python:X.Y-slim' line in Dockerfile" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python ${{ steps.python-version.outputs.version }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ steps.python-version.outputs.version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      # The same full run as pull requests, plus rewriting the tracked file.
+      - name: Run mutation testing
+        env:
+          UPDATE_MUTATION_BADGE: "1"
+        run: ./mutation.sh
+
+      - name: Upload badge data
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mutation-badge
+          path: ${{ env.BADGE_FILE }}
+          if-no-files-found: error
+
+  # A separate job so that only it holds a write token. It needs the mutation job
+  # to succeed, so a failed run never updates anything. The PAT is the existing
+  # BADGE_PUSH_TOKEN secret (Contents and Pull requests: read and write): a push or
+  # PR made with GITHUB_TOKEN would not start the PR's other checks.
+  update-pr:
+    name: Open or update the update PR
+    needs: mutation-testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.BADGE_PUSH_TOKEN }}
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          token: ${{ secrets.BADGE_PUSH_TOKEN }}
+
+      - name: Download badge data
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: mutation-badge
+          path: ${{ runner.temp }}/new-badge
+
+      # The file holds only schemaVersion, label, message (the score) and color,
+      # with no timestamps or run IDs, so an unchanged result is byte-identical up
+      # to formatting. Comparing normalised JSON ignores formatting too.
+      - name: Compare with the tracked file
+        id: compare
+        env:
+          NEW_FILE: ${{ runner.temp }}/new-badge/mutation.json
+        run: |
+          if [ "$(jq -cS . "$BADGE_FILE")" = "$(jq -cS . "$NEW_FILE")" ]; then
+            echo "The mutation results are unchanged; nothing to update."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+          # The score is only reported when both files hold a plain "NN.N%"
+          # message; otherwise it is left unknown rather than estimated.
+          score() { jq -r '.message // empty' "$1" | grep -E '^[0-9]+(\.[0-9]+)?%$' || true; }
+          old=$(score "$BADGE_FILE")
+          new=$(score "$NEW_FILE")
+          title="chore: update mutation results"
+          dropped=false
+          if [ -n "$old" ] && [ -n "$new" ] && [ "$old" != "$new" ]; then
+            title="$title ($old → $new)"
+            if awk -v o="${old%\%}" -v n="${new%\%}" 'BEGIN { exit !(n < o) }'; then
+              dropped=true
+            fi
+          fi
+
+          {
+            echo "title=$title"
+            echo "old=$old"
+            echo "new=$new"
+            echo "dropped=$dropped"
+          } >> "$GITHUB_OUTPUT"
+          cp "$NEW_FILE" "$BADGE_FILE"
+
+      - name: Commit and push the update branch
+        if: ${{ steps.compare.outputs.changed == 'true' }}
+        env:
+          TITLE: ${{ steps.compare.outputs.title }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$UPDATE_BRANCH"
+          git add -- "$BADGE_FILE"
+          git commit -m "$TITLE"
+          # The branch holds only this commit on top of main, so an existing
+          # update branch is simply replaced with the latest result.
+          git fetch origin "$UPDATE_BRANCH" || true
+          git push --force-with-lease origin "HEAD:refs/heads/$UPDATE_BRANCH"
+
+      - name: Open or update the pull request
+        if: ${{ steps.compare.outputs.changed == 'true' }}
+        env:
+          TITLE: ${{ steps.compare.outputs.title }}
+          OLD: ${{ steps.compare.outputs.old }}
+          NEW: ${{ steps.compare.outputs.new }}
+          DROPPED: ${{ steps.compare.outputs.dropped }}
+        run: |
+          {
+            if [ "$DROPPED" = "true" ]; then
+              echo "> [!WARNING]"
+              echo "> ⚠️ Mutation score dropped from $OLD to $NEW."
+              echo
+            fi
+            echo "## Summary"
+            echo
+            echo "Refreshes \`$BADGE_FILE\` from a full mutation run on \`main\`."
+            if [ -n "$OLD" ] && [ -n "$NEW" ]; then
+              echo
+              echo "Mutation score: $OLD → $NEW."
+            fi
+            echo
+            echo "Informational only: a lower score does not fail this workflow or block the merge."
+            echo "Generated by the Update Mutation Results workflow (run ${GITHUB_RUN_ID})."
+          } > "$RUNNER_TEMP/pr-body.md"
+
+          number=$(gh pr list --base main --head "$UPDATE_BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --title "$TITLE" --body-file "$RUNNER_TEMP/pr-body.md"
+            echo "Updated pull request #$number."
+          else
+            gh pr create --base main --head "$UPDATE_BRANCH" --title "$TITLE" --body-file "$RUNNER_TEMP/pr-body.md"
+          fi

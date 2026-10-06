@@ -87,23 +87,30 @@ stats; nothing calculates the score by hand. The score equals the **Detected** f
 the job summary, since no mutants are skipped. It is informational only: the run succeeds
 whatever the score, so no threshold is implied, and it is not a gate.
 
-The file is updated by the pull request that changes the score:
+The file is **not** updated by pull requests. A full `./mutation.sh` run leaves it alone
+unless `UPDATE_MUTATION_BADGE=1` is set, so ordinary local and pull request runs never
+modify it, and the badge keeps showing the last committed score between refreshes.
 
-- A full `./mutation.sh` run (no arguments) rewrites the file locally.
-  Focused runs leave it alone, because they score only part of the target.
-- On a pull request from this repository, the workflow's `commit-badge` job commits the
-  new file to the PR branch as `ci: update mutation badge`, unless it is unchanged. Only
-  that job has a write token. Fork pull requests get no write token, so they never
-  commit: they add a notice and a line to the job summary if the file differs. The new
-  file is in the `mutation-badge` artifact. Runs on `main` never commit.
-- The commit is pushed with the `BADGE_PUSH_TOKEN` repository secret, a fine-grained
-  personal access token with **Contents: read and write** on this repository. A push made
-  with `GITHUB_TOKEN` would not start the PR's other checks, leaving the required ones
-  missing on the new head. The badge commit does start them, but the workflow's `gate` job
-  skips the mutation run for it, since the commit only changes the badge file. If the token
-  expires or is removed, or branch protection rejects the push, the `commit-badge` job
-  fails (the mutation job itself stays green) and the badge keeps its last score.
-- If the file is left stale, the badge simply keeps showing the last committed score.
+The `Update Mutation Results` workflow (`.github/workflows/update-mutation-results.yml`)
+refreshes it:
+
+- It has only a `workflow_dispatch` trigger and no GitHub `schedule`. Run it from the
+  Actions tab, or let an external scheduler (cron-job.org) call the `workflow_dispatch`
+  API. The caller's token is configured outside the repository. It always checks out and
+  tests `main`; a dispatch against any other ref does nothing.
+- It runs the same full `./mutation.sh` with `UPDATE_MUTATION_BADGE=1`, then compares the
+  new file with the one on `main`. The file holds only the score and its colour (no
+  timestamps or run IDs), so an unchanged result is identical and nothing is committed or
+  opened.
+- On a change it force-pushes a single commit to `chore/update-mutation-results` and opens
+  a pull request to `main`, or updates the one already open. The title is
+  `chore: update mutation results (65.8% → 66.7%)`; when the score is unchanged or cannot
+  be read from either file it is `chore: update mutation results`. If the score dropped,
+  the PR body starts with a warning. A drop never fails the workflow.
+- Only its second job holds a write token: the `BADGE_PUSH_TOKEN` repository secret, a
+  fine-grained personal access token with **Contents** and **Pull requests**:
+  read and write. A push or PR made with `GITHUB_TOKEN` would not start the PR's other
+  checks. The updater PR goes through the normal pull request checks like any other.
 
 Find results on the workflow run page (for a pull request, the **Mutmut**
 check's details link):
