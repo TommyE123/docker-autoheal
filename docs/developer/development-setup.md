@@ -86,6 +86,26 @@ Conventions** and **Run Security Scanners**.
 published image. The result is tagged `docker-autoheal:dev` locally, so it does not replace
 `tommye123/docker-autoheal:latest`.
 
+**Autoheal: Run Playwright E2E Tests** starts the same dev stack in the background
+(`up --build -d --wait`, which waits for the image's healthcheck), then runs
+`npm run test:e2e` from `frontend/` against it, so the browser tests the Docker-served
+app rather than the Vite dev server. It reads the published port back from Compose
+(`3132` unless `AUTOHEAL_DEV_PORT` is set) and reaches it as `host.docker.internal`,
+because the stack runs on the host's daemon, not inside the Dev Container
+(`devcontainer.json` maps that name with `--add-host`). It leaves your deployment alone and
+removes the dev stack afterwards (printing its last logs first if the run failed), unless it was already running
+when the task started, in which case it is left alone. Chromium
+and its system libraries are installed by `post-create.sh`; after pulling this change into
+an existing Dev Container, run **Dev Containers: Rebuild Container** once.
+
+**Autoheal: Run Playwright E2E Tests (UI)** does the same setup but runs
+`npm run test:e2e:ui`, which opens [Playwright's UI mode](https://playwright.dev/docs/test-ui-mode)
+on port `9323`, so you can watch the browser run the smoke test with a timeline and
+screenshots, and re-run it. Open the forwarded **Playwright UI** port (the Ports tab, or the
+link in the terminal) in your browser. The task keeps running until you stop it (**Ctrl+C** in
+its terminal), which also tears down the stack under the same rule as above. Rebuild the
+Dev Container once to pick up the forwarded port.
+
 **Autoheal: Install gh-aw** installs the `github/gh-aw` extension pinned to the
 `compiler_version` recorded in the header of `.github/workflows/issue-triage.lock.yml`, so
 recompiling the workflows doesn't churn the lock file. It needs `gh auth login` (or a
