@@ -1,4 +1,4 @@
-import { defineConfig, coverageConfigDefaults } from 'vitest/config'
+import { defineConfig, configDefaults, coverageConfigDefaults } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
@@ -23,6 +23,8 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // Playwright E2E specs run via `npm run test:e2e`, not Vitest.
+    exclude: [...configDefaults.exclude, 'e2e/**'],
     setupFiles: ['./src/test/setup.js'],
     globalSetup: ['./src/test/globalSetup.js'],
     coverage: {
@@ -33,7 +35,14 @@ export default defineConfig({
       // v8 coverage instrumentation never sees it execute; excluding it
       // keeps coverage % from being diluted by a file that can never show
       // as covered no matter how it's tested.
-      exclude: [...coverageConfigDefaults.exclude, 'src/test/globalSetup.js'],
+      // Playwright config and specs run in a browser against the Docker image,
+      // not under Vitest, so they can never show as covered here either.
+      exclude: [
+        ...coverageConfigDefaults.exclude,
+        'src/test/globalSetup.js',
+        'playwright.config.js',
+        'e2e/**',
+      ],
     },
   },
 })
