@@ -1,9 +1,6 @@
 {
   "name": "Docker Auto-Heal",
   "runArgs": ["--name", "docker-autoheal-devcontainer"],
-
-  // Docker-in-Docker needs a privileged container. That is what gives the Dev Container its
-  // own Docker daemon instead of the host's; see docs/developer/development-setup.md.
   "privileged": true,
   "build": {
     "dockerfile": "Dockerfile"
