@@ -91,7 +91,7 @@ class UptimeKumaMonitor:
         if not self.client:
             return
 
-        monitors = await self.client.get_all_monitors()
+        monitors = await self.client.get_all_monitors() or []
         self._monitor_cache = {m['friendly_name']: m for m in monitors}
         logger.info("Cached %s Uptime-Kuma monitors", len(self._monitor_cache))
 
@@ -133,11 +133,15 @@ class UptimeKumaMonitor:
         try:
             # Fetch /metrics once per refresh and reuse it for every mapped container,
             # instead of re-fetching the full endpoint once per mapping (see #94)
-            # fetch_monitors() raises on a failed request, so a failure keeps the cached
-            # statuses while a successful empty list is a valid refresh that clears them
-            monitors = await self.client.fetch_monitors()
+            monitors = await self.client.get_all_monitors()
         except Exception as e:
             logger.error("Error fetching Uptime-Kuma monitor statuses: %s", e)
+            return
+
+        if monitors is None:
+            # The fetch failed (the client already logged why): keep the cached statuses
+            # instead of treating the failure as evidence that the monitors disappeared.
+            # A successful empty list is a valid refresh and falls through to the pruning.
             return
 
         status_by_name = {m['friendly_name']: m['status'] for m in monitors}

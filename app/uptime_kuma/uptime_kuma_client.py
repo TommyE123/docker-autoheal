@@ -50,33 +50,30 @@ class UptimeKumaClient:
             logger.warning("Failed to connect to Uptime-Kuma: %s", e)
             return False
 
-    async def fetch_monitors(self) -> list[dict]:
-        """Fetch all monitors from /metrics endpoint, raising if the request fails.
+    async def get_all_monitors(self) -> list[dict] | None:
+        """Fetch all monitors from /metrics endpoint.
 
-        Unlike get_all_monitors(), a failed request is not reported as an empty list,
-        so callers can tell an outage apart from a genuinely empty monitor list.
+        Returns None if the request fails, so callers can tell a failed fetch apart
+        from a successful response that contains no monitors (an empty list).
         """
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{self.server_url}/metrics",
-                headers={"Authorization": self.auth_header},
-                timeout=aiohttp.ClientTimeout(total=10)
-            ) as response:
-                if response.status != 200:
-                    raise RuntimeError(f"Metrics endpoint returned HTTP {response.status}")
-
-                text = await response.text()
-                monitors = self._parse_monitors_from_metrics(text)
-                logger.debug("Parsed %s monitors from metrics", len(monitors))
-                return monitors
-
-    async def get_all_monitors(self) -> list[dict]:
-        """Fetch all monitors from /metrics endpoint, returning [] if the request fails"""
         try:
-            return await self.fetch_monitors()
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{self.server_url}/metrics",
+                    headers={"Authorization": self.auth_header},
+                    timeout=aiohttp.ClientTimeout(total=10)
+                ) as response:
+                    if response.status != 200:
+                        logger.error("Failed to fetch metrics: HTTP %s", response.status)
+                        return None
+
+                    text = await response.text()
+                    monitors = self._parse_monitors_from_metrics(text)
+                    logger.debug("Parsed %s monitors from metrics", len(monitors))
+                    return monitors
         except Exception as e:
             logger.error("Failed to fetch monitors: %s", e)
-            return []
+            return None
 
     def _parse_monitors_from_metrics(self, metrics_text: str) -> list[dict]:
         """Parse monitor data from Prometheus metrics format"""
@@ -111,7 +108,7 @@ class UptimeKumaClient:
     async def get_monitor_status(self, monitor_id: int) -> int | None:
         """Get status of a specific monitor by ID"""
         # Since we use hashed IDs, we need to fetch all monitors and find the matching one
-        monitors = await self.get_all_monitors()
+        monitors = await self.get_all_monitors() or []
         for monitor in monitors:
             if monitor['id'] == monitor_id:
                 return monitor['status']

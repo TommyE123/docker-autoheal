@@ -54,6 +54,20 @@ class TestUptimeKumaConnection:
         assert result["success"] is True
         assert result["monitor_count"] == 2
 
+    async def test_failed_monitor_fetch_reports_zero_monitors(self, monkeypatch):
+        fake_client = FakeUptimeKumaClient(connect_result=True, get_all_monitors_fails=True)
+        monkeypatch.setattr(
+            "app.uptime_kuma.uptime_kuma_client.UptimeKumaClient",
+            lambda *a, **k: fake_client,
+        )
+
+        result = await api_test_uptime_kuma_connection(
+            {"server_url": "http://kuma.example", "api_token": "token"}
+        )
+
+        assert result["success"] is True
+        assert result["monitor_count"] == 0
+
     async def test_failed_connection_reports_failure_without_raising(self, monkeypatch):
         fake_client = FakeUptimeKumaClient(connect_result=False)
         monkeypatch.setattr(
@@ -165,6 +179,26 @@ class TestUptimeKumaIntegration:
         assert result["success"] is True
         assert result["auto_mappings"] == []
 
+    async def test_enable_with_failed_monitor_fetch_creates_no_auto_mappings(
+        self, wired_api, monkeypatch
+    ):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+        fake_client = FakeUptimeKumaClient(get_all_monitors_fails=True)
+        monkeypatch.setattr(
+            "app.uptime_kuma.uptime_kuma_client.UptimeKumaClient",
+            lambda *a, **k: fake_client,
+        )
+
+        result = await enable_uptime_kuma_integration(
+            {"server_url": "http://kuma.example", "api_token": "token"}
+        )
+
+        assert result["success"] is True
+        assert result["monitors"] == []
+        assert result["auto_mappings"] == []
+
     async def test_get_monitors_when_integration_disabled_returns_400(self):
         with pytest.raises(HTTPException) as exc_info:
             await get_uptime_kuma_monitors()
@@ -188,6 +222,20 @@ class TestUptimeKumaIntegration:
             await get_uptime_kuma_monitors()
 
         assert exc_info.value.status_code == 500
+
+    async def test_get_monitors_returns_empty_list_when_fetch_fails(self, monkeypatch):
+        config = config_manager.get_config()
+        config.uptime_kuma.enabled = True
+        config_manager.update_config(config)
+        fake_client = FakeUptimeKumaClient(get_all_monitors_fails=True)
+        monkeypatch.setattr(
+            "app.uptime_kuma.uptime_kuma_client.UptimeKumaClient",
+            lambda *a, **k: fake_client,
+        )
+
+        result = await get_uptime_kuma_monitors()
+
+        assert result == {"monitors": []}
 
     async def test_get_monitors_returns_fetched_monitors(self, monkeypatch):
         config = config_manager.get_config()

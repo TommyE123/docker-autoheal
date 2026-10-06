@@ -241,31 +241,28 @@ class FakeUptimeKumaClient:
         monitors: list | None = None,
         statuses: dict | None = None,
         get_all_monitors_error: Exception | None = None,
+        get_all_monitors_fails: bool = False,
     ) -> None:
         self.connect_result = connect_result
         self.monitors = monitors if monitors is not None else []
         # monitor_friendly_name -> status (or exception to raise)
         self.statuses = statuses if statuses is not None else {}
         self.status_calls: list[str] = []
-        # Support tests that expect get_all_monitors/fetch_monitors to report errors
-        # or call counts. The error models a failed request: fetch_monitors raises it.
+        # Support tests that expect get_all_monitors to report errors or call counts
         self.get_all_monitors_error = get_all_monitors_error
+        # Models a failed request: the real client returns None (not []) for it
+        self.get_all_monitors_fails = get_all_monitors_fails
         self.get_all_monitors_calls = 0
-        self.fetch_monitors_calls = 0
 
     async def connect(self) -> bool:
         return self.connect_result
-
-    async def fetch_monitors(self):
-        self.fetch_monitors_calls += 1
-        if self.get_all_monitors_error is not None:
-            raise self.get_all_monitors_error
-        return self.monitors
 
     async def get_all_monitors(self):
         self.get_all_monitors_calls += 1
         if self.get_all_monitors_error is not None:
             raise self.get_all_monitors_error
+        if self.get_all_monitors_fails:
+            return None
         return self.monitors
 
     async def get_monitor_status_by_name(self, name: str):
