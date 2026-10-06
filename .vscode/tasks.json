@@ -56,6 +56,18 @@
       "problemMatcher": []
     },
     {
+      "label": "Autoheal: Run Playwright E2E Tests (UI)",
+      "type": "shell",
+      "command": "set -eu; compose='docker compose -p docker-autoheal-dev -f docker-compose.yml -f docker-compose.dev.yml'; if [ -z \"$($compose ps -q autoheal)\" ]; then trap 'status=$?; [ \"$status\" -eq 0 ] || $compose logs --tail=50 autoheal; $compose down' EXIT; fi; $compose up --build -d --wait autoheal; port=$($compose port autoheal 3131); E2E_BASE_URL=\"http://host.docker.internal:${port##*:}\" npm --prefix frontend run test:e2e:ui",
+      "options": {
+        "shell": {
+          "executable": "bash",
+          "args": ["-c"]
+        }
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "Autoheal: Build Frontend",
       "type": "shell",
       "command": "npm run build",

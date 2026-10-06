@@ -163,7 +163,8 @@ excludes `e2e/`.
 
 In the Dev Container, run **Terminal → Run Task → Autoheal: Run Playwright E2E Tests**. It
 builds and starts the dev stack from `docker-compose.dev.yml` (so it never touches a real
-deployment on `3131`), then runs `npm run test:e2e` against it; see
+deployment on `3131`), then runs `npm run test:e2e` against it. **Run Playwright E2E Tests (UI)** runs
+`npm run test:e2e:ui` instead, to watch the run in Playwright's UI mode; see
 [Tasks](development-setup.md#tasks). To run it by hand against any running instance:
 
 ```bash

@@ -33,7 +33,7 @@
 
   "waitFor": "postCreateCommand",
 
-  "forwardPorts": [3000, 3131, 9090],
+  "forwardPorts": [3000, 3131, 9090, 9323],
 
   "portsAttributes": {
     "3000": {
@@ -44,6 +44,9 @@
     },
     "9090": {
       "label": "Metrics"
+    },
+    "9323": {
+      "label": "Playwright UI"
     }
   },
 
