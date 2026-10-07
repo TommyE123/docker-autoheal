@@ -285,6 +285,23 @@ class TestAutoHealServiceStartFailure:
             mock_notif.stop.assert_awaited_once()
 
     @pytest.mark.asyncio
+    async def test_failure_without_notification_manager_still_cleans_up(self):
+        with (
+            patch("app.main.config_manager") as mock_cm,
+            patch("app.main.DockerClientWrapper") as mock_docker_cls,
+            patch("app.main.MonitoringEngine", side_effect=RuntimeError("engine broke")),
+        ):
+            mock_cm.get_config.return_value = self._make_config()
+
+            service = AutoHealService()
+            service.notification_manager = None
+
+            with pytest.raises(RuntimeError, match="engine broke"):
+                await service.start()
+
+            mock_docker_cls.return_value.close.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_config_load_failure_reraises_before_any_component_created(self):
         with patch('app.main.config_manager') as mock_cm, \
              patch('app.main.DockerClientWrapper') as mock_docker_cls, \
