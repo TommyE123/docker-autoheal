@@ -233,8 +233,8 @@ remove that project's containers and networks. `-p` takes precedence over both.
 
 By default the startup log reports the published host port (`3132`) and the container port
 (`3131`), for example `Web UI published on host port 3132 (container port 3131)`, because the
-application cannot know which address other machines use to reach the host. Open that port on
-the host's address. To have the log print a full, clickable URL instead, set
+application cannot know which address other machines use to reach the Docker host. In the
+Dev Container, open `localhost:3132` (the forwarded port); elsewhere, use the Docker host's address. To have the log print a full, clickable URL instead, set
 `AUTOHEAL_DEV_HOST` to that address. The simplest way is a `.env` file next to
 `docker-compose.yml`, which Docker Compose reads automatically and Git ignores:
 

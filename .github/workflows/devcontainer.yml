@@ -41,6 +41,11 @@ jobs:
         with:
           persist-credentials: false
 
+      # A known container on the runner's own (host) Docker daemon. The Dev Container's
+      # isolated daemon must not be able to see it; see the isolation check below.
+      - name: Start host-daemon isolation sentinel
+        run: docker run -d --name docker-autoheal-host-isolation-fixture alpine:3.22 sleep 3600
+
       # Validates that the environment builds and its tooling runs, not that
       # the application works - tests.yml owns that.
       - name: Build and test Dev Container
@@ -105,6 +110,13 @@ jobs:
             # daemon, not the host's.
             echo "== Isolated Docker daemon =="
             pgrep -x dockerd
+            # The host daemon holds docker-autoheal-host-isolation-fixture; if this client
+            # can see it (or anything else), it is not talking to the isolated daemon.
+            if docker ps -a --format '{{.Names}}' | grep -qx docker-autoheal-host-isolation-fixture; then
+              echo "::error::Host daemon sentinel container is visible from inside the Dev Container"
+              docker ps -a
+              exit 1
+            fi
             if [ -n "$(docker ps -aq)" ]; then
               echo "::error::Containers from outside the Dev Container are visible to its Docker daemon"
               docker ps -a
@@ -124,3 +136,7 @@ jobs:
             echo "dev stack is healthy"
             bash .devcontainer/verify-isolation.sh
             $compose down --remove-orphans
+
+      - name: Remove host-daemon isolation sentinel
+        if: always()
+        run: docker rm -f docker-autoheal-host-isolation-fixture
