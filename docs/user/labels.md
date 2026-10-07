@@ -72,6 +72,20 @@ Use an explicit `monitoring.id` label when you want restart history and quaranti
 to survive container recreation outside of Compose, or when you're renaming a service and
 want to keep its history.
 
+### Scaled Compose services
+
+Replicas of a scaled Compose service (`docker compose up --scale web=3`) share one stable
+identifier, so selection, custom health checks and Uptime Kuma mappings apply to the
+whole service. Restart counts, cooldown, backoff and quarantine are tracked per replica,
+so one failing replica cannot use up its siblings' restart budget, keep them in
+quarantine, or be released from quarantine because a sibling is healthy. Replica 1 uses
+the stable identifier itself (`myapp_web`) and replica *N* uses it with the Compose
+container number appended (`myapp_web-2`, `myapp_web-3`). Compose keeps a replica's
+number when it recreates it, so its state survives recreation.
+
+An explicit `monitoring.id` label is never given a replica suffix: replicas that share
+one `monitoring.id` also share their restart count, cooldown, backoff and quarantine.
+
 ## See also
 
 - [Configuration](configuration.md)

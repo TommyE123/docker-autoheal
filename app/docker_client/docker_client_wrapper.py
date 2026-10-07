@@ -14,6 +14,34 @@ from docker.models.containers import Container
 logger = logging.getLogger(__name__)
 
 
+def recovery_identifier[S](stable_id: S, labels: dict) -> S | str:
+    """
+    Key for one running container's recovery state, derived from its stable ID.
+
+    Restart counts, cooldown, backoff and quarantine belong to a single container,
+    so replicas of a scaled Compose service must not share them. Replica 1, a
+    missing or invalid ``com.docker.compose.container-number`` and every
+    non-Compose container keep ``stable_id`` unchanged, so state persisted before
+    per-replica keys still applies. An explicit ``monitoring.id`` label is the
+    user's chosen identity and is never suffixed.
+
+    Args:
+        stable_id: The container's stable identifier
+        labels: Container labels
+
+    Returns:
+        ``stable_id`` for replica 1, or ``"{stable_id}-{N}"`` for Compose replica N > 1
+    """
+    if "monitoring.id" in labels:
+        return stable_id
+    if not (labels.get("com.docker.compose.project") and labels.get("com.docker.compose.service")):
+        return stable_id
+    number = labels.get("com.docker.compose.container-number")
+    if isinstance(number, str) and number.isdecimal() and int(number) > 1:
+        return f"{stable_id}-{int(number)}"
+    return stable_id
+
+
 class DockerClientWrapper:
     """Wrapper around Docker SDK client with retry logic"""
 
@@ -131,6 +159,8 @@ class DockerClientWrapper:
                 "full_id": container.id,
                 "name": container.name,
                 "stable_id": stable_id,  # NEW: Stable identifier for tracking
+                # Per-replica key for restart counts and quarantine
+                "recovery_id": recovery_identifier(stable_id, labels),
                 "image": image_name,
                 "image_id": image_id,  # NEW: For version tracking
                 "status": container.status,

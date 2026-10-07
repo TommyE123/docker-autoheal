@@ -149,7 +149,9 @@ would restart your container. Remove any mapping you didn't expect.
 automatically by the application (via the UI, labels, and the monitoring engine) — you
 normally don't need to edit them directly. Restart counts persist across container
 recreation using a *stable identifier* (see [Labels](labels.md#stable-container-identity)),
-not Docker's own container ID.
+not Docker's own container ID. Each replica of a scaled Compose service has its own
+restart count, keyed `project_service-N` for replica *N* > 1 (see
+[Labels](labels.md#scaled-compose-services)).
 
 ## See also
 

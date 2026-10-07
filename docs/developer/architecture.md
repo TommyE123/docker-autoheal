@@ -87,6 +87,15 @@ Docker's own `State.RestartCount`: the UI shows Auto-Heal's own tracked count
 (`config.containers.restart_counts`, keyed by stable ID), not Docker's native counter,
 which resets on recreation and includes restarts from Docker's own `restart:` policy.
 
+Recovery state (restart counts, cooldown, backoff and quarantine) is keyed by a
+per-replica *recovery identifier* rather than the stable identifier itself:
+`recovery_identifier()` in `app/docker_client/docker_client_wrapper.py`, used by
+`MonitoringEngine.get_recovery_identifier()` and exposed by the wrapper as
+`info["recovery_id"]` for the API. It appends `-N` for Compose replica *N* > 1 and is
+otherwise the stable identifier, so state persisted before per-replica keys still
+applies to replica 1. Configuration (selection, custom health checks, Uptime Kuma
+mappings) stays keyed by the per-service stable identifier.
+
 ## Notifications
 
 `NotificationManager` runs an async worker consuming a queue, so a slow or failing
