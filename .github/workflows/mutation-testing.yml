@@ -58,6 +58,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 2 # a pull request checkout is a merge commit; its first parent is the base
           persist-credentials: false
 
       # Same Python version the Dockerfile ships, as in tests.yml.
@@ -108,14 +109,21 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       # Detected score as in the summary above, and the score tracked on main (the
-      # committed badge file, which pull requests no longer change). The baseline is
-      # empty unless it is a plain "NN.N%".
+      # committed badge file). On a pull request it is read from the base commit, so
+      # the PR cannot change it. The baseline is empty unless it is a plain "NN.N%".
       - name: Compute score
         id: score
+        env:
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           jq -r '"total=\(.total)", "killed=\(.killed)", "timeout=\(.timeout)", "survived=\(.survived)", "no_tests=\(.no_tests)",
             "score=\(((.killed + .timeout) / .total * 1000 | round) / 10)"' mutants/mutmut-cicd-stats.json >> "$GITHUB_OUTPUT"
-          baseline=$(jq -r '.message // empty' .github/badges/mutation.json | grep -E '^[0-9]+(\.[0-9]+)?%$' | tr -d '%' || true)
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            badge=$(git show HEAD^1:.github/badges/mutation.json || true)
+          else
+            badge=$(cat .github/badges/mutation.json || true)
+          fi
+          baseline=$(jq -r '.message // empty' <<<"$badge" | grep -E '^[0-9]+(\.[0-9]+)?%$' | tr -d '%' || true)
           echo "baseline=$baseline" >> "$GITHUB_OUTPUT"
 
       - name: Upload mutation results
