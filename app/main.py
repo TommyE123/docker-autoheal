@@ -208,7 +208,7 @@ class AutoHealService:
         try:
             await self.notification_manager.stop()
         except Exception as e:
-            logger.warning("Error stopping notification manager: %s", e)
+            logger.warning("Error stopping notification manager: %s", e, exc_info=True)
 
         if self.docker_client:
             try:
