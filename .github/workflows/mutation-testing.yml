@@ -125,13 +125,13 @@ jobs:
             echo
             echo "Mutmut $(mutmut --version | awk '{print $NF}'), Python $(python -V | awk '{print $2}'), commit \`${GITHUB_SHA}\` (\`${GITHUB_REF}\`)"
             echo
-            jq -r '
+            jq -r --arg score "$(jq -r .message mutants/mutation-badge.json)" '
               "| Generated | Killed | Timeout | Survived | No tests | Detected |",
               "|---|---|---|---|---|---|",
-              "| \(.total) | \(.killed) | \(.timeout) | \(.survived) | \(.no_tests) | \(((.killed + .timeout) / .total * 1000 | round) / 10)% |"
+              "| \(.total) | \(.killed) | \(.timeout) | \(.survived) | \(.no_tests) | \($score) |"
             ' mutants/mutmut-cicd-stats.json
             echo
-            echo "Detected = (killed + timeout) / generated. It excludes FastAPI route handlers and every other decorated function, which Mutmut does not mutate."
+            echo "Detected is the score \`mutmut badge\` computes: (killed + timeout) / generated. It excludes FastAPI route handlers and every other decorated function, which Mutmut does not mutate."
             echo "Survivors are listed in \`mutation-results.txt\` in the \`mutation-results\` artifact."
           } >> "$GITHUB_STEP_SUMMARY"
 
