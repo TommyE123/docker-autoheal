@@ -182,9 +182,20 @@ class AutoHealService:
 
         except Exception as e:
             logger.exception("Failed to start service: %s", e)
-            if self.notification_manager:
-                await self.notification_manager.stop()
+            await self._cleanup_failed_start()
             raise
+
+    async def _cleanup_failed_start(self):
+        """
+        Release whatever start() created or started before the step that failed.
+
+        run() only reaches stop() after start() succeeds, so a failed start() must clean
+        up itself. stop() skips components that were never created and logs, rather than
+        raises, per-component errors, so the startup error is what propagates.
+        """
+        await self.stop()
+        if self.notification_manager:
+            await self.notification_manager.stop()
 
     async def stop(self):
         """Stop the auto-heal service"""
