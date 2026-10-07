@@ -64,10 +64,9 @@ function and the changed text, not by name.
 suite. It runs:
 
 - automatically on pull requests to `main`, and on pushes to `main`, that change
-  `app/**/*.py` (production code or tests, except `app/tests/integration/`, which Mutmut
-  does not run), `requirements*.txt`, `pyproject.toml`, `mutation.sh`, the `Dockerfile`
-  (which sets the Python version) or the workflow itself; documentation-only and other
-  unrelated changes do not run it;
+  `app/**/*.py` (production code or tests), `requirements*.txt`, `pyproject.toml`,
+  `mutation.sh`, the `Dockerfile` (which sets the Python version) or the workflow itself;
+  documentation-only and other unrelated changes do not run it;
 - manually, from the Actions tab (**Mutation Testing** -> **Run
   workflow**).
 
