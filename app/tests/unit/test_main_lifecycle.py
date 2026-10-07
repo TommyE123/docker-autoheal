@@ -62,7 +62,7 @@ class TestAutoHealServiceStop:
         assert service.running is False
 
     @pytest.mark.asyncio
-    async def test_stop_order_kuma_then_engine_then_docker(self):
+    async def test_stop_order_kuma_then_engine_then_notifications_then_docker(self):
         service = AutoHealService()
         order = []
 
@@ -70,12 +70,40 @@ class TestAutoHealServiceStop:
         service.uptime_kuma_monitor.stop = AsyncMock(side_effect=lambda: order.append("kuma"))
         service.monitoring_engine = MagicMock()
         service.monitoring_engine.stop = AsyncMock(side_effect=lambda: order.append("engine"))
+        service.notification_manager = MagicMock()
+        service.notification_manager.stop = AsyncMock(
+            side_effect=lambda: order.append("notifications")
+        )
         service.docker_client = MagicMock()
         service.docker_client.close = MagicMock(side_effect=lambda: order.append("docker"))
 
         await service.stop()
 
-        assert order == ["kuma", "engine", "docker"]
+        assert order == ["kuma", "engine", "notifications", "docker"]
+
+    @pytest.mark.asyncio
+    async def test_stop_stops_notification_manager(self):
+        service = AutoHealService()
+        service.notification_manager = MagicMock()
+        service.notification_manager.stop = AsyncMock()
+
+        await service.stop()
+
+        service.notification_manager.stop.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_stop_continues_after_notification_manager_stop_raises(self):
+        service = AutoHealService()
+        service.notification_manager = MagicMock()
+        service.notification_manager.stop = AsyncMock(
+            side_effect=RuntimeError("notif boom")
+        )
+        service.docker_client = MagicMock()
+
+        await service.stop()
+
+        service.docker_client.close.assert_called_once()
+        assert service.running is False
 
     @pytest.mark.asyncio
     async def test_stop_continues_after_kuma_stop_raises(self):
