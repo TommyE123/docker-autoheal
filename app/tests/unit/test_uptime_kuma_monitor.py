@@ -379,6 +379,34 @@ class TestUpdateStatusCache:
 
         assert monitor._container_status_cache == {"web": 0}
 
+    @pytest.mark.parametrize(
+        "mapped_names",
+        [("Database", "Web Monitor"), ("Web Monitor", "Database")],
+        ids=["ambiguous-first", "ambiguous-last"],
+    )
+    async def test_container_with_any_ambiguous_mapping_gets_no_status(self, mapped_names):
+        """A container's other, unique mapping must not restore a status that its
+        ambiguous mapping dropped, whatever order the mappings are stored in."""
+        for name in mapped_names:
+            _add_mapping("db", name)
+        _add_mapping("web", "Web Monitor")
+        monitor = UptimeKumaMonitor()
+        monitor._container_status_cache["db"] = 0
+        _install_client(
+            monitor,
+            FakeUptimeKumaClient(
+                monitors=[
+                    {"friendly_name": "Database", "status": 1},
+                    {"friendly_name": "Web Monitor", "status": 0},
+                    {"friendly_name": "Database", "status": 0},
+                ]
+            ),
+        )
+
+        await monitor._update_status_cache()
+
+        assert monitor._container_status_cache == {"web": 0}
+
     async def test_error_fetching_metrics_is_logged_and_leaves_cache_unchanged(
         self, caplog
     ):
@@ -527,6 +555,24 @@ class TestShouldRestartFromUptimeKuma:
         _install_client(monitor, FakeUptimeKumaClient(monitors=parsed))
 
         assert len(parsed) == 2
+        assert await monitor.should_restart_from_uptime_kuma("db") is False
+
+    async def test_false_when_another_mapping_of_the_container_is_ambiguous(self):
+        _enable_uptime_kuma(auto_restart_on_down=True)
+        _add_mapping("db", "Database")
+        _add_mapping("db", "Web Monitor")
+        monitor = UptimeKumaMonitor()
+        _install_client(
+            monitor,
+            FakeUptimeKumaClient(
+                monitors=[
+                    {"friendly_name": "Database", "status": 1},
+                    {"friendly_name": "Database", "status": 1},
+                    {"friendly_name": "Web Monitor", "status": 0},
+                ]
+            ),
+        )
+
         assert await monitor.should_restart_from_uptime_kuma("db") is False
 
     async def test_false_when_mapped_name_becomes_ambiguous_after_down(self):

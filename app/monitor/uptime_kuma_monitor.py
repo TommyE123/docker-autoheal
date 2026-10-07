@@ -147,6 +147,13 @@ class UptimeKumaMonitor:
         status_by_name = {m['friendly_name']: m['status'] for m in monitors}
         monitor_count_by_name = Counter(m["friendly_name"] for m in monitors)
         ambiguous_mappings: set[tuple[str, str]] = set()
+        # A container can have several mappings. If any of them is ambiguous, none
+        # of them may set its status, whatever order the mappings are stored in.
+        ambiguous_containers = {
+            mapping.container_id
+            for mapping in config.uptime_kuma_mappings
+            if monitor_count_by_name[mapping.monitor_friendly_name] > 1
+        }
 
         for mapping in config.uptime_kuma_mappings:
             mapping_key = (mapping.container_id, mapping.monitor_friendly_name)
@@ -166,6 +173,8 @@ class UptimeKumaMonitor:
                 # Drop any status cached while the name was unique, so it cannot
                 # keep driving a restart decision.
                 self._container_status_cache.pop(mapping.container_id, None)
+                continue
+            if mapping.container_id in ambiguous_containers:
                 continue
 
             status = status_by_name.get(mapping.monitor_friendly_name)
