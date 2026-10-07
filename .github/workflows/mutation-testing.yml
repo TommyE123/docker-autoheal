@@ -16,7 +16,7 @@ on:
       - "pyproject.toml"
       - "mutation.sh"
       - ".github/workflows/mutation-testing.yml"
-      - "Dockerfile" # selects the Python version the job runs on
+      - "!app/tests/integration/**" # not run by Mutmut, so it cannot change the score
   push:
     branches:
       - main
@@ -26,7 +26,7 @@ on:
       - "pyproject.toml"
       - "mutation.sh"
       - ".github/workflows/mutation-testing.yml"
-      - "Dockerfile" # selects the Python version the job runs on
+      - "!app/tests/integration/**" # not run by Mutmut, so it cannot change the score
   workflow_dispatch:
 
 permissions:
@@ -44,6 +44,15 @@ jobs:
     name: Mutmut
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # For the pull request comment job below.
+    outputs:
+      score: ${{ steps.score.outputs.score }}
+      baseline: ${{ steps.score.outputs.baseline }}
+      total: ${{ steps.score.outputs.total }}
+      killed: ${{ steps.score.outputs.killed }}
+      timeout: ${{ steps.score.outputs.timeout }}
+      survived: ${{ steps.score.outputs.survived }}
+      no_tests: ${{ steps.score.outputs.no_tests }}
 
     steps:
       - name: Checkout code
@@ -98,6 +107,17 @@ jobs:
             echo "Survivors are listed in \`mutation-results.txt\` in the \`mutation-results\` artifact."
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # Detected score as in the summary above, and the score tracked on main (the
+      # committed badge file, which pull requests no longer change). The baseline is
+      # empty unless it is a plain "NN.N%".
+      - name: Compute score
+        id: score
+        run: |
+          jq -r '"total=\(.total)", "killed=\(.killed)", "timeout=\(.timeout)", "survived=\(.survived)", "no_tests=\(.no_tests)",
+            "score=\(((.killed + .timeout) / .total * 1000 | round) / 10)"' mutants/mutmut-cicd-stats.json >> "$GITHUB_OUTPUT"
+          baseline=$(jq -r '.message // empty' .github/badges/mutation.json | grep -E '^[0-9]+(\.[0-9]+)?%$' | tr -d '%' || true)
+          echo "baseline=$baseline" >> "$GITHUB_OUTPUT"
+
       - name: Upload mutation results
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -108,3 +128,60 @@ jobs:
             !mutants/**/__pycache__/
             !mutants/data/
           if-no-files-found: warn
+
+  # One comment per pull request that is edited in place on every run, found by its
+  # hidden marker. A separate job so the job that runs the PR's code holds no write
+  # token. Fork pull requests are skipped: their token is read-only (the job summary
+  # still shows the score).
+  score-comment:
+    name: Mutation score comment
+    needs: mutation-testing
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      SCORE: ${{ needs.mutation-testing.outputs.score }}
+      BASELINE: ${{ needs.mutation-testing.outputs.baseline }}
+      TOTAL: ${{ needs.mutation-testing.outputs.total }}
+      KILLED: ${{ needs.mutation-testing.outputs.killed }}
+      TIMEOUT: ${{ needs.mutation-testing.outputs.timeout }}
+      SURVIVED: ${{ needs.mutation-testing.outputs.survived }}
+      NO_TESTS: ${{ needs.mutation-testing.outputs.no_tests }}
+
+    steps:
+      - name: Create or update the comment
+        run: |
+          marker="<!-- mutation-score-comment -->"
+          score=$(printf '%.1f' "$SCORE")
+          if [ -n "$BASELINE" ]; then
+            change=$(awk -v n="$score" -v o="$BASELINE" 'BEGIN { d = sprintf("%.1f", n - o); v = d + 0; if (v > 0) print "🔺 +" d; else if (v < 0) print "🔻 " d; else print "➖ no change" }')
+            base="$BASELINE%"
+          else
+            change="n/a"
+            base="n/a"
+          fi
+          {
+            echo "$marker"
+            echo "### 🧬 Mutation score"
+            echo
+            echo "| This PR | Main | Change |"
+            echo "|:-:|:-:|:-:|"
+            echo "| **$score%** | $base | $change |"
+            echo
+            echo "<sub>Killed $KILLED · Timeout $TIMEOUT · Survived $SURVIVED · No tests $NO_TESTS (of $TOTAL) · \`${HEAD_SHA:0:7}\` · [details]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID) · informational, never blocks a merge</sub>"
+          } > "$RUNNER_TEMP/comment.md"
+
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | contains(\"$marker\"))) | .id" | head -n1)
+          if [ -n "$id" ]; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@"$RUNNER_TEMP/comment.md" > /dev/null
+            echo "Updated comment $id."
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -F body=@"$RUNNER_TEMP/comment.md" > /dev/null
+            echo "Created comment."
+          fi

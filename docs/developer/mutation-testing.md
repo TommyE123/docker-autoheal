@@ -64,9 +64,10 @@ function and the changed text, not by name.
 suite. It runs:
 
 - automatically on pull requests to `main`, and on pushes to `main`, that change
-  `app/**/*.py` (production code or tests), `requirements*.txt`, `pyproject.toml`,
-  `mutation.sh`, the `Dockerfile` (which sets the Python version) or the workflow itself;
-  documentation-only and other unrelated changes do not run it;
+  `app/**/*.py` (production code or tests, except `app/tests/integration/`, which Mutmut
+  does not run), `requirements*.txt`, `pyproject.toml`, `mutation.sh` or the workflow
+  itself; documentation-only and other unrelated changes, including `Dockerfile`-only
+  changes, do not run it;
 - manually, from the Actions tab (**Mutation Testing** -> **Run
   workflow**).
 
@@ -139,6 +140,12 @@ filters, which do not include `.github/badges/mutation.json`. The updater workfl
 full mutation process itself against `main`, and its PR carries only the resulting JSON, so
 that PR does not trigger another full mutation run. That avoids running the 4-5 minute
 mutation job again for a badge-only change. Its other checks run as for any pull request.
+
+On a pull request from this repository, a short comment shows this PR's score next to the
+score tracked on `main`, with the change. It is one comment per PR, found by a hidden
+marker and edited in place on every run rather than added to. Only a separate job holds
+the write token for it; fork PRs get no comment (the job summary still has the numbers).
+It is informational and never blocks a merge.
 
 Find results on the workflow run page (for a pull request, the **Mutmut**
 check's details link):
