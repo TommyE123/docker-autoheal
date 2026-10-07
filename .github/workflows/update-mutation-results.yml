@@ -1,15 +1,13 @@
 name: Update Mutation Results
 
 # Refreshes the tracked .github/badges/mutation.json (the README mutation badge
-# data) from a full mutation run on main, and opens or updates a pull request when
-# the result meaningfully changed. Pull request mutation runs (mutation-testing.yml)
-# never touch that file.
+# data) from a full mutation run on main, through one auto-merging pull request.
+# Pull request mutation runs (mutation-testing.yml) never touch that file.
 #
 # Informational only: a lower score is flagged in the PR but never fails this
-# workflow. Triggered by workflow_dispatch only, run manually from the Actions tab
-# or by an external scheduler (cron-job.org) calling the workflow_dispatch API on
-# main. There is deliberately no GitHub schedule. The caller's token is not stored
-# in this repository.
+# workflow, blocks the merge or delays Release Please. workflow_dispatch only: run
+# it from the Actions tab or from an external scheduler (cron-job.org) calling the
+# API on main. There is deliberately no GitHub schedule.
 on:
   workflow_dispatch:
 
@@ -22,18 +20,14 @@ concurrency:
 
 env:
   BADGE_FILE: .github/badges/mutation.json
-  UPDATE_BRANCH: chore/update-mutation-results
 
 jobs:
-  mutation-testing:
-    name: Mutmut on main
+  update:
+    name: Update mutation results
     # Always main: a dispatch against any other ref does nothing.
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    # The exact main commit that was tested, so the result is attached to it.
-    outputs:
-      sha: ${{ steps.checkout-sha.outputs.sha }}
 
     steps:
       - name: Checkout main
@@ -42,19 +36,12 @@ jobs:
           ref: main
           persist-credentials: false
 
-      - name: Record the tested commit
-        id: checkout-sha
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
       # Same Python version the Dockerfile ships, as in mutation-testing.yml.
       - name: Determine Python version from Dockerfile
         id: python-version
         run: |
           VERSION=$(sed -n 's/^FROM python:\([0-9]\+\.[0-9]\+\)-slim.*/\1/p' Dockerfile | head -n1)
-          if [ -z "$VERSION" ]; then
-            echo "::error::Could not find a 'FROM python:X.Y-slim' line in Dockerfile" >&2
-            exit 1
-          fi
+          [ -n "$VERSION" ] || { echo "::error::No 'FROM python:X.Y-slim' line in Dockerfile" >&2; exit 1; }
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python ${{ steps.python-version.outputs.version }}
@@ -74,223 +61,70 @@ jobs:
           UPDATE_MUTATION_BADGE: "1"
         run: ./mutation.sh
 
-      - name: Upload badge data
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: mutation-badge
-          path: ${{ env.BADGE_FILE }}
-          if-no-files-found: error
-
-  # A separate job from the mutation run. It needs that job to succeed, so a failed
-  # run never updates anything. The job's GITHUB_TOKEN stays read-only: every write
-  # (push, PR, auto-merge, close) uses the existing BADGE_PUSH_TOKEN secret (a PAT
-  # with Contents and Pull requests: read and write), and only the steps that need
-  # it are given it. A push or PR made with GITHUB_TOKEN would not start the PR's
-  # other checks, which auto-merge waits for.
-  update-pr:
-    name: Open or update the update PR
-    needs: mutation-testing
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-
-    steps:
-      # The commit the mutation job tested, not whatever main is by now.
-      - name: Checkout the tested commit
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.mutation-testing.outputs.sha }}
-          persist-credentials: false
-
-      - name: Download badge data
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: mutation-badge
-          path: ${{ runner.temp }}/new-badge
-
-      # The file holds only schemaVersion, label, message (the score) and color,
-      # with no timestamps or run IDs, so an unchanged result is byte-identical up
-      # to formatting. Comparing normalised JSON ignores formatting too.
-      - name: Compare with the tracked file
-        id: compare
-        env:
-          NEW_FILE: ${{ runner.temp }}/new-badge/mutation.json
+      # Old score from the tracked file, new from the file just generated.
+      - name: Compare scores
+        id: score
         run: |
-          if [ "$(jq -cS . "$BADGE_FILE")" = "$(jq -cS . "$NEW_FILE")" ]; then
-            echo "The mutation results are unchanged; nothing to update."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "changed=true" >> "$GITHUB_OUTPUT"
-
-          # The score is only reported when both files hold a plain "NN.N%"
-          # message; otherwise it is left unknown rather than estimated.
-          score() { jq -r '.message // empty' "$1" | grep -E '^[0-9]+(\.[0-9]+)?%$' || true; }
-          old=$(score "$BADGE_FILE")
-          new=$(score "$NEW_FILE")
+          old=$(git show "HEAD:$BADGE_FILE" | jq -r '.message // empty')
+          new=$(jq -r '.message // empty' "$BADGE_FILE")
           title="chore: update mutation results"
-          dropped=false
-          if [ -n "$old" ] && [ -n "$new" ] && [ "$old" != "$new" ]; then
+          warning=""
+          if [[ $old =~ ^[0-9.]+%$ && $new =~ ^[0-9.]+%$ && $old != "$new" ]]; then
             title="$title ($old → $new)"
             if awk -v o="${old%\%}" -v n="${new%\%}" 'BEGIN { exit !(n < o) }'; then
-              dropped=true
+              warning="> ⚠️ Mutation score dropped from $old to $new."
             fi
           fi
-
           {
             echo "title=$title"
-            echo "old=$old"
-            echo "new=$new"
-            echo "dropped=$dropped"
+            echo "warning=$warning"
           } >> "$GITHUB_OUTPUT"
-          cp "$NEW_FILE" "$BADGE_FILE"
 
-      # The mutation run takes a while. If main has moved on, the result describes
-      # an older commit, so publish nothing and close nothing: leave it to the next
-      # run. This runs for changed and unchanged results alike.
+      # The run takes a while: if main moved on, the result is stale, so publish and
+      # close nothing and leave it to the next run.
       - name: Verify main has not moved
         id: fresh
-        env:
-          GH_TOKEN: ${{ secrets.BADGE_PUSH_TOKEN }}
-          TESTED_SHA: ${{ needs.mutation-testing.outputs.sha }}
         run: |
-          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
-          echo "::add-mask::$auth"
-          current=$(git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" ls-remote "https://github.com/$GITHUB_REPOSITORY" refs/heads/main | cut -f1)
-          if [ "$current" = "$TESTED_SHA" ]; then
+          current=$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)
+          if [ "$current" = "$(git rev-parse HEAD)" ]; then
             echo "current=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "current=false" >> "$GITHUB_OUTPUT"
-          echo "::warning title=Mutation results are stale::main moved from $TESTED_SHA to $current during the run; nothing was published or closed. Run the workflow again."
-          echo "main moved from \`$TESTED_SHA\` to \`$current\` during the run, so nothing was published or closed. Run this workflow again." >> "$GITHUB_STEP_SUMMARY"
-
-      # Both PR steps below act with a write-capable token, so they only ever touch
-      # the one PR this workflow owns: open, into main, head branch UPDATE_BRANCH in
-      # this same repository (a fork PR with the same branch name is ignored).
-      # Prints its number, nothing if there is none, and fails if there are several.
-      - name: Write the update PR lookup helper
-        run: |
-          cat > "$RUNNER_TEMP/find-updater-pr.sh" <<'EOF'
-          #!/usr/bin/env bash
-          set -euo pipefail
-          owner="${GITHUB_REPOSITORY%%/*}"
-          repo="${GITHUB_REPOSITORY#*/}"
-          owned=$(gh pr list --repo "$GITHUB_REPOSITORY" --base main --head "$UPDATE_BRANCH" --state open --limit 100 \
-            --json number,baseRefName,headRefName,isCrossRepository,headRepositoryOwner,headRepository |
-            jq -c --arg owner "$owner" --arg repo "$repo" --arg branch "$UPDATE_BRANCH" '
-              map(select(
-                .baseRefName == "main" and
-                .headRefName == $branch and
-                .isCrossRepository == false and
-                .headRepositoryOwner.login == $owner and
-                .headRepository.name == $repo
-              ))')
-          if [ "$(jq 'length' <<<"$owned")" -gt 1 ]; then
-            echo "::error::Found more than one open update pull request from $UPDATE_BRANCH; refusing to guess which to use." >&2
-            exit 1
-          fi
-          jq -r '.[0].number // empty' <<<"$owned"
-          EOF
-          chmod +x "$RUNNER_TEMP/find-updater-pr.sh"
-
-      # The result now matches the tracked file on a current main, so an update PR
-      # left open from an earlier run only carries an obsolete badge.
-      - name: Close an obsolete update pull request
-        if: ${{ steps.compare.outputs.changed == 'false' && steps.fresh.outputs.current == 'true' }}
-        env:
-          GH_TOKEN: ${{ secrets.BADGE_PUSH_TOKEN }}
-        run: |
-          number=$("$RUNNER_TEMP/find-updater-pr.sh")
-          if [ -z "$number" ]; then
-            echo "No open update pull request; nothing to close."
-            exit 0
-          fi
-          gh pr close "$number" --repo "$GITHUB_REPOSITORY" --delete-branch --comment "Superseded: the current mutation result matches the tracked badge on main, so this update is no longer needed."
-          echo "Closed obsolete pull request #$number."
-
-      - name: Commit and push the update branch
-        id: push
-        if: ${{ steps.compare.outputs.changed == 'true' && steps.fresh.outputs.current == 'true' }}
-        env:
-          GH_TOKEN: ${{ secrets.BADGE_PUSH_TOKEN }}
-          TITLE: ${{ steps.compare.outputs.title }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -B "$UPDATE_BRANCH"
-          git add -- "$BADGE_FILE"
-          git commit -m "$TITLE"
-          # The branch holds only this commit on top of main, so an existing
-          # update branch is simply replaced with the latest result.
-          # Credentials are not persisted by the checkout, so pass them per command.
-          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
-          echo "::add-mask::$auth"
-          url="https://github.com/$GITHUB_REPOSITORY"
-          header="http.https://github.com/.extraheader=AUTHORIZATION: basic $auth"
-          remote_sha=$(git -c "$header" ls-remote "$url" "refs/heads/$UPDATE_BRANCH" | cut -f1)
-          git -c "$header" push --force-with-lease="refs/heads/$UPDATE_BRANCH:$remote_sha" "$url" "HEAD:refs/heads/$UPDATE_BRANCH"
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
-      - name: Open or update the pull request
-        if: ${{ steps.compare.outputs.changed == 'true' && steps.fresh.outputs.current == 'true' }}
-        env:
-          GH_TOKEN: ${{ secrets.BADGE_PUSH_TOKEN }}
-          TITLE: ${{ steps.compare.outputs.title }}
-          PUSHED_SHA: ${{ steps.push.outputs.sha }}
-          OLD: ${{ steps.compare.outputs.old }}
-          NEW: ${{ steps.compare.outputs.new }}
-          DROPPED: ${{ steps.compare.outputs.dropped }}
-        run: |
-          {
-            if [ "$DROPPED" = "true" ]; then
-              echo "> [!WARNING]"
-              echo "> ⚠️ Mutation score dropped from $OLD to $NEW."
-              echo
-            fi
-            echo "## Summary"
-            echo
-            echo "Refreshes \`$BADGE_FILE\` from a full mutation run on \`main\`."
-            if [ -n "$OLD" ] && [ -n "$NEW" ]; then
-              echo
-              echo "Mutation score: $OLD → $NEW."
-            fi
-            echo
-            echo "A score change is informational. A drop is flagged above but does not fail the workflow, block this PR or delay Release Please."
-            echo "This PR is intentionally auto-merged once the required checks pass, to persist the result on \`main\`."
-            echo "Generated by the Update Mutation Results workflow (run ${GITHUB_RUN_ID})."
-          } > "$RUNNER_TEMP/pr-body.md"
-
-          number=$("$RUNNER_TEMP/find-updater-pr.sh")
-          if [ -n "$number" ]; then
-            gh pr edit "$number" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file "$RUNNER_TEMP/pr-body.md"
-            echo "Updated pull request #$number."
           else
-            gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$UPDATE_BRANCH" --title "$TITLE" --body-file "$RUNNER_TEMP/pr-body.md"
-            number=$("$RUNNER_TEMP/find-updater-pr.sh")
-            if [ -z "$number" ]; then
-              echo "::error::The update pull request was created but could not be found again; not enabling auto-merge." >&2
-              exit 1
-            fi
+            echo "::warning title=Mutation results are stale::main moved during the run; nothing was published or closed. Run the workflow again."
           fi
+        env:
+          GH_TOKEN: ${{ github.token }}
 
-          # Before auto-merge, check the PR is exactly what was just pushed: into
-          # main, head at the generated commit, containing only the badge file. The
-          # PR can take a few seconds to pick up a new head, so retry briefly.
-          verified=false
-          for _ in $(seq 1 10); do
-            pr=$(gh pr view "$number" --repo "$GITHUB_REPOSITORY" --json baseRefName,headRefOid,files)
-            if jq -e --arg sha "$PUSHED_SHA" --arg file "$BADGE_FILE" \
-              '.baseRefName == "main" and .headRefOid == $sha and ((.files | map(.path)) == [$file])' <<<"$pr" > /dev/null; then
-              verified=true
-              break
-            fi
-            sleep 3
-          done
-          if [ "$verified" != "true" ]; then
-            echo "::error::Pull request #$number is not at the pushed commit $PUSHED_SHA or does not contain only $BADGE_FILE; not enabling auto-merge." >&2
-            exit 1
-          fi
+      # Commits only the badge to chore/update-mutation-results and creates or
+      # updates the one PR. With no diff it creates nothing, and closes (and deletes
+      # the branch of) an update PR left open by an earlier run.
+      - name: Create or update the pull request
+        id: cpr
+        if: ${{ steps.fresh.outputs.current == 'true' }}
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1 # zizmor: ignore[superfluous-actions] - also commits, pushes and closes obsolete PRs.
+        with:
+          token: ${{ secrets.BADGE_PUSH_TOKEN }}
+          base: main
+          branch: chore/update-mutation-results
+          delete-branch: true
+          add-paths: .github/badges/mutation.json
+          commit-message: ${{ steps.score.outputs.title }}
+          title: ${{ steps.score.outputs.title }}
+          body: |
+            ${{ steps.score.outputs.warning }}
 
-          gh pr merge "$number" --auto --squash --match-head-commit "$PUSHED_SHA"
+            Refreshes `.github/badges/mutation.json` from a full mutation run on `main`.
+            A score change is informational: a drop does not fail the workflow, block this
+            PR or delay Release Please. This PR is intentionally auto-merged once the
+            required checks pass.
+
+      # Bound to the exact commit the action pushed: if the head changes, it fails.
+      - name: Enable auto-merge
+        if: ${{ contains(fromJSON('["created","updated"]'), steps.cpr.outputs.pull-request-operation) }}
+        env:
+          GH_TOKEN: ${{ secrets.BADGE_PUSH_TOKEN }}
+          PR: ${{ steps.cpr.outputs.pull-request-number }}
+          SHA: ${{ steps.cpr.outputs.pull-request-head-sha }}
+        run: |
+          files=$(gh pr view "$PR" --json files --jq '[.files[].path] | join(",")')
+          [ "$files" = "$BADGE_FILE" ] || { echo "::error::PR #$PR changes more than $BADGE_FILE ($files); not enabling auto-merge." >&2; exit 1; }
+          gh pr merge "$PR" --auto --squash --match-head-commit "$SHA"

@@ -65,9 +65,9 @@ suite. It runs:
 
 - automatically on pull requests to `main`, and on pushes to `main`, that change
   `app/**/*.py` (production code or tests, except `app/tests/integration/`, which Mutmut
-  does not run), `requirements*.txt`, `pyproject.toml`, `mutation.sh` or the workflow
-  itself; documentation-only and other unrelated changes, including `Dockerfile`-only
-  changes, do not run it;
+  does not run), `requirements*.txt`, `pyproject.toml`, `mutation.sh`, the `Dockerfile`
+  (which sets the Python version) or the workflow itself; documentation-only and other
+  unrelated changes do not run it;
 - manually, from the Actions tab (**Mutation Testing** -> **Run
   workflow**).
 
@@ -100,28 +100,27 @@ refreshes it:
   API. The caller's token is configured outside the repository. It always checks out and
   tests `main`; a dispatch against any other ref does nothing.
 - It runs the same full `./mutation.sh` with `UPDATE_MUTATION_BADGE=1`, then compares the
-  new file with the one on `main`. The file holds only the score and its colour (no
-  timestamps or run IDs), so an unchanged result is identical and nothing is committed or
-  opened.
-  The result is tied to the exact `main` commit that was tested; if `main` has moved by
-  the time the run finishes, nothing is published or closed and the workflow must be run
-  again.
-- If the result is unchanged and `main` is still current, it closes any update PR left
-  open from an earlier run (deleting its branch) with a comment saying it was superseded.
-- On a change it force-pushes a single commit to `chore/update-mutation-results` and opens
-  a pull request to `main`, or updates the one already open. The PR contains only
-  `.github/badges/mutation.json`. The title is
-  `chore: update mutation results (65.8% → 66.7%)`; when the score is unchanged or cannot
-  be read from either file it is `chore: update mutation results`. If the score dropped,
-  the PR body starts with a warning. A drop never fails the workflow.
-- It only touches its own PR: open, into `main`, with `chore/update-mutation-results` as
-  its head branch in this repository (a fork PR using the same branch name is ignored,
-  and more than one match fails the run). Before enabling auto-merge it checks that the PR
-  head is the commit it just pushed and that the PR changes only the badge file.
-- Its `GITHUB_TOKEN` is read-only. Every write uses the `BADGE_PUSH_TOKEN` repository
-  secret, a fine-grained personal access token with **Contents** and **Pull requests**:
-  read and write, which only the steps that push, open, close or merge are given. A push
-  or PR made with `GITHUB_TOKEN` would not start the PR's other checks.
+  new score with the one tracked on `main`. The result is tied to the exact `main` commit
+  that was tested; if `main` has moved by the time the run finishes, nothing is published
+  or closed and the workflow must be run again.
+- It then hands the tracked file to
+  [`peter-evans/create-pull-request`](https://github.com/peter-evans/create-pull-request)
+  (pinned by commit SHA), which owns the branch and PR lifecycle:
+  - On a change it commits only `.github/badges/mutation.json` to
+    `chore/update-mutation-results` and opens a pull request to `main`, or updates the one
+    already open. The title is `chore: update mutation results (65.8% → 66.7%)`; when the
+    score is unchanged or cannot be read from either file it is
+    `chore: update mutation results`. If the score dropped, the PR body starts with a
+    warning. A drop never fails the workflow.
+  - With no change it creates nothing, and closes (and deletes the branch of) an update PR
+    left open by an earlier run, because the result has caught up.
+- Before enabling auto-merge it checks that the PR changes only the badge file, and the
+  merge request is bound to the exact commit the action pushed, so it fails if the head
+  changes in between.
+- Its `GITHUB_TOKEN` is read-only. Writes use the `BADGE_PUSH_TOKEN` repository secret, a
+  fine-grained personal access token with **Contents** and **Pull requests**: read and
+  write, which only the pull request and auto-merge steps are given. A push or PR made
+  with `GITHUB_TOKEN` would not start the PR's other checks.
 
 ### Why the updater PR auto-merges
 

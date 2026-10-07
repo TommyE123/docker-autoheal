@@ -16,6 +16,7 @@ on:
       - "pyproject.toml"
       - "mutation.sh"
       - ".github/workflows/mutation-testing.yml"
+      - "Dockerfile" # selects the Python version the job runs on
       - "!app/tests/integration/**" # not run by Mutmut, so it cannot change the score
   push:
     branches:
@@ -26,6 +27,7 @@ on:
       - "pyproject.toml"
       - "mutation.sh"
       - ".github/workflows/mutation-testing.yml"
+      - "Dockerfile" # selects the Python version the job runs on
       - "!app/tests/integration/**" # not run by Mutmut, so it cannot change the score
   workflow_dispatch:
 
