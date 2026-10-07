@@ -205,11 +205,10 @@ class AutoHealService:
             except Exception as e:
                 logger.warning("Error stopping monitoring engine: %s", e)
 
-        if self.notification_manager:
-            try:
-                await self.notification_manager.stop()
-            except Exception as e:
-                logger.warning("Error stopping notification manager: %s", e)
+        try:
+            await self.notification_manager.stop()
+        except Exception as e:
+            logger.warning("Error stopping notification manager: %s", e)
 
         if self.docker_client:
             try:
