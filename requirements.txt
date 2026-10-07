@@ -1,6 +1,6 @@
 aiohttp==3.14.3
 docker==7.2.0
-fastapi==0.142.1
+fastapi==0.142.2
 prometheus-client==0.26.0
 pydantic==2.13.5
 pydantic-settings==2.15.0
