@@ -73,7 +73,7 @@ def get_default_config() -> dict[str, Any]:
         "notifications": {
             "enabled": False,
             "services": [],
-            "event_filters": ["restart", "quarantine", "health_check_failed", "auto_unquarantine"]
+            "event_filters": ["restart", "quarantine", "auto_unquarantine", "auto_monitor"]
         },
         "custom_health_checks": {}
     }
