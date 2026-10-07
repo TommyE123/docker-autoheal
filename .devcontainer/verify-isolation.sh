@@ -15,16 +15,25 @@ timeout_seconds=150
 cleanup() {
   docker rm -f "${web}" "${victim}" >/dev/null 2>&1 || true
 }
-trap cleanup EXIT
-cleanup
 
+# Check which daemon the client talks to before mutating anything. A dockerd process alone
+# does not prove it: the daemon's reported name is its own host's name, which is this
+# container's hostname only when the client is bound to the local (inner) daemon.
 echo "== Inner daemon =="
 pgrep -x dockerd >/dev/null || {
   echo "::error::No dockerd process in this container; Docker is not the isolated daemon" >&2
   exit 1
 }
-echo "Containers on this daemon:"
+daemon_name="$(docker info --format '{{.Name}}')"
+if [ "${daemon_name}" != "$(hostname)" ]; then
+  echo "::error::Docker daemon '${daemon_name}' is not this container's own daemon ('$(hostname)')" >&2
+  exit 1
+fi
+echo "Daemon ${daemon_name} is local. Containers on it:"
 docker ps -a --format '  {{.Names}}'
+
+trap cleanup EXIT
+cleanup
 
 echo "== ${web}: create, stop, restart, remove =="
 docker run -d --name "${web}" nginx:alpine >/dev/null
