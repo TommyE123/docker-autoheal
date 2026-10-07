@@ -140,7 +140,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      pull-requests: write
+      pull-requests: write # create or edit the one score comment on the PR
     env:
       GH_TOKEN: ${{ github.token }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -173,7 +173,8 @@ jobs:
             echo "|:-:|:-:|:-:|"
             echo "| **$score%** | $base | $change |"
             echo
-            echo "<sub>Killed $KILLED · Timeout $TIMEOUT · Survived $SURVIVED · No tests $NO_TESTS (of $TOTAL) · \`${HEAD_SHA:0:7}\` · [details]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID) · informational, never blocks a merge</sub>"
+            echo -n "<sub>Killed $KILLED · Timeout $TIMEOUT · Survived $SURVIVED · No tests $NO_TESTS (of $TOTAL) · "
+            echo "\`${HEAD_SHA:0:7}\` · [details]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID) · informational, never blocks a merge</sub>"
           } > "$RUNNER_TEMP/comment.md"
 
           id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate \
