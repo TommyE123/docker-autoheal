@@ -293,4 +293,4 @@ jobs:
             exit 1
           fi
 
-          gh pr merge "$number" --auto --squash
+          gh pr merge "$number" --auto --squash --match-head-commit "$PUSHED_SHA"
