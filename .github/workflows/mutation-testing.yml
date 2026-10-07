@@ -108,16 +108,25 @@ jobs:
             echo "Survivors are listed in \`mutation-results.txt\` in the \`mutation-results\` artifact."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # Detected score as in the summary above, and the score tracked on main (the
-      # committed badge file). On a pull request it is read from the base commit, so
-      # the PR cannot change it. The baseline is empty unless it is a plain "NN.N%".
+      # The score is formatted by `mutmut badge` (from the stats exported above, no
+      # second mutation run), the same way as the score tracked on main, so the two
+      # are comparable. That tracked score is the committed badge file; on a pull
+      # request it is read from the base commit, so the PR cannot change it. The
+      # baseline is empty unless it is a plain "NN.N%"; if `mutmut badge` fails, the
+      # score falls back to the summary's calculation.
       - name: Compute score
         id: score
         env:
           EVENT_NAME: ${{ github.event_name }}
         run: |
-          jq -r '"total=\(.total)", "killed=\(.killed)", "timeout=\(.timeout)", "survived=\(.survived)", "no_tests=\(.no_tests)",
-            "score=\(((.killed + .timeout) / .total * 1000 | round) / 10)"' mutants/mutmut-cicd-stats.json >> "$GITHUB_OUTPUT"
+          jq -r '"total=\(.total)", "killed=\(.killed)", "timeout=\(.timeout)", "survived=\(.survived)", "no_tests=\(.no_tests)"' \
+            mutants/mutmut-cicd-stats.json >> "$GITHUB_OUTPUT"
+          score=$(jq -r '((.killed + .timeout) / .total * 1000 | round) / 10' mutants/mutmut-cicd-stats.json)
+          if mutmut badge --label Mutation --output "$RUNNER_TEMP/badge.json"; then
+            badge_score=$(jq -r '.message // empty' "$RUNNER_TEMP/badge.json" | grep -E '^[0-9]+(\.[0-9]+)?%$' | tr -d '%' || true)
+            score="${badge_score:-$score}"
+          fi
+          echo "score=$score" >> "$GITHUB_OUTPUT"
           if [ "$EVENT_NAME" = "pull_request" ]; then
             badge=$(git show HEAD^1:.github/badges/mutation.json || true)
           else
