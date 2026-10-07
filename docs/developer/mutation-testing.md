@@ -84,8 +84,8 @@ The workflow:
 
 The README badge shows the mutation score stored in `.github/badges/mutation.json`, a
 small Shields endpoint file on `main`. `mutmut badge` generates it from the exported
-stats; nothing calculates the score by hand. The score equals the **Detected** figure in
-the job summary, since no mutants are skipped. It is informational only: the run succeeds
+stats; nothing calculates the score by hand. The job summary's **Detected** figure and
+the pull request comment use that same score. It is informational only: the run succeeds
 whatever the score, so no threshold is implied, and it is not a gate.
 
 The file is **not** updated by pull requests. A full `./mutation.sh` run leaves it alone

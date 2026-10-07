@@ -94,28 +94,31 @@ jobs:
       - name: Export results and summary
         run: |
           mutmut export-cicd-stats
+          # The score as `mutmut badge` computes it for the README badge: the single
+          # source for the summary below and the pull request comment.
+          mutmut badge --label Mutation --output "$RUNNER_TEMP/badge.json"
+          score=$(jq -r .message "$RUNNER_TEMP/badge.json")
           mutmut results > mutants/mutation-results.txt
           {
             echo "## Mutation testing"
             echo
             echo "Mutmut $(mutmut --version | awk '{print $NF}'), Python $(python -V | awk '{print $2}'), commit \`${GITHUB_SHA}\` (\`${GITHUB_REF}\`)"
             echo
-            jq -r '
+            jq -r --arg score "$score" '
               "| Generated | Killed | Timeout | Survived | No tests | Detected |",
               "|---|---|---|---|---|---|",
-              "| \(.total) | \(.killed) | \(.timeout) | \(.survived) | \(.no_tests) | \(((.killed + .timeout) / .total * 1000 | round) / 10)% |"
+              "| \(.total) | \(.killed) | \(.timeout) | \(.survived) | \(.no_tests) | \($score) |"
             ' mutants/mutmut-cicd-stats.json
             echo
-            echo "Detected = (killed + timeout) / generated. It excludes FastAPI route handlers and every other decorated function, which Mutmut does not mutate."
+            echo "Detected is the score \`mutmut badge\` computes: (killed + timeout) / generated. It excludes FastAPI route handlers and every other decorated function, which Mutmut does not mutate."
             echo "Survivors are listed in \`mutation-results.txt\` in the \`mutation-results\` artifact."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # The score is formatted by `mutmut badge` (from the stats exported above, no
-      # second mutation run), the same way as the score tracked on main, so the two
-      # are comparable. That tracked score is the committed badge file; on a pull
-      # request it is read from the base commit, so the PR cannot change it. The
-      # baseline is empty unless it is a plain "NN.N%"; if `mutmut badge` fails, the
-      # score falls back to the summary's calculation.
+      # The score is the one `mutmut badge` wrote above (no second mutation run), the
+      # same way as the score tracked on main, so the two are comparable. That tracked
+      # score is the committed badge file; on a pull request it is read from the base
+      # commit, so the PR cannot change it. The baseline is empty unless it is a plain
+      # "NN.N%".
       - name: Compute score
         id: score
         env:
@@ -123,11 +126,8 @@ jobs:
         run: |
           jq -r '"total=\(.total)", "killed=\(.killed)", "timeout=\(.timeout)", "survived=\(.survived)", "no_tests=\(.no_tests)"' \
             mutants/mutmut-cicd-stats.json >> "$GITHUB_OUTPUT"
-          score=$(jq -r '((.killed + .timeout) / .total * 1000 | round) / 10' mutants/mutmut-cicd-stats.json)
-          if mutmut badge --label Mutation --output "$RUNNER_TEMP/badge.json"; then
-            badge_score=$(jq -r '.message // empty' "$RUNNER_TEMP/badge.json" | grep -E '^[0-9]+(\.[0-9]+)?%$' | tr -d '%' || true)
-            score="${badge_score:-$score}"
-          fi
+          score=$(jq -r '.message // empty' "$RUNNER_TEMP/badge.json" | grep -E '^[0-9]+(\.[0-9]+)?%$' | tr -d '%') ||
+            { echo "::error::Unexpected \`mutmut badge\` message in $RUNNER_TEMP/badge.json" >&2; exit 1; }
           echo "score=$score" >> "$GITHUB_OUTPUT"
           if [ "$EVENT_NAME" = "pull_request" ]; then
             badge=$(git show HEAD^1:.github/badges/mutation.json || true)
