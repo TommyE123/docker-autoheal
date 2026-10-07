@@ -92,7 +92,7 @@ class TestAutoHealServiceStop:
         service.notification_manager.stop.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_stop_continues_after_notification_manager_stop_raises(self):
+    async def test_stop_continues_after_notification_manager_stop_raises(self, caplog):
         service = AutoHealService()
         service.notification_manager = MagicMock()
         service.notification_manager.stop = AsyncMock(
@@ -100,10 +100,15 @@ class TestAutoHealServiceStop:
         )
         service.docker_client = MagicMock()
 
-        await service.stop()
+        with caplog.at_level("WARNING", logger="app.main"):
+            await service.stop()
 
         service.docker_client.close.assert_called_once()
         assert service.running is False
+        [record] = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert record.getMessage() == "Error stopping notification manager: notif boom"
+        assert record.exc_info is not None
+        assert isinstance(record.exc_info[1], RuntimeError)
 
     @pytest.mark.asyncio
     async def test_stop_continues_after_kuma_stop_raises(self):
