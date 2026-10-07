@@ -30,7 +30,7 @@ def recovery_identifier[S](stable_id: S, labels: dict) -> S | str:
         labels: Container labels
 
     Returns:
-        ``stable_id`` for replica 1, or ``"{stable_id}-{N}"`` for Compose replica N > 1
+        ``stable_id`` for replica 1, or ``"{stable_id}#{N}"`` for Compose replica N > 1
     """
     if "monitoring.id" in labels:
         return stable_id
@@ -38,7 +38,7 @@ def recovery_identifier[S](stable_id: S, labels: dict) -> S | str:
         return stable_id
     number = labels.get("com.docker.compose.container-number")
     if isinstance(number, str) and number.isdecimal() and int(number) > 1:
-        return f"{stable_id}-{int(number)}"
+        return f"{stable_id}#{int(number)}"
     return stable_id
 
 

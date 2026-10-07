@@ -91,7 +91,7 @@ Recovery state (restart counts, cooldown, backoff and quarantine) is keyed by a
 per-replica *recovery identifier* rather than the stable identifier itself:
 `recovery_identifier()` in `app/docker_client/docker_client_wrapper.py`, used by
 `MonitoringEngine.get_recovery_identifier()` and exposed by the wrapper as
-`info["recovery_id"]` for the API. It appends `-N` for Compose replica *N* > 1 and is
+`info["recovery_id"]` for the API. It appends `#N` for Compose replica *N* > 1 (`#` cannot occur in a Compose project or service name, so the key cannot collide with another service's stable identifier) and is
 otherwise the stable identifier, so state persisted before per-replica keys still
 applies to replica 1. Configuration (selection, custom health checks, Uptime Kuma
 mappings) stays keyed by the per-service stable identifier.
