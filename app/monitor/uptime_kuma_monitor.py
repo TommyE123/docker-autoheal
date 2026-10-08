@@ -10,6 +10,7 @@ Core functionality (restarts, quarantine, events, etc.) is delegated to Monitori
 """
 import asyncio
 import logging
+from collections import Counter
 
 from app.config.config_manager import config_manager
 from app.uptime_kuma.uptime_kuma_client import UptimeKumaClient
@@ -31,6 +32,8 @@ class UptimeKumaMonitor:
         self._task: asyncio.Task | None = None
         self._monitor_cache: dict[str, dict] = {}  # Cache monitor IDs by friendly name
         self._container_status_cache: dict[str, int] = {}  # Cache of stable_id -> status
+        # (stable_id, monitor name) mappings already warned about as ambiguous
+        self._ambiguous_mappings: set[tuple[str, str]] = set()
 
     async def start(self):
         """Start Uptime-Kuma monitoring"""
@@ -137,9 +140,44 @@ class UptimeKumaMonitor:
             logger.error("Error fetching Uptime-Kuma monitor statuses: %s", e)
             return
 
+        # Uptime-Kuma allows several monitors to share a friendly name, and mappings
+        # identify a monitor only by that name. A name reported more than once is
+        # ambiguous: picking either monitor's status could restart a container based
+        # on a monitor that is not its own, so such a name yields no status at all.
         status_by_name = {m['friendly_name']: m['status'] for m in monitors}
+        monitor_count_by_name = Counter(m["friendly_name"] for m in monitors)
+        ambiguous_mappings: set[tuple[str, str]] = set()
+        # A container can have several mappings. If any of them is ambiguous, none
+        # of them may set its status, whatever order the mappings are stored in.
+        ambiguous_containers = {
+            mapping.container_id
+            for mapping in config.uptime_kuma_mappings
+            if monitor_count_by_name[mapping.monitor_friendly_name] > 1
+        }
 
         for mapping in config.uptime_kuma_mappings:
+            mapping_key = (mapping.container_id, mapping.monitor_friendly_name)
+            monitor_count = monitor_count_by_name[mapping.monitor_friendly_name]
+            if monitor_count > 1:
+                ambiguous_mappings.add(mapping_key)
+                # The status is refreshed once per mapped container check, so warn
+                # once per mapping until the name is unique again, not on every refresh.
+                if mapping_key not in self._ambiguous_mappings:
+                    logger.warning(
+                        "Uptime-Kuma monitor name '%s' mapped to %s matches %d monitors - "
+                        "ignoring its status because the name is ambiguous, so it will not "
+                        "trigger an automatic restart",
+                        mapping.monitor_friendly_name,
+                        mapping.container_id,
+                        monitor_count,
+                    )
+                # Drop any status cached while the name was unique, so it cannot
+                # keep driving a restart decision.
+                self._container_status_cache.pop(mapping.container_id, None)
+                continue
+            if mapping.container_id in ambiguous_containers:
+                continue
+
             status = status_by_name.get(mapping.monitor_friendly_name)
 
             if status is None:
@@ -159,6 +197,8 @@ class UptimeKumaMonitor:
                 status,
                 mapping.monitor_friendly_name,
             )
+
+        self._ambiguous_mappings = ambiguous_mappings
 
     def get_container_status(self, stable_id: str) -> int | None:
         return self._container_status_cache.get(stable_id)

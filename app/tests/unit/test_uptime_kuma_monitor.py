@@ -57,6 +57,7 @@ class TestInit:
         assert monitor._task is None
         assert monitor._monitor_cache == {}
         assert monitor._container_status_cache == {}
+        assert monitor._ambiguous_mappings == set()
 
 
 @pytest.mark.asyncio
@@ -251,6 +252,162 @@ class TestUpdateStatusCache:
 
         assert monitor._container_status_cache == {}
 
+    @pytest.mark.parametrize(
+        "statuses",
+        [(1, 0), (0, 1)],
+        ids=["up-then-down", "down-then-up"],
+    )
+    async def test_duplicate_friendly_name_is_ambiguous_and_not_cached(self, statuses, caplog):
+        """Two monitors sharing the mapped name must not resolve to either one."""
+        _add_mapping("db", "Database")
+        monitor = UptimeKumaMonitor()
+        _install_client(
+            monitor,
+            FakeUptimeKumaClient(
+                monitors=[
+                    {"friendly_name": "Database", "status": statuses[0]},
+                    {"friendly_name": "Database", "status": statuses[1]},
+                ]
+            ),
+        )
+
+        with caplog.at_level(logging.WARNING):
+            await monitor._update_status_cache()
+
+        assert monitor._container_status_cache == {}
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) == 1
+        assert warnings[0].getMessage() == (
+            "Uptime-Kuma monitor name 'Database' mapped to db matches 2 monitors - "
+            "ignoring its status because the name is ambiguous, so it will not "
+            "trigger an automatic restart"
+        )
+
+    async def test_ambiguous_name_warns_once_until_it_is_unique_again(self, caplog):
+        _add_mapping("db", "Database")
+        monitor = UptimeKumaMonitor()
+        duplicates = [
+            {"friendly_name": "Database", "status": 0},
+            {"friendly_name": "Database", "status": 1},
+        ]
+        fake_client = FakeUptimeKumaClient(monitors=duplicates)
+        _install_client(monitor, fake_client)
+
+        def ambiguity_warnings() -> int:
+            return sum(
+                r.levelno == logging.WARNING and "ambiguous" in r.getMessage()
+                for r in caplog.records
+            )
+
+        with caplog.at_level(logging.WARNING):
+            await monitor._update_status_cache()
+            await monitor._update_status_cache()
+            assert ambiguity_warnings() == 1
+
+            fake_client.monitors = [{"friendly_name": "Database", "status": 0}]
+            await monitor._update_status_cache()
+            assert monitor._container_status_cache == {"db": 0}
+
+            fake_client.monitors = duplicates
+            await monitor._update_status_cache()
+            assert ambiguity_warnings() == 2
+            assert monitor._container_status_cache == {}
+
+    async def test_each_newly_ambiguous_mapping_is_warned_about(self, caplog):
+        _add_mapping("db", "Database")
+        _add_mapping("web", "Web Monitor")
+        monitor = UptimeKumaMonitor()
+        fake_client = FakeUptimeKumaClient(
+            monitors=[
+                {"friendly_name": "Database", "status": 1},
+                {"friendly_name": "Database", "status": 1},
+                {"friendly_name": "Web Monitor", "status": 1},
+            ]
+        )
+        _install_client(monitor, fake_client)
+
+        with caplog.at_level(logging.WARNING):
+            await monitor._update_status_cache()
+            fake_client.monitors = [
+                *fake_client.monitors,
+                {"friendly_name": "Web Monitor", "status": 0},
+            ]
+            await monitor._update_status_cache()
+
+        warned = sorted(
+            r.getMessage().split(" mapped to ")[1].split(" ")[0]
+            for r in caplog.records
+            if r.levelno == logging.WARNING
+        )
+        assert warned == ["db", "web"]
+        assert monitor._container_status_cache == {}
+
+    async def test_duplicate_friendly_name_clears_previously_cached_status(self):
+        """A status cached before the name became ambiguous must not survive."""
+        _add_mapping("db", "Database")
+        monitor = UptimeKumaMonitor()
+        monitor._container_status_cache["db"] = 0
+        _install_client(
+            monitor,
+            FakeUptimeKumaClient(
+                monitors=[
+                    {"friendly_name": "Database", "status": 1},
+                    {"friendly_name": "Database", "status": 1},
+                ]
+            ),
+        )
+
+        await monitor._update_status_cache()
+
+        assert monitor._container_status_cache == {}
+
+    async def test_duplicate_name_does_not_affect_other_mappings(self):
+        _add_mapping("db", "Database")
+        _add_mapping("web", "Web Monitor")
+        monitor = UptimeKumaMonitor()
+        _install_client(
+            monitor,
+            FakeUptimeKumaClient(
+                monitors=[
+                    {"friendly_name": "Database", "status": 0},
+                    {"friendly_name": "Web Monitor", "status": 0},
+                    {"friendly_name": "Database", "status": 1},
+                ]
+            ),
+        )
+
+        await monitor._update_status_cache()
+
+        assert monitor._container_status_cache == {"web": 0}
+
+    @pytest.mark.parametrize(
+        "mapped_names",
+        [("Database", "Web Monitor"), ("Web Monitor", "Database")],
+        ids=["ambiguous-first", "ambiguous-last"],
+    )
+    async def test_container_with_any_ambiguous_mapping_gets_no_status(self, mapped_names):
+        """A container's other, unique mapping must not restore a status that its
+        ambiguous mapping dropped, whatever order the mappings are stored in."""
+        for name in mapped_names:
+            _add_mapping("db", name)
+        _add_mapping("web", "Web Monitor")
+        monitor = UptimeKumaMonitor()
+        monitor._container_status_cache["db"] = 0
+        _install_client(
+            monitor,
+            FakeUptimeKumaClient(
+                monitors=[
+                    {"friendly_name": "Database", "status": 1},
+                    {"friendly_name": "Web Monitor", "status": 0},
+                    {"friendly_name": "Database", "status": 0},
+                ]
+            ),
+        )
+
+        await monitor._update_status_cache()
+
+        assert monitor._container_status_cache == {"web": 0}
+
     async def test_error_fetching_metrics_is_logged_and_leaves_cache_unchanged(
         self, caplog
     ):
@@ -358,6 +515,81 @@ class TestShouldRestartFromUptimeKuma:
         )
 
         assert await monitor.should_restart_from_uptime_kuma("web") is False
+
+    @pytest.mark.parametrize(
+        "statuses",
+        [(1, 0), (0, 1), (0, 0)],
+        ids=["up-then-down", "down-then-up", "both-down"],
+    )
+    async def test_false_when_mapped_name_matches_several_monitors(self, statuses):
+        """An ambiguous monitor identity must never produce a restart decision."""
+        _enable_uptime_kuma(auto_restart_on_down=True)
+        _add_mapping("db", "Database")
+        monitor = UptimeKumaMonitor()
+        _install_client(
+            monitor,
+            FakeUptimeKumaClient(
+                monitors=[
+                    {"friendly_name": "Database", "status": statuses[0]},
+                    {"friendly_name": "Database", "status": statuses[1]},
+                ]
+            ),
+        )
+
+        assert await monitor.should_restart_from_uptime_kuma("db") is False
+        assert monitor.get_container_status("db") is None
+
+    async def test_false_for_duplicate_names_parsed_from_real_metrics(self):
+        """End to end from the /metrics parser: Uptime-Kuma reports two monitors
+        named "Database" (distinct monitor_id labels), one UP and one DOWN."""
+        metrics = (
+            'monitor_status{monitor_id="7",monitor_name="Database",'
+            'monitor_url="",monitor_hostname="db-a",monitor_port="5432"} 1\n'
+            'monitor_status{monitor_id="9",monitor_name="Database",'
+            'monitor_url="",monitor_hostname="db-b",monitor_port="5432"} 0\n'
+        )
+        client = UptimeKumaClient("http://kuma.example", "token")
+        parsed = client._parse_monitors_from_metrics(metrics)
+        _enable_uptime_kuma(auto_restart_on_down=True)
+        _add_mapping("db", "Database")
+        monitor = UptimeKumaMonitor()
+        _install_client(monitor, FakeUptimeKumaClient(monitors=parsed))
+
+        assert len(parsed) == 2
+        assert await monitor.should_restart_from_uptime_kuma("db") is False
+
+    async def test_false_when_another_mapping_of_the_container_is_ambiguous(self):
+        _enable_uptime_kuma(auto_restart_on_down=True)
+        _add_mapping("db", "Database")
+        _add_mapping("db", "Web Monitor")
+        monitor = UptimeKumaMonitor()
+        _install_client(
+            monitor,
+            FakeUptimeKumaClient(
+                monitors=[
+                    {"friendly_name": "Database", "status": 1},
+                    {"friendly_name": "Database", "status": 1},
+                    {"friendly_name": "Web Monitor", "status": 0},
+                ]
+            ),
+        )
+
+        assert await monitor.should_restart_from_uptime_kuma("db") is False
+
+    async def test_false_when_mapped_name_becomes_ambiguous_after_down(self):
+        _enable_uptime_kuma(auto_restart_on_down=True)
+        _add_mapping("db", "Database")
+        monitor = UptimeKumaMonitor()
+        fake_client = FakeUptimeKumaClient(monitors=[{"friendly_name": "Database", "status": 0}])
+        _install_client(monitor, fake_client)
+        assert await monitor.should_restart_from_uptime_kuma("db") is True
+
+        fake_client.monitors = [
+            {"friendly_name": "Database", "status": 1},
+            {"friendly_name": "Database", "status": 0},
+        ]
+
+        assert await monitor.should_restart_from_uptime_kuma("db") is False
 
     async def test_false_when_status_unavailable(self):
         _enable_uptime_kuma(auto_restart_on_down=True)
