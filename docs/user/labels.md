@@ -87,9 +87,11 @@ state survives recreation.
 
 An explicit `monitoring.id` label is never given a replica suffix: replicas that share
 one `monitoring.id` also share their restart count, cooldown, backoff and quarantine.
-Autoheal uses an explicit `monitoring.id` as it is, so don't set one that matches another
-container's generated identifier (such as `myapp_web` or `myapp_web#2`), or the two
-containers share that recovery state.
+An explicit `monitoring.id` that contains `#` is kept apart from the generated replica
+keys, so it can never share state with a replica such as `myapp_web#2`. Any other explicit
+`monitoring.id` is used as it is, so don't set one that matches another container's
+generated identifier (such as `myapp_web`), or the two containers share that recovery
+state.
 
 ## See also
 

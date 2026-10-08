@@ -115,6 +115,20 @@ class TestRecoveryIdentifier:
             "myapp_web-2", web_2_service
         )
 
+    def test_explicit_id_cannot_collide_with_a_generated_replica_key(self):
+        """A ``monitoring.id`` copied from replica 2's key must not share its state."""
+        web_replica_2 = {**COMPOSE, "com.docker.compose.container-number": "2"}
+        other = {"monitoring.id": "myapp_web#2"}
+
+        generated = recovery_identifier("myapp_web", web_replica_2)
+        explicit = recovery_identifier("myapp_web#2", other)
+
+        assert generated == "myapp_web#2"
+        assert explicit == "monitoring.id:myapp_web#2"
+
+    def test_explicit_id_without_hash_keeps_its_key(self):
+        assert recovery_identifier("my-database", {"monitoring.id": "my-database"}) == "my-database"
+
     def test_engine_uses_per_service_stable_id_and_per_replica_recovery_id(self, engine):
         _, info = replica(2)
 
