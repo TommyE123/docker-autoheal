@@ -86,12 +86,9 @@ for another Compose service. Compose keeps a replica's number when it recreates 
 state survives recreation.
 
 An explicit `monitoring.id` label is never given a replica suffix: replicas that share
-one `monitoring.id` also share their restart count, cooldown, backoff and quarantine.
-An explicit `monitoring.id` that contains `#` is kept apart from the generated replica
-keys, so it can never share state with a replica such as `myapp_web#2`. Any other explicit
-`monitoring.id` is used as it is, so don't set one that matches another container's
-generated identifier (such as `myapp_web`), or the two containers share that recovery
-state.
+one `monitoring.id` also share their restart count, cooldown, backoff and quarantine. Its
+recovery state is kept separately from every generated identifier, so a `monitoring.id`
+can never share state with another container by matching its generated identifier.
 
 ## See also
 

@@ -79,12 +79,12 @@ class TestRecoveryIdentifier:
     def test_explicit_monitoring_id_is_never_suffixed(self):
         labels = {**COMPOSE, "monitoring.id": "shared", "com.docker.compose.container-number": "3"}
 
-        assert recovery_identifier("shared", labels) == "shared"
+        assert recovery_identifier("shared", labels) == "monitoring.id:shared"
 
     def test_empty_monitoring_id_label_is_still_never_suffixed(self):
         labels = {**COMPOSE, "monitoring.id": "", "com.docker.compose.container-number": "3"}
 
-        assert recovery_identifier("", labels) == ""
+        assert recovery_identifier("", labels) == "monitoring.id:"
 
     @pytest.mark.parametrize(
         "labels",
@@ -126,8 +126,12 @@ class TestRecoveryIdentifier:
         assert generated == "myapp_web#2"
         assert explicit == "monitoring.id:myapp_web#2"
 
-    def test_explicit_id_without_hash_keeps_its_key(self):
-        assert recovery_identifier("my-database", {"monitoring.id": "my-database"}) == "my-database"
+    def test_explicit_id_cannot_collide_with_a_generated_service_key(self):
+        """A ``monitoring.id`` equal to a service's generated key must not share its state."""
+        assert recovery_identifier("myapp_web", COMPOSE) == "myapp_web"
+        assert recovery_identifier("myapp_web", {"monitoring.id": "myapp_web"}) == (
+            "monitoring.id:myapp_web"
+        )
 
     def test_engine_uses_per_service_stable_id_and_per_replica_recovery_id(self, engine):
         _, info = replica(2)
@@ -302,7 +306,7 @@ class TestExplicitMonitoringIdIsShared:
         docker_client.restart_calls.clear()
         await engine._check_single_container(b)
 
-        assert config_manager.is_quarantined("shared-web")
+        assert config_manager.is_quarantined("monitoring.id:shared-web")
         assert docker_client.restart_calls == []
 
 

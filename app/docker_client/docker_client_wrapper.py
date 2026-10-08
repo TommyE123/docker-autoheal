@@ -23,22 +23,20 @@ def recovery_identifier[S](stable_id: S, labels: dict) -> S | str:
     missing or invalid ``com.docker.compose.container-number`` and every
     non-Compose container keep ``stable_id`` unchanged, so state persisted before
     per-replica keys still applies. An explicit ``monitoring.id`` label is the
-    user's chosen identity and is never suffixed. Generated replica keys contain
-    ``#``, which Compose project, service and container names cannot, so only an
-    explicit ID containing ``#`` could equal one. Such an ID is kept in its own
-    ``monitoring.id:`` namespace instead.
+    user's chosen identity: it is never suffixed, and it is keyed under a
+    ``monitoring.id:`` prefix so it can never equal a generated key (Compose
+    project, service and container names cannot contain ``:``).
 
     Args:
         stable_id: The container's stable identifier
         labels: Container labels
 
     Returns:
-        ``stable_id`` for replica 1, or ``"{stable_id}#{N}"`` for Compose replica N > 1
+        ``"monitoring.id:{stable_id}"`` for an explicit ``monitoring.id``,
+        ``"{stable_id}#{N}"`` for Compose replica N > 1, otherwise ``stable_id``
     """
     if "monitoring.id" in labels:
-        if isinstance(stable_id, str) and "#" in stable_id:
-            return f"monitoring.id:{stable_id}"
-        return stable_id
+        return f"monitoring.id:{stable_id}"
     if not (labels.get("com.docker.compose.project") and labels.get("com.docker.compose.service")):
         return stable_id
     number = labels.get("com.docker.compose.container-number")
