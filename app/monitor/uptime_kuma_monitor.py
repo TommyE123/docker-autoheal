@@ -165,7 +165,8 @@ class UptimeKumaMonitor:
                 if mapping_key not in self._ambiguous_mappings:
                     logger.warning(
                         "Uptime-Kuma monitor name '%s' mapped to %s matches %d monitors - "
-                        "ignoring its status because the monitor is ambiguous",
+                        "ignoring its status because the name is ambiguous, so it will not "
+                        "trigger an automatic restart",
                         mapping.monitor_friendly_name,
                         mapping.container_id,
                         monitor_count,

@@ -279,7 +279,8 @@ class TestUpdateStatusCache:
         assert len(warnings) == 1
         assert warnings[0].getMessage() == (
             "Uptime-Kuma monitor name 'Database' mapped to db matches 2 monitors - "
-            "ignoring its status because the monitor is ambiguous"
+            "ignoring its status because the name is ambiguous, so it will not "
+            "trigger an automatic restart"
         )
 
     async def test_ambiguous_name_warns_once_until_it_is_unique_again(self, caplog):
