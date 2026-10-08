@@ -30,3 +30,4 @@ rules:
       .github/workflows/semantic-pr-title.yml
       .github/workflows/tests.yml
       .github/workflows/ui-e2e.yml
+      .github/workflows/update-mutation-results.yml
