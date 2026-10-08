@@ -19,7 +19,10 @@ mode="${2:-headless}"
 
 args=()
 case "${scope}" in
-full) ;;
+full)
+  # The whole suite, even if UI_E2E_TAG is already set in the calling shell.
+  unset UI_E2E_TAG
+  ;;
 smoke | containers | monitoring | events | configuration | notifications | errors | regression)
   # A per-project filter (see playwright.ui.config.js), not --grep: --grep would still
   # run every test of the `parallel` project that the `exclusive` project depends on.
