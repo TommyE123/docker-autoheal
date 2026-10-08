@@ -63,11 +63,14 @@ function and the changed text, not by name.
 `.github/workflows/mutation-testing.yml` runs the same `./mutation.sh`, always the full
 suite. It runs:
 
-- automatically on pull requests to `main`, and on pushes to `main`, that change
+- automatically on pull requests to `main` that change
   `app/**/*.py` (production code or tests), `requirements-dev.txt` (it pins Mutmut and
   pytest), `pyproject.toml`, `mutation.sh`, the `Dockerfile` (which sets the Python
   version) or the workflow itself; documentation-only and other unrelated changes, and
-  runtime dependency bumps in `requirements.txt`, do not run it;
+  runtime dependency bumps in `requirements.txt`, do not run it. Release Please pull
+  requests (branches starting `release-please--`, which only bump the version in
+  `app/api/api.py`) are skipped, and pushes to `main` do not run it: the badge comes from
+  the updater, not from a run on `main`;
 - manually, from the Actions tab (**Mutation Testing** -> **Run
   workflow**).
 
@@ -78,7 +81,7 @@ The workflow:
 
 - installs `requirements-dev.txt` on the Python version the `Dockerfile` uses;
 - starts from an empty `mutants/` (and never caches it);
-- is grouped by ref: a new push to a pull request cancels that PR's in-progress run, while runs on `main` and manual runs are never cancelled once running (a newer run can still replace one that is only queued);
+- is grouped by ref: a new push to a pull request cancels that PR's in-progress run, while manual runs are never cancelled once running (a newer run can still replace one that is only queued);
 - is informational: it is not a required check, has no score threshold, and must not be
   made one.
 
