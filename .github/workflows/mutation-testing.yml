@@ -119,6 +119,7 @@ jobs:
       # "NN.N%".
       - name: Compute score
         id: score
+        shell: bash # -eo pipefail, so a failed jq or grep in the score pipeline is not masked by tr
         env:
           EVENT_NAME: ${{ github.event_name }}
         run: |
