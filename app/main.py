@@ -195,7 +195,10 @@ class AutoHealService:
         """
         await self.stop()
         if self.notification_manager:
-            await self.notification_manager.stop()
+            try:
+                await self.notification_manager.stop()
+            except Exception as e:
+                logger.warning("Error stopping notification manager: %s", e)
 
     async def stop(self):
         """Stop the auto-heal service"""

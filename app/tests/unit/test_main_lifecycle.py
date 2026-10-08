@@ -285,6 +285,30 @@ class TestAutoHealServiceStartFailure:
             mock_notif.stop.assert_awaited_once()
 
     @pytest.mark.asyncio
+    async def test_notification_stop_error_does_not_mask_the_startup_error(self, caplog):
+        startup_error = RuntimeError("engine broke")
+        with (
+            patch("app.main.config_manager") as mock_cm,
+            patch("app.main.DockerClientWrapper") as mock_docker_cls,
+            patch("app.main.MonitoringEngine", side_effect=startup_error),
+            patch("app.main.notification_manager") as mock_notif,
+        ):
+            mock_cm.get_config.return_value = self._make_config()
+            mock_notif.stop = AsyncMock(side_effect=RuntimeError("notify boom"))
+
+            service = AutoHealService()
+
+            with pytest.raises(RuntimeError) as excinfo:
+                await service.start()
+
+            assert excinfo.value is startup_error
+            mock_docker_cls.return_value.close.assert_called_once()
+            mock_notif.stop.assert_awaited_once()
+            assert "Error stopping notification manager: notify boom" in [
+                r.getMessage() for r in caplog.records
+            ]
+
+    @pytest.mark.asyncio
     async def test_failure_without_notification_manager_still_cleans_up(self):
         with (
             patch("app.main.config_manager") as mock_cm,
