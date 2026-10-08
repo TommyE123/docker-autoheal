@@ -182,8 +182,7 @@ class AutoHealService:
 
         except Exception as e:
             logger.exception("Failed to start service: %s", e)
-            if self.notification_manager:
-                await self.notification_manager.stop()
+            await self.notification_manager.stop()
             raise
 
     async def stop(self):
@@ -200,24 +199,30 @@ class AutoHealService:
                 try:
                     await self.uptime_kuma_monitor.stop()
                 except Exception as e:
-                    logger.warning("Error stopping Uptime-Kuma monitor: %s", e)
+                    logger.warning(
+                        "Error stopping Uptime-Kuma monitor: %s", e, exc_info=True
+                    )
 
             if self.monitoring_engine:
                 try:
                     await self.monitoring_engine.stop()
                 except Exception as e:
-                    logger.warning("Error stopping monitoring engine: %s", e)
+                    logger.warning(
+                        "Error stopping monitoring engine: %s", e, exc_info=True
+                    )
 
             try:
                 await self.notification_manager.stop()
             except Exception as e:
-                logger.warning("Error stopping notification manager: %s", e, exc_info=True)
+                logger.warning(
+                    "Error stopping notification manager: %s", e, exc_info=True
+                )
         finally:
             if self.docker_client:
                 try:
                     self.docker_client.close()
                 except Exception as e:
-                    logger.warning("Error closing Docker client: %s", e)
+                    logger.warning("Error closing Docker client: %s", e, exc_info=True)
 
         logger.info("Docker Auto-Heal Service stopped")
 

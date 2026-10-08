@@ -166,6 +166,9 @@ class TestAutoHealServiceStop:
         assert self._messages(caplog, "WARNING") == [
             "Error stopping Uptime-Kuma monitor: kuma boom"
         ]
+        [record] = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert record.exc_info is not None
+        assert isinstance(record.exc_info[1], RuntimeError)
 
     @pytest.mark.asyncio
     async def test_stop_continues_after_engine_stop_raises(self, caplog):
@@ -181,6 +184,9 @@ class TestAutoHealServiceStop:
         assert self._messages(caplog, "WARNING") == [
             "Error stopping monitoring engine: engine boom"
         ]
+        [record] = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert record.exc_info is not None
+        assert isinstance(record.exc_info[1], RuntimeError)
 
     @pytest.mark.asyncio
     async def test_stop_swallows_docker_close_error(self, caplog):
@@ -195,6 +201,9 @@ class TestAutoHealServiceStop:
         assert self._messages(caplog, "WARNING") == [
             "Error closing Docker client: close boom"
         ]
+        [record] = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert record.exc_info is not None
+        assert isinstance(record.exc_info[1], RuntimeError)
 
 
 class TestAutoHealServiceStartFailure:
