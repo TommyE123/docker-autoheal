@@ -43,7 +43,10 @@ The integration suite requires a real Docker daemon reachable at the default
 socket (`unix://var/run/docker.sock`), and some of its tests additionally
 require a running Auto-Heal service on `http://localhost:3132` (the dev stack,
 started with the **Autoheal: Run Docker Stack** task). Set `AUTOHEAL_BASE_URL` (and
-`AUTOHEAL_METRICS_URL`, default `http://localhost:9091`) to test another instance. In the
+`AUTOHEAL_METRICS_URL`, default `http://localhost:9091`) to test another instance. To test the
+backend run directly with **Autoheal: Run Backend** (it listens on `3131`, metrics on `9090`,
+inside the Dev Container), use `AUTOHEAL_BASE_URL=http://localhost:3131` and
+`AUTOHEAL_METRICS_URL=http://localhost:9090`. In the
 Dev Container, Docker is the isolated inner daemon, so these tests never touch production
 containers; see [Docker isolation](development-setup.md#docker-isolation). Every test skips itself - rather than failing - when the
 resource it needs isn't available, so it's safe to run with only some of those

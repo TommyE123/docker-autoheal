@@ -117,6 +117,8 @@ jobs:
               docker ps -a
               exit 1
             fi
+            # CI starts from a fresh inner-daemon volume, so it must begin empty (local
+            # rebuilds keep their containers; see the docs).
             if [ -n "$(docker ps -aq)" ]; then
               echo "::error::Containers from outside the Dev Container are visible to its Docker daemon"
               docker ps -a
@@ -125,16 +127,18 @@ jobs:
 
             echo "== Docker Compose dev stack =="
             compose='docker compose -p docker-autoheal-dev -f docker-compose.yml -f docker-compose.dev.yml'
-            $compose up -d --build --wait autoheal || {
-              echo "::error::dev stack did not become healthy"
+            # Chained with && (not a { ...; } group): set -e is ignored inside the left side
+            # of ||, so a group could swallow a failing step. Logs are printed on any failure.
+            $compose up -d --build --wait autoheal &&
+              curl -fsS http://localhost:3132/health &&
+              echo &&
+              echo "dev stack is healthy" &&
+              bash .devcontainer/verify-isolation.sh || {
+              echo "::error::dev stack did not become healthy or the isolation check failed"
               $compose logs
               $compose down --remove-orphans
               exit 1
             }
-            curl -fsS http://localhost:3132/health
-            echo
-            echo "dev stack is healthy"
-            bash .devcontainer/verify-isolation.sh
             $compose down --remove-orphans
 
       - name: Remove host-daemon isolation sentinel

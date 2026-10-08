@@ -147,10 +147,13 @@ provides a separate daemon, but a privileged container has the usual host-escape
 considerations, so only open this Dev Container with code you trust.
 
 **Persistence.** The inner daemon's state (`/var/lib/docker`, which holds images, build
-cache and named volumes) lives in the named volume `docker-autoheal-dind-<devcontainerId>`
-and survives rebuilds. Containers do not survive a Dev Container recreation; bring the stack
-back with `docker compose` (or the tasks). Remove the volume from the host with
-`docker volume rm` to discard the inner daemon's images and volumes.
+cache, named volumes and container metadata) lives in the named volume
+`docker-autoheal-dind-<devcontainerId>` and survives rebuilds. That includes the containers
+themselves: stopped containers are still there afterwards, and the dev stack, which inherits
+`restart: unless-stopped` from `docker-compose.yml`, is brought back by its restart policy when
+the Dev Container's daemon starts. Re-running `docker compose` (or the tasks) is safe, and
+**Stop Docker Stack** removes it. Remove the volume from the host with `docker volume rm` to
+discard the inner daemon's images, volumes and containers.
 
 Relative bind mounts such as `./data-dev:/data` work as expected: the inner daemon runs in
 the same container as the Compose client, so it sees your checkout.
