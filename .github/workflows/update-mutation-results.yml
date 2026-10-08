@@ -119,7 +119,7 @@ jobs:
 
       # Bound to the exact commit the action pushed: if the head changes, it fails.
       - name: Enable auto-merge
-        if: ${{ contains(fromJSON('["created","updated"]'), steps.cpr.outputs.pull-request-operation) }}
+        if: ${{ steps.cpr.outputs.pull-request-number != '' }}
         env:
           GH_TOKEN: ${{ secrets.BADGE_PUSH_TOKEN }}
           PR: ${{ steps.cpr.outputs.pull-request-number }}
