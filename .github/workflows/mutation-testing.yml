@@ -12,7 +12,7 @@ on:
       - main
     paths:
       - "app/**/*.py"
-      - "requirements*.txt"
+      - "requirements-dev.txt"
       - "pyproject.toml"
       - "mutation.sh"
       - ".github/workflows/mutation-testing.yml"
@@ -22,7 +22,7 @@ on:
       - main
     paths:
       - "app/**/*.py"
-      - "requirements*.txt"
+      - "requirements-dev.txt"
       - "pyproject.toml"
       - "mutation.sh"
       - ".github/workflows/mutation-testing.yml"
