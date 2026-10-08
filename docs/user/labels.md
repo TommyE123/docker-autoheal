@@ -78,12 +78,12 @@ Replicas of a scaled Compose service (`docker compose up --scale web=3`) share o
 identifier, so selection, custom health checks and Uptime Kuma mappings apply to the
 whole service. Restart counts, cooldown, backoff and quarantine are tracked per replica,
 so one failing replica cannot use up its siblings' restart budget, keep them in
-quarantine, or be released from quarantine because a sibling is healthy. Replica 1 uses
-the stable identifier itself (`myapp_web`) and replica *N* uses it with the Compose
-container number appended after `#` (`myapp_web#2`, `myapp_web#3`). Compose project and
-service names cannot contain `#`, so these keys never clash with the identifier generated
-for another Compose service. Compose keeps a replica's number when it recreates it, so its
-state survives recreation.
+quarantine, or be released from quarantine because a sibling is healthy. Each replica's
+recovery state is keyed by the stable identifier with its Compose container number
+appended after `#` (`myapp_web#1`, `myapp_web#2`), including the single container of an
+unscaled service. Compose project and service names cannot contain `#`, so these keys never
+clash with the identifier generated for another Compose service. Compose keeps a replica's
+number when it recreates it, so its state survives recreation.
 
 An explicit `monitoring.id` label is never given a replica suffix: replicas that share
 one `monitoring.id` also share their restart count, cooldown, backoff and quarantine. Its

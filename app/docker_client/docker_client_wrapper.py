@@ -19,13 +19,11 @@ def recovery_identifier[S](stable_id: S, labels: dict) -> S | str:
     Key for one running container's recovery state, derived from its stable ID.
 
     Restart counts, cooldown, backoff and quarantine belong to a single container,
-    so replicas of a scaled Compose service must not share them. Replica 1, a
-    missing or invalid ``com.docker.compose.container-number`` and every
-    non-Compose container keep ``stable_id`` unchanged, so state persisted before
-    per-replica keys still applies. An explicit ``monitoring.id`` label is the
-    user's chosen identity: it is never suffixed, and it is keyed under a
-    ``monitoring.id:`` prefix so it can never equal a generated key (Compose
-    project, service and container names cannot contain ``:``).
+    so replicas of a scaled Compose service must not share them: every Compose
+    container is keyed by its container number. An explicit ``monitoring.id``
+    label is the user's chosen identity: it is never suffixed, and it is keyed
+    under a ``monitoring.id:`` prefix so it can never equal a generated key
+    (Compose project, service and container names cannot contain ``:`` or ``#``).
 
     Args:
         stable_id: The container's stable identifier
@@ -33,14 +31,14 @@ def recovery_identifier[S](stable_id: S, labels: dict) -> S | str:
 
     Returns:
         ``"monitoring.id:{stable_id}"`` for an explicit ``monitoring.id``,
-        ``"{stable_id}#{N}"`` for Compose replica N > 1, otherwise ``stable_id``
+        ``"{stable_id}#{N}"`` for Compose container number N, otherwise ``stable_id``
     """
     if "monitoring.id" in labels:
         return f"monitoring.id:{stable_id}"
     if not (labels.get("com.docker.compose.project") and labels.get("com.docker.compose.service")):
         return stable_id
     number = labels.get("com.docker.compose.container-number")
-    if isinstance(number, str) and number.isdecimal() and int(number) > 1:
+    if isinstance(number, str) and number.isdecimal():
         return f"{stable_id}#{int(number)}"
     return stable_id
 
