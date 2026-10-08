@@ -2,7 +2,11 @@ name: Mutation Testing
 
 # Informational only: never a required check, never a merge gate, and no
 # mutation-score threshold. Runs the full suite on demand and on pull requests
-# and pushes to main that change Python code or tests, or the mutation tooling.
+# that change Python code or tests, or the mutation tooling. Not on pushes to
+# main (nothing consumes that result: the badge comes from the updater) and not
+# on Release Please pull requests (they only bump the version string).
+# It never changes the tracked .github/badges/mutation.json: only
+# update-mutation-results.yml refreshes that file.
 # See docs/developer/mutation-testing.md for how to read the results.
 on:
   pull_request:
@@ -10,19 +14,7 @@ on:
       - main
     paths:
       - "app/**/*.py"
-      - "requirements*.txt"
-      - "pyproject.toml"
-      - "mutation.sh"
-      - ".github/workflows/mutation-testing.yml"
-      - "Dockerfile" # selects the Python version the job runs on
-  # Runs on main keep the README status badge current: it shows the latest run
-  # on the default branch, and pull request runs are not on that branch.
-  push:
-    branches:
-      - main
-    paths:
-      - "app/**/*.py"
-      - "requirements*.txt"
+      - "requirements-dev.txt"
       - "pyproject.toml"
       - "mutation.sh"
       - ".github/workflows/mutation-testing.yml"
@@ -33,59 +25,34 @@ permissions:
   contents: read
 
 # One run per ref. A new push to a pull request cancels that PR's in-progress
-# run; runs on main and manual runs are never cancelled once running (a newer run
-# can still replace one that is only queued), so the README badge reflects a run
-# that finished.
+# run; manual runs are never cancelled once running (a newer run can still replace
+# one that is only queued).
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # The badge commit made by commit-badge below only changes
-  # .github/badges/mutation.json, so a full mutation run on it would just
-  # reproduce the score it already carries. Skip that run (and with it
-  # commit-badge); the PR's other workflows still run for the commit. The pull
-  # request checkout is a merge commit, so its second parent is the PR head.
-  gate:
-    name: Skip badge commits
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    outputs:
-      skip: ${{ steps.check.outputs.skip }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 2
-          persist-credentials: false
-
-      - name: Is the head commit the badge commit?
-        id: check
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-        run: |
-          skip=false
-          if [ "$EVENT_NAME" = "pull_request" ] \
-            && [ "$(git log -1 --format='%an|%s' HEAD^2)" = "github-actions[bot]|ci: update mutation badge" ]; then
-            skip=true
-            echo "The head commit is the mutation badge commit; skipping the mutation run."
-          fi
-          echo "skip=$skip" >> "$GITHUB_OUTPUT"
-
   mutation-testing:
     name: Mutmut
-    needs: gate
-    if: ${{ needs.gate.outputs.skip != 'true' }}
+    # Release Please PRs only bump the version string in app/api/api.py.
+    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # For the pull request comment job below.
+    outputs:
+      score: ${{ steps.score.outputs.score }}
+      baseline: ${{ steps.score.outputs.baseline }}
+      total: ${{ steps.score.outputs.total }}
+      killed: ${{ steps.score.outputs.killed }}
+      timeout: ${{ steps.score.outputs.timeout }}
+      survived: ${{ steps.score.outputs.survived }}
+      no_tests: ${{ steps.score.outputs.no_tests }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 2 # a pull request checkout is a merge commit; its first parent is the base
           persist-credentials: false
 
       # Same Python version the Dockerfile ships, as in tests.yml.
@@ -119,45 +86,49 @@ jobs:
       - name: Export results and summary
         run: |
           mutmut export-cicd-stats
+          # The score as `mutmut badge` computes it for the README badge: the single
+          # source for the summary below and the pull request comment.
+          mutmut badge --label Mutation --output "$RUNNER_TEMP/badge.json"
+          score=$(jq -r .message "$RUNNER_TEMP/badge.json")
           mutmut results > mutants/mutation-results.txt
           {
             echo "## Mutation testing"
             echo
             echo "Mutmut $(mutmut --version | awk '{print $NF}'), Python $(python -V | awk '{print $2}'), commit \`${GITHUB_SHA}\` (\`${GITHUB_REF}\`)"
             echo
-            jq -r '
+            jq -r --arg score "$score" '
               "| Generated | Killed | Timeout | Survived | No tests | Detected |",
               "|---|---|---|---|---|---|",
-              "| \(.total) | \(.killed) | \(.timeout) | \(.survived) | \(.no_tests) | \(((.killed + .timeout) / .total * 1000 | round) / 10)% |"
+              "| \(.total) | \(.killed) | \(.timeout) | \(.survived) | \(.no_tests) | \($score) |"
             ' mutants/mutmut-cicd-stats.json
             echo
-            echo "Detected = (killed + timeout) / generated. It excludes FastAPI route handlers and every other decorated function, which Mutmut does not mutate."
+            echo "Detected is the score \`mutmut badge\` computes: (killed + timeout) / generated. It excludes FastAPI route handlers and every other decorated function, which Mutmut does not mutate."
             echo "Survivors are listed in \`mutation-results.txt\` in the \`mutation-results\` artifact."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # ./mutation.sh has just regenerated .github/badges/mutation.json with
-      # `mutmut badge`. This job is read-only; for a pull request from this
-      # repository the commit-badge job below commits the new file to the PR
-      # branch, so here it only says whether the committed copy is stale.
-      - name: Check the committed mutation badge
+      # The score is the one `mutmut badge` wrote above (no second mutation run), the
+      # same way as the score tracked on main, so the two are comparable. That tracked
+      # score is the committed badge file; on a pull request it is read from the base
+      # commit, so the PR cannot change it. The baseline is empty unless it is a plain
+      # "NN.N%".
+      - name: Compute score
+        id: score
+        shell: bash # -eo pipefail, so a failed jq or grep in the score pipeline is not masked by tr
+        env:
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          if [ -z "$(git status --porcelain -- .github/badges/mutation.json)" ]; then
-            echo "The committed mutation badge is current."
+          jq -r '"total=\(.total)", "killed=\(.killed)", "timeout=\(.timeout)", "survived=\(.survived)", "no_tests=\(.no_tests)"' \
+            mutants/mutmut-cicd-stats.json >> "$GITHUB_OUTPUT"
+          score=$(jq -r '.message // empty' "$RUNNER_TEMP/badge.json" | grep -E '^[0-9]+(\.[0-9]+)?%$' | tr -d '%') ||
+            { echo "::error::Unexpected \`mutmut badge\` message in $RUNNER_TEMP/badge.json" >&2; exit 1; }
+          echo "score=$score" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            badge=$(git show HEAD^1:.github/badges/mutation.json || true)
           else
-            echo "::notice title=Mutation badge out of date::The committed .github/badges/mutation.json differs from this run (mutation-badge artifact)."
-            {
-              echo
-              echo "The committed README badge (\`.github/badges/mutation.json\`) does not match this run."
-              echo "A successful run on a pull request from this repository commits the new file to the PR branch. The new file is in the \`mutation-badge\` artifact."
-            } >> "$GITHUB_STEP_SUMMARY"
+            badge=$(cat .github/badges/mutation.json || true)
           fi
-
-      - name: Upload badge data
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: mutation-badge
-          path: .github/badges/mutation.json
-          if-no-files-found: error
+          baseline=$(jq -r '.message // empty' <<<"$badge" | grep -E '^[0-9]+(\.[0-9]+)?%$' | tr -d '%' || true)
+          echo "baseline=$baseline" >> "$GITHUB_OUTPUT"
 
       - name: Upload mutation results
         if: ${{ !cancelled() }}
@@ -170,49 +141,60 @@ jobs:
             !mutants/data/
           if-no-files-found: warn
 
-  # Commits the badge generated by the run above to the pull request branch, so
-  # the PR that changes the score also changes the file. A separate job so that
-  # only it holds a write token. It needs the mutation job to succeed, so a
-  # failed run never updates the badge. Fork PRs are skipped: secrets are not
-  # available to them. The commit is pushed with the BADGE_PUSH_TOKEN secret (a
-  # fine-grained personal access token with Contents: read and write), not
-  # GITHUB_TOKEN, because a GITHUB_TOKEN push does not start the PR's other
-  # checks, which would leave the required ones missing on the new head. Those
-  # checks run again for the badge commit; the gate job skips the mutation run
-  # for it, so it does not loop.
-  commit-badge:
-    name: Commit mutation badge
+  # One comment per pull request that is edited in place on every run, found by its
+  # hidden marker. A separate job so the job that runs the PR's code holds no write
+  # token. Fork pull requests are skipped: their token is read-only (the job summary
+  # still shows the score).
+  score-comment:
+    name: Mutation score comment
     needs: mutation-testing
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      contents: write
+      pull-requests: write # create or edit the one score comment on the PR
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      SCORE: ${{ needs.mutation-testing.outputs.score }}
+      BASELINE: ${{ needs.mutation-testing.outputs.baseline }}
+      TOTAL: ${{ needs.mutation-testing.outputs.total }}
+      KILLED: ${{ needs.mutation-testing.outputs.killed }}
+      TIMEOUT: ${{ needs.mutation-testing.outputs.timeout }}
+      SURVIVED: ${{ needs.mutation-testing.outputs.survived }}
+      NO_TESTS: ${{ needs.mutation-testing.outputs.no_tests }}
 
     steps:
-      # The tip of the PR branch rather than the merge commit that was tested.
-      - name: Checkout pull request branch
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.head_ref }}
-          token: ${{ secrets.BADGE_PUSH_TOKEN }}
-
-      - name: Download badge data
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: mutation-badge
-          path: .github/badges
-
-      - name: Commit badge if changed
-        env:
-          HEAD_REF: ${{ github.head_ref }}
+      - name: Create or update the comment
         run: |
-          if [ -z "$(git status --porcelain -- .github/badges/mutation.json)" ]; then
-            echo "The committed mutation badge is current."
-            exit 0
+          marker="<!-- mutation-score-comment -->"
+          score=$(printf '%.1f' "$SCORE")
+          if [ -n "$BASELINE" ]; then
+            change=$(awk -v n="$score" -v o="$BASELINE" 'BEGIN { d = sprintf("%.1f", n - o); v = d + 0; if (v > 0) print "🔺 +" d; else if (v < 0) print "🔻 " d; else print "➖ no change" }')
+            base="$BASELINE%"
+          else
+            change="n/a"
+            base="n/a"
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/badges/mutation.json
-          git commit -m "ci: update mutation badge"
-          git push origin "HEAD:refs/heads/${HEAD_REF}"
+          {
+            echo "$marker"
+            echo "### 🧬 Mutation score"
+            echo
+            echo "| This PR | Main | Change |"
+            echo "|:-:|:-:|:-:|"
+            echo "| **$score%** | $base | $change |"
+            echo
+            echo -n "<sub>Killed $KILLED · Timeout $TIMEOUT · Survived $SURVIVED · No tests $NO_TESTS (of $TOTAL) · "
+            echo "\`${HEAD_SHA:0:7}\` · [details]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID) · informational, never blocks a merge</sub>"
+          } > "$RUNNER_TEMP/comment.md"
+
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | contains(\"$marker\"))) | .id" | head -n1)
+          if [ -n "$id" ]; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@"$RUNNER_TEMP/comment.md" > /dev/null
+            echo "Updated comment $id."
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -F body=@"$RUNNER_TEMP/comment.md" > /dev/null
+            echo "Created comment."
+          fi
