@@ -24,12 +24,19 @@ env:
 jobs:
   update:
     name: Update mutation results
-    # Always main: a dispatch against any other ref does nothing.
-    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
     steps:
+      # Only valid when dispatched on main: any other ref fails loudly, so a
+      # misdirected run is never mistaken for a successful one.
+      - name: Require main
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Dispatch this workflow on main (it was dispatched on $GITHUB_REF); nothing was run." >&2
+            exit 1
+          fi
+
       - name: Checkout main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

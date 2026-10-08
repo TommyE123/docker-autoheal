@@ -98,7 +98,7 @@ refreshes it:
 - It has only a `workflow_dispatch` trigger and no GitHub `schedule`. Run it from the
   Actions tab, or let an external scheduler (cron-job.org) call the `workflow_dispatch`
   API. The caller's token is configured outside the repository. It always checks out and
-  tests `main`; a dispatch against any other ref does nothing.
+  tests `main`; a dispatch against any other ref fails immediately with an error.
 - It runs the same full `./mutation.sh` with `UPDATE_MUTATION_BADGE=1`, then compares the
   new score with the one tracked on `main`. The result is tied to the exact `main` commit
   that was tested; if `main` has moved by the time the run finishes, nothing is published
