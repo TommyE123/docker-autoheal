@@ -10,16 +10,15 @@ tests swap ``notification_manager`` for a ``MagicMock`` (see
 ``mock_notification_manager`` in ``conftest.py``), and
 ``test_notification_manager.py`` always supplies its own ``event_filters``.
 
-These tests deliberately document *current* behaviour rather than desired
-behaviour, including the known gaps (see #100 and its follow-up):
+They pin the shipped default contract (see #100 and #235):
 
-* ``health_check_failed`` sits in the default filter list but nothing ever
-  emits it - a failed custom health check surfaces as ``restart``.
-* ``auto_monitor`` and ``unquarantine`` are emitted but excluded by the default
-  filters, so they are silently dropped out of the box.
-* ``auto_unquarantine`` notifies by default but has no entry in
-  ``_format_notification``'s ``title_map``, so it falls through to the generic
-  title fallback.
+* The defaults are ``restart``, ``quarantine``, ``auto_unquarantine`` and
+  ``auto_monitor``.
+* ``unquarantine`` is a manual action and is not notified by default.
+* ``health_check_failed`` is never emitted (a failed custom health check
+  surfaces as ``restart``), so it is not in the defaults.
+* ``auto_unquarantine`` has an explicit title, and the generic title fallback
+  has no leading space.
 
 Integration boundary: real ``MonitoringEngine`` and real
 ``NotificationManager``, wired together instead of one being mocked out. Only
@@ -35,10 +34,12 @@ scenario 2 is to catch a future rename on either side of the contract, and a
 locally constructed event can never drift from itself.
 """
 
+from datetime import datetime, timezone
+
 import pytest
 
 from app.api.routes.containers import unquarantine_container
-from app.config.config_manager import NotificationService, config_manager
+from app.config.config_manager import AutoHealEvent, NotificationService, config_manager
 from app.notifications.notification_manager import NotificationManager
 from app.tests.unit.conftest import make_container
 from app.tests.unit.test_engine_lifecycle import start_event
@@ -48,7 +49,7 @@ WEBHOOK_URL = "https://example.invalid/default-contract"
 
 # The shipped default, asserted rather than imported so that changing it is a
 # deliberate act that breaks this test.
-DEFAULT_EVENT_FILTERS = ["restart", "quarantine", "health_check_failed", "auto_unquarantine"]
+DEFAULT_EVENT_FILTERS = ["restart", "quarantine", "auto_unquarantine", "auto_monitor"]
 
 RESTART_ID = "1" * 64
 QUARANTINE_ID = "2" * 64
@@ -176,13 +177,10 @@ class TestDefaultNotificationContract:
             "unquarantine",
         ]
 
-    async def test_only_three_of_five_event_types_notify_by_default(
+    async def test_four_of_five_event_types_notify_by_default(
         self, engine, docker_client, real_notification_manager
     ):
-        """
-        Current behaviour, gaps included: ``auto_monitor`` and ``unquarantine``
-        are emitted but silently dropped by the default filters.
-        """
+        """``unquarantine`` is user-initiated, so it is not notified by default."""
         enable_notifications_with_default_filters()
 
         await emit_one_event_of_each_type(engine, docker_client)
@@ -192,36 +190,19 @@ class TestDefaultNotificationContract:
             "restart",
             "quarantine",
             "auto_unquarantine",
+            "auto_monitor",
         ]
 
-    async def test_auto_monitor_and_unquarantine_are_dropped(
+    async def test_health_check_failed_is_not_a_default_filter(
         self, engine, docker_client, real_notification_manager
     ):
-        """
-        Both have dedicated titles in ``_format_notification``'s ``title_map``
-        but are absent from the default filters, so they never reach a service.
-        """
-        enable_notifications_with_default_filters()
-
-        await emit_one_event_of_each_type(engine, docker_client)
-        await drain_notification_queue(real_notification_manager)
-
-        delivered = delivered_event_types(real_notification_manager)
-        assert "auto_monitor" not in delivered
-        assert "unquarantine" not in delivered
-
-    async def test_health_check_failed_filter_entry_is_unreachable(
-        self, engine, docker_client, real_notification_manager
-    ):
-        """
-        ``health_check_failed`` is in the default filter list but no code path
-        emits it - a failed custom health check surfaces as ``restart``.
-        """
+        """``health_check_failed`` is never emitted, so it is not in the defaults."""
         enable_notifications_with_default_filters()
 
         await emit_one_event_of_each_type(engine, docker_client)
 
-        assert "health_check_failed" in DEFAULT_EVENT_FILTERS
+        assert "health_check_failed" not in DEFAULT_EVENT_FILTERS
+        assert "health_check_failed" not in config_manager.get_config().notifications.event_filters
         emitted = {event.event_type for event in config_manager.get_events()}
         assert "health_check_failed" not in emitted
 
@@ -259,10 +240,23 @@ class TestDefaultNotificationPayloads:
 
         assert titles_by_type["restart"] == "Container Restarted"
         assert titles_by_type["quarantine"] == "Container Quarantined"
-        # Known gap: ``title_map`` has no ``auto_unquarantine`` entry even though
-        # the default filters let it through, so it lands on the generic
-        # fallback - note the leading space the fallback produces.
-        assert titles_by_type["auto_unquarantine"] == " Auto Unquarantine"
+        assert titles_by_type["auto_unquarantine"] == "Container Auto-Unquarantined"
+        assert titles_by_type["auto_monitor"] == "Container Auto-Monitored"
+
+    async def test_generic_title_fallback_has_no_leading_space(self, real_notification_manager):
+        event = AutoHealEvent(
+            timestamp=datetime.now(timezone.utc),
+            container_id="a" * 64,
+            container_name="fallback-target",
+            event_type="some_new_event",
+            restart_count=0,
+            status="success",
+            message="m",
+        )
+
+        title, _, _ = real_notification_manager._format_notification(event)
+
+        assert title == "Some New Event"
 
     async def test_delivered_payloads_carry_the_container_and_url(
         self, engine, docker_client, real_notification_manager
@@ -272,7 +266,7 @@ class TestDefaultNotificationPayloads:
         await emit_one_event_of_each_type(engine, docker_client)
         await drain_notification_queue(real_notification_manager)
 
-        assert len(real_notification_manager._session.calls) == 3
+        assert len(real_notification_manager._session.calls) == 4
         for call in real_notification_manager._session.calls:
             assert call["url"] == WEBHOOK_URL
             event = call["json"]["event"]
