@@ -68,6 +68,18 @@
       "problemMatcher": []
     },
     {
+      "label": "Autoheal: Run UI E2E",
+      "type": "shell",
+      "command": "bash frontend/e2e-ui/run.sh ${input:uiE2eScope} ${input:uiE2eMode}",
+      "options": {
+        "shell": {
+          "executable": "bash",
+          "args": ["-c"]
+        }
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "Autoheal: Build Frontend",
       "type": "shell",
       "command": "npm run build",
@@ -434,6 +446,32 @@
         }
       },
       "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "uiE2eScope",
+      "type": "pickString",
+      "description": "Which UI E2E tests to run (smoke is the pull-request subset)",
+      "options": [
+        "smoke",
+        "full",
+        "containers",
+        "monitoring",
+        "events",
+        "configuration",
+        "notifications",
+        "errors",
+        "regression"
+      ],
+      "default": "smoke"
+    },
+    {
+      "id": "uiE2eMode",
+      "type": "pickString",
+      "description": "headless, headed (needs a display), or ui (Playwright UI on port 9323)",
+      "options": ["headless", "headed", "ui"],
+      "default": "headless"
     }
   ]
 }

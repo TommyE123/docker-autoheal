@@ -106,6 +106,12 @@ link in the terminal) in your browser. The task keeps running until you stop it 
 its terminal), which also tears down the stack under the same rule as above. Rebuild the
 Dev Container once to pick up the forwarded port.
 
+**Autoheal: Run UI E2E** runs the tagged UI journey suite (not the production-image smoke
+test above). It asks for a scope (`smoke`, `full`, or a functional area such as `events`)
+and a mode (`headless`, `headed` if a display is available, or Playwright's `ui` mode),
+starts the dev stack on the Dev Container's isolated daemon and runs the same tests in
+every mode. See [UI E2E suite (Playwright)](testing.md#ui-e2e-suite-playwright).
+
 **Autoheal: Install gh-aw** installs the `github/gh-aw` extension pinned to the
 `compiler_version` recorded in the header of `.github/workflows/issue-triage.lock.yml`, so
 recompiling the workflows doesn't churn the lock file. It needs `gh auth login` (or a

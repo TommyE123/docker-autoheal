@@ -1,0 +1,140 @@
+name: UI E2E
+
+# Browser tests of real user journeys (containers, events, configuration,
+# notifications) against the development stack, run inside the Dev Container on its
+# own isolated Docker-in-Docker daemon (#460 / PR #461). The tests are Playwright
+# specs in frontend/e2e-ui, selected by tag; see docs/developer/testing.md.
+#
+# This is NOT the Production Image Smoke (production-smoke-test.yml): that one proves
+# the shipped image starts and serves the UI, this one proves application behaviour on
+# the development stack and never exercises the built production image. Each runs, and
+# can fail, on its own.
+#
+# What runs:
+#   - Pull request            -> UI E2E (smoke): the small @smoke subset, headless.
+#   - Release Please PR       -> UI E2E (full): the whole suite, before the release can
+#                                be merged. It is recognised by its branch name, and
+#                                matches the paths below because it changes
+#                                version.txt and app/api/api.py.
+#   - Manual (workflow_dispatch, "Run workflow" in the Actions tab)
+#                             -> any scope: smoke, full, or one functional area.
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "frontend/**"
+      - "app/**"
+      - "Dockerfile"
+      - ".dockerignore"
+      - "docker-compose.yml"
+      - "docker-compose.dev.yml"
+      - ".devcontainer/**"
+      - "requirements.txt"
+      - "version.txt"
+      - ".release-please-manifest.json"
+      - ".github/workflows/ui-e2e.yml"
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "Tests to run: smoke, full, or one functional area (a Playwright tag)"
+        type: choice
+        default: full
+        options:
+          - smoke
+          - full
+          - containers
+          - monitoring
+          - events
+          - configuration
+          - notifications
+          - errors
+          - regression
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ui-e2e:
+    name: UI E2E (${{ github.event_name == 'workflow_dispatch' && inputs.scope || (github.head_ref == 'release-please--branches--main' && 'full' || 'smoke') }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Select the test scope
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_SCOPE: ${{ inputs.scope }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            scope="$INPUT_SCOPE"
+          elif [ "$HEAD_REF" = release-please--branches--main ]; then
+            scope=full
+          else
+            scope=smoke
+          fi
+          echo "scope=$scope" >> "$GITHUB_OUTPUT"
+
+      # The suite only runs against the Dev Container's own Docker daemon, and refuses
+      # to run Docker tests otherwise. Until #461 replaces docker-outside-of-docker with
+      # docker-in-docker, there is no such environment, so say so loudly instead of
+      # failing every pull request. This step goes away once #461 has merged.
+      - name: Check the isolated Docker prerequisite
+        id: prerequisite
+        run: |
+          if grep -q 'docker-in-docker' .devcontainer/devcontainer.json; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::UI E2E did NOT run: the Dev Container has no isolated Docker daemon yet (#460 / PR #461)."
+            {
+              echo "### UI E2E did not run"
+              echo
+              echo "The Dev Container still shares the host Docker daemon (docker-outside-of-docker)."
+              echo "The suite refuses to run there. It starts running automatically once #461 merges."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # run.sh starts the dev stack on the inner daemon and runs Playwright headless.
+      # It exits 3 when the environment cannot be set up and 1 when a test fails; the
+      # ::error:: annotation says which.
+      - name: Run UI E2E in the Dev Container
+        if: steps.prerequisite.outputs.ready == 'true'
+        uses: devcontainers/ci@513af61f4de4f75d37e4438f184ba4358f0fc1ca # v0.3.1900000450
+        with:
+          env: |
+            CI=true
+            SCOPE=${{ steps.scope.outputs.scope }}
+          runCmd: |
+            set -e
+            # devcontainers/ci's headless exec ignores devcontainer.json's
+            # remoteEnv.PATH, so re-add the mise shims and pip's user scripts here.
+            export PATH="${HOME}/.local/share/mise/shims:${HOME}/.local/bin:${PATH}"
+            status=0
+            bash frontend/e2e-ui/run.sh "${SCOPE}" headless || status=$?
+            if [ "$status" -eq 1 ]; then
+              echo "::error::UI E2E tests failed; see the Playwright report artifact"
+            fi
+            exit "$status"
+
+      - name: Upload Playwright report and traces
+        if: failure() && steps.prerequisite.outputs.ready == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ui-e2e-report-${{ steps.scope.outputs.scope }}
+          path: |
+            frontend/playwright-report-ui/
+            frontend/test-results-ui/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -185,6 +185,145 @@ same-repository pull requests, like the rest of that job. On failure the report 
 traces are uploaded as the `playwright-report` artifact, and the job's existing
 diagnostics step prints the container logs.
 
+## UI E2E suite (Playwright)
+
+A second Playwright suite, in `frontend/e2e-ui/`, drives the real UI through real user
+journeys: containers, monitoring, events, configuration and notifications. It is separate
+from the Production Image Smoke described above, and the two prove different things:
+
+|              | Production Image Smoke                                       | UI E2E                                                     |
+|--------------|--------------------------------------------------------------|------------------------------------------------------------|
+| Proves       | The shipped image starts, serves the UI and talks to Docker  | UI behaviour and the backend/UI/Docker interaction         |
+| Runs against | The built production image, port `3131`                      | The development stack in the Dev Container, port `3132`    |
+| Config       | `playwright.config.js`, `e2e/`                               | `playwright.ui.config.js`, `e2e-ui/`                       |
+| Workflow     | `production-smoke-test.yml` (called from `docker-build.yml`) | `ui-e2e.yml`                                               |
+| Parallelism  | One worker                                                   | Parallel workers, with an exclusive group for shared state |
+
+The suite never exercises the production image and cannot replace the smoke test; both
+stay independently visible and can fail independently. They use separate Playwright
+configs because their lifecycles differ (one worker against a prebuilt image versus
+parallel workers, Docker fixtures and tag selection), and because the UI suite changes
+configuration and must never be pointed at a production instance. Its base URL therefore
+has its own variable, `UI_E2E_BASE_URL` (default `http://localhost:3132`), rather than the
+`E2E_BASE_URL` the smoke test uses.
+
+### Environment
+
+The suite uses the isolated Docker daemon from [Docker isolation](development-setup.md#docker-isolation)
+(the Dev Container's own Docker-in-Docker daemon, #460), and adds no environment of its
+own. It needs:
+
+* the Dev Container (or Codespaces), where Docker is that isolated daemon
+* the dev stack from `docker-compose.dev.yml`, which `frontend/e2e-ui/run.sh` starts
+  (and removes afterwards if it started it) at `http://localhost:3132`
+* Chromium, installed by `post-create.sh`
+
+Docker-backed tests create a few small, labelled `alpine` containers on that daemon and
+remove them afterwards. Before the first Docker command the suite checks that the daemon
+is the environment's own (the same checks as `.devcontainer/verify-isolation.sh`) and that
+the app under test monitors `autoheal.dev=true`, and it refuses to continue otherwise, so
+it cannot act on a host or production daemon. Tests that need no Docker (navigation,
+configuration, notifications) do not run that check. Until the isolation change is on
+`main`, the Docker-backed tests fail with that refusal by design.
+
+### Running it
+
+In VS Code, run **Terminal → Run Task → Autoheal: Run UI E2E** and pick a scope and a
+mode. From a terminal in the Dev Container:
+
+```bash
+bash frontend/e2e-ui/run.sh smoke          # the pull-request subset, headless
+bash frontend/e2e-ui/run.sh full headless  # everything
+bash frontend/e2e-ui/run.sh events ui      # one area, in Playwright's UI mode
+```
+
+The scope is `smoke`, `full`, or a functional tag below. The mode is one of:
+
+* `headless` (default): what CI runs.
+* `headed`: a visible browser window. It needs a display, which the stock Dev Container
+  does not have, so the script stops with a message when none is set.
+* `ui`: Playwright's UI mode, served on forwarded port 9323 and opened in your own
+  browser. It is a test runner and debugger, not a headed run.
+
+Every mode runs the same specs. To run against a stack you started yourself, or another
+dev instance, use Playwright directly:
+
+```bash
+cd frontend
+UI_E2E_BASE_URL=http://localhost:3132 npm run test:ui-e2e -- --grep @events
+UI_E2E_BASE_URL=http://localhost:3132 npm run test:ui-e2e:smoke
+```
+
+### Tags
+
+Tags select tests and are not mutually exclusive: one test can be
+`@smoke @containers @regression`.
+
+| Tag                                                                         | Meaning                                                                                   |
+|-----------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|
+| `@smoke`                                                                    | The small pull-request subset: is the UI fundamentally working? Keep it small and stable. |
+| `@regression`                                                               | Tests that guard a specific past or likely regression.                                    |
+| `@containers`, `@monitoring`, `@events`, `@configuration`, `@notifications` | Functional areas                                                                          |
+| `@errors`                                                                   | Loading, empty and failure handling, using `page.route` to fail one API call              |
+
+### Parallelism and shared state
+
+The app keeps one set of state in `/data` (configuration, notification services, the
+event log), so tests are split into two Playwright projects:
+
+* `parallel` (`e2e-ui/parallel/`): fully parallel. Tests either read a small set of
+  containers shared by the whole run (running and monitored, running and unmonitored,
+  unhealthy, exited) or create a container of their own, with a unique name.
+* `exclusive` (`e2e-ui/exclusive/`): tests that change shared state, such as saving
+  configuration, editing notification services or clearing the event log. It runs one
+  worker at a time and only after `parallel` has passed, so nothing reads that state
+  while it changes. The app configuration is snapshotted before each test and restored
+  after it. The event log cannot be restored through the API; it only holds the dev
+  stack's own events, and **Clear All** empties it.
+
+Put a new test in `exclusive/` if it changes anything a test in another file could see.
+`--no-deps --project=exclusive` runs that group alone. Because it depends on `parallel`,
+a failure there skips it.
+
+Containers carry the label `autoheal.e2e.run=<run id>`. Global teardown removes them and
+the configuration entries Autoheal made for them; the next run also removes any left over
+by an interrupted one.
+
+### Tests waiting on other work
+
+A test for behaviour that is not on `main` yet is written now and marked `test.fixme()`,
+so it shows as skipped in every report. When the blocking change merges, remove the
+`fixme` and leave the assertions alone:
+
+* #455: the empty-state alert covering the Add Service modal (`notifications.spec.js`)
+* #431: the Events page filters (`events.spec.js`)
+
+### CI
+
+`ui-e2e.yml` is one workflow that selects tests by tag. It runs `bash
+frontend/e2e-ui/run.sh <scope> headless` inside the Dev Container, the same way
+`devcontainer.yml` does.
+
+* **Pull requests** run **UI E2E (smoke)** when frontend, backend, Docker or Dev Container
+  files change.
+* **The Release Please PR** runs **UI E2E (full)**, so the whole suite runs before a
+  release can be merged.
+* **Run workflow** in the Actions tab runs any scope on demand.
+
+The run exits with 3 when the environment cannot be set up and 1 when a test fails, and
+the log annotation says which. On failure the Playwright HTML report, traces and
+screenshots are uploaded as the `ui-e2e-report-<scope>` artifact. While the Dev Container
+still shares the host daemon, the job reports that it did not run instead of failing; it
+starts running on its own once the isolation change is merged.
+
+### Writing tests
+
+Use role, text and label locators and wait for visible UI state, never fixed sleeps or
+`networkidle`. Keep each test independent. Use `page.route` only to make one API call fail
+or stall; the app itself is never faked. The settings forms and the modals do not yet link
+labels to inputs or give dialogs accessible names, so those are found by role within their
+form and by title (`dialogTitled`).
+
 ## CI
 
 `.github/workflows/tests.yml` runs the unit suite with coverage on every push
