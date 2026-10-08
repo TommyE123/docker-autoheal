@@ -222,8 +222,9 @@ Docker-backed tests create a few small, labelled `alpine` containers on that dae
 remove them afterwards. Before the first Docker command the suite checks that the daemon
 is the environment's own (the same checks as `.devcontainer/verify-isolation.sh`) and that
 the app under test monitors `autoheal.dev=true`, and it refuses to continue otherwise, so
-it cannot act on a host or production daemon. Tests that need no Docker (navigation,
-configuration, notifications) do not run that check. Until the isolation change is on
+it cannot act on a host or production daemon. The app check runs before every test,
+because even the tests that need no Docker (configuration, notifications) change the app's
+state; only the Docker daemon check is skipped for them. Until the isolation change is on
 `main`, the Docker-backed tests fail with that refusal by design.
 
 ### Running it
@@ -288,6 +289,10 @@ event log), so tests are split into two Playwright projects:
 Put a new test in `exclusive/` if it changes anything a test in another file could see.
 `--no-deps --project=exclusive` runs that group alone. Because it depends on `parallel`,
 a failure there skips it.
+
+Run one UI E2E at a time per Dev Container: starting a run removes leftover containers
+of earlier runs, which would also remove those of a run still in progress (for example
+Playwright's UI mode left open while the task runs in a terminal).
 
 Containers carry the label `autoheal.e2e.run=<run id>`. Global teardown removes them and
 the configuration entries Autoheal made for them; the next run also removes any left over

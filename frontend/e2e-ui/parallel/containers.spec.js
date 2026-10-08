@@ -69,11 +69,11 @@ test(
 
     const navigation = page.getByRole("navigation");
     await expect(navigation.getByText("Active")).toBeVisible();
-    // "<monitored>/<total> monitored"; the total covers at least the shared containers.
+    // "<monitored>/<total> monitored"; the total counts stopped containers too, so it covers at least the 4 shared ones.
     const summary = navigation.getByText(/\d+\/\d+ monitored/);
     await expect(summary).toBeVisible();
     const total = Number((await summary.innerText()).match(/\/(\d+)/)[1]);
-    expect(total).toBeGreaterThanOrEqual(3);
+    expect(total).toBeGreaterThanOrEqual(4);
   },
 );
 

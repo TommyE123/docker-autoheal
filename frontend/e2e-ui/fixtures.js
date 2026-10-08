@@ -46,7 +46,9 @@ export const test = base.extend({
         await readMonitorLabel(playwright, workerInfo.project.use.baseURL),
       );
     },
-    { scope: "worker" },
+    // Automatic, so the dev-stack check runs before every test, including the ones that
+    // use no containers but still change the app's state (configuration, notifications).
+    { scope: "worker", auto: true },
   ],
 
   /**
@@ -93,9 +95,15 @@ export const test = base.extend({
       };
       for (const [key, [format, value]] of Object.entries(expectedState)) {
         await expect
-          .poll(() => inspectContainer(containers[key].name, format), {
-            timeout: 60000,
-          })
+          .poll(
+            // A container that exists but has not started yet has no health data, which
+            // makes `docker inspect` fail; treat that as "not there yet", not as an error.
+            () =>
+              inspectContainer(containers[key].name, format).catch(
+                () => "unavailable",
+              ),
+            { timeout: 60000 },
+          )
           .toBe(value);
       }
       await provide(

@@ -55,7 +55,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.scope }}
   cancel-in-progress: true
 
 jobs:
@@ -93,7 +93,7 @@ jobs:
       - name: Check the isolated Docker prerequisite
         id: prerequisite
         run: |
-          if grep -q 'docker-in-docker' .devcontainer/devcontainer.json; then
+          if grep -Eq '"ghcr.io/devcontainers/features/docker-in-docker[:"]' .devcontainer/devcontainer.json; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
