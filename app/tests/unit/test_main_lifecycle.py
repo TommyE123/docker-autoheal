@@ -156,12 +156,15 @@ class TestAutoHealServiceStop:
         service.uptime_kuma_monitor.stop = AsyncMock(side_effect=RuntimeError("kuma boom"))
         service.monitoring_engine = MagicMock()
         service.monitoring_engine.stop = AsyncMock()
+        service.notification_manager = MagicMock()
+        service.notification_manager.stop = AsyncMock()
         service.docker_client = MagicMock()
 
         with caplog.at_level("WARNING", logger="app.main"):
             await service.stop()
 
         service.monitoring_engine.stop.assert_awaited_once()
+        service.notification_manager.stop.assert_awaited_once()
         service.docker_client.close.assert_called_once()
         assert self._messages(caplog, "WARNING") == [
             "Error stopping Uptime-Kuma monitor: kuma boom"
@@ -175,11 +178,14 @@ class TestAutoHealServiceStop:
         service = AutoHealService()
         service.monitoring_engine = MagicMock()
         service.monitoring_engine.stop = AsyncMock(side_effect=RuntimeError("engine boom"))
+        service.notification_manager = MagicMock()
+        service.notification_manager.stop = AsyncMock()
         service.docker_client = MagicMock()
 
         with caplog.at_level("WARNING", logger="app.main"):
             await service.stop()
 
+        service.notification_manager.stop.assert_awaited_once()
         service.docker_client.close.assert_called_once()
         assert self._messages(caplog, "WARNING") == [
             "Error stopping monitoring engine: engine boom"
