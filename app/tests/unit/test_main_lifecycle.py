@@ -124,6 +124,32 @@ class TestAutoHealServiceStop:
         assert isinstance(record.exc_info[1], RuntimeError)
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("cancelled_step", ["kuma", "engine", "notifications"])
+    async def test_stop_closes_docker_when_cancelled_mid_shutdown(self, cancelled_step):
+        # CancelledError is not an Exception, so the per-step handlers do not catch
+        # it; the Docker client must still be closed before it propagates.
+        service = AutoHealService()
+        service.uptime_kuma_monitor = MagicMock()
+        service.uptime_kuma_monitor.stop = AsyncMock()
+        service.monitoring_engine = MagicMock()
+        service.monitoring_engine.stop = AsyncMock()
+        service.notification_manager = MagicMock()
+        service.notification_manager.stop = AsyncMock()
+        service.docker_client = MagicMock()
+        step = {
+            "kuma": service.uptime_kuma_monitor,
+            "engine": service.monitoring_engine,
+            "notifications": service.notification_manager,
+        }[cancelled_step]
+        step.stop.side_effect = asyncio.CancelledError
+
+        with pytest.raises(asyncio.CancelledError):
+            await service.stop()
+
+        service.docker_client.close.assert_called_once()
+        assert service.running is False
+
+    @pytest.mark.asyncio
     async def test_stop_continues_after_kuma_stop_raises(self, caplog):
         service = AutoHealService()
         service.uptime_kuma_monitor = MagicMock()

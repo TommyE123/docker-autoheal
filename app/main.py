@@ -192,29 +192,32 @@ class AutoHealService:
 
         self.running = False
 
-        # Stop components gracefully with error handling
-        if self.uptime_kuma_monitor:
-            try:
-                await self.uptime_kuma_monitor.stop()
-            except Exception as e:
-                logger.warning("Error stopping Uptime-Kuma monitor: %s", e)
-
-        if self.monitoring_engine:
-            try:
-                await self.monitoring_engine.stop()
-            except Exception as e:
-                logger.warning("Error stopping monitoring engine: %s", e)
-
+        # Stop components gracefully with error handling. The Docker client is
+        # closed in `finally` so a cancellation (not an Exception) during an
+        # earlier step cannot skip it.
         try:
-            await self.notification_manager.stop()
-        except Exception as e:
-            logger.warning("Error stopping notification manager: %s", e, exc_info=True)
+            if self.uptime_kuma_monitor:
+                try:
+                    await self.uptime_kuma_monitor.stop()
+                except Exception as e:
+                    logger.warning("Error stopping Uptime-Kuma monitor: %s", e)
 
-        if self.docker_client:
+            if self.monitoring_engine:
+                try:
+                    await self.monitoring_engine.stop()
+                except Exception as e:
+                    logger.warning("Error stopping monitoring engine: %s", e)
+
             try:
-                self.docker_client.close()
+                await self.notification_manager.stop()
             except Exception as e:
-                logger.warning("Error closing Docker client: %s", e)
+                logger.warning("Error stopping notification manager: %s", e, exc_info=True)
+        finally:
+            if self.docker_client:
+                try:
+                    self.docker_client.close()
+                except Exception as e:
+                    logger.warning("Error closing Docker client: %s", e)
 
         logger.info("Docker Auto-Heal Service stopped")
 
