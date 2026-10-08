@@ -9,6 +9,13 @@ import { defineConfig, devices } from "@playwright/test";
 //
 // The base URL has its own variable (not E2E_BASE_URL, which the production smoke
 // sets to port 3131) so a stray environment value cannot aim this suite at production.
+
+// Selects tests by tag, e.g. UI_E2E_TAG=@events. This is set per project rather than
+// passed as --grep because the CLI filter does not apply to a dependency project: with
+// `--grep @events`, the exclusive project would still pull in every `parallel` test.
+const tag = process.env.UI_E2E_TAG;
+const grep = tag ? new RegExp(tag) : undefined;
+
 export default defineConfig({
   testDir: "./e2e-ui",
   outputDir: "./test-results-ui",
@@ -32,6 +39,7 @@ export default defineConfig({
       // Tests that only touch their own containers or only read shared state.
       name: "parallel",
       testMatch: "parallel/**/*.spec.js",
+      grep,
       fullyParallel: true,
       use: { ...devices["Desktop Chrome"] },
     },
@@ -42,6 +50,7 @@ export default defineConfig({
       // `--no-deps` runs it alone.
       name: "exclusive",
       testMatch: "exclusive/**/*.spec.js",
+      grep,
       workers: 1,
       dependencies: ["parallel"],
       use: { ...devices["Desktop Chrome"] },

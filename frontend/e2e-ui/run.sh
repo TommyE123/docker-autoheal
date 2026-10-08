@@ -21,7 +21,9 @@ args=()
 case "${scope}" in
 full) ;;
 smoke | containers | monitoring | events | configuration | notifications | errors | regression)
-  args+=(--grep "@${scope}")
+  # A per-project filter (see playwright.ui.config.js), not --grep: --grep would still
+  # run every test of the `parallel` project that the `exclusive` project depends on.
+  export UI_E2E_TAG="@${scope}"
   ;;
 *)
   echo "Unknown scope '${scope}'" >&2
@@ -46,6 +48,23 @@ ui) args+=(--ui-host=0.0.0.0 --ui-port=9323) ;;
 esac
 
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
+
+# Refuse to start anything unless Docker here is this environment's own daemon. The same
+# checks as .devcontainer/verify-isolation.sh and frontend/e2e-ui/docker.js; they run
+# before Compose so that a host or production daemon is never built on or started against.
+if [ -n "${DOCKER_HOST:-}${DOCKER_CONTEXT:-}" ]; then
+  echo "::error::UI E2E refused to start: DOCKER_HOST or DOCKER_CONTEXT is set, so Docker may not be the local daemon" >&2
+  exit 3
+fi
+if ! pgrep -x dockerd >/dev/null; then
+  echo "::error::UI E2E refused to start: no dockerd runs here, so Docker is not the Dev Container's own daemon (#460 / PR #461)" >&2
+  exit 3
+fi
+daemon_name="$(docker info --format '{{.Name}}' 2>/dev/null || true)"
+if [ "${daemon_name}" != "$(hostname)" ]; then
+  echo "::error::UI E2E refused to start: Docker daemon '${daemon_name}' is not this environment's own ('$(hostname)')" >&2
+  exit 3
+fi
 
 compose=(docker compose -p docker-autoheal-dev -f docker-compose.yml -f docker-compose.dev.yml)
 

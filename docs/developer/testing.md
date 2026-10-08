@@ -250,9 +250,13 @@ dev instance, use Playwright directly:
 
 ```bash
 cd frontend
-UI_E2E_BASE_URL=http://localhost:3132 npm run test:ui-e2e -- --grep @events
+UI_E2E_BASE_URL=http://localhost:3132 UI_E2E_TAG=@events npm run test:ui-e2e
 UI_E2E_BASE_URL=http://localhost:3132 npm run test:ui-e2e:smoke
 ```
+
+Select by tag with `UI_E2E_TAG`, not `--grep`: Playwright does not apply `--grep` to a
+dependency project, so `--grep @events` would also run every `parallel` test. `@smoke`
+tests must live in `parallel/`, which is all `test:ui-e2e:smoke` runs.
 
 ### Tags
 
