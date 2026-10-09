@@ -3,7 +3,9 @@ set -euo pipefail
 
 # Proves, from inside the Dev Container, that Docker here is an isolated daemon and that the
 # development Autoheal recovers a container on it. It creates two disposable probes and removes
-# them afterwards. Start the dev stack first (task "Autoheal: Run Docker Stack"). Host-side
+# them afterwards, and restores the Autoheal configuration it snapshotted (auto-monitoring adds the
+# victim to containers.selected and restarts add to containers.restart_counts, both persisted in
+# data-dev). Events cannot be deleted one at a time, so the event log keeps this run's entries. Start the dev stack first (task "Autoheal: Run Docker Stack"). Host-side
 # checks (production containers invisible here, probes invisible there) are in
 # docs/developer/development-setup.md.
 
@@ -12,8 +14,26 @@ web=autoheal-isolation-web
 victim=autoheal-isolation-victim
 timeout_seconds=150
 
-cleanup() {
+config_backup=""
+
+remove_probes() {
   docker rm -f "${web}" "${victim}" >/dev/null 2>&1 || true
+}
+
+# EXIT handler: removes the probes, then restores the configuration snapshot (if one was taken)
+# whatever happened. Keeps the script's own exit status, but a failed restore turns a success
+# into a failure instead of being ignored.
+on_exit() {
+  local status=$?
+  remove_probes
+  if [ -n "${config_backup}" ]; then
+    if ! curl -fsS -X PUT -H 'Content-Type: application/json' --data "${config_backup}" \
+      "${base_url}/api/config" >/dev/null; then
+      echo "::error::Could not restore the original Autoheal configuration at ${base_url}/api/config" >&2
+      [ "${status}" -ne 0 ] || status=1
+    fi
+  fi
+  exit "${status}"
 }
 
 # Check which daemon the client talks to before mutating anything. A dockerd process alone
@@ -32,8 +52,8 @@ fi
 echo "Daemon ${daemon_name} is local. Containers on it:"
 docker ps -a --format '  {{.Names}}'
 
-trap cleanup EXIT
-cleanup
+trap on_exit EXIT
+remove_probes
 
 echo "== ${web}: create, stop, restart, remove =="
 docker run -d --name "${web}" nginx:alpine >/dev/null
@@ -56,6 +76,9 @@ if [ "${label_key}=${label_value}" != "autoheal.dev=true" ]; then
   echo "::error::${base_url} monitors ${label_key}=${label_value}, not the dev label autoheal.dev=true" >&2
   exit 1
 fi
+
+# Snapshot before the victim exists; on_exit puts it back.
+config_backup="${config}"
 
 # Exits non-zero shortly after starting; --restart no leaves recovery to Autoheal. The event log
 # persists in data-dev, so success is matched on this run's container ID, not on the fixed name.

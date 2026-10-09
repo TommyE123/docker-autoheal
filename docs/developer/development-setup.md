@@ -170,8 +170,10 @@ bash .devcontainer/verify-isolation.sh
 It creates `autoheal-isolation-web` (an `nginx:alpine` container) and
 `autoheal-isolation-victim` (an `alpine` container that exits with an error after a few
 seconds, `--restart no`, labelled for the dev monitor), checks that the dev Autoheal restarts
-the victim, and removes both. The probes are created on demand and are not part of any
-Compose file. To confirm the other direction, run `docker ps` **on the host** while
+the victim, and removes both. Auto-monitoring adds the victim to the saved configuration, so the
+script snapshots `/api/config` first and puts it back on exit, even when a check fails; a failed
+restore fails the script. Only the event log keeps this run's entries, because events cannot be
+deleted one at a time. The probes are created on demand and are not part of any Compose file. To confirm the other direction, run `docker ps` **on the host** while
 the probes exist: neither appears, and the host's containers are unchanged.
 
 **Migrating from the old setup.** Earlier versions used `docker-outside-of-docker`, which
