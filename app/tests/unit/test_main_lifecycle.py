@@ -327,6 +327,35 @@ class TestAutoHealServiceStartFailure:
             assert service.running is False
 
     @pytest.mark.asyncio
+    async def test_failure_after_metrics_server_started_stops_it(self):
+        config = self._make_config()
+        config.observability.prometheus_enabled = True
+        server = MagicMock()
+
+        with (
+            patch("app.main.config_manager") as mock_cm,
+            patch("app.main.DockerClientWrapper"),
+            patch("app.main.MonitoringEngine") as mock_engine_cls,
+            patch("app.main.UptimeKumaMonitor"),
+            patch("app.main.init_api"),
+            patch("app.main.start_http_server", return_value=(server, MagicMock())),
+            patch("app.main.notification_manager") as mock_notif,
+        ):
+            mock_cm.get_config.return_value = config
+            mock_engine_cls.return_value.stop = AsyncMock()
+            mock_notif.start = AsyncMock(side_effect=RuntimeError("notify broke"))
+            mock_notif.stop = AsyncMock()
+
+            service = AutoHealService()
+
+            with pytest.raises(RuntimeError, match="notify broke"):
+                await service.start()
+
+            server.shutdown.assert_called_once()
+            server.server_close.assert_called_once()
+            assert service.metrics_server is None
+
+    @pytest.mark.asyncio
     async def test_failure_after_components_started_stops_them(self):
         # A failure after the engine and Uptime-Kuma have started (here while building
         # the startup log) must stop both and close the Docker client, not leave them running.
