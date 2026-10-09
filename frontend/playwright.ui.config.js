@@ -1,15 +1,14 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// UI E2E: real user journeys, selected by tag, run by frontend/e2e-ui/run.sh. It needs an
-// instance monitoring autoheal.dev=true on an isolated Docker daemon, which is either
-//   - CI: a throwaway instance of the exact image docker-build.yml built, started by
-//     production-smoke-test.yml, which sets UI_E2E_BASE_URL; or
-//   - development: the dev stack of docker-compose.dev.yml in the Dev Container.
-// It uses parallel workers and Docker fixtures, and must never be pointed at a production
-// instance (the fixtures refuse one). See docs/developer/testing.md.
+// UI E2E: real user journeys against the development stack running on the Dev
+// Container's isolated Docker daemon (docker-compose.dev.yml, PR #461). This is
+// deliberately separate from playwright.config.js, which is the Production Image
+// Smoke: that one proves the shipped image on port 3131 with a single worker, this
+// one needs parallel workers, Docker fixtures and tag selection, and must never be
+// pointed at a production instance. See docs/developer/testing.md.
 //
-// The base URL has its own variable so a stray environment value (such as a generic
-// E2E_BASE_URL) cannot aim this suite at production.
+// The base URL has its own variable (not E2E_BASE_URL, which the production smoke
+// sets to port 3131) so a stray environment value cannot aim this suite at production.
 
 // Selects tests by tag, e.g. UI_E2E_TAG=@events. This is set per project rather than
 // passed as --grep because the CLI filter does not apply to a dependency project: with

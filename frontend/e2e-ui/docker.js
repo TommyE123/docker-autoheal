@@ -1,8 +1,7 @@
 // Thin, guarded access to Docker for the UI E2E fixtures.
 //
-// The isolated environment is the Dev Container's own Docker-in-Docker daemon (PR #461)
-// or, in CI, the ephemeral GitHub-hosted runner's own daemon; this module does not create
-// another one. Every Docker command goes
+// The isolated environment is the Dev Container's own Docker-in-Docker daemon
+// (PR #461); this module does not create another one. Every Docker command goes
 // through `docker()`, which first proves the daemon is that isolated one and refuses
 // to run anything otherwise, so the suite can never act on a host or production daemon.
 import { execFile } from "node:child_process";
@@ -70,8 +69,7 @@ export async function assertIsolatedDocker() {
   if (!result.ok) {
     throw new Error(
       `Refusing to use Docker: ${result.reason}. UI E2E tests that need Docker only run ` +
-        "against an isolated local daemon: the Dev Container's Docker-in-Docker daemon " +
-        "or the CI runner's own " +
+        "inside the Dev Container, against its isolated Docker-in-Docker daemon " +
         "(docs/developer/testing.md#ui-e2e-suite-playwright).",
     );
   }
