@@ -311,9 +311,8 @@ runs the same way for pull requests from forks (GitHub still asks a maintainer t
 first-time contributor's workflow run).
 
 1. `build-amd64` builds the `linux/amd64` image and uploads it as the `docker-image-amd64`
-   artifact (kept for a day). The tests run on this image, not on the multi-arch image that
-   the `build` job pushes for same-repository pull requests; both come from the same commit
-   and Dockerfile.
+   artifact (kept for a day). Nothing is pushed to a registry on a pull request; releases are
+   built and pushed by `release-please.yml`.
 2. The smoke test job downloads and loads that image and starts a throwaway container from
    it with no config;
 3. waits until `/health` responds and `/api/status` reports `docker_connected`, checks
