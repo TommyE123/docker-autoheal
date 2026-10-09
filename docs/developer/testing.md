@@ -7,7 +7,7 @@ Unit tests live in `app/tests/unit/`. They run entirely against fakes and mocks:
 external network calls are made. This is what CI runs.
 
 An integration suite lives in `app/tests/integration/`. Those tests exercise a
-real Docker daemon and/or a running Auto-Heal service (`http://localhost:3131`)
+real Docker daemon and/or a running Auto-Heal service (the dev stack on `http://localhost:3132`)
 and are **not** collected by a plain `pytest` run - `pytest.ini`'s `testpaths`
 only points at `app/tests/unit`. Run them explicitly (see below) when you have
 the resources they need available.
@@ -41,8 +41,14 @@ check.
 
 The integration suite requires a real Docker daemon reachable at the default
 socket (`unix://var/run/docker.sock`), and some of its tests additionally
-require a running Auto-Heal service on `http://localhost:3131` (e.g. via
-`docker-compose up`). Every test skips itself - rather than failing - when the
+require a running Auto-Heal service on `http://localhost:3132` (the dev stack,
+started with the **Autoheal: Run Docker Stack** task). Set `AUTOHEAL_BASE_URL` (and
+`AUTOHEAL_METRICS_URL`, default `http://localhost:9091`) to test another instance. To test the
+backend run directly with **Autoheal: Run Backend** (it listens on `3131`, metrics on `9090`,
+inside the Dev Container), use `AUTOHEAL_BASE_URL=http://localhost:3131` and
+`AUTOHEAL_METRICS_URL=http://localhost:9090`. In the
+Dev Container, Docker is the isolated inner daemon, so these tests never touch production
+containers; see [Docker isolation](development-setup.md#docker-isolation). Every test skips itself - rather than failing - when the
 resource it needs isn't available, so it's safe to run with only some of those
 resources present.
 
@@ -53,7 +59,7 @@ pytest app/tests/integration
 # Only the tests that need Docker but not a running service
 pytest app/tests/integration/test_container_recreation.py app/tests/integration/test_restart_count.py
 
-# Only the tests that need a running service (start it first: docker-compose up -d)
+# Only the tests that need a running service (start the dev stack first)
 pytest app/tests/integration/test_service_smoke.py app/tests/integration/test_auto_monitor.py
 ```
 
@@ -65,19 +71,20 @@ includes both suites.
 |----------------------------------------------------------------|--------------------------------|
 | Container-ID-vs-stable-ID tracking across real recreation      | `test_container_recreation.py` |
 | Native restart count after a policy-triggered restart          | `test_restart_count.py`        |
-| Auto-discovery of `autoheal=true` labelled containers          | `test_auto_monitor.py`         |
+| Auto-discovery of containers with the service's monitor label  | `test_auto_monitor.py`         |
 | `/health`, `/api/status`, the React UI, and Prometheus metrics | `test_service_smoke.py`        |
 
 ### Isolation against a real Auto-Heal instance
 
-`http://localhost:3131` may be someone's real, already-running instance, not a
+`AUTOHEAL_BASE_URL` may point at someone's real, already-running instance, not a
 throwaway test fixture - these tests only do things a real user's actions
 would also do, and undo the ones with lasting effect:
 
 * Containers are uniquely named (`autoheal-*-<uuid>`) and force-removed by
   `disposable_container`, so they never collide with anything already running.
-* `test_auto_monitor.py` removes the container it caused to be auto-selected
-  from `containers.selected` afterward (via `GET`/`PUT /api/config` - not
+* `test_auto_monitor.py` labels its container with the running service's own
+  configured monitor label (`autoheal.dev=true` for the dev stack) and removes the
+  container it caused to be auto-selected from `containers.selected` afterward (via `GET`/`PUT /api/config` - not
   `POST /api/containers/select`, which moves it to `containers.excluded`
   instead of clearing it). The `auto_monitor` event itself is left in the
   log, same as it would be from real usage, because the API only exposes
@@ -163,7 +170,7 @@ excludes `e2e/`.
 
 In the Dev Container, run **Terminal → Run Task → Autoheal: Run Playwright E2E Tests**. It
 builds and starts the dev stack from `docker-compose.dev.yml` (so it never touches a real
-deployment on `3131`), then runs `npm run test:e2e` against it. **Run Playwright E2E Tests (UI)** runs
+deployment on `3131`, and inside the Dev Container never on the host's daemon), then runs `npm run test:e2e` against it. **Run Playwright E2E Tests (UI)** runs
 `npm run test:e2e:ui` instead, to watch the run in Playwright's UI mode; see
 [Tasks](development-setup.md#tasks). To run it by hand against any running instance:
 
@@ -174,7 +181,8 @@ npx playwright install chromium   # first time only
 E2E_BASE_URL=http://localhost:3132 npm run test:e2e
 ```
 
-`E2E_BASE_URL` defaults to `http://localhost:3131`; set it to test a different
+`E2E_BASE_URL` defaults to `http://localhost:3132`, the dev stack (CI sets it to the production
+smoke-test port `3131`); set it to test a different
 instance. Failures write screenshots and traces to `frontend/test-results/` and an HTML
 report to `frontend/playwright-report/` when `CI` is set (both git-ignored).
 

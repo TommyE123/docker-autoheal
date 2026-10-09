@@ -17,6 +17,7 @@ on:
       - "frontend/package.json"
       - "frontend/package-lock.json"
       - "docker-compose.yml"
+      - "docker-compose.dev.yml"
       - "Dockerfile"
       - ".dockerignore"
   workflow_dispatch:
@@ -39,6 +40,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      # A known container on the runner's own (host) Docker daemon. The Dev Container's
+      # isolated daemon must not be able to see it; see the isolation check below.
+      - name: Start host-daemon isolation sentinel
+        run: docker run -d --name docker-autoheal-host-isolation-fixture alpine:3.22 sleep 3600
 
       # Validates that the environment builds and its tooling runs, not that
       # the application works - tests.yml owns that.
@@ -100,22 +106,41 @@ jobs:
             echo "== Pytest collection =="
             python -m pytest --collect-only -q
 
-            # The fragile part: Compose talking to the host daemon via DooD.
-            echo "== Docker Compose stack =="
-            docker compose up -d --build autoheal
-            healthy=false
-            for _ in $(seq 1 60); do
-              if [ "$(docker inspect -f '{{.State.Health.Status}}' docker-autoheal 2>/dev/null)" = "healthy" ]; then
-                healthy=true
-                break
-              fi
-              sleep 2
-            done
-            if [ "$healthy" != "true" ]; then
-              echo "::error::docker compose stack did not become healthy"
-              docker compose logs
-              docker compose down --remove-orphans
+            # The fragile part: Compose talking to the Dev Container's own (Docker-in-Docker)
+            # daemon, not the host's.
+            echo "== Isolated Docker daemon =="
+            pgrep -x dockerd
+            # The host daemon holds docker-autoheal-host-isolation-fixture; if this client
+            # can see it (or anything else), it is not talking to the isolated daemon.
+            if docker ps -a --format '{{.Names}}' | grep -qx docker-autoheal-host-isolation-fixture; then
+              echo "::error::Host daemon sentinel container is visible from inside the Dev Container"
+              docker ps -a
               exit 1
             fi
-            echo "docker compose stack is healthy"
-            docker compose down --remove-orphans
+            # CI starts from a fresh inner-daemon volume, so it must begin empty (local
+            # rebuilds keep their containers; see the docs).
+            if [ -n "$(docker ps -aq)" ]; then
+              echo "::error::Containers from outside the Dev Container are visible to its Docker daemon"
+              docker ps -a
+              exit 1
+            fi
+
+            echo "== Docker Compose dev stack =="
+            compose='docker compose -p docker-autoheal-dev -f docker-compose.yml -f docker-compose.dev.yml'
+            # Chained with && (not a { ...; } group): set -e is ignored inside the left side
+            # of ||, so a group could swallow a failing step. Logs are printed on any failure.
+            $compose up -d --build --wait autoheal &&
+              curl -fsS http://localhost:3132/health &&
+              echo &&
+              echo "dev stack is healthy" &&
+              bash .devcontainer/verify-isolation.sh || {
+              echo "::error::dev stack did not become healthy or the isolation check failed"
+              $compose logs
+              $compose down --remove-orphans
+              exit 1
+            }
+            $compose down --remove-orphans
+
+      - name: Remove host-daemon isolation sentinel
+        if: always()
+        run: docker rm -f docker-autoheal-host-isolation-fixture
