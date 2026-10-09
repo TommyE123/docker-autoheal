@@ -234,22 +234,36 @@ Compose gives the `COMPOSE_PROJECT_NAME` environment variable precedence over it
 variable set the stack would otherwise land in another project, and `docker compose down` could
 remove that project's containers and networks. `-p` takes precedence over both.
 
-By default the startup log reports the published host port (`3132`) and the container port
-(`3131`), for example `Web UI published on host port 3132 (container port 3131)`, because the
-application cannot know which address other machines use to reach the Docker host. In the
-Dev Container, open `localhost:3132` (the forwarded port); elsewhere, use the Docker host's address. To have the log print a full, clickable URL instead, set
-`AUTOHEAL_DEV_HOST` to that address. The simplest way is a `.env` file next to
-`docker-compose.yml`, which Docker Compose reads automatically and Git ignores:
+By default the startup log reports only the published port and the container port, for
+example `Web UI published on host port 3132 (container port 3131)`, because the application
+cannot know which address anything else uses to reach it.
+
+**Inside the Dev Container (the isolated workflow)**, leave `AUTOHEAL_DEV_HOST` unset and open
+`http://localhost:3132`. VS Code forwards port 3132 to your desktop, so the same
+`http://localhost:3132` works in a browser on the machine running VS Code (see the Ports tab).
+The inner Docker daemon publishes the port inside the Dev Container only: it does not become a
+port on the Docker host's LAN address, so `http://<server-address>:3132` does not reach the
+isolated dev stack, and the host's own `3131` is still production.
+
+`AUTOHEAL_DEV_HOST` (passed to the app as `AUTOHEAL_PUBLIC_HOST`) only changes the URL printed in
+the startup logs, to `Web UI available at http://<value>:3132`. It does not expose, publish or
+forward anything. Setting it to the server's address in the Dev Container would make the logs
+advertise a URL that does not work, so don't. Compose reads a `.env` file next to
+`docker-compose.yml` automatically, and the Dev Container mounts your checkout, so a `.env`
+created for a host workflow also applies to the stack started inside the Dev Container. Delete
+`AUTOHEAL_DEV_HOST` from it, or the file, if you see an unexpected URL in the logs.
+
+The variable is only useful when you run this override from a host shell (not isolated: see
+below), where the published port really is on the host's address. There you can set it to the
+address you reach the host at, in `.env` or the shell that runs the command:
 
 ```bash
 echo 'AUTOHEAL_DEV_HOST=192.0.2.10' > .env
 ```
 
-The log then shows `Web UI available at http://192.0.2.10:3132`. Exporting the variable in
-the shell that runs the command works too. Nothing detects the address for you. This only
-changes the logged messages. The server still listens on `0.0.0.0:3131` inside the
-container. Outside this override, `AUTOHEAL_PUBLIC_HOST` and `AUTOHEAL_PUBLIC_PORT` do the
-same job.
+The log then shows `Web UI available at http://192.0.2.10:3132`. Nothing detects the address
+for you, and the server still listens on `0.0.0.0:3131` inside the container. Outside this
+override, `AUTOHEAL_PUBLIC_HOST` and `AUTOHEAL_PUBLIC_PORT` do the same job.
 
 Inside the Dev Container the Docker socket belongs to the isolated inner daemon, so the
 dev instance cannot see production containers at all. The override also seeds

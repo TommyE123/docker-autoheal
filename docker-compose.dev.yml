@@ -43,8 +43,10 @@ services:
         PY
         exec python -m app.main
     # Only changes the URLs shown in the startup logs; the server still listens on 0.0.0.0:3131
-    # inside the container. Set AUTOHEAL_DEV_HOST to the address you reach this host at to log a
-    # real URL; left unset, the logs only report the listen address. The port is the published one.
+    # inside the container, and nothing is exposed or forwarded. Inside the Dev Container leave
+    # AUTOHEAL_DEV_HOST unset: the stack is reached at http://localhost:3132 (VS Code forwards that
+    # port), and the logs report only the published port. Set it only when running this override
+    # from a host shell, to the address you reach that host at, to log a real URL.
     environment:
       - AUTOHEAL_PUBLIC_HOST=${AUTOHEAL_DEV_HOST:-}
       - AUTOHEAL_PUBLIC_PORT=${AUTOHEAL_DEV_PORT:-3132}
