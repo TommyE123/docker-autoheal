@@ -84,7 +84,14 @@ test(
       .toContain("success");
 
     await page.goto("/events");
-    await expect(page.getByRole("heading", { name })).toBeVisible();
+    // By now the container has two events (auto_monitor, then restart), so its heading
+    // appears more than once; the restart event is identified by its own message.
+    await expect(page.getByRole("heading", { name }).first()).toBeVisible();
+    await expect(
+      page
+        .getByText("Restart successful: Container exited with code 1")
+        .first(),
+    ).toBeVisible();
     await expect(
       page.getByText("restart", { exact: true }).first(),
     ).toBeVisible();
