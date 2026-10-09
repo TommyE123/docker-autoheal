@@ -45,8 +45,9 @@ services:
     # Only changes the URLs shown in the startup logs; the server still listens on 0.0.0.0:3131
     # inside the container. Inside the Dev Container, localhost is the default because VS Code
     # forwards port 3132 to your desktop. Set AUTOHEAL_DEV_HOST only when running this override
-    # from a host shell and you want the logs to show that host's address. This changes the log
-    # URL only; it does not expose or forward any additional ports.
+    # from a host shell and you browse from another machine, so the logs show that host's address
+    # (the default localhost is right on the host itself). This changes the log URL only; it does
+    # not expose or forward any additional ports.
     environment:
       - AUTOHEAL_PUBLIC_HOST=${AUTOHEAL_DEV_HOST:-localhost}
       - AUTOHEAL_PUBLIC_PORT=${AUTOHEAL_DEV_PORT:-3132}

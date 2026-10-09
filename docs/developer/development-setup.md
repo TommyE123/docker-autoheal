@@ -68,8 +68,10 @@ To reset a volume completely, stop the container and remove the volume from the 
 `~/.cache` at once, and removing `docker-autoheal-mise-data` uninstalls the mise tools until
 `mise install --locked` runs again. If you used an earlier version of this Dev Container,
 its `docker-autoheal-pip-cache` and `docker-autoheal-npm-cache` volumes are no longer used
-and can be removed the same way. Avoid running these cleanups while an install is in
-progress in another terminal.
+and can be removed the same way. The inner Docker daemon has its own volume,
+`docker-autoheal-dind-<devcontainerId>`, which holds its images, volumes and containers; it
+is not touched by these cleanups and is described under [Docker isolation](#docker-isolation).
+Avoid running these cleanups while an install is in progress in another terminal.
 
 ### Tasks
 
@@ -86,7 +88,8 @@ Conventions** and **Run Security Scanners**.
 (see [Running beside an existing deployment](#running-beside-an-existing-deployment)). The
 `--build` flag is what makes `docker-compose.yml` build your changes instead of using the
 published image. The result is tagged `docker-autoheal:dev` locally, so it does not replace
-`tommye123/docker-autoheal:latest`.
+`tommye123/docker-autoheal:latest`. Open it at `http://localhost:3132` (VS Code forwards the port
+to your desktop; see [Docker isolation](#docker-isolation) and the logging notes below).
 
 **Autoheal: Run Playwright E2E Tests** starts the same dev stack in the background
 (`up --build -d --wait`, which waits for the image's healthcheck), then runs
@@ -234,28 +237,33 @@ Compose gives the `COMPOSE_PROJECT_NAME` environment variable precedence over it
 variable set the stack would otherwise land in another project, and `docker compose down` could
 remove that project's containers and networks. `-p` takes precedence over both.
 
-By default the startup log reports only the published port and the container port, for
-example `Web UI published on host port 3132 (container port 3131)`, because the application
-cannot know which address anything else uses to reach it.
+The dev override sets the address shown in the startup logs to `localhost` and the published
+port, so the logs print `Web UI available at http://localhost:3132` and
+`API documentation available at http://localhost:3132/docs`. The application cannot know which
+address anything else uses to reach it, so the override supplies this default (`AUTOHEAL_DEV_HOST`
+overrides it, see below). With no host supplied, the app does not print a URL: it logs the
+published port when `AUTOHEAL_PUBLIC_PORT` is set, otherwise just the listen address (for
+example `Web UI listening on 0.0.0.0:3131`, as with the base `docker-compose.yml`).
 
-**Inside the Dev Container (the isolated workflow)**, leave `AUTOHEAL_DEV_HOST` unset and open
-`http://localhost:3132`. VS Code forwards port 3132 to your desktop, so the same
-`http://localhost:3132` works in a browser on the machine running VS Code (see the Ports tab).
-The inner Docker daemon publishes the port inside the Dev Container only: it does not become a
-port on the Docker host's LAN address, so `http://<server-address>:3132` does not reach the
-isolated dev stack, and the host's own `3131` is still production.
+**Inside the Dev Container (the isolated workflow)** that default is correct, so leave
+`AUTOHEAL_DEV_HOST` unset and open `http://localhost:3132`. VS Code forwards port 3132 to your
+desktop, so the same `http://localhost:3132` works in a browser on the machine running VS Code
+(see the Ports tab). The inner Docker daemon publishes the port inside the Dev Container only:
+it does not become a port on the Docker host's LAN address, so `http://<server-address>:3132`
+does not reach the isolated dev stack, and the host's own `3131` is still production.
 
-`AUTOHEAL_DEV_HOST` (passed to the app as `AUTOHEAL_PUBLIC_HOST`) only changes the URL printed in
-the startup logs, to `Web UI available at http://<value>:3132`. It does not expose, publish or
-forward anything. Setting it to the server's address in the Dev Container would make the logs
-advertise a URL that does not work, so don't. Compose reads a `.env` file next to
+`AUTOHEAL_DEV_HOST` (passed to the app as `AUTOHEAL_PUBLIC_HOST`) only changes the address
+printed in the startup logs, to `Web UI available at http://<value>:3132`. It does not expose,
+publish or forward anything. Setting it to the server's address in the Dev Container would make
+the logs advertise a URL that does not work, so don't. Compose reads a `.env` file next to
 `docker-compose.yml` automatically, and the Dev Container mounts your checkout, so a `.env`
 created for a host workflow also applies to the stack started inside the Dev Container. Delete
 `AUTOHEAL_DEV_HOST` from it, or the file, if you see an unexpected URL in the logs.
 
 The variable is only useful when you run this override from a host shell (not isolated: see
-below), where the published port really is on the host's address. There you can set it to the
-address you reach the host at, in `.env` or the shell that runs the command:
+below), where the published port really is on the host's address. The default `localhost` is
+right if you browse from that same host; from another machine, set it to the address you reach
+the host at, in `.env` or the shell that runs the command:
 
 ```bash
 echo 'AUTOHEAL_DEV_HOST=192.0.2.10' > .env
