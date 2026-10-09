@@ -183,7 +183,8 @@ class AutoHealService:
                 logger.info("Web UI listening on %s", listen)
                 logger.info("API documentation listening on %s/docs", listen)
 
-        except Exception as e:
+        except (Exception, asyncio.CancelledError) as e:
+            # CancelledError is a BaseException; clean up on cancellation too, then re-raise.
             logger.exception("Failed to start service: %s", e)
             await self.stop()
             raise
@@ -222,11 +223,15 @@ class AutoHealService:
                 )
         finally:
             if self.metrics_server:
-                try:
-                    self.metrics_server.shutdown()
-                    self.metrics_server.server_close()
-                except Exception as e:
-                    logger.warning("Error stopping metrics server: %s", e, exc_info=True)
+                # Separate attempts so a failed shutdown() still closes the socket.
+                for close_step in (
+                    self.metrics_server.shutdown,
+                    self.metrics_server.server_close,
+                ):
+                    try:
+                        close_step()
+                    except Exception as e:
+                        logger.warning("Error stopping metrics server: %s", e, exc_info=True)
                 self.metrics_server = None
             if self.docker_client:
                 try:
