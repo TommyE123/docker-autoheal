@@ -60,7 +60,7 @@ PYTHON_PYRIGHT_PRE_COMMANDS:
   - command: pip install --no-cache-dir -r requirements-dev.txt
     cwd: workspace
     continue_if_failed: false
-    
+
 # ---------------------------------------------------------------------------
 # JavaScript / JSX
 # ---------------------------------------------------------------------------
