@@ -216,12 +216,12 @@ In VS Code, run **Terminal → Run Task → Autoheal: Run UI E2E** and pick a sc
 mode. From a terminal in the Dev Container:
 
 ```bash
-bash frontend/e2e-ui/run.sh smoke          # the pull-request subset, headless
-bash frontend/e2e-ui/run.sh full headless  # everything
+bash frontend/e2e-ui/run.sh smoke          # a quick subset, headless
+bash frontend/e2e-ui/run.sh full headless  # everything (what CI runs)
 bash frontend/e2e-ui/run.sh events ui      # one area, in Playwright's UI mode
 ```
 
-The scope is `smoke`, `full`, or a functional tag below. The task's menu words these in plain
+The scope is `smoke` (a quick local check), `full` (what CI runs), or a functional tag below. The task's menu words these in plain
 language ("Quick check of the basics", "Everything", "The event log" and so on); the script takes
 the short names. The mode is one of two:
 
@@ -259,12 +259,12 @@ unsets an inherited `UI_E2E_TAG`, so it always runs the whole suite.
 Tags select tests and are not mutually exclusive: one test can be
 `@smoke @containers @regression`.
 
-| Tag                                                                         | Meaning                                                                                   |
-|-----------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|
-| `@smoke`                                                                    | The small pull-request subset: is the UI fundamentally working? Keep it small and stable. |
-| `@regression`                                                               | Tests that guard a specific past or likely regression.                                    |
-| `@containers`, `@monitoring`, `@events`, `@configuration`, `@notifications` | Functional areas                                                                          |
-| `@errors`                                                                   | Loading, empty and failure handling, using `page.route` to fail one API call              |
+| Tag                                                                         | Meaning                                                                          |
+|-----------------------------------------------------------------------------|----------------------------------------------------------------------------------|
+| `@smoke`                                                                    | A small, fast subset: is the UI fundamentally working? Keep it small and stable. |
+| `@regression`                                                               | Tests that guard a specific past or likely regression.                           |
+| `@containers`, `@monitoring`, `@events`, `@configuration`, `@notifications` | Functional areas                                                                 |
+| `@errors`                                                                   | Loading, empty and failure handling, using `page.route` to fail one API call     |
 
 ### Parallelism and shared state
 

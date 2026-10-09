@@ -85,7 +85,13 @@ if [ -z "$("${compose[@]}" ps -q autoheal)" ]; then
   trap '"${compose[@]}" down' EXIT
 fi
 
-if ! "${compose[@]}" up --build -d --wait autoheal; then
+# Build and start the stack only when this script owns it. A stack that was already running
+# is only waited on, so it is neither rebuilt nor recreated underneath its user.
+up_args=(up --build -d --wait autoheal)
+if [ "${started_here}" = false ]; then
+  up_args=(up -d --no-build --no-recreate --wait autoheal)
+fi
+if ! "${compose[@]}" "${up_args[@]}"; then
   echo "::error::UI E2E environment setup failed: the dev stack did not become healthy"
   "${compose[@]}" logs --tail=50 autoheal || true
   exit 3

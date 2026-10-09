@@ -431,7 +431,7 @@
       "description": "Which UI tests to run?",
       "options": [
         {
-          "label": "Quick check of the basics (smoke: what pull requests run)",
+          "label": "Quick check of the basics (smoke: a fast subset)",
           "value": "smoke"
         },
         { "label": "Everything (full)", "value": "full" },
