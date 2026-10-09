@@ -148,6 +148,26 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
+      # Pull the test containers' image once, before Playwright starts its parallel workers, so
+      # they do not all race to pull it from Docker Hub (a 500 or a rate limit there failed
+      # tests on their first attempt). Try the Google mirror first, then Docker Hub, with
+      # retries. Keep the tag in step with IMAGE in frontend/e2e-ui/docker.js.
+      - name: Pre-pull the test container image
+        run: |
+          image=alpine:3.22
+          for attempt in 1 2 3 4 5; do
+            if docker pull "mirror.gcr.io/library/${image}" && docker tag "mirror.gcr.io/library/${image}" "${image}"; then
+              exit 0
+            fi
+            if docker pull "${image}"; then
+              exit 0
+            fi
+            echo "Pull attempt ${attempt} failed; retrying"
+            sleep $((attempt * 5))
+          done
+          echo "::error::Could not pull ${image} from the mirror or Docker Hub"
+          exit 1
+
       # UI_E2E_BASE_URL makes run.sh use this running instance instead of starting the
       # dev stack. It always runs the full suite. run.sh exits 3
       # when the environment cannot be used and 1 when a test fails.

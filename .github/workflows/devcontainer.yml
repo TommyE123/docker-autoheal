@@ -55,6 +55,24 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # Pull the sentinel's image first: the Google mirror, then Docker Hub, with retries, so a
+      # Docker Hub error or rate limit does not fail the job on its first command.
+      - name: Pre-pull the sentinel image
+        run: |
+          image=alpine:3.22
+          for attempt in 1 2 3 4 5; do
+            if docker pull "mirror.gcr.io/library/${image}" && docker tag "mirror.gcr.io/library/${image}" "${image}"; then
+              exit 0
+            fi
+            if docker pull "${image}"; then
+              exit 0
+            fi
+            echo "Pull attempt ${attempt} failed; retrying"
+            sleep $((attempt * 5))
+          done
+          echo "::error::Could not pull ${image} from the mirror or Docker Hub"
+          exit 1
+
       # A known container on the runner's own (host) Docker daemon. The Dev Container's
       # isolated daemon must not be able to see it; see the isolation check below.
       - name: Start host-daemon isolation sentinel
