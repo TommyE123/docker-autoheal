@@ -60,17 +60,30 @@ class TestAutoHealServiceStop:
         assert service.monitoring_engine is None
         assert service.uptime_kuma_monitor is None
 
+    @staticmethod
+    def _messages(caplog, level):
+        return [
+            r.getMessage()
+            for r in caplog.records
+            if r.name == "app.main" and r.levelname == level
+        ]
+
     @pytest.mark.asyncio
-    async def test_stop_with_no_components_initialized(self):
+    async def test_stop_with_no_components_initialized(self, caplog):
         service = AutoHealService()
         service.running = True
 
-        await service.stop()
+        with caplog.at_level("INFO", logger="app.main"):
+            await service.stop()
 
         assert service.running is False
+        assert self._messages(caplog, "INFO") == [
+            "Stopping Docker Auto-Heal Service...",
+            "Docker Auto-Heal Service stopped",
+        ]
 
     @pytest.mark.asyncio
-    async def test_stop_order_kuma_then_engine_then_docker(self):
+    async def test_stop_order_kuma_then_engine_then_notifications_then_docker(self):
         service = AutoHealService()
         order = []
 
@@ -78,47 +91,133 @@ class TestAutoHealServiceStop:
         service.uptime_kuma_monitor.stop = AsyncMock(side_effect=lambda: order.append("kuma"))
         service.monitoring_engine = MagicMock()
         service.monitoring_engine.stop = AsyncMock(side_effect=lambda: order.append("engine"))
+        service.notification_manager = MagicMock()
+        service.notification_manager.stop = AsyncMock(
+            side_effect=lambda: order.append("notifications")
+        )
         service.docker_client = MagicMock()
         service.docker_client.close = MagicMock(side_effect=lambda: order.append("docker"))
 
         await service.stop()
 
-        assert order == ["kuma", "engine", "docker"]
+        assert order == ["kuma", "engine", "notifications", "docker"]
 
     @pytest.mark.asyncio
-    async def test_stop_continues_after_kuma_stop_raises(self):
+    async def test_stop_stops_notification_manager(self):
+        service = AutoHealService()
+        service.notification_manager = MagicMock()
+        service.notification_manager.stop = AsyncMock()
+
+        await service.stop()
+
+        service.notification_manager.stop.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_stop_continues_after_notification_manager_stop_raises(self, caplog):
+        service = AutoHealService()
+        service.notification_manager = MagicMock()
+        service.notification_manager.stop = AsyncMock(
+            side_effect=RuntimeError("notif boom")
+        )
+        service.docker_client = MagicMock()
+
+        with caplog.at_level("WARNING", logger="app.main"):
+            await service.stop()
+
+        service.docker_client.close.assert_called_once()
+        assert service.running is False
+        [record] = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert record.getMessage() == "Error stopping notification manager: notif boom"
+        assert record.exc_info is not None
+        assert isinstance(record.exc_info[1], RuntimeError)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("cancelled_step", ["kuma", "engine", "notifications"])
+    async def test_stop_closes_docker_when_cancelled_mid_shutdown(self, cancelled_step):
+        # CancelledError is not an Exception, so the per-step handlers do not catch
+        # it; the Docker client must still be closed before it propagates.
+        service = AutoHealService()
+        service.uptime_kuma_monitor = MagicMock()
+        service.uptime_kuma_monitor.stop = AsyncMock()
+        service.monitoring_engine = MagicMock()
+        service.monitoring_engine.stop = AsyncMock()
+        service.notification_manager = MagicMock()
+        service.notification_manager.stop = AsyncMock()
+        service.docker_client = MagicMock()
+        step = {
+            "kuma": service.uptime_kuma_monitor,
+            "engine": service.monitoring_engine,
+            "notifications": service.notification_manager,
+        }[cancelled_step]
+        step.stop.side_effect = asyncio.CancelledError
+
+        with pytest.raises(asyncio.CancelledError):
+            await service.stop()
+
+        service.docker_client.close.assert_called_once()
+        assert service.running is False
+
+    @pytest.mark.asyncio
+    async def test_stop_continues_after_kuma_stop_raises(self, caplog):
         service = AutoHealService()
         service.uptime_kuma_monitor = MagicMock()
         service.uptime_kuma_monitor.stop = AsyncMock(side_effect=RuntimeError("kuma boom"))
         service.monitoring_engine = MagicMock()
         service.monitoring_engine.stop = AsyncMock()
+        service.notification_manager = MagicMock()
+        service.notification_manager.stop = AsyncMock()
         service.docker_client = MagicMock()
 
-        await service.stop()
+        with caplog.at_level("WARNING", logger="app.main"):
+            await service.stop()
 
         service.monitoring_engine.stop.assert_awaited_once()
+        service.notification_manager.stop.assert_awaited_once()
         service.docker_client.close.assert_called_once()
+        assert self._messages(caplog, "WARNING") == [
+            "Error stopping Uptime-Kuma monitor: kuma boom"
+        ]
+        [record] = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert record.exc_info is not None
+        assert isinstance(record.exc_info[1], RuntimeError)
 
     @pytest.mark.asyncio
-    async def test_stop_continues_after_engine_stop_raises(self):
+    async def test_stop_continues_after_engine_stop_raises(self, caplog):
         service = AutoHealService()
         service.monitoring_engine = MagicMock()
         service.monitoring_engine.stop = AsyncMock(side_effect=RuntimeError("engine boom"))
+        service.notification_manager = MagicMock()
+        service.notification_manager.stop = AsyncMock()
         service.docker_client = MagicMock()
 
-        await service.stop()
+        with caplog.at_level("WARNING", logger="app.main"):
+            await service.stop()
 
+        service.notification_manager.stop.assert_awaited_once()
         service.docker_client.close.assert_called_once()
+        assert self._messages(caplog, "WARNING") == [
+            "Error stopping monitoring engine: engine boom"
+        ]
+        [record] = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert record.exc_info is not None
+        assert isinstance(record.exc_info[1], RuntimeError)
 
     @pytest.mark.asyncio
-    async def test_stop_swallows_docker_close_error(self):
+    async def test_stop_swallows_docker_close_error(self, caplog):
         service = AutoHealService()
         service.docker_client = MagicMock()
         service.docker_client.close.side_effect = RuntimeError("close boom")
 
-        await service.stop()  # must not raise
+        with caplog.at_level("WARNING", logger="app.main"):
+            await service.stop()  # must not raise
 
         assert service.running is False
+        assert self._messages(caplog, "WARNING") == [
+            "Error closing Docker client: close boom"
+        ]
+        [record] = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert record.exc_info is not None
+        assert isinstance(record.exc_info[1], RuntimeError)
 
 
 class TestAutoHealServiceStartFailure:
