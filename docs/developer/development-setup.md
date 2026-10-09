@@ -94,9 +94,8 @@ to your desktop; see [Docker isolation](#docker-isolation) and the logging notes
 **Autoheal: Run UI E2E** runs the tagged UI journey suite (see
 [UI E2E suite (Playwright)](testing.md#ui-e2e-suite-playwright)). It asks which tests to run
 (a quick check of the basics, everything, or one area such as the event log) and how: in the
-background with no window, in a browser panel where you can watch and debug
-([Playwright's UI mode](https://playwright.dev/docs/test-ui-mode)), or in a real browser
-window if a screen is available. It then starts the dev stack in the
+background with no window, or in a browser panel where you can watch and debug
+([Playwright's UI mode](https://playwright.dev/docs/test-ui-mode)). It then starts the dev stack in the
 background (`up --build -d --wait`, which waits for the image's healthcheck) on the Dev
 Container's isolated daemon and runs the same tests in every mode. It reads the published
 port back from Compose (`3132` unless `AUTOHEAL_DEV_PORT` is set) and reaches it on

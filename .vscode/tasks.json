@@ -475,10 +475,6 @@
         {
           "label": "Watch and debug in a browser panel (Playwright UI, port 9323)",
           "value": "ui"
-        },
-        {
-          "label": "Real browser window (needs a screen; not available in the Dev Container yet)",
-          "value": "headed"
         }
       ],
       "default": "headless"

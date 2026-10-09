@@ -9,7 +9,7 @@ set -euo pipefail
 #
 # scope: smoke (default) | full | containers | monitoring | events | configuration |
 #        notifications | errors | regression
-# mode:  headless (default) | headed (needs a display) | ui (Playwright UI on port 9323)
+# mode:  headless (default) | ui (Playwright UI on port 9323)
 #
 # Exit codes: 0 passed, 1 a test failed, 2 bad arguments, 3 the environment could not
 # be set up (the stack did not start), so setup failures stay distinguishable from tests.
@@ -35,14 +35,6 @@ smoke | containers | monitoring | events | configuration | notifications | error
 esac
 case "${mode}" in
 headless) ;;
-headed)
-  if [ -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
-    echo "Headed mode needs a display, and none is available here (DISPLAY and" >&2
-    echo "WAYLAND_DISPLAY are unset). Use the headless or ui mode instead." >&2
-    exit 2
-  fi
-  args+=(--headed)
-  ;;
 ui) args+=(--ui-host=0.0.0.0 --ui-port=9323) ;;
 *)
   echo "Unknown mode '${mode}'" >&2
