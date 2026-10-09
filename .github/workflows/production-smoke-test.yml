@@ -14,6 +14,11 @@ name: Production Smoke Test
 # Any failing step fails this job.
 on:
   workflow_call:
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: false
+      DOCKERHUB_TOKEN:
+        required: false
 
 permissions:
   contents: read
@@ -23,8 +28,20 @@ jobs:
     name: Production container smoke test
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
 
     steps:
+      # Authenticated pulls avoid Docker Hub's anonymous rate limit (429). Repo secrets are not
+      # available to fork or Dependabot runs, which skip this step.
+      - name: Login to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Download the built image
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:

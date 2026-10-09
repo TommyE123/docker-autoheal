@@ -34,12 +34,24 @@ jobs:
     name: Build and test Dev Container
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      # Authenticated pulls avoid Docker Hub's anonymous rate limit (429). Repo secrets are not
+      # available to fork or Dependabot runs, which skip this step.
+      - name: Login to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # A known container on the runner's own (host) Docker daemon. The Dev Container's
       # isolated daemon must not be able to see it; see the isolation check below.
