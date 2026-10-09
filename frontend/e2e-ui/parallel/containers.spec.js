@@ -3,6 +3,9 @@ import { inspectContainer, RUN_LABEL, stopContainer } from "../docker.js";
 
 const rowFor = (page, name) => page.getByRole("row", { name });
 
+// The row action buttons are icon-only: the icon glyph becomes their accessible name, so
+// getByRole("button", { name: "Restart" }) never matches. Find them by their title.
+
 // What the Containers page should show for each shared container. Only the first is
 // part of @smoke: the rest are the same list rendering with different data.
 const sharedStates = [
@@ -102,7 +105,7 @@ test(
     const startedBefore = await inspectContainer(name, "{{.State.StartedAt}}");
     await page.goto("/containers");
 
-    await rowFor(page, name).getByRole("button", { name: "Restart" }).click();
+    await rowFor(page, name).getByTitle("Restart").click();
     const dialog = dialogTitled(page, "Restart Container");
     await expect(
       dialog.getByText(`Are you sure you want to restart container "${name}"?`),
@@ -216,7 +219,7 @@ test(
     await page.goto("/containers");
 
     await rowFor(page, sharedContainers.unmonitored)
-      .getByRole("button", { name: "Restart" })
+      .getByTitle("Restart")
       .click();
     await dialogTitled(page, "Restart Container")
       .getByRole("button", { name: "Confirm" })
