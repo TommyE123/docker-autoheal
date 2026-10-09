@@ -27,8 +27,9 @@ on_exit() {
   local status=$?
   remove_probes
   if [ -n "${config_backup}" ]; then
-    if ! curl -fsS -X PUT -H 'Content-Type: application/json' --data "${config_backup}" \
-      "${base_url}/api/config" >/dev/null; then
+    # The snapshot can hold tokens, so send it on stdin rather than in curl's argument list.
+    if ! curl -fsS -X PUT -H 'Content-Type: application/json' --data-binary @- \
+      "${base_url}/api/config" >/dev/null <<<"${config_backup}"; then
       echo "::error::Could not restore the original Autoheal configuration at ${base_url}/api/config" >&2
       [ "${status}" -ne 0 ] || status=1
     fi
