@@ -245,13 +245,20 @@ bash frontend/e2e-ui/run.sh full headless  # everything
 bash frontend/e2e-ui/run.sh events ui      # one area, in Playwright's UI mode
 ```
 
-The scope is `smoke`, `full`, or a functional tag below. The mode is one of:
+The scope is `smoke`, `full`, or a functional tag below. The task's menu words these in plain
+language ("Quick check of the basics", "Everything", "The event log" and so on); the script takes
+the short names. The mode is one of:
 
-* `headless` (default): what CI runs.
-* `headed`: a visible browser window. It needs a display, which the stock Dev Container
-  does not have, so the script stops with a message when none is set.
-* `ui`: Playwright's UI mode, served on forwarded port 9323 and opened in your own
-  browser. It is a test runner and debugger, not a headed run.
+* `headless` ("In the background, no window"; the default): what CI runs. Fast, and nothing to
+  watch.
+* `ui` ("Watch and debug in a browser panel"): Playwright's UI mode, served on forwarded port
+  9323 and opened in your own browser. You can watch each test run with a live view of the page,
+  a timeline and screenshots, pause, step through and re-run single tests. This is the way to
+  watch or debug a run.
+* `headed` ("Real browser window"): a visible Chrome window clicking by itself. It needs a
+  screen, which the stock Dev Container does not have, so the script stops with a message
+  when none is set. It is a different thing from `ui` mode, which is a test runner and
+  debugger, not a headed run.
 
 Every mode runs the same specs. To run against a stack you started yourself, or another
 dev instance, use Playwright directly:
