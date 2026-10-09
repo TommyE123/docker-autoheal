@@ -23,8 +23,8 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    // Playwright E2E specs run via `npm run test:e2e`, not Vitest.
-    exclude: [...configDefaults.exclude, 'e2e/**', 'e2e-ui/**'],
+    // Playwright UI E2E specs run via `npm run test:ui-e2e`, not Vitest.
+    exclude: [...configDefaults.exclude, 'e2e-ui/**'],
     setupFiles: ['./src/test/setup.js'],
     globalSetup: ['./src/test/globalSetup.js'],
     coverage: {
@@ -40,9 +40,7 @@ export default defineConfig({
       exclude: [
         ...coverageConfigDefaults.exclude,
         'src/test/globalSetup.js',
-        'playwright.config.js',
         'playwright.ui.config.js',
-        'e2e/**',
         'e2e-ui/**',
       ],
     },

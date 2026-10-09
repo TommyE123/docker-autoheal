@@ -104,7 +104,8 @@ failed), unless the stack was already running when the task started, in which ca
 left alone. In the browser-panel (`ui`) mode the task keeps running until you stop it (**Ctrl+C** in its
 terminal); open the forwarded **Playwright UI** port (the Ports tab, or the link in the
 terminal) in your browser. Chromium and its system libraries are installed by
-`post-create.sh`; after pulling this change into an existing Dev Container, run
+`post-create.sh`. CI does not use the dev stack: it runs the same suite against the image built for the pull
+request (see [UI E2E CI](testing.md#ci)). After pulling this change into an existing Dev Container, run
 **Dev Containers: Rebuild Container** once.
 
 **Autoheal: Install gh-aw** installs the `github/gh-aw` extension pinned to the
