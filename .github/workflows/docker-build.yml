@@ -86,6 +86,3 @@ jobs:
     uses: ./.github/workflows/production-smoke-test.yml
     with:
       image_ref: ${{ needs.build.outputs.image_ref }}
-      # Every PR runs the small @smoke subset against the built image; the Release
-      # Please PR runs the whole UI E2E suite before the release can be merged.
-      ui_e2e_scope: full # TEMP: remove before merge

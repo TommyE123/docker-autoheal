@@ -9,17 +9,13 @@ name: Production Smoke Test
 #
 # Against the exact image docker-build.yml built, it runs, in order: the container
 # startup, health and Docker-connectivity checks, a real auto-heal restart, and then the
-# tagged Playwright UI E2E suite (frontend/e2e-ui; scope from the ui_e2e_scope input).
+# full tagged Playwright UI E2E suite (frontend/e2e-ui).
 # Any failing step fails this job.
 on:
   workflow_call:
     inputs:
       image_ref:
         description: "Exact image reference to test, e.g. ghcr.io/owner/docker-autoheal:sha-abc1234"
-        required: true
-        type: string
-      ui_e2e_scope:
-        description: "UI E2E scope run against that image: smoke (every PR) or full (Release Please PR)"
         required: true
         type: string
 
@@ -191,17 +187,16 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       # UI_E2E_BASE_URL makes run.sh use this running instance instead of starting the
-      # dev stack. The scope (smoke or full) is chosen by docker-build.yml. run.sh exits 3
+      # dev stack. It always runs the full suite. run.sh exits 3
       # when the environment cannot be used and 1 when a test fails.
-      - name: Run the UI E2E suite (${{ inputs.ui_e2e_scope }}) against the built image
+      - name: Run the full UI E2E suite against the built image
         env:
           UI_E2E_BASE_URL: http://localhost:3132
-          UI_E2E_SCOPE: ${{ inputs.ui_e2e_scope }}
         run: |
           status=0
-          bash frontend/e2e-ui/run.sh "$UI_E2E_SCOPE" headless || status=$?
+          bash frontend/e2e-ui/run.sh full headless || status=$?
           if [ "$status" -eq 1 ]; then
-            echo "::error::UI E2E (${UI_E2E_SCOPE}) tests failed; see the Playwright report artifact"
+            echo "::error::UI E2E tests failed; see the Playwright report artifact"
           fi
           exit "$status"
 
@@ -209,7 +204,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ui-e2e-report-${{ inputs.ui_e2e_scope }}
+          name: ui-e2e-report
           path: |
             frontend/playwright-report-ui/
             frontend/test-results-ui/

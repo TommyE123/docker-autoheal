@@ -176,7 +176,7 @@ it:
 | Runs against  | The exact image `docker-build.yml` built for the commit (`sha-<short sha>`) | The dev stack from `docker-compose.dev.yml`, port `3132`     |
 | Started by    | `production-smoke-test.yml`, which sets `UI_E2E_BASE_URL`                   | `frontend/e2e-ui/run.sh` (the **Autoheal: Run UI E2E** task) |
 | Docker daemon | The GitHub-hosted runner's own, ephemeral daemon                            | The Dev Container's own Docker-in-Docker daemon              |
-| Scope         | `smoke` on every pull request, `full` on the Release Please PR              | Your choice                                                  |
+| Scope         | `full`, the whole suite, on every pull request                              | Your choice                                                  |
 | Image         | The one built by that CI run; nothing is rebuilt                            | Built from your checkout; no published image is needed       |
 
 Both use `playwright.ui.config.js` and the same `frontend/e2e-ui/run.sh`, so a CI failure
@@ -317,19 +317,16 @@ image for:
    container;
 3. starts a second, throwaway container from the same `image_ref` with its own `/data`
    seeded with the `autoheal.dev` label, and waits until `/api/config` reports it;
-4. runs `bash frontend/e2e-ui/run.sh <scope> headless` against it with `UI_E2E_BASE_URL`
+4. runs `bash frontend/e2e-ui/run.sh full headless` against it with `UI_E2E_BASE_URL`
    set.
 
-The scope comes from `docker-build.yml`:
-
-* **Pull requests** run **`smoke`**, the small `@smoke` subset.
-* **The Release Please PR** (branch `release-please--branches--main`) runs **`full`**, the
-  whole suite, before the release can be merged.
+CI always runs the **`full`** suite, on every pull request including the Release Please PR.
+There is no CI scope switch; the `smoke` subset and the functional tags are for local runs.
 
 Any failing step fails the job. `run.sh` exits with 3 when the environment cannot be used
 (including a failed isolation check) and 1 when a test fails; the log annotation says which. On
 failure the Playwright HTML report, traces and screenshots are uploaded as the
-`ui-e2e-report-<scope>` artifact, and the diagnostics step prints the logs of the smoke,
+`ui-e2e-report` artifact, and the diagnostics step prints the logs of the smoke,
 victim and UI E2E containers. Whether the job blocks a merge depends on the repository's
 branch-protection required checks.
 

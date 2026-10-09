@@ -50,8 +50,7 @@ or added.
 | Unit tests on every push/PR                                       | Yes (`tests.yml`)                                                         |
 | MegaLinter on every PR to `main`                                  | Yes (`mega-linter.yml`)                                                   |
 | Docker image build (verification only, no release) on every PR    | Yes (`docker-build.yml`)                                                  |
-| Production smoke test and UI E2E against the actual PR image      | Yes (`production-smoke-test.yml`, invoked from `docker-build.yml`)        |
-| Full UI E2E suite on the Release Please PR (smoke on other PRs)   | Yes (same job; scope chosen in `docker-build.yml`)                        |
+| Production smoke test and full UI E2E suite against the PR image  | Yes (`production-smoke-test.yml`, invoked from `docker-build.yml`)        |
 | Keeping the Release PR (title, release notes, version) up to date | Yes (`release-please.yml`)                                                |
 | Choosing patch vs. minor vs. major                                | Yes — derived from Conventional Commit PR titles, never chosen by hand    |
 | Deciding *when* to actually release                               | No — a human merges the Release PR when ready                             |
