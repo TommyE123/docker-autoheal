@@ -173,11 +173,11 @@ it:
 
 |               | CI                                                                          | Development                                                  |
 |---------------|-----------------------------------------------------------------------------|--------------------------------------------------------------|
-| Runs against  | The `linux/amd64` image `docker-build.yml` built from the commit           | The dev stack from `docker-compose.dev.yml`, port `3132`     |
+| Runs against  | The `linux/amd64` image `docker-build.yml` built from the commit            | The dev stack from `docker-compose.dev.yml`, port `3132`     |
 | Started by    | `production-smoke-test.yml`, which sets `UI_E2E_BASE_URL`                   | `frontend/e2e-ui/run.sh` (the **Autoheal: Run UI E2E** task) |
 | Docker daemon | The GitHub-hosted runner's own, ephemeral daemon                            | The Dev Container's own Docker-in-Docker daemon              |
 | Scope         | `full`, the whole suite, on every pull request                              | Your choice                                                  |
-| Image         | Built by that CI run and passed on as an artifact; no registry involved    | Built from your checkout; no published image is needed       |
+| Image         | Built by that CI run and passed on as an artifact; no registry involved     | Built from your checkout; no published image is needed       |
 
 Both use `playwright.ui.config.js` and the same `frontend/e2e-ui/run.sh`, so a CI failure
 reproduces locally with the same scope. The base URL has its own variable,
