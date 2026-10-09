@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Runs the UI E2E suite against the development stack on the Dev Container's isolated
-# Docker daemon. The VS Code task "Autoheal: Run UI E2E" and the UI E2E workflow both
-# call this, so local and CI runs follow the same steps. Run it inside the Dev Container.
+# Runs the UI E2E suite. Two targets, one script, so local and CI runs follow the same
+# steps:
+#   - Development (the VS Code task "Autoheal: Run UI E2E"): the dev stack from
+#     docker-compose.dev.yml, started here, on the Dev Container's isolated Docker
+#     daemon. Run it inside the Dev Container.
+#   - CI (production-smoke-test.yml): an already-running instance of the built image,
+#     selected by setting UI_E2E_BASE_URL. Nothing is built or started here.
 #
 #   bash frontend/e2e-ui/run.sh [scope] [mode]
 #
@@ -12,7 +16,8 @@ set -euo pipefail
 # mode:  headless (default) | ui (Playwright UI on port 9323)
 #
 # Exit codes: 0 passed, 1 a test failed, 2 bad arguments, 3 the environment could not
-# be set up (the stack did not start), so setup failures stay distinguishable from tests.
+# be set up (the stack did not start, or Docker is not an isolated local daemon), so setup
+# failures stay distinguishable from tests.
 
 scope="${1:-smoke}"
 mode="${2:-headless}"
@@ -44,9 +49,10 @@ esac
 
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 
-# Refuse to start anything unless Docker here is this environment's own daemon. The same
-# checks as .devcontainer/verify-isolation.sh and frontend/e2e-ui/docker.js; they run
-# before Compose so that a host or production daemon is never built on or started against.
+# Refuse to continue unless Docker here is this environment's own daemon. The same checks
+# as .devcontainer/verify-isolation.sh and frontend/e2e-ui/docker.js; they run before
+# Compose, and also for an already-running instance (the tests create containers on this
+# daemon either way), so a host or production daemon is never built on or acted on.
 if [ -n "${DOCKER_HOST:-}${DOCKER_CONTEXT:-}" ]; then
   echo "::error::UI E2E refused to start: DOCKER_HOST or DOCKER_CONTEXT is set, so Docker may not be the local daemon" >&2
   exit 3
@@ -59,6 +65,15 @@ daemon_name="$(docker info --format '{{.Name}}' 2>/dev/null || true)"
 if [ "${daemon_name}" != "$(hostname)" ]; then
   echo "::error::UI E2E refused to start: Docker daemon '${daemon_name}' is not this environment's own ('$(hostname)')" >&2
   exit 3
+fi
+
+status=0
+if [ -n "${UI_E2E_BASE_URL:-}" ]; then
+  # An instance something else started, e.g. the built image in CI. It must monitor
+  # autoheal.dev=true: the fixtures read that from /api/config and refuse otherwise.
+  echo "UI E2E (${scope}, ${mode}) against ${UI_E2E_BASE_URL}; using the running instance"
+  npm --prefix frontend run test:ui-e2e -- "${args[@]}" || status=$?
+  exit "${status}"
 fi
 
 compose=(docker compose -p docker-autoheal-dev -f docker-compose.yml -f docker-compose.dev.yml)
@@ -80,7 +95,6 @@ port="$("${compose[@]}" port autoheal 3131)"
 export UI_E2E_BASE_URL="http://localhost:${port##*:}"
 echo "UI E2E (${scope}, ${mode}) against ${UI_E2E_BASE_URL}; stack started here: ${started_here}"
 
-status=0
 npm --prefix frontend run test:ui-e2e -- "${args[@]}" || status=$?
 if [ "${status}" -ne 0 ]; then
   "${compose[@]}" logs --tail=50 autoheal || true

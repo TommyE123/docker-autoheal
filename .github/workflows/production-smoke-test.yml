@@ -6,11 +6,20 @@ name: Production Smoke Test
 # run for the PR that introduces this file. Running as a job in the same
 # pull_request-triggered run avoids that, and gives direct access to the
 # same-repo guard docker-build.yml's own push step already uses.
+#
+# Against the exact image docker-build.yml built, it runs, in order: the container
+# startup, health and Docker-connectivity checks, a real auto-heal restart, and then the
+# tagged Playwright UI E2E suite (frontend/e2e-ui; scope from the ui_e2e_scope input).
+# Any failing step fails this job.
 on:
   workflow_call:
     inputs:
       image_ref:
         description: "Exact image reference to test, e.g. ghcr.io/owner/docker-autoheal:sha-abc1234"
+        required: true
+        type: string
+      ui_e2e_scope:
+        description: "UI E2E scope run against that image: smoke (every PR) or full (Release Please PR)"
         required: true
         type: string
 
@@ -22,6 +31,7 @@ jobs:
   smoke-test:
     name: Production container smoke test
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - name: Login to GitHub Container Registry
@@ -106,9 +116,60 @@ jobs:
           echo "::error::Expected autoheal restart event for autoheal-victim was not observed"
           exit 1
 
-      # Browser-level check against the same running container (the image
-      # built by docker-build.yml), not the Vite dev server. Chromium only.
-      - name: Check out the E2E tests
+      # The tagged UI E2E suite (frontend/e2e-ui) against the same built image, not the
+      # Vite dev server and not a separately built dev image. It replaces the former
+      # single-dashboard Playwright test (@smoke includes that dashboard check).
+      #
+      # The suite's fixtures only create containers for an instance that monitors
+      # autoheal.dev=true, and several tests change the app's configuration and event log.
+      # So it gets its own throwaway instance of the image, with its own /data seeded with
+      # that label (as docker-compose.dev.yml does), and autoheal-smoke above, which
+      # monitors autoheal=true, is left exactly as the checks above verified it.
+      #
+      # The suite creates containers on this runner's Docker daemon. That is only
+      # acceptable on an ephemeral GitHub-hosted VM; run.sh additionally refuses to start
+      # unless Docker is this machine's own local daemon (no DOCKER_HOST/DOCKER_CONTEXT,
+      # a dockerd process, daemon name equal to the hostname).
+      - name: Require an ephemeral GitHub-hosted runner for the UI E2E suite
+        run: |
+          if [ "${RUNNER_ENVIRONMENT:-}" != "github-hosted" ]; then
+            echo "::error::UI E2E creates containers on the runner's Docker daemon and only runs on GitHub-hosted runners (RUNNER_ENVIRONMENT='${RUNNER_ENVIRONMENT:-}')"
+            exit 1
+          fi
+
+      - name: Start an isolated instance of the image for the UI E2E suite
+        env:
+          IMAGE_REF: ${{ inputs.image_ref }}
+        run: |
+          data="${RUNNER_TEMP}/ui-e2e-data"
+          mkdir -p "$data"
+          printf '{"monitor":{"label_key":"autoheal.dev"}}' > "$data/config.json"
+          docker run -d --name autoheal-ui-e2e \
+            -v /var/run/docker.sock:/var/run/docker.sock:ro \
+            -v "$data:/data" \
+            -p 3132:3131 \
+            -e PYTHONUNBUFFERED=1 \
+            --label autoheal.dev=false \
+            "$IMAGE_REF"
+          echo "UI E2E instance image: $(docker inspect --format '{{.Config.Image}} ({{.Image}})' autoheal-ui-e2e)"
+
+      # The suite's own fixtures re-check the monitored label before every test; failing
+      # here first gives a clearer message when the seeded config was not picked up.
+      - name: Wait for the UI E2E instance to monitor autoheal.dev=true
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -sf http://localhost:3132/api/config \
+              | jq -e '.monitor.label_key == "autoheal.dev" and .monitor.label_value == "true"' \
+              >/dev/null 2>&1; then
+              echo "UI E2E instance is ready and monitors autoheal.dev=true"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::UI E2E instance never became ready with the autoheal.dev=true monitor label"
+          exit 1
+
+      - name: Check out the UI E2E tests
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -121,7 +182,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install E2E dependencies
+      - name: Install UI E2E dependencies
         working-directory: frontend
         run: npm ci
 
@@ -129,20 +190,29 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
-      - name: Run Playwright E2E smoke test against the container
-        working-directory: frontend
+      # UI_E2E_BASE_URL makes run.sh use this running instance instead of starting the
+      # dev stack. The scope (smoke or full) is chosen by docker-build.yml. run.sh exits 3
+      # when the environment cannot be used and 1 when a test fails.
+      - name: Run the UI E2E suite (${{ inputs.ui_e2e_scope }}) against the built image
         env:
-          E2E_BASE_URL: http://localhost:3131
-        run: npm run test:e2e
+          UI_E2E_BASE_URL: http://localhost:3132
+          UI_E2E_SCOPE: ${{ inputs.ui_e2e_scope }}
+        run: |
+          status=0
+          bash frontend/e2e-ui/run.sh "$UI_E2E_SCOPE" headless || status=$?
+          if [ "$status" -eq 1 ]; then
+            echo "::error::UI E2E (${UI_E2E_SCOPE}) tests failed; see the Playwright report artifact"
+          fi
+          exit "$status"
 
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: playwright-report
+          name: ui-e2e-report-${{ inputs.ui_e2e_scope }}
           path: |
-            frontend/playwright-report/
-            frontend/test-results/
+            frontend/playwright-report-ui/
+            frontend/test-results-ui/
           if-no-files-found: ignore
           retention-days: 7
 
@@ -155,6 +225,8 @@ jobs:
           docker logs autoheal-smoke || true
           echo "--- autoheal-victim logs ---"
           docker logs autoheal-victim || true
+          echo "--- autoheal-ui-e2e logs ---"
+          docker logs autoheal-ui-e2e || true
           echo "--- autoheal-smoke inspect ---"
           docker inspect autoheal-smoke || true
           if docker logs autoheal-smoke 2>&1 | grep -qi "http+docker\|Not supported URL scheme"; then
@@ -164,4 +236,6 @@ jobs:
       - name: Clean up
         if: always()
         run: |
-          docker rm -f autoheal-smoke autoheal-victim 2>/dev/null || true
+          docker rm -f autoheal-smoke autoheal-victim autoheal-ui-e2e 2>/dev/null || true
+          # Containers the UI E2E suite labels, if its own teardown did not run.
+          docker ps -aq --filter label=autoheal.e2e.run | xargs -r docker rm -f || true
