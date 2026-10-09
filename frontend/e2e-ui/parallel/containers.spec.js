@@ -112,8 +112,10 @@ test(
     ).toBeVisible();
     await dialog.getByRole("button", { name: "Confirm" }).click();
 
+    // The alert only appears once Docker has restarted the container.
     await expect(page.getByRole("alert")).toContainText(
       `Container "${name}" restarted`,
+      { timeout: 20000 },
     );
     await expect
       .poll(() => inspectContainer(name, "{{.State.StartedAt}}"))

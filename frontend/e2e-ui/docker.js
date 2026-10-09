@@ -111,6 +111,9 @@ export async function startContainer({
       name,
       "--restart",
       "no",
+      // PID 1 ignores SIGTERM unless it handles it, so without an init process a plain
+      // `sleep` makes every stop or restart wait out Docker's 10 second grace period.
+      "--init",
       ...labelArgs({ [RUN_LABEL]: runId, ...labels }),
       ...options,
       IMAGE,
