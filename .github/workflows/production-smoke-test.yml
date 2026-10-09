@@ -44,8 +44,9 @@ jobs:
 
       # The suite's fixtures only create containers for an instance that monitors
       # autoheal.dev=true, and several tests change the app's configuration and event log.
-      # So the image runs as a throwaway instance with its own /data seeded with that label
-      # (as docker-compose.dev.yml does).
+      # So the image runs as a throwaway instance. It starts with no config, which proves
+      # the image's default configuration (autoheal=true) loads, and is then switched to
+      # autoheal.dev=true over the API before the suite runs.
       #
       # The suite creates containers on this runner's Docker daemon. That is only
       # acceptable on an ephemeral GitHub-hosted VM; run.sh additionally refuses to start
@@ -62,12 +63,8 @@ jobs:
         env:
           IMAGE_REF: ${{ inputs.image_ref }}
         run: |
-          data="${RUNNER_TEMP}/ui-e2e-data"
-          mkdir -p "$data"
-          printf '{"monitor":{"label_key":"autoheal.dev"}}' > "$data/config.json"
           docker run -d --name autoheal-ui-e2e \
             -v /var/run/docker.sock:/var/run/docker.sock:ro \
-            -v "$data:/data" \
             -p 3132:3131 \
             -e PYTHONUNBUFFERED=1 \
             --label autoheal.dev=false \
@@ -101,21 +98,25 @@ jobs:
           echo "::error::Application never reported a successful Docker connection"
           exit 1
 
-      # The suite's own fixtures re-check the monitored label before every test; failing
-      # here first gives a clearer message when the seeded config was not picked up.
-      - name: Wait for the instance to monitor autoheal.dev=true
+      - name: Verify the default monitor configuration
         run: |
-          for _ in $(seq 1 30); do
-            if curl -sf http://localhost:3132/api/config \
-              | jq -e '.monitor.label_key == "autoheal.dev" and .monitor.label_value == "true"' \
-              >/dev/null 2>&1; then
-              echo "Instance monitors autoheal.dev=true"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "::error::Instance never reported the autoheal.dev=true monitor label"
-          exit 1
+          curl -sf http://localhost:3132/api/config \
+            | jq -e '.monitor.label_key == "autoheal" and .monitor.label_value == "true"' >/dev/null \
+            || { echo "::error::The image's default monitor label is not autoheal=true"; exit 1; }
+          echo "Default monitor label is autoheal=true"
+
+      # Same API the suite's configuration tests use; only the label changes.
+      - name: Switch the instance to monitor autoheal.dev=true
+        run: |
+          body="$(curl -sf http://localhost:3132/api/config | jq -c '.monitor | .label_key = "autoheal.dev"')"
+          curl -sf -X PUT http://localhost:3132/api/config/monitor \
+            -H "Content-Type: application/json" -d "$body" >/dev/null
+          # The suite's own fixtures re-check the label before every test; failing here
+          # first gives a clearer message.
+          curl -sf http://localhost:3132/api/config \
+            | jq -e '.monitor.label_key == "autoheal.dev" and .monitor.label_value == "true"' >/dev/null \
+            || { echo "::error::Instance does not monitor autoheal.dev=true after the switch"; exit 1; }
+          echo "Instance monitors autoheal.dev=true"
 
       - name: Check out the UI E2E tests
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

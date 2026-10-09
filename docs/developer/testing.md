@@ -196,8 +196,8 @@ The suite needs a Docker daemon of its own and an instance of the app that monit
   installed by `post-create.sh`.
 * **CI**: the GitHub-hosted runner, whose Docker daemon is that ephemeral VM's own. The
   workflow refuses to continue on anything but a GitHub-hosted runner, and starts a
-  throwaway instance of the built image on port `3132` with its own `/data` seeded with
-  the `autoheal.dev` label.
+  throwaway instance of the built image on port `3132`, which first has to show the default
+  `autoheal=true` configuration and is then switched to `autoheal.dev=true` over the API.
 
 Docker-backed tests create a few small, labelled `alpine` containers on that daemon and
 remove them afterwards. Before the first Docker command the suite checks that the daemon
@@ -311,10 +311,10 @@ image for:
 
 1. pulls `ghcr.io/<owner>/docker-autoheal:sha-<short sha>`, the `image_ref` output of the
    build job (not `pr-<N>`, not `latest`);
-2. starts a throwaway container from it with its own `/data` seeded with the `autoheal.dev`
-   label;
-3. waits until `/health` responds, `/api/status` reports `docker_connected`, and
-   `/api/config` reports the label;
+2. starts a throwaway container from it with no config;
+3. waits until `/health` responds and `/api/status` reports `docker_connected`, checks
+   `/api/config` shows the default `autoheal=true` label, then switches it to
+   `autoheal.dev=true` through `PUT /api/config/monitor`;
 4. runs `bash frontend/e2e-ui/run.sh full headless` against it with `UI_E2E_BASE_URL`
    set.
 
