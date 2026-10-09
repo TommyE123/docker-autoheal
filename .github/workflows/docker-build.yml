@@ -1,5 +1,12 @@
 name: Docker Build
 
+# Pull requests build the production image in these jobs:
+#   - build-amd64:     the linux/amd64 image, exported as an artifact for the tests. No
+#                      registry and no secrets, so it works the same for forks.
+#   - build:           the multi-arch image (amd64 + arm64). Pushed only for same-repo PRs.
+#   - smoke-test:      the production checks and the full UI E2E suite, on the amd64
+#                      artifact (production-smoke-test.yml).
+#   - arm64-startup:   starts the arm64 image under QEMU emulation and checks it is healthy.
 on:
   pull_request:
     branches:
@@ -60,29 +67,107 @@ jobs:
           cache-from: type=gha,scope=docker-autoheal
           cache-to: type=gha,mode=max,scope=docker-autoheal
 
-      # sha-<short sha> is unambiguous: it's pushed above via metadata-action's
-      # type=sha (keyed on this job's own github.sha), unlike pr-<N> which a
-      # later commit on the same PR can overwrite before it's consumed.
-      - name: Record the exact image reference for the smoke test
-        id: image
-        # Image references must be lowercase; github.repository_owner isn't
-        # (metadata-action above lowercases it internally when tagging).
-        run: |
-          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
-          echo "ref=ghcr.io/${OWNER_LC}/docker-autoheal:sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-    outputs:
-      image_ref: ${{ steps.image.outputs.ref }}
+  # The image the tests run on: linux/amd64 only (the artifact format cannot hold a
+  # multi-arch image), built from the same commit and Dockerfile as the pushed image.
+  build-amd64:
+    name: Build amd64 test image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build the amd64 image to a tarball
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: false
+          tags: autoheal-test:amd64
+          outputs: type=docker,dest=${{ runner.temp }}/image.tar
+          cache-from: type=gha,scope=docker-autoheal
+
+      - name: Upload the image
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docker-image-amd64
+          path: ${{ runner.temp }}/image.tar
+          retention-days: 1
+          if-no-files-found: error
 
   smoke-test:
     name: Production container smoke test
-    needs: build
-    # docker-build.yml only pushes an image for same-repo PRs; running this
-    # job (which mounts the runner's Docker socket into the built image) for
-    # anything else would be pulling nothing, or worse, an unrelated image.
-    if: needs.build.result == 'success' && github.event.pull_request.head.repo.full_name == github.repository
+    needs: build-amd64
     permissions:
       contents: read
-      packages: read
     uses: ./.github/workflows/production-smoke-test.yml
-    with:
-      image_ref: ${{ needs.build.outputs.image_ref }}
+
+  # The arm64 image is built under QEMU emulation and only started, not put through the UI
+  # suite: this catches an image that does not start on arm64 (a missing wheel or a base
+  # image mismatch), not behaviour that differs on real arm64 hardware.
+  arm64-startup:
+    name: Start the arm64 image (QEMU)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build the arm64 image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/arm64
+          push: false
+          load: true
+          tags: autoheal-test:arm64
+          cache-from: type=gha,scope=docker-autoheal
+
+      - name: Start the arm64 image
+        run: |
+          docker run -d --name autoheal-arm64 --platform linux/arm64 \
+            -v /var/run/docker.sock:/var/run/docker.sock:ro \
+            -p 3133:3131 \
+            -e PYTHONUNBUFFERED=1 \
+            autoheal-test:arm64
+          echo "Architecture: $(docker inspect --format '{{.Architecture}}' autoheal-arm64)"
+
+      # Emulation is slow, so allow far longer than the amd64 start.
+      - name: Wait for the arm64 service to become healthy and reach Docker
+        run: |
+          for _ in $(seq 1 60); do
+            if curl -sf http://localhost:3133/health >/dev/null \
+              && curl -sf http://localhost:3133/api/status | jq -e '.docker_connected == true' >/dev/null 2>&1; then
+              echo "arm64 image is healthy and connected to Docker"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::The arm64 image never became healthy and connected to Docker"
+          exit 1
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          docker ps -a
+          docker logs autoheal-arm64 || true
+
+      - name: Clean up
+        if: always()
+        run: docker rm -f autoheal-arm64 2>/dev/null || true

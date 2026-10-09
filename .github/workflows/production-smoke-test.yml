@@ -4,24 +4,19 @@ name: Production Smoke Test
 # smoke-test job there), not a standalone trigger: workflow_run only fires
 # using the workflow file already on the default branch, so it could never
 # run for the PR that introduces this file. Running as a job in the same
-# pull_request-triggered run avoids that, and gives direct access to the
-# same-repo guard docker-build.yml's own push step already uses.
+# pull_request-triggered run avoids that.
 #
-# Against the exact image docker-build.yml built, it runs, in order: the container
-# startup, health and Docker-connectivity checks, and then the full tagged Playwright UI
-# E2E suite (frontend/e2e-ui), which includes a real auto-heal restart.
+# It tests the linux/amd64 image that docker-build.yml's build-amd64 job built from this
+# commit and handed over as an artifact (no registry, no secrets), so it runs the same
+# way for pull requests from forks. In order: the container startup, health,
+# Docker-connectivity and default-configuration checks, and then the full tagged
+# Playwright UI E2E suite (frontend/e2e-ui), which includes a real auto-heal restart.
 # Any failing step fails this job.
 on:
   workflow_call:
-    inputs:
-      image_ref:
-        description: "Exact image reference to test, e.g. ghcr.io/owner/docker-autoheal:sha-abc1234"
-        required: true
-        type: string
 
 permissions:
   contents: read
-  packages: read
 
 jobs:
   smoke-test:
@@ -30,17 +25,14 @@ jobs:
     timeout-minutes: 45
 
     steps:
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+      - name: Download the built image
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          name: docker-image-amd64
+          path: ${{ runner.temp }}/image
 
-      - name: Pull the exact PR image
-        env:
-          IMAGE_REF: ${{ inputs.image_ref }}
-        run: docker pull "$IMAGE_REF"
+      - name: Load the built image
+        run: docker load --input "${RUNNER_TEMP}/image/image.tar"
 
       # The suite's fixtures only create containers for an instance that monitors
       # autoheal.dev=true, and several tests change the app's configuration and event log.
@@ -60,15 +52,13 @@ jobs:
           fi
 
       - name: Start the image for the UI E2E suite
-        env:
-          IMAGE_REF: ${{ inputs.image_ref }}
         run: |
           docker run -d --name autoheal-ui-e2e \
             -v /var/run/docker.sock:/var/run/docker.sock:ro \
             -p 3132:3131 \
             -e PYTHONUNBUFFERED=1 \
             --label autoheal.dev=false \
-            "$IMAGE_REF"
+            autoheal-test:amd64
           echo "UI E2E instance image: $(docker inspect --format '{{.Config.Image}} ({{.Image}})' autoheal-ui-e2e)"
 
       - name: Wait for the service to become ready

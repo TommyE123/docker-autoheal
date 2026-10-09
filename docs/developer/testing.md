@@ -173,11 +173,11 @@ it:
 
 |               | CI                                                                          | Development                                                  |
 |---------------|-----------------------------------------------------------------------------|--------------------------------------------------------------|
-| Runs against  | The exact image `docker-build.yml` built for the commit (`sha-<short sha>`) | The dev stack from `docker-compose.dev.yml`, port `3132`     |
+| Runs against  | The `linux/amd64` image `docker-build.yml` built from the commit           | The dev stack from `docker-compose.dev.yml`, port `3132`     |
 | Started by    | `production-smoke-test.yml`, which sets `UI_E2E_BASE_URL`                   | `frontend/e2e-ui/run.sh` (the **Autoheal: Run UI E2E** task) |
 | Docker daemon | The GitHub-hosted runner's own, ephemeral daemon                            | The Dev Container's own Docker-in-Docker daemon              |
 | Scope         | `full`, the whole suite, on every pull request                              | Your choice                                                  |
-| Image         | The one built by that CI run; nothing is rebuilt                            | Built from your checkout; no published image is needed       |
+| Image         | Built by that CI run and passed on as an artifact; no registry involved    | Built from your checkout; no published image is needed       |
 
 Both use `playwright.ui.config.js` and the same `frontend/e2e-ui/run.sh`, so a CI failure
 reproduces locally with the same scope. The base URL has its own variable,
@@ -305,13 +305,17 @@ so it shows as skipped in every report. When the blocking change merges, remove 
 ### CI
 
 The suite runs in the "Production container smoke test" job (`production-smoke-test.yml`),
-called from `docker-build.yml`, against the exact image that run built. There is no separate UI E2E
-workflow. The job, for the same-repository pull requests that `docker-build.yml` pushes an
-image for:
+called from `docker-build.yml`. There is no separate UI E2E workflow. It tests an image
+built from the pull request's own commit, and it needs no registry and no secrets, so it
+runs the same way for pull requests from forks (GitHub still asks a maintainer to approve a
+first-time contributor's workflow run).
 
-1. pulls `ghcr.io/<owner>/docker-autoheal:sha-<short sha>`, the `image_ref` output of the
-   build job (not `pr-<N>`, not `latest`);
-2. starts a throwaway container from it with no config;
+1. `build-amd64` builds the `linux/amd64` image and uploads it as the `docker-image-amd64`
+   artifact (kept for a day). The tests run on this image, not on the multi-arch image that
+   the `build` job pushes for same-repository pull requests; both come from the same commit
+   and Dockerfile.
+2. The smoke test job downloads and loads that image and starts a throwaway container from
+   it with no config;
 3. waits until `/health` responds and `/api/status` reports `docker_connected`, checks
    `/api/config` shows the default `autoheal=true` label, then switches it to
    `autoheal.dev=true` through `PUT /api/config/monitor`;
@@ -321,13 +325,17 @@ image for:
 CI always runs the **`full`** suite, on every pull request including the Release Please PR.
 There is no CI scope switch; the `smoke` subset and the functional tags are for local runs.
 
+The `arm64-startup` job builds the `arm64` image under QEMU emulation, starts it, and checks
+`/health` and `docker_connected`. That catches an image that does not start on `arm64`;
+the UI suite does not run on it, and real `arm64` hardware is not tested.
+
 Any failing step fails the job. `run.sh` exits with 3 when the environment cannot be used
-(including a failed isolation check) and 1 when a test fails; the log annotation says which. On
-failure the Playwright HTML report, traces and screenshots are uploaded as the
-`ui-e2e-report` artifact, and the diagnostics step prints the container's logs.
-The real auto-heal restart of a failing container is covered by the suite itself
-(@events: "Autoheal restarts a container that exits and logs the restart"). Whether the job blocks a merge depends on the repository's
-branch-protection required checks.
+(including a failed isolation check) and 1 when a test fails; the log annotation says which.
+On failure the Playwright HTML report, traces and screenshots are uploaded as the
+`ui-e2e-report` artifact, and the diagnostics step prints the container's logs. The real
+auto-heal restart of a failing container is covered by the suite itself (`@events`: "Autoheal
+restarts a container that exits and logs the restart"). Whether the jobs block a merge
+depends on the repository's branch-protection required checks.
 
 Nothing in CI uses the development stack or `docker-compose.dev.yml`; that is the local
 workflow above.
