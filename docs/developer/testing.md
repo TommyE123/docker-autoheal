@@ -168,11 +168,10 @@ build, the container and the real `/api` backend. It currently holds one smoke t
 open `/` and check the Dashboard renders. Vitest remains the unit-test runner and
 excludes `e2e/`.
 
-In the Dev Container, run **Terminal → Run Task → Autoheal: Run Playwright E2E Tests**. It
-builds and starts the dev stack from `docker-compose.dev.yml` (so it never touches a real
-deployment on `3131`, and inside the Dev Container never on the host's daemon), then runs `npm run test:e2e` against it. **Run Playwright E2E Tests (UI)** runs
-`npm run test:e2e:ui` instead, to watch the run in Playwright's UI mode; see
-[Tasks](development-setup.md#tasks). To run it by hand against any running instance:
+This suite is what CI runs against the production image. To run it locally, use the
+**Autoheal: Run UI E2E** task (see [UI E2E suite](#ui-e2e-suite-playwright)): its `smoke`
+scope includes the same dashboard check against the dev stack, so there is no separate task
+for it. To run just this one test by hand against any running instance:
 
 ```bash
 cd frontend

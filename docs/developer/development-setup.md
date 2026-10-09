@@ -91,30 +91,21 @@ published image. The result is tagged `docker-autoheal:dev` locally, so it does 
 `tommye123/docker-autoheal:latest`. Open it at `http://localhost:3132` (VS Code forwards the port
 to your desktop; see [Docker isolation](#docker-isolation) and the logging notes below).
 
-**Autoheal: Run Playwright E2E Tests** starts the same dev stack in the background
-(`up --build -d --wait`, which waits for the image's healthcheck), then runs
-`npm run test:e2e` from `frontend/` against it, so the browser tests the Docker-served
-app rather than the Vite dev server. It reads the published port back from Compose
-(`3132` unless `AUTOHEAL_DEV_PORT` is set) and reaches it on `localhost`, because the
-stack runs on the Dev Container's own Docker daemon and publishes its ports inside the
-Dev Container. It removes the dev stack afterwards (printing its last logs first if the run failed), unless it was already running
-when the task started, in which case it is left alone. Chromium
-and its system libraries are installed by `post-create.sh`; after pulling this change into
-an existing Dev Container, run **Dev Containers: Rebuild Container** once.
-
-**Autoheal: Run Playwright E2E Tests (UI)** does the same setup but runs
-`npm run test:e2e:ui`, which opens [Playwright's UI mode](https://playwright.dev/docs/test-ui-mode)
-on port `9323`, so you can watch the browser run the smoke test with a timeline and
-screenshots, and re-run it. Open the forwarded **Playwright UI** port (the Ports tab, or the
-link in the terminal) in your browser. The task keeps running until you stop it (**Ctrl+C** in
-its terminal), which also tears down the stack under the same rule as above. Rebuild the
-Dev Container once to pick up the forwarded port.
-
-**Autoheal: Run UI E2E** runs the tagged UI journey suite (not the production-image smoke
-test above). It asks for a scope (`smoke`, `full`, or a functional area such as `events`)
-and a mode (`headless`, `headed` if a display is available, or Playwright's `ui` mode),
-starts the dev stack on the Dev Container's isolated daemon and runs the same tests in
-every mode. See [UI E2E suite (Playwright)](testing.md#ui-e2e-suite-playwright).
+**Autoheal: Run UI E2E** runs the tagged UI journey suite (see
+[UI E2E suite (Playwright)](testing.md#ui-e2e-suite-playwright)). It asks for a scope
+(`smoke`, `full`, or a functional area such as `events`) and a mode (`headless`, `headed`
+if a display is available, or Playwright's
+[`ui` mode](https://playwright.dev/docs/test-ui-mode)), then starts the dev stack in the
+background (`up --build -d --wait`, which waits for the image's healthcheck) on the Dev
+Container's isolated daemon and runs the same tests in every mode. It reads the published
+port back from Compose (`3132` unless `AUTOHEAL_DEV_PORT` is set) and reaches it on
+`localhost`. It removes the dev stack afterwards (printing its last logs first if the run
+failed), unless the stack was already running when the task started, in which case it is
+left alone. In `ui` mode the task keeps running until you stop it (**Ctrl+C** in its
+terminal); open the forwarded **Playwright UI** port (the Ports tab, or the link in the
+terminal) in your browser. Chromium and its system libraries are installed by
+`post-create.sh`; after pulling this change into an existing Dev Container, run
+**Dev Containers: Rebuild Container** once.
 
 **Autoheal: Install gh-aw** installs the `github/gh-aw` extension pinned to the
 `compiler_version` recorded in the header of `.github/workflows/issue-triage.lock.yml`, so
