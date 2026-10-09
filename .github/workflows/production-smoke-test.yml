@@ -8,8 +8,8 @@ name: Production Smoke Test
 # same-repo guard docker-build.yml's own push step already uses.
 #
 # Against the exact image docker-build.yml built, it runs, in order: the container
-# startup, health and Docker-connectivity checks, a real auto-heal restart, and then the
-# full tagged Playwright UI E2E suite (frontend/e2e-ui).
+# startup, health and Docker-connectivity checks, and then the full tagged Playwright UI
+# E2E suite (frontend/e2e-ui), which includes a real auto-heal restart.
 # Any failing step fails this job.
 on:
   workflow_call:
@@ -42,85 +42,10 @@ jobs:
           IMAGE_REF: ${{ inputs.image_ref }}
         run: docker pull "$IMAGE_REF"
 
-      - name: Start the container with a realistic production configuration
-        env:
-          IMAGE_REF: ${{ inputs.image_ref }}
-        run: |
-          docker run -d --name autoheal-smoke \
-            -v /var/run/docker.sock:/var/run/docker.sock:ro \
-            -p 3131:3131 \
-            -e PYTHONUNBUFFERED=1 \
-            --label autoheal=false \
-            "$IMAGE_REF"
-
-      - name: Wait for the service to become ready
-        run: |
-          for _ in $(seq 1 30); do
-            if curl -sf http://localhost:3131/health >/dev/null; then
-              echo "Service is ready"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "::error::Auto-Heal service did not become ready within the timeout"
-          exit 1
-
-      - name: Verify the application can communicate with Docker
-        # /api/status returns HTTP 200 even when Docker is unreachable
-        # (docker_connected: false) rather than failing the request, so the
-        # field itself - not just the HTTP status - has to be checked.
-        run: |
-          for _ in $(seq 1 30); do
-            if curl -sf http://localhost:3131/api/status | jq -e '.docker_connected == true' >/dev/null 2>&1; then
-              echo "Application is connected to Docker"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "::error::Application never reported a successful Docker connection"
-          exit 1
-
-      # A short interval makes the deterministic scenario below observable
-      # quickly, without resorting to an arbitrary fixed sleep.
-      - name: Speed up the monitoring interval
-        run: |
-          curl -sf -X PUT http://localhost:3131/api/config/monitor \
-            -H "Content-Type: application/json" \
-            -d '{"interval_seconds": 2, "label_key": "autoheal", "label_value": "true", "include_all": false}' \
-            >/dev/null
-
-      - name: Start a container that will fail and require autoheal
-        run: |
-          docker run -d --name autoheal-victim \
-            --restart no \
-            --label autoheal=true \
-            alpine:latest sh -c "sleep 3 && exit 1"
-
-      - name: Wait for the expected autoheal restart
-        # container_name in the event log is "<name> (<stable_id>)", not an
-        # exact container name, hence contains() rather than ==.
-        run: |
-          for _ in $(seq 1 30); do
-            if curl -sf http://localhost:3131/api/events \
-              | jq -e '.[] | select(.container_name | contains("autoheal-victim")) | select(.event_type == "restart")' \
-              >/dev/null 2>&1; then
-              echo "Autoheal restarted the failed container"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "::error::Expected autoheal restart event for autoheal-victim was not observed"
-          exit 1
-
-      # The tagged UI E2E suite (frontend/e2e-ui) against the same built image, not the
-      # Vite dev server and not a separately built dev image. It replaces the former
-      # single-dashboard Playwright test (@smoke includes that dashboard check).
-      #
       # The suite's fixtures only create containers for an instance that monitors
       # autoheal.dev=true, and several tests change the app's configuration and event log.
-      # So it gets its own throwaway instance of the image, with its own /data seeded with
-      # that label (as docker-compose.dev.yml does), and autoheal-smoke above, which
-      # monitors autoheal=true, is left exactly as the checks above verified it.
+      # So the image runs as a throwaway instance with its own /data seeded with that label
+      # (as docker-compose.dev.yml does).
       #
       # The suite creates containers on this runner's Docker daemon. That is only
       # acceptable on an ephemeral GitHub-hosted VM; run.sh additionally refuses to start
@@ -133,7 +58,7 @@ jobs:
             exit 1
           fi
 
-      - name: Start an isolated instance of the image for the UI E2E suite
+      - name: Start the image for the UI E2E suite
         env:
           IMAGE_REF: ${{ inputs.image_ref }}
         run: |
@@ -149,20 +74,47 @@ jobs:
             "$IMAGE_REF"
           echo "UI E2E instance image: $(docker inspect --format '{{.Config.Image}} ({{.Image}})' autoheal-ui-e2e)"
 
+      - name: Wait for the service to become ready
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -sf http://localhost:3132/health >/dev/null; then
+              echo "Service is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Auto-Heal service did not become ready within the timeout"
+          exit 1
+
+      - name: Verify the application can communicate with Docker
+        # /api/status returns HTTP 200 even when Docker is unreachable
+        # (docker_connected: false) rather than failing the request, so the
+        # field itself - not just the HTTP status - has to be checked.
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -sf http://localhost:3132/api/status | jq -e '.docker_connected == true' >/dev/null 2>&1; then
+              echo "Application is connected to Docker"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Application never reported a successful Docker connection"
+          exit 1
+
       # The suite's own fixtures re-check the monitored label before every test; failing
       # here first gives a clearer message when the seeded config was not picked up.
-      - name: Wait for the UI E2E instance to monitor autoheal.dev=true
+      - name: Wait for the instance to monitor autoheal.dev=true
         run: |
           for _ in $(seq 1 30); do
             if curl -sf http://localhost:3132/api/config \
               | jq -e '.monitor.label_key == "autoheal.dev" and .monitor.label_value == "true"' \
               >/dev/null 2>&1; then
-              echo "UI E2E instance is ready and monitors autoheal.dev=true"
+              echo "Instance monitors autoheal.dev=true"
               exit 0
             fi
             sleep 2
           done
-          echo "::error::UI E2E instance never became ready with the autoheal.dev=true monitor label"
+          echo "::error::Instance never reported the autoheal.dev=true monitor label"
           exit 1
 
       - name: Check out the UI E2E tests
@@ -216,21 +168,17 @@ jobs:
         run: |
           echo "--- docker ps -a ---"
           docker ps -a
-          echo "--- autoheal-smoke logs ---"
-          docker logs autoheal-smoke || true
-          echo "--- autoheal-victim logs ---"
-          docker logs autoheal-victim || true
           echo "--- autoheal-ui-e2e logs ---"
           docker logs autoheal-ui-e2e || true
-          echo "--- autoheal-smoke inspect ---"
-          docker inspect autoheal-smoke || true
-          if docker logs autoheal-smoke 2>&1 | grep -qi "http+docker\|Not supported URL scheme"; then
+          echo "--- autoheal-ui-e2e inspect ---"
+          docker inspect autoheal-ui-e2e || true
+          if docker logs autoheal-ui-e2e 2>&1 | grep -qi "http+docker\|Not supported URL scheme"; then
             echo "::error::Confirmed known Docker SDK/requests 'http+docker' transport failure (see PR #61)"
           fi
 
       - name: Clean up
         if: always()
         run: |
-          docker rm -f autoheal-smoke autoheal-victim autoheal-ui-e2e 2>/dev/null || true
+          docker rm -f autoheal-ui-e2e 2>/dev/null || true
           # Containers the UI E2E suite labels, if its own teardown did not run.
           docker ps -aq --filter label=autoheal.e2e.run | xargs -r docker rm -f || true

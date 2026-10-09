@@ -196,9 +196,8 @@ The suite needs a Docker daemon of its own and an instance of the app that monit
   installed by `post-create.sh`.
 * **CI**: the GitHub-hosted runner, whose Docker daemon is that ephemeral VM's own. The
   workflow refuses to continue on anything but a GitHub-hosted runner, and starts a
-  second, throwaway instance of the built image on port `3132` with its own `/data`
-  seeded with the `autoheal.dev` label. The production smoke instance (`autoheal=true`)
-  is left alone, so its checks are unaffected.
+  throwaway instance of the built image on port `3132` with its own `/data` seeded with
+  the `autoheal.dev` label.
 
 Docker-backed tests create a few small, labelled `alpine` containers on that daemon and
 remove them afterwards. Before the first Docker command the suite checks that the daemon
@@ -305,18 +304,17 @@ so it shows as skipped in every report. When the blocking change merges, remove 
 
 ### CI
 
-The suite runs in the Production Smoke Test job (`production-smoke-test.yml`), called from
-`docker-build.yml`, against the exact image that run built. There is no separate UI E2E
+The suite runs in the "Production container smoke test" job (`production-smoke-test.yml`),
+called from `docker-build.yml`, against the exact image that run built. There is no separate UI E2E
 workflow. The job, for the same-repository pull requests that `docker-build.yml` pushes an
 image for:
 
 1. pulls `ghcr.io/<owner>/docker-autoheal:sha-<short sha>`, the `image_ref` output of the
    build job (not `pr-<N>`, not `latest`);
-2. runs the production checks against it: container startup, `/health`, the Docker
-   connection reported by `/api/status`, and a real auto-heal restart of a failing
-   container;
-3. starts a second, throwaway container from the same `image_ref` with its own `/data`
-   seeded with the `autoheal.dev` label, and waits until `/api/config` reports it;
+2. starts a throwaway container from it with its own `/data` seeded with the `autoheal.dev`
+   label;
+3. waits until `/health` responds, `/api/status` reports `docker_connected`, and
+   `/api/config` reports the label;
 4. runs `bash frontend/e2e-ui/run.sh full headless` against it with `UI_E2E_BASE_URL`
    set.
 
@@ -326,8 +324,9 @@ There is no CI scope switch; the `smoke` subset and the functional tags are for 
 Any failing step fails the job. `run.sh` exits with 3 when the environment cannot be used
 (including a failed isolation check) and 1 when a test fails; the log annotation says which. On
 failure the Playwright HTML report, traces and screenshots are uploaded as the
-`ui-e2e-report` artifact, and the diagnostics step prints the logs of the smoke,
-victim and UI E2E containers. Whether the job blocks a merge depends on the repository's
+`ui-e2e-report` artifact, and the diagnostics step prints the container's logs.
+The real auto-heal restart of a failing container is covered by the suite itself
+(@events: "Autoheal restarts a container that exits and logs the restart"). Whether the job blocks a merge depends on the repository's
 branch-protection required checks.
 
 Nothing in CI uses the development stack or `docker-compose.dev.yml`; that is the local
