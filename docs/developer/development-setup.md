@@ -21,7 +21,8 @@ Container**. It also works as a GitHub Codespace.
 The container provides:
 
 - Python (matching the pinned base image in `.devcontainer/Dockerfile`) and Node.js 24
-- Access to the host's Docker daemon, via the `docker-outside-of-docker` feature
+- Its own, isolated Docker daemon, via the `docker-in-docker` feature (see
+  [Docker isolation](#docker-isolation))
 - The GitHub CLI (`gh`). The `github/gh-aw` extension, for working on the agentic
   workflows, is not installed automatically: run **Autoheal: Install gh-aw** after
   `gh auth login` (see below)
@@ -30,7 +31,8 @@ The container provides:
   npm-based linters (markdownlint, prettier, stylelint and the rest) stay pinned in
   `.devcontainer/package.json`
 - Shared VS Code settings, a shared set of installed VS Code extensions, and forwarded
-  ports for the frontend (3000), API (3131) and metrics (9090)
+  ports for the frontend (3000), the dev stack's UI/API (3132) and metrics (9091), and
+  Playwright's UI (9323)
 
 Application services are **not** started automatically — use the tasks below.
 
@@ -66,8 +68,10 @@ To reset a volume completely, stop the container and remove the volume from the 
 `~/.cache` at once, and removing `docker-autoheal-mise-data` uninstalls the mise tools until
 `mise install --locked` runs again. If you used an earlier version of this Dev Container,
 its `docker-autoheal-pip-cache` and `docker-autoheal-npm-cache` volumes are no longer used
-and can be removed the same way. Avoid running these cleanups while an install is in
-progress in another terminal.
+and can be removed the same way. The inner Docker daemon has its own volume,
+`docker-autoheal-dind-<devcontainerId>`, which holds its images, volumes and containers; it
+is not touched by these cleanups and is described under [Docker isolation](#docker-isolation).
+Avoid running these cleanups while an install is in progress in another terminal.
 
 ### Tasks
 
@@ -84,16 +88,16 @@ Conventions** and **Run Security Scanners**.
 (see [Running beside an existing deployment](#running-beside-an-existing-deployment)). The
 `--build` flag is what makes `docker-compose.yml` build your changes instead of using the
 published image. The result is tagged `docker-autoheal:dev` locally, so it does not replace
-`tommye123/docker-autoheal:latest`.
+`tommye123/docker-autoheal:latest`. Open it at `http://localhost:3132` (VS Code forwards the port
+to your desktop; see [Docker isolation](#docker-isolation) and the logging notes below).
 
 **Autoheal: Run Playwright E2E Tests** starts the same dev stack in the background
 (`up --build -d --wait`, which waits for the image's healthcheck), then runs
 `npm run test:e2e` from `frontend/` against it, so the browser tests the Docker-served
 app rather than the Vite dev server. It reads the published port back from Compose
-(`3132` unless `AUTOHEAL_DEV_PORT` is set) and reaches it as `host.docker.internal`,
-because the stack runs on the host's daemon, not inside the Dev Container
-(`devcontainer.json` maps that name with `--add-host`). It leaves your deployment alone and
-removes the dev stack afterwards (printing its last logs first if the run failed), unless it was already running
+(`3132` unless `AUTOHEAL_DEV_PORT` is set) and reaches it on `localhost`, because the
+stack runs on the Dev Container's own Docker daemon and publishes its ports inside the
+Dev Container. It removes the dev stack afterwards (printing its last logs first if the run failed), unless it was already running
 when the task started, in which case it is left alone. Chromium
 and its system libraries are installed by `post-create.sh`; after pulling this change into
 an existing Dev Container, run **Dev Containers: Rebuild Container** once.
@@ -114,29 +118,69 @@ task. The extension lives in the `gh` volume, so it survives rebuilds; run the t
 after the lock file is recompiled with a newer version.
 
 **Autoheal: Stop Docker Stack** runs `docker compose down` with the same `-p` and `-f` options.
-Stacks started with **Run Docker Stack** run on the host's Docker daemon (see below), so
-they keep running when the Dev Container stops or is rebuilt until you stop them.
+Stacks started with **Run Docker Stack** run on the Dev Container's own Docker daemon, so
+they stop with the Dev Container and never appear on the host's daemon.
 
 The tasks that need shell globbing run under `bash`, so outside the Dev Container they
 need `bash` on `PATH` (Git Bash or WSL on Windows).
 
 **Autoheal: Run Megalinter Cupcake** runs the same pinned MegaLinter image CI uses. It
-mounts `$LOCAL_WORKSPACE_FOLDER` — set by `devcontainer.json` to the *host* path of your
-checkout — rather than the container path, because the Docker daemon is the host's (see
-below). Without that it would mount an empty directory, lint nothing, and pass.
+mounts the current directory. Because the Dev Container has its own Docker daemon, the
+container path is the path that daemon sees.
 
-### Docker Compose inside the Dev Container
+### Docker isolation
 
-`docker compose` talks to the Docker daemon through the `docker-outside-of-docker`
-feature — the daemon is the host's, not the container's. Relative bind mounts in
-`docker-compose.yml` (e.g. `./data:/data`) are resolved by the
-Compose client to the container's path and handed to the host daemon as-is, which has no
-such path and silently creates an empty directory there instead of binding your checkout.
-The stack still starts and passes its health check, but persisted data (config, events,
-logs) won't be visible in your working copy — use `docker compose logs`/`docker exec` to
-inspect it instead. If the mount does resolve (for example when running Compose from the
-host), the stack reads and writes the same `./data` a deployment from that checkout would
-use, and stopping the stack doesn't revert changes made to it.
+The Dev Container runs its own Docker daemon (the official `docker-in-docker` feature), so
+Docker here is separate from the host's:
+
+- Production containers on the host are **not** visible from the Dev Container. `docker ps`
+  there lists only the Dev Container daemon's containers.
+- Test containers created inside the Dev Container are **not** visible on the host's daemon,
+  and nothing done to them can affect production containers.
+- `/var/run/docker.sock` inside the Dev Container is the inner daemon's socket, so
+  `docker-compose.yml`'s socket mount, the integration tests and the Compose tasks all use it.
+
+Host-side commands are unchanged: `docker`, `docker compose` and `python -m app.main` run
+on the host still use the host's (production) daemon. They are **not** made safe by this
+setup and are not part of the isolated workflow. The isolated workflow is the Dev Container
+(and Codespaces, which uses the same configuration).
+
+**Trade-off.** Docker-in-Docker needs the Dev Container to run `privileged`. That is what
+provides a separate daemon, but a privileged container has the usual host-escape
+considerations, so only open this Dev Container with code you trust.
+
+**Persistence.** The inner daemon's state (`/var/lib/docker`, which holds images, build
+cache, named volumes and container metadata) lives in the named volume
+`docker-autoheal-dind-<devcontainerId>` and survives rebuilds. That includes the containers
+themselves: stopped containers are still there afterwards, and the dev stack, which inherits
+`restart: unless-stopped` from `docker-compose.yml`, is brought back by its restart policy when
+the Dev Container's daemon starts. Re-running `docker compose` (or the tasks) is safe, and
+**Stop Docker Stack** removes it. Remove the volume from the host with `docker volume rm` to
+discard the inner daemon's images, volumes and containers.
+
+Relative bind mounts such as `./data-dev:/data` work as expected: the inner daemon runs in
+the same container as the Compose client, so it sees your checkout.
+
+To demonstrate the isolation, start the dev stack and run:
+
+```bash
+bash .devcontainer/verify-isolation.sh
+```
+
+It creates `autoheal-isolation-web` (an `nginx:alpine` container) and
+`autoheal-isolation-victim` (an `alpine` container that exits with an error after a few
+seconds, `--restart no`, labelled for the dev monitor), checks that the dev Autoheal restarts
+the victim, and removes both. Auto-monitoring adds the victim to the saved configuration, so the
+script snapshots `/api/config` first and puts it back on exit, even when a check fails; a failed
+restore fails the script. Only the event log keeps this run's entries, because events cannot be
+deleted one at a time. The probes are created on demand and are not part of any Compose file. To confirm the other direction, run `docker ps` **on the host** while
+the probes exist: neither appears, and the host's containers are unchanged.
+
+**Migrating from the old setup.** Earlier versions used `docker-outside-of-docker`, which
+left `docker-autoheal-dev` (and any other containers you created) running on the host
+daemon. After rebuilding the Dev Container, remove them on the host once:
+`docker rm -f docker-autoheal-dev` (and `docker compose -p docker-autoheal-dev down` from
+a host shell if needed). The new Dev Container does not use or interact with them.
 
 `.github/workflows/devcontainer.yml` builds the container and checks its tooling on pull
 requests that touch it, and can also be run manually from the Actions tab.
@@ -195,42 +239,58 @@ Compose gives the `COMPOSE_PROJECT_NAME` environment variable precedence over it
 variable set the stack would otherwise land in another project, and `docker compose down` could
 remove that project's containers and networks. `-p` takes precedence over both.
 
-By default the startup log reports the published host port (`3132`) and the container port
-(`3131`), for example `Web UI published on host port 3132 (container port 3131)`, because the
-application cannot know which address other machines use to reach the host. Open that port on
-the host's address. To have the log print a full, clickable URL instead, set
-`AUTOHEAL_DEV_HOST` to that address. The simplest way is a `.env` file next to
-`docker-compose.yml`, which Docker Compose reads automatically and Git ignores:
+The dev override sets the address shown in the startup logs to `localhost` and the published
+port, so the logs print `Web UI available at http://localhost:3132` and
+`API documentation available at http://localhost:3132/docs`. The application cannot know which
+address anything else uses to reach it, so the override supplies this default (`AUTOHEAL_DEV_HOST`
+overrides it, see below). With no host supplied, the app does not print a URL: it logs the
+published port when `AUTOHEAL_PUBLIC_PORT` is set, otherwise just the listen address (for
+example `Web UI listening on 0.0.0.0:3131`, as with the base `docker-compose.yml`).
+
+**Inside the Dev Container (the isolated workflow)** that default is correct, so leave
+`AUTOHEAL_DEV_HOST` unset and open `http://localhost:3132`. VS Code forwards port 3132 to your
+desktop, so the same `http://localhost:3132` works in a browser on the machine running VS Code
+(see the Ports tab). The inner Docker daemon publishes the port inside the Dev Container only:
+it does not become a port on the Docker host's LAN address, so `http://<server-address>:3132`
+does not reach the isolated dev stack, and the host's own `3131` is still production.
+
+`AUTOHEAL_DEV_HOST` (passed to the app as `AUTOHEAL_PUBLIC_HOST`) only changes the address
+printed in the startup logs, to `Web UI available at http://<value>:3132`. It does not expose,
+publish or forward anything. Setting it to the server's address in the Dev Container would make
+the logs advertise a URL that does not work, so don't. Compose reads a `.env` file next to
+`docker-compose.yml` automatically, and the Dev Container mounts your checkout, so a `.env`
+created for a host workflow also applies to the stack started inside the Dev Container. Delete
+`AUTOHEAL_DEV_HOST` from it, or the file, if you see an unexpected URL in the logs.
+
+The variable is only useful when you run this override from a host shell (not isolated: see
+below), where the published port really is on the host's address. The default `localhost` is
+right if you browse from that same host; from another machine, set it to the address you reach
+the host at, in `.env` or the shell that runs the command:
 
 ```bash
 echo 'AUTOHEAL_DEV_HOST=192.0.2.10' > .env
 ```
 
-The log then shows `Web UI available at http://192.0.2.10:3132`. Exporting the variable in
-the shell that runs the command works too. Nothing detects the address for you. This only
-changes the logged messages. The server still listens on `0.0.0.0:3131` inside the
-container. Outside this override, `AUTOHEAL_PUBLIC_HOST` and `AUTOHEAL_PUBLIC_PORT` do the
-same job.
+The log then shows `Web UI available at http://192.0.2.10:3132`. Nothing detects the address
+for you, and the server still listens on `0.0.0.0:3131` inside the container. Outside this
+override, `AUTOHEAL_PUBLIC_HOST` and `AUTOHEAL_PUBLIC_PORT` do the same job.
 
-The dev instance shares the host's Docker socket, so it can see every container on the
-daemon. To keep its automatic discovery away from production containers, the override seeds
+Inside the Dev Container the Docker socket belongs to the isolated inner daemon, so the
+dev instance cannot see production containers at all. The override also seeds
 `./data-dev/config.json` on first start with `monitor.label_key` set to `autoheal.dev`. Only
 containers labelled `autoheal.dev=true` are discovered and auto-added; containers labelled
 `autoheal=true` are not. Label your test containers accordingly.
 
-This is not a security boundary. The label only controls automatic discovery: a container
-explicitly selected in the UI (`containers.selected`) is monitored whatever its labels, and the
-API can restart any container on the shared socket. Don't select production containers in the
-dev instance.
+The label is not the isolation boundary; it only controls automatic discovery. The boundary
+is the separate Docker daemon (see [Docker isolation](#docker-isolation)). If you run this
+override from a host shell instead, the dev instance shares the host's daemon, can see and
+restart every container on it, and is not safe beside a production deployment.
 
 An existing `./data-dev/config.json` is kept, so your own changes to the monitoring label
 survive restarts; delete `./data-dev` to re-seed it. The container refuses to start, and logs
 why, if the file is unreadable or its `monitor` section is invalid or still uses the production
 `autoheal=true` label, or if the seed can't be written. Without that check the app would fall
 back to its defaults and monitor `autoheal=true` containers.
-
-Inside the Dev Container this comes with a caveat — see
-[Docker Compose inside the Dev Container](#docker-compose-inside-the-dev-container).
 
 ## Running tests
 
