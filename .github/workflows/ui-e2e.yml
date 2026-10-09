@@ -60,7 +60,7 @@ concurrency:
 
 jobs:
   ui-e2e:
-    name: UI E2E (${{ github.event_name == 'workflow_dispatch' && inputs.scope || (github.head_ref == 'release-please--branches--main' && 'full' || 'smoke') }})
+    name: UI E2E (${{ github.event_name == 'workflow_dispatch' && inputs.scope || 'full' }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -82,7 +82,8 @@ jobs:
           elif [ "$HEAD_REF" = release-please--branches--main ]; then
             scope=full
           else
-            scope=smoke
+            # TEMPORARY (#479): run the full suite on this pull request. Revert before merge.
+            scope=full
           fi
           echo "scope=$scope" >> "$GITHUB_OUTPUT"
 
