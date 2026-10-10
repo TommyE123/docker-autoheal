@@ -1,0 +1,137 @@
+name: Update Mutation Results
+
+# Refreshes the tracked .github/badges/mutation.json (the README mutation badge
+# data) from a full mutation run on main, through one auto-merging pull request.
+# Pull request mutation runs (mutation-testing.yml) never touch that file.
+#
+# Informational only: a lower score is flagged in the PR but never fails this
+# workflow, blocks the merge or delays Release Please. workflow_dispatch only: run
+# it from the Actions tab or from an external scheduler (cron-job.org) calling the
+# API on main. There is deliberately no GitHub schedule.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-mutation-results
+  cancel-in-progress: false
+
+env:
+  BADGE_FILE: .github/badges/mutation.json
+
+jobs:
+  update:
+    name: Update mutation results
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      # Only valid when dispatched on main: any other ref fails loudly, so a
+      # misdirected run is never mistaken for a successful one.
+      - name: Require main
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Dispatch this workflow on main (it was dispatched on $GITHUB_REF); nothing was run." >&2
+            exit 1
+          fi
+
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      # Same Python version the Dockerfile ships, as in mutation-testing.yml.
+      - name: Determine Python version from Dockerfile
+        id: python-version
+        run: |
+          VERSION=$(sed -n 's/^FROM python:\([0-9]\+\.[0-9]\+\)-slim.*/\1/p' Dockerfile | head -n1)
+          [ -n "$VERSION" ] || { echo "::error::No 'FROM python:X.Y-slim' line in Dockerfile" >&2; exit 1; }
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python ${{ steps.python-version.outputs.version }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ steps.python-version.outputs.version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      # The same full run as pull requests, plus rewriting the tracked file.
+      - name: Run mutation testing
+        env:
+          UPDATE_MUTATION_BADGE: "1"
+        run: ./mutation.sh
+
+      # Old score from the tracked file, new from the file just generated.
+      - name: Compare scores
+        id: score
+        run: |
+          old=$(git show "HEAD:$BADGE_FILE" | jq -r '.message // empty')
+          new=$(jq -r '.message // empty' "$BADGE_FILE")
+          title="chore: update mutation results"
+          warning=""
+          if [[ $old =~ ^[0-9.]+%$ && $new =~ ^[0-9.]+%$ && $old != "$new" ]]; then
+            title="$title ($old → $new)"
+            if awk -v o="${old%\%}" -v n="${new%\%}" 'BEGIN { exit !(n < o) }'; then
+              warning="> ⚠️ Mutation score dropped from $old to $new."
+            fi
+          fi
+          {
+            echo "title=$title"
+            echo "warning=$warning"
+          } >> "$GITHUB_OUTPUT"
+
+      # The run takes a while: if main moved on, the result is stale, so publish and
+      # close nothing and leave it to the next run.
+      - name: Verify main has not moved
+        id: fresh
+        run: |
+          current=$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)
+          if [ "$current" = "$(git rev-parse HEAD)" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning title=Mutation results are stale::main moved during the run; nothing was published or closed. Run the workflow again."
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      # Commits only the badge to chore/update-mutation-results and creates or
+      # updates the one PR. With no diff it creates nothing, and closes (and deletes
+      # the branch of) an update PR left open by an earlier run.
+      - name: Create or update the pull request
+        id: cpr
+        if: ${{ steps.fresh.outputs.current == 'true' }}
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1 # zizmor: ignore[superfluous-actions] - also commits, pushes and closes obsolete PRs.
+        with:
+          token: ${{ secrets.BADGE_PUSH_TOKEN }}
+          base: main
+          branch: chore/update-mutation-results
+          delete-branch: true
+          add-paths: .github/badges/mutation.json
+          commit-message: ${{ steps.score.outputs.title }}
+          title: ${{ steps.score.outputs.title }}
+          body: |
+            ${{ steps.score.outputs.warning }}
+
+            Refreshes `.github/badges/mutation.json` from a full mutation run on `main`.
+            A score change is informational: a drop does not fail the workflow, block this
+            PR or delay Release Please. This PR is intentionally auto-merged once the
+            required checks pass.
+
+      # Bound to the exact commit the action pushed: if the head changes, it fails.
+      - name: Enable auto-merge
+        if: ${{ steps.cpr.outputs.pull-request-number != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.BADGE_PUSH_TOKEN }}
+          PR: ${{ steps.cpr.outputs.pull-request-number }}
+          SHA: ${{ steps.cpr.outputs.pull-request-head-sha }}
+        run: |
+          files=$(gh pr view "$PR" --json files --jq '[.files[].path] | join(",")')
+          [ "$files" = "$BADGE_FILE" ] || { echo "::error::PR #$PR changes more than $BADGE_FILE ($files); not enabling auto-merge." >&2; exit 1; }
+          gh pr merge "$PR" --auto --squash --match-head-commit "$SHA"
