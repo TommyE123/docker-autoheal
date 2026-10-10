@@ -52,6 +52,14 @@ class TestCancelledErrorFilter:
 class TestAutoHealServiceStop:
     """AutoHealService.stop() shutdown ordering and per-component error handling."""
 
+    def test_new_service_is_not_running(self):
+        service = AutoHealService()
+
+        assert service.running is False
+        assert service.docker_client is None
+        assert service.monitoring_engine is None
+        assert service.uptime_kuma_monitor is None
+
     @staticmethod
     def _messages(caplog, level):
         return [
@@ -213,7 +221,7 @@ class TestAutoHealServiceStop:
 
 
 class TestAutoHealServiceStartFailure:
-    """Failure handling for AutoHealService.start(): partial init + notification cleanup + re-raise."""
+    """Failure handling for AutoHealService.start(): partial-init cleanup + re-raise."""
 
     def _make_config(self, uptime_kuma_enabled=False):
         config = MagicMock()
@@ -264,6 +272,231 @@ class TestAutoHealServiceStartFailure:
             # Docker client was already assigned before the failing step (partial init).
             assert service.docker_client is not None
             assert service.monitoring_engine is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "failing_step",
+        [
+            "monitoring_engine_init",
+            "uptime_kuma_init",
+            "init_api",
+            "prometheus_server",
+            "notification_manager_start",
+            "monitoring_engine_start",
+        ],
+    )
+    async def test_failure_after_docker_client_created_closes_it(self, failing_step):
+        # Every step after DockerClientWrapper() can fail. run() only reaches stop()
+        # after a successful start(), so start() itself must release the client.
+        config = self._make_config()
+        config.observability.prometheus_enabled = True
+        error = RuntimeError(f"{failing_step} broke")
+
+        with (
+            patch("app.main.config_manager") as mock_cm,
+            patch("app.main.DockerClientWrapper") as mock_docker_cls,
+            patch("app.main.MonitoringEngine") as mock_engine_cls,
+            patch("app.main.UptimeKumaMonitor") as mock_kuma_cls,
+            patch("app.main.init_api") as mock_init_api,
+            patch("app.main.start_http_server") as mock_http,
+            patch("app.main.notification_manager") as mock_notif,
+        ):
+            mock_cm.get_config.return_value = config
+            mock_engine_cls.return_value.start = AsyncMock()
+            mock_engine_cls.return_value.stop = AsyncMock()
+            mock_kuma_cls.return_value.stop = AsyncMock()
+            mock_notif.start = AsyncMock()
+            mock_notif.stop = AsyncMock()
+            {
+                "monitoring_engine_init": mock_engine_cls,
+                "uptime_kuma_init": mock_kuma_cls,
+                "init_api": mock_init_api,
+                "prometheus_server": mock_http,
+                "notification_manager_start": mock_notif.start,
+                "monitoring_engine_start": mock_engine_cls.return_value.start,
+            }[failing_step].side_effect = error
+
+            service = AutoHealService()
+
+            with pytest.raises(RuntimeError) as exc_info:
+                await service.start()
+
+            assert exc_info.value is error
+            mock_docker_cls.return_value.close.assert_called_once()
+            mock_notif.stop.assert_awaited_once()
+            assert service.running is False
+
+    @pytest.mark.asyncio
+    async def test_failure_after_metrics_server_started_stops_it(self):
+        config = self._make_config()
+        config.observability.prometheus_enabled = True
+        server = MagicMock()
+
+        with (
+            patch("app.main.config_manager") as mock_cm,
+            patch("app.main.DockerClientWrapper"),
+            patch("app.main.MonitoringEngine") as mock_engine_cls,
+            patch("app.main.UptimeKumaMonitor"),
+            patch("app.main.init_api"),
+            patch("app.main.start_http_server", return_value=(server, MagicMock())),
+            patch("app.main.notification_manager") as mock_notif,
+        ):
+            mock_cm.get_config.return_value = config
+            mock_engine_cls.return_value.stop = AsyncMock()
+            mock_notif.start = AsyncMock(side_effect=RuntimeError("notify broke"))
+            mock_notif.stop = AsyncMock()
+
+            service = AutoHealService()
+
+            with pytest.raises(RuntimeError, match="notify broke"):
+                await service.start()
+
+            server.shutdown.assert_called_once()
+            server.server_close.assert_called_once()
+            assert service.metrics_server is None
+
+    @pytest.mark.asyncio
+    async def test_cancellation_during_startup_cleans_up_and_propagates(self):
+        config = self._make_config()
+        config.observability.prometheus_enabled = True
+        server = MagicMock()
+
+        with (
+            patch("app.main.config_manager") as mock_cm,
+            patch("app.main.DockerClientWrapper") as mock_docker_cls,
+            patch("app.main.MonitoringEngine") as mock_engine_cls,
+            patch("app.main.UptimeKumaMonitor"),
+            patch("app.main.init_api"),
+            patch("app.main.start_http_server", return_value=(server, MagicMock())),
+            patch("app.main.notification_manager") as mock_notif,
+        ):
+            mock_cm.get_config.return_value = config
+            mock_engine_cls.return_value.stop = AsyncMock()
+            mock_notif.start = AsyncMock(side_effect=asyncio.CancelledError())
+            mock_notif.stop = AsyncMock()
+
+            service = AutoHealService()
+
+            with pytest.raises(asyncio.CancelledError):
+                await service.start()
+
+            mock_docker_cls.return_value.close.assert_called_once()
+            server.shutdown.assert_called_once()
+            server.server_close.assert_called_once()
+            mock_notif.stop.assert_awaited_once()
+            assert service.running is False
+
+    @pytest.mark.asyncio
+    async def test_metrics_shutdown_error_still_closes_the_socket(self):
+        service = AutoHealService()
+        server = MagicMock()
+        server.shutdown.side_effect = RuntimeError("shutdown boom")
+        service.metrics_server = server
+
+        with patch("app.main.notification_manager") as mock_notif:
+            mock_notif.stop = AsyncMock()
+            await service.stop()
+
+        server.server_close.assert_called_once()
+        assert service.metrics_server is None
+
+    @pytest.mark.asyncio
+    async def test_failure_after_components_started_stops_them(self):
+        # A failure after the engine and Uptime-Kuma have started (here while building
+        # the startup log) must stop both and close the Docker client, not leave them running.
+        with (
+            patch("app.main.config_manager") as mock_cm,
+            patch("app.main.DockerClientWrapper") as mock_docker_cls,
+            patch("app.main.MonitoringEngine") as mock_engine_cls,
+            patch("app.main.UptimeKumaMonitor") as mock_kuma_cls,
+            patch("app.main.init_api"),
+            patch("app.main.start_http_server"),
+            patch("app.main.get_ui_url", side_effect=RuntimeError("late failure")),
+            patch("app.main.notification_manager") as mock_notif,
+        ):
+            mock_cm.get_config.return_value = self._make_config(uptime_kuma_enabled=True)
+            engine = mock_engine_cls.return_value
+            engine.start = AsyncMock()
+            engine.stop = AsyncMock()
+            kuma = mock_kuma_cls.return_value
+            kuma.start = AsyncMock()
+            kuma.stop = AsyncMock()
+            mock_notif.start = AsyncMock()
+            mock_notif.stop = AsyncMock()
+
+            service = AutoHealService()
+
+            with pytest.raises(RuntimeError, match="late failure"):
+                await service.start()
+
+            engine.start.assert_awaited_once()
+            kuma.start.assert_awaited_once()
+            kuma.stop.assert_awaited_once()
+            engine.stop.assert_awaited_once()
+            mock_docker_cls.return_value.close.assert_called_once()
+            mock_notif.stop.assert_awaited_once()
+            assert service.running is False
+
+    @pytest.mark.asyncio
+    async def test_cleanup_error_does_not_mask_the_startup_error(self):
+        with (
+            patch("app.main.config_manager") as mock_cm,
+            patch("app.main.DockerClientWrapper") as mock_docker_cls,
+            patch("app.main.MonitoringEngine", side_effect=RuntimeError("engine broke")),
+            patch("app.main.notification_manager") as mock_notif,
+        ):
+            mock_cm.get_config.return_value = self._make_config()
+            mock_docker_cls.return_value.close.side_effect = RuntimeError("close boom")
+            mock_notif.stop = AsyncMock()
+
+            service = AutoHealService()
+
+            with pytest.raises(RuntimeError, match="engine broke"):
+                await service.start()
+
+            mock_docker_cls.return_value.close.assert_called_once()
+            mock_notif.stop.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_notification_stop_error_does_not_mask_the_startup_error(self, caplog):
+        startup_error = RuntimeError("engine broke")
+        with (
+            patch("app.main.config_manager") as mock_cm,
+            patch("app.main.DockerClientWrapper") as mock_docker_cls,
+            patch("app.main.MonitoringEngine", side_effect=startup_error),
+            patch("app.main.notification_manager") as mock_notif,
+        ):
+            mock_cm.get_config.return_value = self._make_config()
+            mock_notif.stop = AsyncMock(side_effect=RuntimeError("notify boom"))
+
+            service = AutoHealService()
+
+            with pytest.raises(RuntimeError) as excinfo:
+                await service.start()
+
+            assert excinfo.value is startup_error
+            mock_docker_cls.return_value.close.assert_called_once()
+            mock_notif.stop.assert_awaited_once()
+            assert "Error stopping notification manager: notify boom" in [
+                r.getMessage() for r in caplog.records
+            ]
+
+    @pytest.mark.asyncio
+    async def test_failure_without_notification_manager_still_cleans_up(self):
+        with (
+            patch("app.main.config_manager") as mock_cm,
+            patch("app.main.DockerClientWrapper") as mock_docker_cls,
+            patch("app.main.MonitoringEngine", side_effect=RuntimeError("engine broke")),
+        ):
+            mock_cm.get_config.return_value = self._make_config()
+
+            service = AutoHealService()
+            service.notification_manager = None
+
+            with pytest.raises(RuntimeError, match="engine broke"):
+                await service.start()
+
+            mock_docker_cls.return_value.close.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_config_load_failure_reraises_before_any_component_created(self):

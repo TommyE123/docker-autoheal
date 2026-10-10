@@ -13,8 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui-host=0.0.0.0 --ui-port=9323"
+    "test:ui-e2e": "playwright test -c playwright.ui.config.js",
+    "test:ui-e2e:smoke": "playwright test -c playwright.ui.config.js --project=parallel --grep @smoke"
   },
   "dependencies": {
     "axios": "^1.6.2",
