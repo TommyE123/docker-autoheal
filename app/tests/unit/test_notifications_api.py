@@ -122,7 +122,7 @@ class TestNotificationServiceCrud:
         assert result["service"]["name"] == "Webhook"
         assert config_manager.get_config().notifications.services[0].name == "Webhook"
 
-    async def test_add_notification_service_validation_error_hides_credentials(self):
+    async def test_add_notification_service_validation_error_hides_credentials(self, caplog):
         with pytest.raises(HTTPException) as exc_info:
             await add_notification_service(
                 {
@@ -136,6 +136,8 @@ class TestNotificationServiceCrud:
         assert exc_info.value.status_code == 500
         assert "access_token" in exc_info.value.detail
         assert "tk_leak_check" not in exc_info.value.detail
+        assert "Error adding notification service" in caplog.text
+        assert "tk_leak_check" not in caplog.text
 
     async def test_add_notification_service_duplicate_name_returns_400(self):
         await add_notification_service(
