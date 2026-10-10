@@ -49,6 +49,18 @@ curl -X POST http://localhost:3131/api/notifications/services \
 | `DELETE /api/notifications/services/{name}` | Remove a service                                        |
 | `POST /api/notifications/test/{name}`       | Send a test notification                                |
 
+### ntfy authentication
+
+ntfy services can authenticate with either a username and password (HTTP Basic) or an
+optional **access token** (`access_token`, sent as `Authorization: Bearer <token>`). If
+both are set, the access token is used. With neither, requests are sent unauthenticated.
+Like the other service credentials, the token is stored in the config file and returned
+by `GET /api/notifications/config`; it is never written to the application logs.
+
+Credentials are sent exactly as configured, so use an `https://` server URL whenever the
+token (or password) crosses an untrusted network. Over plain `http://` they are sent
+unencrypted.
+
 ## Event filtering
 
 By default, notifications are sent for these event types:

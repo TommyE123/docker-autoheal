@@ -40,7 +40,12 @@ smoke | containers | monitoring | events | configuration | notifications | error
 esac
 case "${mode}" in
 headless) ;;
-ui) args+=(--ui-host=0.0.0.0 --ui-port=9323) ;;
+ui)
+  # One project holding every spec (see playwright.ui.config.js): UI mode otherwise ticks
+  # only `parallel`, which has no tests for the scopes that live in `exclusive`.
+  export UI_E2E_UI_MODE=1
+  args+=(--ui-host=0.0.0.0 --ui-port=9323)
+  ;;
 *)
   echo "Unknown mode '${mode}'" >&2
   exit 2

@@ -71,6 +71,7 @@ function NotificationsPage() {
     chat_id: '',
     topic: '',
     server_url: '',
+    access_token: '',
     app_token: '',
     user_key: '',
     api_token: ''
@@ -160,6 +161,7 @@ function NotificationsPage() {
         chat_id: '',
         topic: '',
         server_url: '',
+        access_token: '',
         app_token: '',
         user_key: '',
         api_token: ''
@@ -203,6 +205,7 @@ function NotificationsPage() {
         if (formData.server_url) cleanedData.server_url = formData.server_url;
         if (formData.username) cleanedData.username = formData.username;
         if (formData.password) cleanedData.password = formData.password;
+        if (formData.access_token) cleanedData.access_token = formData.access_token;
       }
       if (formData.type === 'gotify') {
         if (formData.server_url) cleanedData.server_url = formData.server_url;
@@ -224,7 +227,9 @@ function NotificationsPage() {
       await fetchConfig();
       handleCloseModal();
     } catch (error) {
-      console.error('Failed to save service:', error);
+      // Log the message and status only: the full Axios error carries the request body, which
+      // can include credentials such as the ntfy access token.
+      console.error('Failed to save service:', error.message, error.response?.status);
       showAlert(error.response?.data?.detail || 'Failed to save notification service', 'danger');
     } finally {
       setSaving(false);
@@ -383,6 +388,16 @@ function NotificationsPage() {
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               />
             </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Access token (optional)</Form.Label>
+              <Form.Control
+                type="password"
+                value={formData.access_token || ''}
+                onChange={(e) => setFormData({ ...formData, access_token: e.target.value })}
+                placeholder="tk_..."
+              />
+              <Form.Text muted>Takes precedence over username/password.</Form.Text>
+            </Form.Group>
           </>
         );
 
@@ -464,7 +479,12 @@ function NotificationsPage() {
       </Row>
 
       {alert.show && (
-        <Alert variant={alert.variant} dismissible onClose={() => setAlert({ ...alert, show: false })}>
+        <Alert
+          variant={alert.variant}
+          dismissible
+          className="alert-floating"
+          onClose={() => setAlert({ ...alert, show: false })}
+        >
           {alert.message}
         </Alert>
       )}

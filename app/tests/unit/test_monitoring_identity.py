@@ -1,9 +1,9 @@
 """
 Unit tests for container identity and monitoring selection.
 
-The stable identifier is the key that restart counts, cooldowns, backoff and
-quarantine are all recorded against, so it defines the monitoring identity of a
-container across recreations.
+The stable identifier defines the monitoring identity of a container across
+recreations. Restart counts, cooldowns, backoff and quarantine are recorded against
+the recovery identifier derived from it (see test_compose_replica_recovery.py).
 """
 
 from app.tests.unit.conftest import make_container

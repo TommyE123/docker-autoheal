@@ -190,7 +190,7 @@ function EventsPage() {
 
       <Card.Body style={{ maxHeight: '600px', overflowY: 'auto' }}>
         {alert && (
-          <Alert variant={alert.type} dismissible onClose={() => setAlert(null)} className="mb-3">
+          <Alert variant={alert.type} dismissible onClose={() => setAlert(null)} className="alert-floating mb-3">
             {alert.message}
           </Alert>
         )}

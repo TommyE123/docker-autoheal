@@ -47,11 +47,14 @@ async def list_containers(include_stopped: bool = False):
             if monitoring_engine:
                 monitored = monitoring_engine.should_monitor_container(container, info)
 
-            # Check if quarantined (use stable_id, matching how quarantine is stored)
-            quarantined = config_manager.is_quarantined(stable_id)
+            # Restart counts and quarantine are stored per replica (recovery_id)
+            recovery_id = info.get("recovery_id")
+
+            # Check if quarantined (use recovery_id, matching how quarantine is stored)
+            quarantined = config_manager.is_quarantined(recovery_id)
 
             # Get locally tracked restart count (persists across container recreations)
-            locally_tracked_restarts = config_manager.get_total_restart_count(stable_id)
+            locally_tracked_restarts = config_manager.get_total_restart_count(recovery_id)
 
             # Check for Uptime Kuma mapping and status using uptime_kuma_monitor
             uptime_kuma_status = None
@@ -115,21 +118,23 @@ async def get_container_details(container_id: str):
         full_container_id = info.get("full_id")
         container_name = info.get("name")
         stable_id = info.get("stable_id")
+        # Restart counts and quarantine are stored per replica (recovery_id)
+        recovery_id = info.get("recovery_id")
 
-        # Get locally tracked restart counts (using stable_id)
+        # Get locally tracked restart counts (using recovery_id)
         recent_restart_count = config_manager.get_restart_count(
-            stable_id,
+            recovery_id,
             config_manager.get_config().restart.max_restarts_window_seconds
         )
-        total_restart_count = config_manager.get_total_restart_count(stable_id)
+        total_restart_count = config_manager.get_total_restart_count(recovery_id)
 
         # Check monitoring status
         monitored = False
         if monitoring_engine:
             monitored = monitoring_engine.should_monitor_container(container, info)
 
-        # Check if quarantined (use stable_id, matching how quarantine is stored)
-        quarantined = config_manager.is_quarantined(stable_id)
+        # Check if quarantined (use recovery_id, matching how quarantine is stored)
+        quarantined = config_manager.is_quarantined(recovery_id)
 
         # Get custom health check (by stable_id first for correctness, then fallback to name/ID for legacy compat)
         custom_hc = config_manager.get_custom_health_check(stable_id)
@@ -313,17 +318,17 @@ async def unquarantine_container(container_id: str):
 
         info = docker_client.get_container_info(container)
         container_name = info.get("name")
-        stable_id = info.get("stable_id")
+        recovery_id = info.get("recovery_id")
 
-        # Remove from quarantine using stable_id (matches how quarantine is stored)
-        config_manager.unquarantine_container(stable_id)
+        # Remove from quarantine using recovery_id (matches how quarantine is stored)
+        config_manager.unquarantine_container(recovery_id)
 
-        # Clear restart history using stable_id
-        config_manager.clear_restart_history(stable_id)
+        # Clear restart history using recovery_id
+        config_manager.clear_restart_history(recovery_id)
 
         event = AutoHealEvent(
             timestamp=datetime.now(UTC),
-            container_name=f"{container_name} ({stable_id})",
+            container_name=f"{container_name} ({recovery_id})",
             container_id=info.get("full_id"),  # Store current ID for reference
             event_type="unquarantine",
             restart_count=0,
