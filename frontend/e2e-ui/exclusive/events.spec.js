@@ -132,9 +132,7 @@ test(
   },
 );
 
-// Blocked by https://github.com/TommyE123/docker-autoheal/pull/431: the Events page
-// has no filters on main yet. Enable this test, unchanged, when that PR merges.
-test.fixme(
+test(
   "filters the log by container and event type, and clears the filters (#431)",
   { tag: ["@events", "@regression"] },
   async ({ page, request, createContainer }) => {
