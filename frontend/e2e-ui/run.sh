@@ -41,10 +41,10 @@ esac
 case "${mode}" in
 headless) ;;
 ui)
-  # Select both projects up front: UI mode otherwise starts with only `parallel` ticked,
-  # which has no tests for the functional tags that live in `exclusive` (notifications,
-  # events, configuration), so the tree is empty.
-  args+=(--ui-host=0.0.0.0 --ui-port=9323 --project=parallel --project=exclusive)
+  # One project holding every spec (see playwright.ui.config.js): UI mode otherwise ticks
+  # only `parallel`, which has no tests for the scopes that live in `exclusive`.
+  export UI_E2E_UI_MODE=1
+  args+=(--ui-host=0.0.0.0 --ui-port=9323)
   ;;
 *)
   echo "Unknown mode '${mode}'" >&2
