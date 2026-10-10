@@ -145,8 +145,8 @@ body {
   }
 }
 
-/* Floating feedback alerts (page-level success/error messages). Inline alerts, such as
-   empty states, keep the normal flow so they stay behind modals. */
+/* Floating feedback alerts: page-level success and error messages */
+/* Inline alerts, such as empty states, stay in normal flow behind modals */
 .alert-floating {
   position: fixed;
   top: 70px;
