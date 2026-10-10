@@ -145,8 +145,9 @@ body {
   }
 }
 
-/* Alert Positioning */
-.alert {
+/* Floating feedback alerts (page-level success/error messages). Inline alerts, such as
+   empty states, keep the normal flow so they stay behind modals. */
+.alert-floating {
   position: fixed;
   top: 70px;
   left: 50%;
@@ -155,18 +156,6 @@ body {
   min-width: 300px;
   max-width: 500px;
   box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
-}
-
-/* Override fixed positioning for alerts inside modals */
-.modal .alert {
-  position: relative;
-  top: auto;
-  left: auto;
-  transform: none;
-  z-index: auto;
-  min-width: auto;
-  max-width: none;
-  box-shadow: none;
 }
 
 /* Code blocks */

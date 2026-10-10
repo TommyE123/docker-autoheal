@@ -299,7 +299,6 @@ A test for behaviour that is not on `main` yet is written now and marked `test.f
 so it shows as skipped in every report. When the blocking change merges, remove the
 `fixme` and leave the assertions alone:
 
-* #455: the empty-state alert covering the Add Service modal (`notifications.spec.js`)
 * #431: the Events page filters (`events.spec.js`)
 
 ### CI

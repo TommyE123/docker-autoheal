@@ -482,7 +482,12 @@ function NotificationsPage() {
       </Row>
 
       {alert.show && (
-        <Alert variant={alert.variant} dismissible onClose={() => setAlert({ ...alert, show: false })}>
+        <Alert
+          variant={alert.variant}
+          dismissible
+          className="alert-floating"
+          onClose={() => setAlert({ ...alert, show: false })}
+        >
           {alert.message}
         </Alert>
       )}
