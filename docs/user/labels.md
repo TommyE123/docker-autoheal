@@ -79,16 +79,24 @@ identifier, so selection, custom health checks and Uptime Kuma mappings apply to
 whole service. Restart counts, cooldown, backoff and quarantine are tracked per replica,
 so one failing replica cannot use up its siblings' restart budget, keep them in
 quarantine, or be released from quarantine because a sibling is healthy. Each replica's
-recovery state is keyed by the stable identifier with its Compose container number
-appended after `#` (`myapp_web#1`, `myapp_web#2`), including the single container of an
-unscaled service. Compose project and service names cannot contain `#`, so these keys never
-clash with the identifier generated for another Compose service. Compose keeps a replica's
-number when it recreates it, so its state survives recreation.
+recovery state is keyed by its Compose project, service and container number, written
+`compose:{project}:{service}#{N}` (`compose:myapp:web#1`, `compose:myapp:web#2`),
+including the single container of an unscaled service. The project and service come from
+their own labels rather than the stable identifier, because `project_service` is
+ambiguous (project `foo_bar` with service `baz` and project `foo` with service `bar_baz`
+both give `foo_bar_baz`). Compose project and service names cannot contain `:` or `#`, so
+these keys never clash with another Compose service. Compose keeps a replica's number when
+it recreates it, so its state survives recreation.
 
 An explicit `monitoring.id` label is never given a replica suffix: replicas that share
 one `monitoring.id` also share their restart count, cooldown, backoff and quarantine. Its
 recovery state is kept separately from every generated identifier, so a `monitoring.id`
 can never share state with another container by matching its generated identifier.
+
+Recovery state is re-keyed and not migrated: after upgrading, restart counts and
+quarantine entries recorded under the old per-service or explicit-ID keys no longer
+apply, so they start fresh once. A container that was quarantined is retried until it
+reaches `max_restarts` again.
 
 ## See also
 

@@ -289,7 +289,7 @@ class TestContainerInfo:
 
         assert wrapper.get_container_info(container)["stable_id"] == "stack_web"
 
-    @pytest.mark.parametrize(("number", "recovery_id"), [("1", "stack_web#1"), ("2", "stack_web#2")])
+    @pytest.mark.parametrize(("number", "recovery_id"), [("1", "compose:stack:web#1"), ("2", "compose:stack:web#2")])
     def test_recovery_id_is_per_compose_replica(self, wrapper, number, recovery_id):
         container = make_sdk_container(
             name=f"stack-web-{number}",

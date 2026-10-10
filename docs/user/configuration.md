@@ -150,8 +150,8 @@ automatically by the application (via the UI, labels, and the monitoring engine)
 normally don't need to edit them directly. Restart counts persist across container
 recreation because they are keyed by an identifier derived from the *stable identifier*
 (see [Labels](labels.md#stable-container-identity)), not Docker's own container ID. Each
-replica of a scaled Compose service has its own restart count, keyed `project_service#N`
-for replica *N* (see [Labels](labels.md#scaled-compose-services)).
+replica of a scaled Compose service has its own restart count, keyed
+`compose:{project}:{service}#{N}` for replica *N* (see [Labels](labels.md#scaled-compose-services)).
 
 ## See also
 

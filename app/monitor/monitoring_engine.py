@@ -84,9 +84,9 @@ class MonitoringEngine:
         """
         Get the key for a container's restart count, cooldown, backoff and quarantine.
 
-        This is the stable identifier, suffixed with the Compose container number for
-        replicas after the first (see ``recovery_identifier``), so replicas of a
-        scaled service recover independently. Configuration (selection, health
+        Every Compose container is keyed by its project, service and container
+        number (see ``recovery_identifier``), so replicas of a scaled service recover
+        independently, including ``#1`` for an unscaled service. Configuration (selection, health
         checks, Uptime Kuma mappings) stays keyed by ``get_stable_identifier``.
 
         Args:
