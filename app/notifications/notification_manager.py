@@ -213,8 +213,6 @@ class NotificationManager:
             priority = NotificationPriority.NORMAL
         elif event.event_type == "restart":
             priority = NotificationPriority.NORMAL
-        elif event.event_type == "health_check_failed":
-            priority = NotificationPriority.HIGH
         elif event.event_type == "auto_monitor":
             priority = NotificationPriority.LOW
 
@@ -222,11 +220,11 @@ class NotificationManager:
         title_map = {
             "restart": "Container Restarted",
             "quarantine": "Container Quarantined",
-            "health_check_failed": "Health Check Failed",
             "auto_monitor": "Container Auto-Monitored",
             "unquarantine": "Container Unquarantined",
+            "auto_unquarantine": "Container Auto-Unquarantined",
         }
-        title = title_map.get(event.event_type, f" {event.event_type.replace('_', ' ').title()}")
+        title = title_map.get(event.event_type, f"{event.event_type.replace('_', ' ').title()}")
 
         # Format message
         timestamp = event.timestamp.strftime("%Y-%m-%d %H:%M:%S UTC")

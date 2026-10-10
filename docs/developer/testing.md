@@ -7,7 +7,7 @@ Unit tests live in `app/tests/unit/`. They run entirely against fakes and mocks:
 external network calls are made. This is what CI runs.
 
 An integration suite lives in `app/tests/integration/`. Those tests exercise a
-real Docker daemon and/or a running Auto-Heal service (`http://localhost:3131`)
+real Docker daemon and/or a running Auto-Heal service (the dev stack on `http://localhost:3132`)
 and are **not** collected by a plain `pytest` run - `pytest.ini`'s `testpaths`
 only points at `app/tests/unit`. Run them explicitly (see below) when you have
 the resources they need available.
@@ -32,7 +32,7 @@ rather than enforced locally - `.coveragerc` no longer sets a `fail_under` floor
 
 Whether the tests would notice a change to the code, rather than merely execute it, is
 measured separately by the informational mutation-testing workflow, which runs on pull
-requests and pushes to `main` that change Python code, tests or the mutation tooling, and
+requests that change Python code, tests or the mutation tooling, and
 on demand - see
 [Mutation testing](mutation-testing.md). It is not part of `pytest` and is not a required
 check.
@@ -41,8 +41,14 @@ check.
 
 The integration suite requires a real Docker daemon reachable at the default
 socket (`unix://var/run/docker.sock`), and some of its tests additionally
-require a running Auto-Heal service on `http://localhost:3131` (e.g. via
-`docker-compose up`). Every test skips itself - rather than failing - when the
+require a running Auto-Heal service on `http://localhost:3132` (the dev stack,
+started with the **Autoheal: Run Docker Stack** task). Set `AUTOHEAL_BASE_URL` (and
+`AUTOHEAL_METRICS_URL`, default `http://localhost:9091`) to test another instance. To test the
+backend run directly with **Autoheal: Run Backend** (it listens on `3131`, metrics on `9090`,
+inside the Dev Container), use `AUTOHEAL_BASE_URL=http://localhost:3131` and
+`AUTOHEAL_METRICS_URL=http://localhost:9090`. In the
+Dev Container, Docker is the isolated inner daemon, so these tests never touch production
+containers; see [Docker isolation](development-setup.md#docker-isolation). Every test skips itself - rather than failing - when the
 resource it needs isn't available, so it's safe to run with only some of those
 resources present.
 
@@ -53,7 +59,7 @@ pytest app/tests/integration
 # Only the tests that need Docker but not a running service
 pytest app/tests/integration/test_container_recreation.py app/tests/integration/test_restart_count.py
 
-# Only the tests that need a running service (start it first: docker-compose up -d)
+# Only the tests that need a running service (start the dev stack first)
 pytest app/tests/integration/test_service_smoke.py app/tests/integration/test_auto_monitor.py
 ```
 
@@ -65,19 +71,20 @@ includes both suites.
 |----------------------------------------------------------------|--------------------------------|
 | Container-ID-vs-stable-ID tracking across real recreation      | `test_container_recreation.py` |
 | Native restart count after a policy-triggered restart          | `test_restart_count.py`        |
-| Auto-discovery of `autoheal=true` labelled containers          | `test_auto_monitor.py`         |
+| Auto-discovery of containers with the service's monitor label  | `test_auto_monitor.py`         |
 | `/health`, `/api/status`, the React UI, and Prometheus metrics | `test_service_smoke.py`        |
 
 ### Isolation against a real Auto-Heal instance
 
-`http://localhost:3131` may be someone's real, already-running instance, not a
+`AUTOHEAL_BASE_URL` may point at someone's real, already-running instance, not a
 throwaway test fixture - these tests only do things a real user's actions
 would also do, and undo the ones with lasting effect:
 
 * Containers are uniquely named (`autoheal-*-<uuid>`) and force-removed by
   `disposable_container`, so they never collide with anything already running.
-* `test_auto_monitor.py` removes the container it caused to be auto-selected
-  from `containers.selected` afterward (via `GET`/`PUT /api/config` - not
+* `test_auto_monitor.py` labels its container with the running service's own
+  configured monitor label (`autoheal.dev=true` for the dev stack) and removes the
+  container it caused to be auto-selected from `containers.selected` afterward (via `GET`/`PUT /api/config` - not
   `POST /api/containers/select`, which moves it to `containers.excluded`
   instead of clearing it). The `auto_monitor` event itself is left in the
   log, same as it would be from real usage, because the API only exposes
@@ -153,37 +160,192 @@ There is currently no automated frontend test suite. `npm run lint` (ESLint) is 
 `frontend/package.json`, but there's no ESLint configuration file yet, so it doesn't
 currently run successfully — see [Frontend Development](frontend.md#linting).
 
-## End-to-end tests (Playwright)
+## UI E2E suite (Playwright)
 
-A small Playwright suite in `frontend/e2e/` drives Chromium against the
-Docker-served application (not the Vite dev server), so it covers the production
-build, the container and the real `/api` backend. It currently holds one smoke test:
-open `/` and check the Dashboard renders. Vitest remains the unit-test runner and
-excludes `e2e/`.
+A Playwright suite in `frontend/e2e-ui/` drives the real UI through real user journeys:
+containers, monitoring, events, configuration and notifications, in Chromium. It is the
+repository's only browser test suite. It replaced the earlier single-dashboard smoke test;
+that check is now the `@smoke` test "the app starts on the containers dashboard". Tests are
+selected by tag (see [Tags](#tags)).
 
-In the Dev Container, run **Terminal → Run Task → Autoheal: Run Playwright E2E Tests**. It
-builds and starts the dev stack from `docker-compose.dev.yml` (so it never touches a real
-deployment on `3131`), then runs `npm run test:e2e` against it. **Run Playwright E2E Tests (UI)** runs
-`npm run test:e2e:ui` instead, to watch the run in Playwright's UI mode; see
-[Tasks](development-setup.md#tasks). To run it by hand against any running instance:
+The same specs run in two places, which differ in the instance they test and in who starts
+it:
+
+|               | CI                                                                      | Development                                                  |
+|---------------|-------------------------------------------------------------------------|--------------------------------------------------------------|
+| Runs against  | The `linux/amd64` image `docker-build.yml` built from the commit        | The dev stack from `docker-compose.dev.yml`, port `3132`     |
+| Started by    | `production-smoke-test.yml`, which sets `UI_E2E_BASE_URL`               | `frontend/e2e-ui/run.sh` (the **Autoheal: Run UI E2E** task) |
+| Docker daemon | The GitHub-hosted runner's own, ephemeral daemon                        | The Dev Container's own Docker-in-Docker daemon              |
+| Scope         | `full`, the whole suite, on every pull request                          | Your choice                                                  |
+| Image         | Built by that CI run and passed on as an artifact; no registry involved | Built from your checkout; no published image is needed       |
+
+Both use `playwright.ui.config.js` and the same `frontend/e2e-ui/run.sh`, so a CI failure
+reproduces locally with the same scope. The base URL has its own variable,
+`UI_E2E_BASE_URL` (default `http://localhost:3132`), so a stray environment value cannot
+aim this suite at a production instance.
+
+### Environment
+
+The suite needs a Docker daemon of its own and an instance of the app that monitors
+`autoheal.dev=true`:
+
+* **Development**: the Dev Container (or Codespaces), where Docker is the isolated
+  Docker-in-Docker daemon from [Docker isolation](development-setup.md#docker-isolation)
+  (#460), and the dev stack from `docker-compose.dev.yml`, which `frontend/e2e-ui/run.sh`
+  starts (and removes afterwards if it started it) at `http://localhost:3132`. Chromium is
+  installed by `post-create.sh`.
+* **CI**: the GitHub-hosted runner, whose Docker daemon is that ephemeral VM's own. The
+  workflow refuses to continue on anything but a GitHub-hosted runner, and starts a
+  throwaway instance of the built image on port `3132`, which first has to show the default
+  `autoheal=true` configuration and is then switched to `autoheal.dev=true` over the API.
+
+Docker-backed tests create a few small, labelled `alpine` containers on that daemon and
+remove them afterwards. Before the first Docker command the suite checks that the daemon
+is the environment's own (the same checks as `.devcontainer/verify-isolation.sh`: no
+`DOCKER_HOST` or `DOCKER_CONTEXT`, a `dockerd` process, and a daemon name equal to the
+hostname) and that the app under test monitors `autoheal.dev=true`, and it refuses to
+continue otherwise, so it cannot act on a host or production daemon. `run.sh` makes the
+daemon check too, before it starts anything and also when `UI_E2E_BASE_URL` points at an
+instance it did not start. The app check runs before every test, because even the tests
+that need no Docker (configuration, notifications) change the app's state; only the
+Docker daemon check is skipped for them. Neither check is relaxed for CI.
+
+### Running it
+
+In VS Code, run **Terminal → Run Task → Autoheal: Run UI E2E** and pick a scope and a
+mode. From a terminal in the Dev Container:
+
+```bash
+bash frontend/e2e-ui/run.sh smoke          # a quick subset, headless
+bash frontend/e2e-ui/run.sh full headless  # everything (what CI runs)
+bash frontend/e2e-ui/run.sh events ui      # one area, in Playwright's UI mode
+```
+
+The scope is `smoke` (a quick local check), `full` (what CI runs), or a functional tag below. The task's menu words these in plain
+language ("Quick check of the basics", "Everything", "The event log" and so on); the script takes
+the short names. The mode is one of two:
+
+* `headless` ("In the background, no window"; the default): what CI runs. Fast, and nothing to
+  watch.
+* `ui` ("Watch and debug in a browser panel"): Playwright's UI mode, served on forwarded port
+  9323 and opened in your own browser. You can watch each test run with a live view of the page,
+  a timeline and screenshots, pause, step through and re-run single tests. This is the way to
+  watch or debug a run.
+
+Every mode runs the same specs. To run against an instance that is already running (the
+dev stack you started yourself, or another instance that monitors `autoheal.dev=true`),
+set `UI_E2E_BASE_URL`. `run.sh` then starts nothing; it still makes the Docker isolation
+checks and applies the scope:
+
+```bash
+UI_E2E_BASE_URL=http://localhost:3132 bash frontend/e2e-ui/run.sh smoke
+```
+
+or use Playwright directly:
 
 ```bash
 cd frontend
-npm ci
-npx playwright install chromium   # first time only
-E2E_BASE_URL=http://localhost:3132 npm run test:e2e
+UI_E2E_BASE_URL=http://localhost:3132 UI_E2E_TAG=@events npm run test:ui-e2e
+UI_E2E_BASE_URL=http://localhost:3132 npm run test:ui-e2e:smoke
 ```
 
-`E2E_BASE_URL` defaults to `http://localhost:3131`; set it to test a different
-instance. Failures write screenshots and traces to `frontend/test-results/` and an HTML
-report to `frontend/playwright-report/` when `CI` is set (both git-ignored).
+Select by tag with `UI_E2E_TAG`, not `--grep`: Playwright does not apply `--grep` to a
+dependency project, so `--grep @events` would also run every `parallel` test. `@smoke`
+tests must live in `parallel/`, which is all `test:ui-e2e:smoke` runs. The `full` scope
+unsets an inherited `UI_E2E_TAG`, so it always runs the whole suite.
 
-In CI the suite runs as the last step of the Production Smoke Test job
-(`.github/workflows/production-smoke-test.yml`), against the container that job already
-started from the image built in `docker-build.yml`. It therefore only runs for
-same-repository pull requests, like the rest of that job. On failure the report and
-traces are uploaded as the `playwright-report` artifact, and the job's existing
-diagnostics step prints the container logs.
+### Tags
+
+Tags select tests and are not mutually exclusive: one test can be
+`@smoke @containers @regression`.
+
+| Tag                                                                         | Meaning                                                                          |
+|-----------------------------------------------------------------------------|----------------------------------------------------------------------------------|
+| `@smoke`                                                                    | A small, fast subset: is the UI fundamentally working? Keep it small and stable. |
+| `@regression`                                                               | Tests that guard a specific past or likely regression.                           |
+| `@containers`, `@monitoring`, `@events`, `@configuration`, `@notifications` | Functional areas                                                                 |
+| `@errors`                                                                   | Loading, empty and failure handling, using `page.route` to fail one API call     |
+
+### Parallelism and shared state
+
+The app keeps one set of state in `/data` (configuration, notification services, the
+event log), so tests are split into two Playwright projects:
+
+* `parallel` (`e2e-ui/parallel/`): fully parallel. Tests either read a small set of
+  containers shared by the whole run (running and monitored, running and unmonitored,
+  unhealthy, exited) or create a container of their own, with a unique name.
+* `exclusive` (`e2e-ui/exclusive/`): tests that change shared state, such as saving
+  configuration, editing notification services or clearing the event log. It runs one
+  worker at a time and only after `parallel` has passed, so nothing reads that state
+  while it changes. The app configuration is snapshotted before each test and restored
+  after it. The event log cannot be restored through the API; it only holds the dev
+  stack's own events, and **Clear All** empties it.
+
+Put a new test in `exclusive/` if it changes anything a test in another file could see.
+`--no-deps --project=exclusive` runs that group alone. Because it depends on `parallel`,
+a failure there skips it.
+
+Run one UI E2E at a time per Dev Container: starting a run removes leftover containers
+of earlier runs, which would also remove those of a run still in progress (for example
+Playwright's UI mode left open while the task runs in a terminal).
+
+Containers carry the label `autoheal.e2e.run=<run id>`. Global teardown removes them and
+the configuration entries Autoheal made for them; the next run also removes any left over
+by an interrupted one.
+
+### Tests waiting on other work
+
+A test for behaviour that is not on `main` yet is written now and marked `test.fixme()`,
+so it shows as skipped in every report. When the blocking change merges, remove the
+`fixme` and leave the assertions alone:
+
+* #455: the empty-state alert covering the Add Service modal (`notifications.spec.js`)
+* #431: the Events page filters (`events.spec.js`)
+
+### CI
+
+The suite runs in the "Production container smoke test" job (`production-smoke-test.yml`),
+called from `docker-build.yml`. There is no separate UI E2E workflow. It tests an image
+built from the pull request's own commit, and it needs no registry and no secrets, so it
+runs the same way for pull requests from forks (GitHub still asks a maintainer to approve a
+first-time contributor's workflow run).
+
+1. `build-amd64` builds the `linux/amd64` image and uploads it as the `docker-image-amd64`
+   artifact (kept for a day). Nothing is pushed to a registry on a pull request; releases are
+   built and pushed by `release-please.yml`.
+2. The smoke test job downloads and loads that image and starts a throwaway container from
+   it with no config;
+3. waits until `/health` responds and `/api/status` reports `docker_connected`, checks
+   `/api/config` shows the default `autoheal=true` label, then switches it to
+   `autoheal.dev=true` through `PUT /api/config/monitor`;
+4. runs `bash frontend/e2e-ui/run.sh full headless` against it with `UI_E2E_BASE_URL`
+   set.
+
+CI always runs the **`full`** suite, on every pull request including the Release Please PR.
+There is no CI scope switch; the `smoke` subset and the functional tags are for local runs.
+
+The `arm64-startup` job builds the `arm64` image under QEMU emulation, starts it, and checks
+`/health` and `docker_connected`. That catches an image that does not start on `arm64`;
+the UI suite does not run on it, and real `arm64` hardware is not tested.
+
+Any failing step fails the job. `run.sh` exits with 3 when the environment cannot be used
+(including a failed isolation check) and 1 when a test fails; the log annotation says which.
+On failure the Playwright HTML report, traces and screenshots are uploaded as the
+`ui-e2e-report` artifact, and the diagnostics step prints the container's logs. The real
+auto-heal restart of a failing container is covered by the suite itself (`@events`: "Autoheal
+restarts a container that exits and logs the restart"). Whether the jobs block a merge
+depends on the repository's branch-protection required checks.
+
+Nothing in CI uses the development stack or `docker-compose.dev.yml`; that is the local
+workflow above.
+
+### Writing tests
+
+Use role, text and label locators and wait for visible UI state, never fixed sleeps or
+`networkidle`. Keep each test independent. Use `page.route` only to make one API call fail
+or stall; the app itself is never faked. The settings forms and the modals do not yet link
+labels to inputs or give dialogs accessible names, so those are found by role within their
+form and by title (`dialogTitled`).
 
 ## CI
 

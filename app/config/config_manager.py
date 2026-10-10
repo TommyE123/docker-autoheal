@@ -132,7 +132,7 @@ class NotificationsConfig(BaseModel):
     enabled: bool = Field(default=False, description="Enable notification system")
     services: list[NotificationService] = Field(default_factory=list, description="List of notification services")
     event_filters: list[str] = Field(
-        default_factory=lambda: ["restart", "quarantine", "health_check_failed", "auto_unquarantine"],
+        default_factory=lambda: ["restart", "quarantine", "auto_unquarantine", "auto_monitor"],
         description="Event types to send notifications for (empty = all events)"
     )
 
@@ -172,7 +172,7 @@ class AutoHealEvent(BaseModel):
     timestamp: datetime
     container_id: str
     container_name: str
-    event_type: str  # restart, quarantine, health_check_failed, etc.
+    event_type: str  # restart, quarantine, auto_unquarantine, etc.
     restart_count: int
     status: str  # success, failure, quarantined
     message: str

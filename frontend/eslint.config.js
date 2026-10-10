@@ -6,7 +6,7 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import eslintConfigPrettier from "eslint-config-prettier";
 
 export default [
-  { ignores: ["dist", "coverage", "test-results", "playwright-report"] },
+  { ignores: ["dist", "coverage", "test-results-ui", "playwright-report-ui"] },
   {
     files: ["**/*.{js,jsx}"],
     languageOptions: {
@@ -36,7 +36,7 @@ export default [
     },
   },
   {
-    files: ["**/playwright.config.js"],
+    files: ["**/playwright.ui.config.js", "**/e2e-ui/**/*.js"],
     languageOptions: { globals: globals.node },
   },
   eslintConfigPrettier,

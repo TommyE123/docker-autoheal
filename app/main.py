@@ -8,6 +8,7 @@ import os
 import signal
 import sys
 from pathlib import Path
+from wsgiref.simple_server import WSGIServer
 
 import uvicorn
 from prometheus_client import Counter, Gauge, start_http_server
@@ -91,6 +92,7 @@ class AutoHealService:
         self.monitoring_engine: MonitoringEngine | None = None
         self.notification_manager = notification_manager
         self.uptime_kuma_monitor: UptimeKumaMonitor | None = None
+        self.metrics_server: WSGIServer | None = None
         self.running = False
 
     async def start(self):
@@ -133,7 +135,8 @@ class AutoHealService:
                     "Starting Prometheus metrics server on port %s",
                     config.observability.metrics_port,
                 )
-                start_http_server(config.observability.metrics_port)
+                # start_http_server returns (server, thread); keep the server so stop() can close it
+                self.metrics_server = start_http_server(config.observability.metrics_port)[0]
 
             # Start notification manager
             logger.info("Starting notification manager...")
@@ -180,10 +183,10 @@ class AutoHealService:
                 logger.info("Web UI listening on %s", listen)
                 logger.info("API documentation listening on %s/docs", listen)
 
-        except Exception as e:
+        except (Exception, asyncio.CancelledError) as e:
+            # CancelledError is a BaseException; clean up on cancellation too, then re-raise.
             logger.exception("Failed to start service: %s", e)
-            if self.notification_manager:
-                await self.notification_manager.stop()
+            await self.stop()
             raise
 
     async def stop(self):
@@ -192,24 +195,49 @@ class AutoHealService:
 
         self.running = False
 
-        # Stop components gracefully with error handling
-        if self.uptime_kuma_monitor:
-            try:
-                await self.uptime_kuma_monitor.stop()
-            except Exception as e:
-                logger.warning("Error stopping Uptime-Kuma monitor: %s", e)
+        # Stop components gracefully with error handling. The Docker client is
+        # closed in `finally` so a cancellation (not an Exception) during an
+        # earlier step cannot skip it.
+        try:
+            if self.uptime_kuma_monitor:
+                try:
+                    await self.uptime_kuma_monitor.stop()
+                except Exception as e:
+                    logger.warning(
+                        "Error stopping Uptime-Kuma monitor: %s", e, exc_info=True
+                    )
 
-        if self.monitoring_engine:
-            try:
-                await self.monitoring_engine.stop()
-            except Exception as e:
-                logger.warning("Error stopping monitoring engine: %s", e)
+            if self.monitoring_engine:
+                try:
+                    await self.monitoring_engine.stop()
+                except Exception as e:
+                    logger.warning(
+                        "Error stopping monitoring engine: %s", e, exc_info=True
+                    )
 
-        if self.docker_client:
             try:
-                self.docker_client.close()
+                await self.notification_manager.stop()
             except Exception as e:
-                logger.warning("Error closing Docker client: %s", e)
+                logger.warning(
+                    "Error stopping notification manager: %s", e, exc_info=True
+                )
+        finally:
+            if self.metrics_server:
+                # Separate attempts so a failed shutdown() still closes the socket.
+                for close_step in (
+                    self.metrics_server.shutdown,
+                    self.metrics_server.server_close,
+                ):
+                    try:
+                        close_step()
+                    except Exception as e:
+                        logger.warning("Error stopping metrics server: %s", e, exc_info=True)
+                self.metrics_server = None
+            if self.docker_client:
+                try:
+                    self.docker_client.close()
+                except Exception as e:
+                    logger.warning("Error closing Docker client: %s", e, exc_info=True)
 
         logger.info("Docker Auto-Heal Service stopped")
 

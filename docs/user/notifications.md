@@ -64,11 +64,12 @@ unencrypted.
 ## Event filtering
 
 By default, notifications are sent for these event types:
-`restart`, `quarantine`, `health_check_failed`, `auto_unquarantine`.
+`restart`, `quarantine`, `auto_unquarantine`, `auto_monitor`. `unquarantine` (a manual
+action) is not notified by default.
 
-An empty event filter list means "notify on every event type" (this also includes
-`auto_monitor`, sent when a container is automatically added to monitoring because it
-started with the `autoheal=true` label). Adjust the filter from the Notifications tab or
+`auto_monitor` is sent when a container is automatically added to monitoring because it
+started with the `autoheal=true` label. An empty event filter list means "notify on every
+event type", including `unquarantine`. Adjust the filter from the Notifications tab or
 via `PUT /api/notifications/config`.
 
 ## Multiple services
