@@ -232,9 +232,6 @@ class MonitoringEngine:
         container_id = info.get("full_id")
         container_name = info.get("name")
 
-        # Get stable identifier (handles auto-generated names, compose services, explicit IDs)
-        stable_id = self.get_stable_identifier(info)
-
         # Check if container should be monitored
         if not self.should_monitor_container(container, info):
             return
@@ -266,9 +263,9 @@ class MonitoringEngine:
                     return
 
             logger.debug(
-                "Container %s (stable_id: %s) is quarantined and still unhealthy, skipping",
+                "Container %s (recovery_id: %s) is quarantined and still unhealthy, skipping",
                 container_name,
-                stable_id,
+                recovery_id,
             )
             return
 
