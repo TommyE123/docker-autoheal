@@ -300,6 +300,96 @@ async def test_send_ntfy_builds_headers_with_auth(isolated_config_manager, manag
 
 
 @pytest.mark.asyncio
+async def test_send_ntfy_without_credentials_sends_no_authorization(
+    isolated_config_manager, manager
+):
+    _configure_service(
+        isolated_config_manager,
+        NotificationService(name="Ntfy", type="ntfy", enabled=True, topic="alerts"),
+    )
+
+    await manager._process_notification(_make_event("health_check_failed"))
+
+    assert "Authorization" not in manager._session.calls[0]["headers"]
+
+
+@pytest.mark.asyncio
+async def test_send_ntfy_with_access_token_sends_bearer_header(isolated_config_manager, manager):
+    _configure_service(
+        isolated_config_manager,
+        NotificationService(
+            name="Ntfy", type="ntfy", enabled=True, topic="alerts", access_token="tk_secret"
+        ),
+    )
+
+    await manager._process_notification(_make_event("health_check_failed"))
+
+    assert manager._session.calls[0]["headers"]["Authorization"] == "Bearer tk_secret"
+
+
+@pytest.mark.asyncio
+async def test_send_ntfy_access_token_takes_precedence_over_basic_auth(
+    isolated_config_manager, manager
+):
+    _configure_service(
+        isolated_config_manager,
+        NotificationService(
+            name="Ntfy",
+            type="ntfy",
+            enabled=True,
+            topic="alerts",
+            username="user",
+            password="pass",
+            access_token="tk_secret",
+        ),
+    )
+
+    await manager._process_notification(_make_event("health_check_failed"))
+
+    assert manager._session.calls[0]["headers"]["Authorization"] == "Bearer tk_secret"
+
+
+@pytest.mark.parametrize("status", [200, 500])
+@pytest.mark.asyncio
+async def test_send_ntfy_access_token_not_logged(caplog, isolated_config_manager, manager, status):
+    manager._session = _FakeSession(status=status)
+    _configure_service(
+        isolated_config_manager,
+        NotificationService(
+            name="Ntfy", type="ntfy", enabled=True, topic="alerts", access_token="tk_secret"
+        ),
+    )
+
+    with caplog.at_level(logging.DEBUG):
+        await manager._process_notification(_make_event("restart"))
+
+    assert "tk_secret" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_send_ntfy_access_token_not_logged_on_exception(
+    caplog, isolated_config_manager, manager
+):
+    class _RaisingSession:
+        def post(self, url, **kwargs):
+            raise RuntimeError("connection refused")
+
+    manager._session = _RaisingSession()
+    _configure_service(
+        isolated_config_manager,
+        NotificationService(
+            name="Ntfy", type="ntfy", enabled=True, topic="alerts", access_token="tk_secret"
+        ),
+    )
+
+    with caplog.at_level(logging.DEBUG):
+        await manager._process_notification(_make_event("restart"))
+
+    assert "Failed to send Ntfy notification" in caplog.text
+    assert "tk_secret" not in caplog.text
+
+
+@pytest.mark.asyncio
 async def test_send_gotify_builds_payload(isolated_config_manager, manager):
     _configure_service(
         isolated_config_manager,

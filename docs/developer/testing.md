@@ -232,6 +232,10 @@ the short names. The mode is one of two:
   9323 and opened in your own browser. You can watch each test run with a live view of the page,
   a timeline and screenshots, pause, step through and re-run single tests. This is the way to
   watch or debug a run.
+  UI mode ticks only the first project and cannot preselect more, so the task starts it with a
+  single project, `all`, that holds every spec and runs them one at a time. CI and the
+  background mode keep the two projects described under
+  [Parallelism and shared state](#parallelism-and-shared-state).
 
 Every mode runs the same specs. To run against an instance that is already running (the
 dev stack you started yourself, or another instance that monitors `autoheal.dev=true`),
@@ -300,7 +304,6 @@ A test for behaviour that is not on `main` yet is written now and marked `test.f
 so it shows as skipped in every report. When the blocking change merges, remove the
 `fixme` and leave the assertions alone:
 
-* #455: the empty-state alert covering the Add Service modal (`notifications.spec.js`)
 * #431: the Events page filters (`events.spec.js`)
 
 ### CI

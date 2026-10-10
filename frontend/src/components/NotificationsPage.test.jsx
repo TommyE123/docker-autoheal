@@ -764,6 +764,41 @@ describe("NotificationsPage", () => {
       });
     });
 
+    it("sends the access token for an ntfy service", async () => {
+      const user = await openAddModal("ntfy", "Ntfy");
+      await user.type(screen.getByPlaceholderText("docker-autoheal"), "alerts");
+      await user.type(screen.getByPlaceholderText("tk_..."), "tk_secret");
+
+      expect(await submitAndGetPayload(user)).toEqual({
+        name: "Ntfy",
+        type: "ntfy",
+        enabled: true,
+        topic: "alerts",
+        access_token: "tk_secret",
+      });
+    });
+
+    it("does not log the access token when saving an ntfy service fails", async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const user = await openAddModal("ntfy", "Ntfy");
+      // Axios errors keep the request configuration, including the serialised body.
+      addNotificationService.mockRejectedValue(
+        Object.assign(new Error("Request failed with status code 500"), {
+          config: { data: JSON.stringify({ access_token: "tk_leak_check" }) },
+          response: { status: 500, data: { detail: "Server error" } },
+        }),
+      );
+      await user.type(screen.getByPlaceholderText("docker-autoheal"), "alerts");
+      await user.type(screen.getByPlaceholderText("tk_..."), "tk_leak_check");
+
+      await user.click(screen.getByRole("button", { name: /^add service$/i }));
+
+      expect(await screen.findByText("Server error")).toBeInTheDocument();
+      expect(consoleError).toHaveBeenCalled();
+      expect(JSON.stringify(consoleError.mock.calls)).not.toContain("tk_leak_check");
+      consoleError.mockRestore();
+    });
+
     it("sends the server url and app token for a gotify service", async () => {
       const user = await openAddModal("gotify", "Gotify");
       await user.type(
