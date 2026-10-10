@@ -2,13 +2,14 @@
 Smoke test for a running Auto-Heal service: health endpoint, API status,
 the React UI, and (best-effort) the Prometheus metrics endpoint.
 
-Requires a running Auto-Heal service reachable at http://localhost:3131.
+Requires a running Auto-Heal service reachable at AUTOHEAL_BASE_URL (default
+http://localhost:3132, the development stack).
 """
 
 import pytest
 import requests
 
-AUTOHEAL_BASE_URL = "http://localhost:3131"
+from app.tests.integration.conftest import AUTOHEAL_BASE_URL, AUTOHEAL_METRICS_URL
 
 pytestmark = pytest.mark.integration
 
@@ -42,6 +43,5 @@ def test_prometheus_metrics_endpoint(running_service):
     if not observability["prometheus_enabled"]:
         pytest.skip("Prometheus metrics are disabled in the running service's config")
 
-    metrics_port = observability["metrics_port"]
-    response = requests.get(f"http://localhost:{metrics_port}/metrics", timeout=5)
+    response = requests.get(f"{AUTOHEAL_METRICS_URL}/metrics", timeout=5)
     assert response.status_code == 200

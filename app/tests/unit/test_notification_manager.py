@@ -202,7 +202,7 @@ def test_format_notification_maps_event_type_to_title_and_priority(manager):
     assert priority == NotificationPriority.NORMAL
 
     title, _message, priority = manager._format_notification(_make_event("unknown_event"))
-    assert title == " Unknown Event"
+    assert title == "Unknown Event"
     assert priority == NotificationPriority.NORMAL
 
 
@@ -290,7 +290,7 @@ async def test_send_ntfy_builds_headers_with_auth(isolated_config_manager, manag
         ),
     )
 
-    await manager._process_notification(_make_event("health_check_failed"))
+    await manager._process_notification(_make_event("quarantine"))
 
     call = manager._session.calls[0]
     assert call["url"] == "https://ntfy.example.invalid/alerts"
