@@ -78,6 +78,7 @@ function NotificationsPage() {
     chat_id: '',
     topic: '',
     server_url: '',
+    access_token: '',
     app_token: '',
     user_key: '',
     api_token: ''
@@ -167,6 +168,7 @@ function NotificationsPage() {
         chat_id: '',
         topic: '',
         server_url: '',
+        access_token: '',
         app_token: '',
         user_key: '',
         api_token: ''

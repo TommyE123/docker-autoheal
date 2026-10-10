@@ -122,6 +122,21 @@ class TestNotificationServiceCrud:
         assert result["service"]["name"] == "Webhook"
         assert config_manager.get_config().notifications.services[0].name == "Webhook"
 
+    async def test_add_notification_service_validation_error_hides_credentials(self):
+        with pytest.raises(HTTPException) as exc_info:
+            await add_notification_service(
+                {
+                    "name": "Ntfy",
+                    "type": "ntfy",
+                    "topic": "alerts",
+                    "access_token": {"value": "tk_leak_check"},
+                }
+            )
+
+        assert exc_info.value.status_code == 500
+        assert "access_token" in exc_info.value.detail
+        assert "tk_leak_check" not in exc_info.value.detail
+
     async def test_add_notification_service_duplicate_name_returns_400(self):
         await add_notification_service(
             {
