@@ -44,21 +44,9 @@
       "problemMatcher": []
     },
     {
-      "label": "Autoheal: Run Playwright E2E Tests",
+      "label": "Autoheal: Run UI E2E",
       "type": "shell",
-      "command": "set -eu; compose='docker compose -p docker-autoheal-dev -f docker-compose.yml -f docker-compose.dev.yml'; if [ -z \"$($compose ps -q autoheal)\" ]; then trap 'status=$?; [ \"$status\" -eq 0 ] || $compose logs --tail=50 autoheal; $compose down' EXIT; fi; $compose up --build -d --wait autoheal; port=$($compose port autoheal 3131); E2E_BASE_URL=\"http://host.docker.internal:${port##*:}\" npm --prefix frontend run test:e2e",
-      "options": {
-        "shell": {
-          "executable": "bash",
-          "args": ["-c"]
-        }
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Autoheal: Run Playwright E2E Tests (UI)",
-      "type": "shell",
-      "command": "set -eu; compose='docker compose -p docker-autoheal-dev -f docker-compose.yml -f docker-compose.dev.yml'; if [ -z \"$($compose ps -q autoheal)\" ]; then trap 'status=$?; [ \"$status\" -eq 0 ] || $compose logs --tail=50 autoheal; $compose down' EXIT; fi; $compose up --build -d --wait autoheal; port=$($compose port autoheal 3131); E2E_BASE_URL=\"http://host.docker.internal:${port##*:}\" npm --prefix frontend run test:e2e:ui",
+      "command": "bash frontend/e2e-ui/run.sh ${input:uiE2eScope} ${input:uiE2eMode}",
       "options": {
         "shell": {
           "executable": "bash",
@@ -390,7 +378,7 @@
     {
       "label": "Autoheal: Run Megalinter Cupcake",
       "type": "shell",
-      "command": "docker run --rm --user \"$(id -u):$(id -g)\" -e \"HOME=/tmp\" -e \"CONSOLE_REPORTER=true\" -e \"CONSOLE_REPORTER_SECTIONS=true\" -e \"OUTPUT_DETAIL=detailed\" -e \"REPORT_OUTPUT_FOLDER=/tmp/lint/.lint/megalinter\" -e \"CLEAR_REPORT_FOLDER=true\" -v \"$(printenv LOCAL_WORKSPACE_FOLDER 2>/dev/null || pwd):/tmp/lint\" ghcr.io/oxsecurity/megalinter-cupcake:v10.1.0@sha256:7cce5b9d46564149d451a9752c5c266982f10c231be7df79996f46e3e171d2fc",
+      "command": "docker run --rm --user \"$(id -u):$(id -g)\" -e \"HOME=/tmp\" -e \"CONSOLE_REPORTER=true\" -e \"CONSOLE_REPORTER_SECTIONS=true\" -e \"OUTPUT_DETAIL=detailed\" -e \"REPORT_OUTPUT_FOLDER=/tmp/lint/.lint/megalinter\" -e \"CLEAR_REPORT_FOLDER=true\" -v \"$(pwd):/tmp/lint\" ghcr.io/oxsecurity/megalinter-cupcake:v10.1.0@sha256:7cce5b9d46564149d451a9752c5c266982f10c231be7df79996f46e3e171d2fc",
       "options": {
         "shell": {
           "executable": "bash",
@@ -402,7 +390,7 @@
     {
       "label": "Autoheal: Run Megalinter Cupcake Beta",
       "type": "shell",
-      "command": "docker run --rm --user \"$(id -u):$(id -g)\" -e \"HOME=/tmp\" -e \"CONSOLE_REPORTER=true\" -e \"CONSOLE_REPORTER_SECTIONS=true\" -e \"OUTPUT_DETAIL=detailed\" -e \"REPORT_OUTPUT_FOLDER=/tmp/lint/.lint/megalinter\" -e \"CLEAR_REPORT_FOLDER=true\" -v \"$(printenv LOCAL_WORKSPACE_FOLDER 2>/dev/null || pwd):/tmp/lint\" ghcr.io/oxsecurity/megalinter-cupcake:beta",
+      "command": "docker run --rm --user \"$(id -u):$(id -g)\" -e \"HOME=/tmp\" -e \"CONSOLE_REPORTER=true\" -e \"CONSOLE_REPORTER_SECTIONS=true\" -e \"OUTPUT_DETAIL=detailed\" -e \"REPORT_OUTPUT_FOLDER=/tmp/lint/.lint/megalinter\" -e \"CLEAR_REPORT_FOLDER=true\" -v \"$(pwd):/tmp/lint\" ghcr.io/oxsecurity/megalinter-cupcake:beta",
       "options": {
         "shell": {
           "executable": "bash",
@@ -434,6 +422,62 @@
         }
       },
       "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "uiE2eScope",
+      "type": "pickString",
+      "description": "Which UI tests to run?",
+      "options": [
+        {
+          "label": "Quick check of the basics (smoke: a fast subset)",
+          "value": "smoke"
+        },
+        { "label": "Everything (full)", "value": "full" },
+        {
+          "label": "Container list and actions (containers)",
+          "value": "containers"
+        },
+        {
+          "label": "Monitored state and auto-heal (monitoring)",
+          "value": "monitoring"
+        },
+        { "label": "The event log (events)", "value": "events" },
+        {
+          "label": "The settings page (configuration)",
+          "value": "configuration"
+        },
+        {
+          "label": "Notification services (notifications)",
+          "value": "notifications"
+        },
+        {
+          "label": "Error and loading messages (errors)",
+          "value": "errors"
+        },
+        {
+          "label": "Checks for bugs fixed before (regression)",
+          "value": "regression"
+        }
+      ],
+      "default": "smoke"
+    },
+    {
+      "id": "uiE2eMode",
+      "type": "pickString",
+      "description": "How do you want to run them?",
+      "options": [
+        {
+          "label": "In the background, no window (fast; what CI does)",
+          "value": "headless"
+        },
+        {
+          "label": "Watch and debug in a browser panel (Playwright UI, port 9323)",
+          "value": "ui"
+        }
+      ],
+      "default": "headless"
     }
   ]
 }

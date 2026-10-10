@@ -6,6 +6,7 @@ daemon. They focus on the boundary behaviour the monitoring engine relies on:
 inspection results and graceful handling of Docker API failures.
 """
 
+import logging
 import socket
 from unittest.mock import MagicMock, patch
 
@@ -85,6 +86,126 @@ class TestConnection:
             return_value=sdk_client,
         ):
             assert wrapper.reconnect() is True
+
+
+class TestClientCleanup:
+    """SDK clients are closed when replaced or when their ping fails (#477)."""
+
+    SDK_CLIENT = "app.docker_client.docker_client_wrapper.docker.DockerClient"
+    LOGGER = "app.docker_client.docker_client_wrapper"
+
+    @classmethod
+    def _messages(cls, caplog) -> list[tuple[int, str]]:
+        return [
+            (record.levelno, record.getMessage())
+            for record in caplog.records
+            if record.name == cls.LOGGER
+        ]
+
+    def test_reconnect_closes_the_previous_client_before_connecting(self, wrapper, sdk_client):
+        new_client = MagicMock()
+        events = []
+        sdk_client.close.side_effect = lambda: events.append("close old")
+
+        def make_client(**kwargs):
+            events.append("create new")
+            return new_client
+
+        with patch(self.SDK_CLIENT, side_effect=make_client):
+            assert wrapper.reconnect() is True
+
+        assert events == ["close old", "create new"]
+        sdk_client.close.assert_called_once_with()
+        new_client.close.assert_not_called()
+        assert wrapper._client is new_client
+
+    def test_reconnect_succeeds_when_closing_the_previous_client_fails(
+        self, wrapper, sdk_client, caplog
+    ):
+        sdk_client.close.side_effect = OSError("close failed")
+        new_client = MagicMock()
+        caplog.set_level(logging.DEBUG, logger=self.LOGGER)
+
+        with patch(self.SDK_CLIENT, return_value=new_client):
+            assert wrapper.reconnect() is True
+
+        assert wrapper._client is new_client
+        assert self._messages(caplog) == [
+            (logging.WARNING, "Failed to close Docker client: close failed"),
+            (logging.INFO, "Connected to Docker daemon at unix://var/run/docker.sock"),
+        ]
+
+    def test_reconnect_without_a_client_does_not_try_to_close_one(self, wrapper, caplog):
+        wrapper._client = None
+        caplog.set_level(logging.DEBUG, logger=self.LOGGER)
+
+        with patch(self.SDK_CLIENT, return_value=MagicMock()):
+            assert wrapper.reconnect() is True
+
+        assert self._messages(caplog) == [
+            (logging.INFO, "Connected to Docker daemon at unix://var/run/docker.sock"),
+        ]
+
+    def test_failed_ping_on_startup_closes_the_new_client_and_reraises(self):
+        client = MagicMock()
+        client.ping.side_effect = docker.errors.APIError("daemon gone")
+
+        with (
+            patch(self.SDK_CLIENT, return_value=client) as sdk_client_cls,
+            pytest.raises(docker.errors.APIError, match="daemon gone"),
+        ):
+            DockerClientWrapper(base_url="tcp://docker-proxy:2375")
+
+        sdk_client_cls.assert_called_once_with(base_url="tcp://docker-proxy:2375")
+        client.close.assert_called_once_with()
+
+    def test_failed_ping_on_reconnect_closes_the_new_client(self, wrapper, sdk_client, caplog):
+        new_client = MagicMock()
+        new_client.ping.side_effect = docker.errors.APIError("daemon gone")
+        caplog.set_level(logging.DEBUG, logger=self.LOGGER)
+
+        with patch(self.SDK_CLIENT, return_value=new_client):
+            assert wrapper.reconnect() is False
+
+        sdk_client.close.assert_called_once_with()
+        new_client.close.assert_called_once_with()
+        # The closed client stays assigned, as the unclosed one did before:
+        # a closed docker-py client recreates its pools on the next request.
+        assert wrapper._client is new_client
+        assert self._messages(caplog) == [
+            (logging.ERROR, "Failed to connect to Docker daemon: daemon gone"),
+            (logging.ERROR, "Reconnection failed: daemon gone"),
+        ]
+
+    def test_close_error_after_failed_ping_does_not_replace_the_ping_error(self, caplog):
+        client = MagicMock()
+        client.ping.side_effect = docker.errors.APIError("daemon gone")
+        client.close.side_effect = OSError("close failed")
+        caplog.set_level(logging.DEBUG, logger=self.LOGGER)
+
+        with (
+            patch(self.SDK_CLIENT, return_value=client),
+            pytest.raises(docker.errors.APIError, match="daemon gone"),
+        ):
+            DockerClientWrapper()
+
+        assert self._messages(caplog) == [
+            (logging.WARNING, "Failed to close Docker client: close failed"),
+            (logging.ERROR, "Failed to connect to Docker daemon: daemon gone"),
+        ]
+
+    def test_client_creation_failure_keeps_the_previous_client(self, wrapper, sdk_client, caplog):
+        caplog.set_level(logging.DEBUG, logger=self.LOGGER)
+
+        with patch(self.SDK_CLIENT, side_effect=docker.errors.DockerException("still down")):
+            assert wrapper.reconnect() is False
+
+        sdk_client.close.assert_called_once_with()
+        assert wrapper._client is sdk_client
+        assert self._messages(caplog) == [
+            (logging.ERROR, "Failed to connect to Docker daemon: still down"),
+            (logging.ERROR, "Reconnection failed: still down"),
+        ]
 
 
 class TestListingAndLookup:

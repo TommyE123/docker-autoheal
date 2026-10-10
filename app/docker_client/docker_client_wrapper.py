@@ -61,14 +61,32 @@ class DockerClientWrapper:
         try:
             self._client = docker.DockerClient(base_url=self.base_url)
             # Test connection
-            self._client.ping()
+            try:
+                self._client.ping()
+            except Exception:
+                # Release the new client's sockets now rather than leaving it to
+                # garbage collection. It stays assigned, as before: a closed
+                # docker-py client recreates its pools on the next request.
+                self._close_client(self._client)
+                raise
             logger.info("Connected to Docker daemon at %s", self.base_url)
         except Exception as e:
             logger.error("Failed to connect to Docker daemon: %s", e)
             raise
 
+    @staticmethod
+    def _close_client(client: docker.DockerClient) -> None:
+        """Close an SDK client best-effort: a close error is logged, never raised"""
+        try:
+            client.close()
+        except Exception as e:
+            logger.warning("Failed to close Docker client: %s", e)
+
     def reconnect(self) -> bool:
         """Reconnect to Docker daemon"""
+        if self._client is not None:
+            # Close the client being replaced so its sockets are released now.
+            self._close_client(self._client)
         try:
             self._connect()
             return True
