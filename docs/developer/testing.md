@@ -300,7 +300,6 @@ so it shows as skipped in every report. When the blocking change merges, remove 
 `fixme` and leave the assertions alone:
 
 * #455: the empty-state alert covering the Add Service modal (`notifications.spec.js`)
-* #431: the Events page filters (`events.spec.js`)
 
 ### CI
 
