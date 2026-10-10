@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { format } from "date-fns";
 
@@ -395,5 +395,37 @@ describe("EventsPage", () => {
       expect(screen.getByRole("heading", { name: "db" })).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: "cache" })).toBeInTheDocument();
     });
+  });
+
+  it("keeps showing the loading state until the latest initial request settles", async () => {
+    let resolveFirst;
+    let resolveSecond;
+    getEvents
+      .mockImplementationOnce(() => new Promise((resolve) => (resolveFirst = resolve)))
+      .mockImplementationOnce(() => new Promise((resolve) => (resolveSecond = resolve)));
+
+    render(<EventsPage />);
+    await waitFor(() => expect(getEvents).toHaveBeenCalledTimes(1));
+
+    // A second request (here via the visibility handler) supersedes the first.
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await waitFor(() => expect(getEvents).toHaveBeenCalledTimes(2));
+
+    // The superseded response must not end the loading state or show an empty list.
+    await act(async () => {
+      resolveFirst({ data: multipleEvents });
+    });
+    expect(screen.getByText(/loading events/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no events recorded yet/i)).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveSecond({ data: sampleEvents });
+    });
+    expect(
+      await screen.findByRole("heading", { name: "web-app" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/loading events/i)).not.toBeInTheDocument();
   });
 });

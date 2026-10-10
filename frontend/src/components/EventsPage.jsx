@@ -30,7 +30,9 @@ function EventsPage() {
     } catch (error) {
       console.error('Failed to load events:', error);
     } finally {
-      setLoading(false);
+      if (requestId === latestRequestId.current) {
+        setLoading(false);
+      }
     }
   };
 
