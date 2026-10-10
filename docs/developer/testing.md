@@ -285,6 +285,13 @@ Put a new test in `exclusive/` if it changes anything a test in another file cou
 `--no-deps --project=exclusive` runs that group alone. Because it depends on `parallel`,
 a failure there skips it.
 
+The Uptime-Kuma test does not use a real server. It starts a throwaway `alpine`
+container on the network of the app under test (found through the app's
+published port) that serves fixed `/metrics`, with every monitor UP and
+auto-restart off, so Uptime-Kuma can never restart anything. An app that
+publishes no port, or runs on the host network, cannot be reached this way and
+the test fails with a message saying so.
+
 Run one UI E2E at a time per Dev Container: starting a run removes leftover containers
 of earlier runs, which would also remove those of a run still in progress (for example
 Playwright's UI mode left open while the task runs in a terminal).
