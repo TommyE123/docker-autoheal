@@ -40,7 +40,12 @@ smoke | containers | monitoring | events | configuration | notifications | error
 esac
 case "${mode}" in
 headless) ;;
-ui) args+=(--ui-host=0.0.0.0 --ui-port=9323) ;;
+ui)
+  # Select both projects up front: UI mode otherwise starts with only `parallel` ticked,
+  # which has no tests for the functional tags that live in `exclusive` (notifications,
+  # events, configuration), so the tree is empty.
+  args+=(--ui-host=0.0.0.0 --ui-port=9323 --project=parallel --project=exclusive)
+  ;;
 *)
   echo "Unknown mode '${mode}'" >&2
   exit 2
