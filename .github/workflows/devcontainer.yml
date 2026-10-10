@@ -34,12 +34,44 @@ jobs:
     name: Build and test Dev Container
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      # Authenticated pulls avoid Docker Hub's anonymous rate limit (429). Best effort: if the
+      # login itself fails (a Docker Hub outage), carry on with anonymous pulls. Repo secrets are
+      # not available to fork or Dependabot runs, which skip this step.
+      - name: Login to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        continue-on-error: true
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Pull the sentinel's image first: the Google mirror, then Docker Hub, with retries, so a
+      # Docker Hub error or rate limit does not fail the job on its first command.
+      - name: Pre-pull the sentinel image
+        run: |
+          image=alpine:3.22
+          for attempt in 1 2 3 4 5; do
+            if docker pull "mirror.gcr.io/library/${image}" && docker tag "mirror.gcr.io/library/${image}" "${image}"; then
+              exit 0
+            fi
+            if docker pull "${image}"; then
+              exit 0
+            fi
+            echo "Pull attempt ${attempt} failed; retrying"
+            sleep $((attempt * 5))
+          done
+          echo "::error::Could not pull ${image} from the mirror or Docker Hub"
+          exit 1
 
       # A known container on the runner's own (host) Docker daemon. The Dev Container's
       # isolated daemon must not be able to see it; see the isolation check below.
