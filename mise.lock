@@ -186,10 +186,9 @@ specifiers = ["1.46.2"]
 uv = { path = ".mise/locks/pypi-djlint/1.46.2", digest = "sha256:b91e2e2dd8c45abd1d5b95d66b64ad72be20e965fef6d904e393491c6887bd2e" }
 
 [[tools."pypi:semgrep"]]
-version = "1.178.0"
+version = "1.179.0"
 backend = "pypi:semgrep"
-specifiers = ["1.178.0"]
-uv = { path = ".mise/locks/pypi-semgrep/1.178.0", digest = "sha256:ef6a9d3bf2d70d81e170fc0221a2725caca986693d87a5edce7a292b941c8821" }
+specifiers = ["1.179.0"]
 
 [[tools."pypi:yamllint"]]
 version = "1.38.0"
