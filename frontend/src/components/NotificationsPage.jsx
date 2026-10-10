@@ -234,7 +234,9 @@ function NotificationsPage() {
       await fetchConfig();
       handleCloseModal();
     } catch (error) {
-      console.error('Failed to save service:', error);
+      // Log the message and status only: the full Axios error carries the request body, which
+      // can include credentials such as the ntfy access token.
+      console.error('Failed to save service:', error.message, error.response?.status);
       showAlert(error.response?.data?.detail || 'Failed to save notification service', 'danger');
     } finally {
       setSaving(false);
