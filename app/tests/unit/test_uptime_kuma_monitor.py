@@ -192,11 +192,20 @@ class TestRefreshMonitorCache:
 
         assert set(monitor._monitor_cache) == {"web", "db"}
 
+    async def test_failed_fetch_leaves_empty_cache(self):
+        monitor = UptimeKumaMonitor()
+        _install_client(monitor, FakeUptimeKumaClient(get_all_monitors_fails=True))
+
+        await monitor._refresh_monitor_cache()
+
+        assert monitor._monitor_cache == {}
+
 
 @pytest.mark.asyncio
 class TestUpdateStatusCache:
-    async def test_noop_when_no_mappings_configured(self):
+    async def test_no_mappings_configured_clears_cached_statuses_without_fetching(self):
         monitor = UptimeKumaMonitor()
+        monitor._container_status_cache["web"] = 0
         fake_client = FakeUptimeKumaClient()
         _install_client(monitor, fake_client)
 
@@ -245,11 +254,82 @@ class TestUpdateStatusCache:
     async def test_missing_monitor_status_is_skipped(self):
         _add_mapping("web", "Unknown Monitor")
         monitor = UptimeKumaMonitor()
+        _install_client(
+            monitor,
+            FakeUptimeKumaClient(monitors=[{"friendly_name": "Other Monitor", "status": 1}]),
+        )
+
+        await monitor._update_status_cache()
+
+        assert monitor._container_status_cache == {}
+
+    async def test_vanished_monitor_among_other_monitors_clears_stale_status(self):
+        _add_mapping("web", "Web Monitor")
+        monitor = UptimeKumaMonitor()
+        monitor._container_status_cache["web"] = 0
+        _install_client(
+            monitor,
+            FakeUptimeKumaClient(monitors=[{"friendly_name": "Other Monitor", "status": 1}]),
+        )
+
+        await monitor._update_status_cache()
+
+        assert monitor._container_status_cache == {}
+
+    async def test_last_mapped_monitor_disappearing_clears_cached_down_status(self):
+        # A successful fetch that returns [] is a valid refresh, not a failure.
+        _enable_uptime_kuma(auto_restart_on_down=True)
+        _add_mapping("web", "Web Monitor")
+        monitor = UptimeKumaMonitor()
+        monitor._container_status_cache["web"] = 0
         _install_client(monitor, FakeUptimeKumaClient(monitors=[]))
 
         await monitor._update_status_cache()
 
         assert monitor._container_status_cache == {}
+        assert await monitor.should_restart_from_uptime_kuma("web") is False
+
+    async def test_failed_fetch_preserves_cached_down_status(self):
+        # The real client returns None (not []) when the request fails.
+        _add_mapping("web", "Web Monitor")
+        monitor = UptimeKumaMonitor()
+        monitor._container_status_cache["web"] = 0
+        _install_client(monitor, FakeUptimeKumaClient(get_all_monitors_fails=True))
+
+        await monitor._update_status_cache()
+
+        assert monitor._container_status_cache == {"web": 0}
+
+    async def test_status_for_unmapped_container_is_dropped(self):
+        _add_mapping("web", "Web Monitor")
+        monitor = UptimeKumaMonitor()
+        monitor._container_status_cache["old"] = 0
+        _install_client(
+            monitor,
+            FakeUptimeKumaClient(monitors=[{"friendly_name": "Web Monitor", "status": 1}]),
+        )
+
+        await monitor._update_status_cache()
+
+        assert monitor._container_status_cache == {"web": 1}
+
+    @pytest.mark.parametrize(
+        "monitor_names",
+        [("Web Monitor", "Deleted Monitor"), ("Deleted Monitor", "Web Monitor")],
+        ids=["present-mapping-first", "present-mapping-last"],
+    )
+    async def test_duplicate_mappings_keep_status_from_present_monitor(self, monitor_names):
+        for monitor_name in monitor_names:
+            _add_mapping("web", monitor_name)
+        monitor = UptimeKumaMonitor()
+        _install_client(
+            monitor,
+            FakeUptimeKumaClient(monitors=[{"friendly_name": "Web Monitor", "status": 0}]),
+        )
+
+        await monitor._update_status_cache()
+
+        assert monitor._container_status_cache == {"web": 0}
 
     async def test_error_fetching_metrics_is_logged_and_leaves_cache_unchanged(
         self, caplog
@@ -356,6 +436,18 @@ class TestShouldRestartFromUptimeKuma:
                 monitors=[{"friendly_name": "Web Monitor", "status": 1}]
             ),
         )
+
+        assert await monitor.should_restart_from_uptime_kuma("web") is False
+
+    async def test_false_when_monitor_vanished_after_being_down(self):
+        _enable_uptime_kuma(auto_restart_on_down=True)
+        _add_mapping("web", "Web Monitor")
+        monitor = UptimeKumaMonitor()
+        fake_client = FakeUptimeKumaClient(monitors=[{"friendly_name": "Web Monitor", "status": 0}])
+        _install_client(monitor, fake_client)
+        assert await monitor.should_restart_from_uptime_kuma("web") is True
+
+        fake_client.monitors = [{"friendly_name": "Other Monitor", "status": 1}]
 
         assert await monitor.should_restart_from_uptime_kuma("web") is False
 

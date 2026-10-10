@@ -91,7 +91,7 @@ class UptimeKumaMonitor:
         if not self.client:
             return
 
-        monitors = await self.client.get_all_monitors()
+        monitors = await self.client.get_all_monitors() or []
         self._monitor_cache = {m['friendly_name']: m for m in monitors}
         logger.info("Cached %s Uptime-Kuma monitors", len(self._monitor_cache))
 
@@ -127,6 +127,7 @@ class UptimeKumaMonitor:
         config = config_manager.get_config()
 
         if not config.uptime_kuma_mappings:
+            self._container_status_cache.clear()
             return
 
         try:
@@ -137,7 +138,15 @@ class UptimeKumaMonitor:
             logger.error("Error fetching Uptime-Kuma monitor statuses: %s", e)
             return
 
+        if monitors is None:
+            # The fetch failed (the client already logged why): keep the cached statuses
+            # instead of treating the failure as evidence that the monitors disappeared.
+            # A successful empty list is a valid refresh and falls through to the pruning.
+            return
+
         status_by_name = {m['friendly_name']: m['status'] for m in monitors}
+
+        refreshed_ids: set[str] = set()
 
         for mapping in config.uptime_kuma_mappings:
             status = status_by_name.get(mapping.monitor_friendly_name)
@@ -152,6 +161,7 @@ class UptimeKumaMonitor:
             # Cache the status (0=down, 1=up, 2=pending, 3=maintenance)
             # mapping.container_id now stores stable_id
             self._container_status_cache[mapping.container_id] = status
+            refreshed_ids.add(mapping.container_id)
 
             logger.debug(
                 "Cached status for %s: %s (monitor: %s)",
@@ -159,6 +169,14 @@ class UptimeKumaMonitor:
                 status,
                 mapping.monitor_friendly_name,
             )
+
+        # Drop statuses that were not refreshed (monitor vanished or container no
+        # longer mapped) so a stale DOWN cannot keep triggering restarts. Done after
+        # the loop so a container with several mappings keeps any status that is
+        # still present.
+        for container_id in list(self._container_status_cache):
+            if container_id not in refreshed_ids:
+                del self._container_status_cache[container_id]
 
     def get_container_status(self, stable_id: str) -> int | None:
         return self._container_status_cache.get(stable_id)

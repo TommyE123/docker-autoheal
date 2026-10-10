@@ -30,7 +30,7 @@ async def test_uptime_kuma_connection(config_data: dict):
 
         if success:
             # Fetch monitors to validate full access
-            monitors = await client.get_all_monitors()
+            monitors = await client.get_all_monitors() or []
             return {
                 "success": True,
                 "message": "Connection successful",
@@ -71,7 +71,7 @@ async def enable_uptime_kuma_integration(integration_config: dict):
             config.uptime_kuma.api_token,      # password (API key or user password)
             config.uptime_kuma.username        # username (optional, empty for API key)
         )
-        monitors = await client.get_all_monitors()
+        monitors = await client.get_all_monitors() or []
 
         # Perform auto-mapping
         containers = docker_client.list_containers(all_containers=False)
@@ -134,7 +134,7 @@ async def get_uptime_kuma_monitors():
             config.uptime_kuma.api_token,      # password (API key or user password)
             config.uptime_kuma.username        # username (optional, empty for API key)
         )
-        monitors = await client.get_all_monitors()
+        monitors = await client.get_all_monitors() or []
         return {"monitors": monitors}
     except Exception as e:
         logger.error("Failed to fetch Uptime-Kuma monitors: %s", e)
