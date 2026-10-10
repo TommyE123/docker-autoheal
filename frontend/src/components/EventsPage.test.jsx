@@ -374,9 +374,9 @@ describe("EventsPage", () => {
       await user.selectOptions(screen.getByLabelText("Event Type"), "restart");
       await screen.findByRole("heading", { name: "web-app" });
 
-      resolveStale({ data: multipleEvents });
-      await waitFor(() => expect(resolveStale).toBeDefined());
-      await new Promise((r) => setTimeout(r, 0));
+      await act(async () => {
+        resolveStale({ data: multipleEvents });
+      });
 
       expect(screen.getByRole("heading", { name: "web-app" })).toBeInTheDocument();
       expect(screen.queryByRole("heading", { name: "cache" })).not.toBeInTheDocument();
