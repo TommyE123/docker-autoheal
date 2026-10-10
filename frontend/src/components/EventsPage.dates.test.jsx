@@ -33,6 +33,7 @@ class TestErrorBoundary extends Component {
 vi.mock("../services/api", () => ({
   getEvents: vi.fn(),
   clearEvents: vi.fn(),
+  getContainers: vi.fn().mockResolvedValue({ data: [] }),
 }));
 
 import { getEvents } from "../services/api";
