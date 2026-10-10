@@ -14,6 +14,42 @@ from docker.models.containers import Container
 logger = logging.getLogger(__name__)
 
 
+def recovery_identifier[S](stable_id: S, labels: dict) -> S | str:
+    """
+    Key for one running container's recovery state, derived from its labels.
+
+    Restart counts, cooldown, backoff and quarantine belong to a single container,
+    so replicas of a scaled Compose service must not share them: every Compose
+    container is keyed by its project, service and container number. The project
+    and service are taken from their separate labels rather than from the stable
+    ID, because ``project_service`` is ambiguous (project ``foo_bar`` with service
+    ``baz`` and project ``foo`` with service ``bar_baz`` both give ``foo_bar_baz``).
+    An explicit ``monitoring.id`` label is the user's chosen identity: it is never
+    suffixed, and it is keyed under a ``monitoring.id:`` prefix so it can never equal
+    a generated key. Compose project and service names cannot contain ``:`` or ``#``,
+    so the delimiters of a generated key are unambiguous.
+
+    Args:
+        stable_id: The container's stable identifier
+        labels: Container labels
+
+    Returns:
+        ``"monitoring.id:{stable_id}"`` for an explicit ``monitoring.id``,
+        ``"compose:{project}:{service}#{N}"`` for Compose container number N,
+        otherwise ``stable_id``
+    """
+    if "monitoring.id" in labels:
+        return f"monitoring.id:{stable_id}"
+    project = labels.get("com.docker.compose.project")
+    service = labels.get("com.docker.compose.service")
+    if not (project and service):
+        return stable_id
+    number = labels.get("com.docker.compose.container-number")
+    if isinstance(number, str) and number.isdecimal():
+        return f"compose:{project}:{service}#{int(number)}"
+    return stable_id
+
+
 class DockerClientWrapper:
     """Wrapper around Docker SDK client with retry logic"""
 
@@ -149,6 +185,8 @@ class DockerClientWrapper:
                 "full_id": container.id,
                 "name": container.name,
                 "stable_id": stable_id,  # NEW: Stable identifier for tracking
+                # Per-replica key for restart counts and quarantine
+                "recovery_id": recovery_identifier(stable_id, labels),
                 "image": image_name,
                 "image_id": image_id,  # NEW: For version tracking
                 "status": container.status,

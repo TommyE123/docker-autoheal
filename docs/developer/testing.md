@@ -131,14 +131,15 @@ were triaged as part of converting this suite:
 
 The suite focuses on the monitoring engine and its restart/recovery behaviour:
 
-| Area                                                                                | File                            |
-|-------------------------------------------------------------------------------------|---------------------------------|
-| Stable identifier and monitoring selection/filters                                  | `test_monitoring_identity.py`   |
-| Health evaluation (exit codes, Docker health, custom checks, Uptime-Kuma)           | `test_health_evaluation.py`     |
-| Cooldown, thresholds, quarantine, backoff, restart success/failure, alerts          | `test_restart_handling.py`      |
-| Per-cycle checks, quarantine skip/auto-unquarantine, disappearance, Docker failures | `test_container_checks.py`      |
-| Start/stop, monitor loop, event listener, auto-discovery                            | `test_engine_lifecycle.py`      |
-| Docker client wrapper boundary behaviour                                            | `test_docker_client_wrapper.py` |
+| Area                                                                                | File                               |
+|-------------------------------------------------------------------------------------|------------------------------------|
+| Stable identifier and monitoring selection/filters                                  | `test_monitoring_identity.py`      |
+| Health evaluation (exit codes, Docker health, custom checks, Uptime-Kuma)           | `test_health_evaluation.py`        |
+| Cooldown, thresholds, quarantine, backoff, restart success/failure, alerts          | `test_restart_handling.py`         |
+| Per-cycle checks, quarantine skip/auto-unquarantine, disappearance, Docker failures | `test_container_checks.py`         |
+| Per-replica recovery state for scaled Compose services                              | `test_compose_replica_recovery.py` |
+| Start/stop, monitor loop, event listener, auto-discovery                            | `test_engine_lifecycle.py`         |
+| Docker client wrapper boundary behaviour                                            | `test_docker_client_wrapper.py`    |
 
 ## How isolation works
 
