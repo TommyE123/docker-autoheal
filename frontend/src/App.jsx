@@ -1,24 +1,24 @@
-import { useState, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { Container, Toast, ToastContainer } from 'react-bootstrap';
-import Navigation from './components/Navigation';
-import Dashboard from './components/Dashboard';
-import ContainersPage from './components/ContainersPage';
-import EventsPage from './components/EventsPage';
-import ConfigPage from './components/ConfigPage';
-import NotificationsPage from './components/NotificationsPage';
-import MaintenanceModal from './components/MaintenanceModal';
+import { useState, useEffect } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { Container, Toast, ToastContainer } from "react-bootstrap";
+import Navigation from "./components/Navigation";
+import Dashboard from "./components/Dashboard";
+import ContainersPage from "./components/ContainersPage";
+import EventsPage from "./components/EventsPage";
+import ConfigPage from "./components/ConfigPage";
+import NotificationsPage from "./components/NotificationsPage";
+import MaintenanceModal from "./components/MaintenanceModal";
 import {
   getSystemStatus,
   enableMaintenanceMode,
-  disableMaintenanceMode
-} from './services/api';
+  disableMaintenanceMode,
+} from "./services/api";
 
 function App() {
   const [systemStatus, setSystemStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
-  const [errorToast, setErrorToast] = useState({ show: false, message: '' });
+  const [errorToast, setErrorToast] = useState({ show: false, message: "" });
 
   const fetchSystemStatus = async () => {
     try {
@@ -27,7 +27,7 @@ function App() {
       // Sync maintenance modal visibility with backend state
       setShowMaintenanceModal(response.data.maintenance_mode);
     } catch (error) {
-      console.error('Failed to fetch system status:', error);
+      console.error("Failed to fetch system status:", error);
     } finally {
       setLoading(false);
     }
@@ -44,8 +44,11 @@ function App() {
       }
       await fetchSystemStatus();
     } catch (error) {
-      console.error('Failed to toggle maintenance mode:', error);
-      setErrorToast({ show: true, message: 'Failed to toggle maintenance mode. Please try again.' });
+      console.error("Failed to toggle maintenance mode:", error);
+      setErrorToast({
+        show: true,
+        message: "Failed to toggle maintenance mode. Please try again.",
+      });
     }
   };
 
@@ -66,11 +69,11 @@ function App() {
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 
@@ -83,8 +86,8 @@ function App() {
         className="py-4"
         style={{
           opacity: systemStatus?.maintenance_mode ? 0.5 : 1,
-          pointerEvents: systemStatus?.maintenance_mode ? 'none' : 'auto',
-          transition: 'opacity 0.3s ease'
+          pointerEvents: systemStatus?.maintenance_mode ? "none" : "auto",
+          transition: "opacity 0.3s ease",
         }}
       >
         <Routes>
@@ -117,10 +120,14 @@ function App() {
       />
 
       {/* Error Toast Notification */}
-      <ToastContainer position="top-end" className="p-3" style={{ zIndex: 9999 }}>
+      <ToastContainer
+        position="top-end"
+        className="p-3"
+        style={{ zIndex: 9999 }}
+      >
         <Toast
           show={errorToast.show}
-          onClose={() => setErrorToast({ show: false, message: '' })}
+          onClose={() => setErrorToast({ show: false, message: "" })}
           autohide
           delay={5000}
           bg="danger"
@@ -136,4 +143,3 @@ function App() {
 }
 
 export default App;
-

@@ -31,8 +31,18 @@ const configWithServices = {
   enabled: true,
   event_filters: [],
   services: [
-    { name: "My Webhook", type: "webhook", enabled: true, url: "https://example.com/webhook" },
-    { name: "Disabled Slack", type: "slack", enabled: false, url: "https://hooks.slack.com/services/x" },
+    {
+      name: "My Webhook",
+      type: "webhook",
+      enabled: true,
+      url: "https://example.com/webhook",
+    },
+    {
+      name: "Disabled Slack",
+      type: "slack",
+      enabled: false,
+      url: "https://hooks.slack.com/services/x",
+    },
   ],
 };
 
@@ -150,21 +160,31 @@ describe("NotificationsPage", () => {
 
     await user.click(screen.getByRole("button", { name: /add service/i }));
 
-    await user.type(screen.getByPlaceholderText(/my discord server/i), "New Webhook");
+    await user.type(
+      screen.getByPlaceholderText(/my discord server/i),
+      "New Webhook",
+    );
     await user.type(
       screen.getByPlaceholderText(/https:\/\/example\.com\/webhook/i),
       "https://example.com/hook",
     );
 
     getNotificationsConfig.mockResolvedValue({
-      data: { ...config, services: [{ name: "New Webhook", type: "webhook", enabled: true }] },
+      data: {
+        ...config,
+        services: [{ name: "New Webhook", type: "webhook", enabled: true }],
+      },
     });
 
     await user.click(screen.getByRole("button", { name: /^add service$/i }));
 
     await waitFor(() =>
       expect(addNotificationService).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "New Webhook", type: "webhook", url: "https://example.com/hook" }),
+        expect.objectContaining({
+          name: "New Webhook",
+          type: "webhook",
+          url: "https://example.com/hook",
+        }),
       ),
     );
     expect(
@@ -183,7 +203,9 @@ describe("NotificationsPage", () => {
 
     await user.click(screen.getByRole("button", { name: /add service/i }));
 
-    expect(screen.getByRole("button", { name: /^add service$/i })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /^add service$/i }),
+    ).toBeDisabled();
   });
 
   it("shows an alert when adding a service fails", async () => {
@@ -199,7 +221,10 @@ describe("NotificationsPage", () => {
 
     await user.click(screen.getByRole("button", { name: /add service/i }));
 
-    await user.type(screen.getByPlaceholderText(/my discord server/i), "New Webhook");
+    await user.type(
+      screen.getByPlaceholderText(/my discord server/i),
+      "New Webhook",
+    );
     await user.type(
       screen.getByPlaceholderText(/https:\/\/example\.com\/webhook/i),
       "https://example.com/hook",
@@ -209,7 +234,11 @@ describe("NotificationsPage", () => {
 
     await waitFor(() =>
       expect(addNotificationService).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "New Webhook", type: "webhook", url: "https://example.com/hook" }),
+        expect.objectContaining({
+          name: "New Webhook",
+          type: "webhook",
+          url: "https://example.com/hook",
+        }),
       ),
     );
     expect(
@@ -230,7 +259,10 @@ describe("NotificationsPage", () => {
 
     await user.click(screen.getByRole("button", { name: /add service/i }));
 
-    await user.type(screen.getByPlaceholderText(/my discord server/i), "Incomplete Webhook");
+    await user.type(
+      screen.getByPlaceholderText(/my discord server/i),
+      "Incomplete Webhook",
+    );
 
     const addButton = screen.getByRole("button", { name: /^add service$/i });
     // Name is filled in, but the webhook type's required URL is still empty.
@@ -268,13 +300,18 @@ describe("NotificationsPage", () => {
     await screen.findByText(/notifications are disabled/i);
 
     await user.click(screen.getByRole("button", { name: /add service/i }));
-    await user.type(screen.getByPlaceholderText(/my discord server/i), "Incomplete Telegram");
+    await user.type(
+      screen.getByPlaceholderText(/my discord server/i),
+      "Incomplete Telegram",
+    );
     await user.selectOptions(screen.getByRole("combobox"), "telegram");
 
     const addButton = screen.getByRole("button", { name: /^add service$/i });
     expect(addButton).toBeDisabled();
 
-    const botTokenInput = screen.getByPlaceholderText(/123456789:abcdefghijklmnopqrstuvwxyz/i);
+    const botTokenInput = screen.getByPlaceholderText(
+      /123456789:abcdefghijklmnopqrstuvwxyz/i,
+    );
     await user.type(botTokenInput, "   ");
     expect(addButton).toBeDisabled();
 
@@ -298,10 +335,16 @@ describe("NotificationsPage", () => {
     await screen.findByText(/notifications are disabled/i);
 
     await user.click(screen.getByRole("button", { name: /add service/i }));
-    await user.type(screen.getByPlaceholderText(/my discord server/i), "Name Only");
+    await user.type(
+      screen.getByPlaceholderText(/my discord server/i),
+      "Name Only",
+    );
 
     const typeSelect = screen.getByRole("combobox");
-    const serviceTypes = Array.from(typeSelect.options, (option) => option.value);
+    const serviceTypes = Array.from(
+      typeSelect.options,
+      (option) => option.value,
+    );
     expect(serviceTypes.length).toBeGreaterThan(0);
 
     const addButton = screen.getByRole("button", { name: /^add service$/i });
@@ -319,7 +362,9 @@ describe("NotificationsPage", () => {
     getNotificationsConfig.mockResolvedValue({
       data: {
         ...configWithServices,
-        services: [{ name: "Legacy Webhook", type: "webhook", enabled: true, url: null }],
+        services: [
+          { name: "Legacy Webhook", type: "webhook", enabled: true, url: null },
+        ],
       },
     });
 
@@ -329,7 +374,9 @@ describe("NotificationsPage", () => {
 
     await user.click(screen.getByRole("button", { name: /^edit$/i }));
 
-    const updateButton = screen.getByRole("button", { name: /update service/i });
+    const updateButton = screen.getByRole("button", {
+      name: /update service/i,
+    });
     expect(updateButton).toBeDisabled();
 
     await user.type(
@@ -345,7 +392,9 @@ describe("NotificationsPage", () => {
     getNotificationsConfig.mockResolvedValue({
       data: {
         ...configWithServices,
-        services: [{ name: "Future Service", type: "carrier-pigeon", enabled: true }],
+        services: [
+          { name: "Future Service", type: "carrier-pigeon", enabled: true },
+        ],
       },
     });
 
@@ -355,7 +404,9 @@ describe("NotificationsPage", () => {
 
     await user.click(screen.getByRole("button", { name: /^edit$/i }));
 
-    expect(screen.getByRole("button", { name: /update service/i })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: /update service/i }),
+    ).toBeEnabled();
   });
 
   it("edits an existing service successfully", async () => {
@@ -428,7 +479,9 @@ describe("NotificationsPage", () => {
     const configAfterEnable = {
       ...configWithServices,
       services: configWithServices.services.map((service) =>
-        service.name === "Disabled Slack" ? { ...service, enabled: true } : service,
+        service.name === "Disabled Slack"
+          ? { ...service, enabled: true }
+          : service,
       ),
     };
     getNotificationsConfig
@@ -464,7 +517,9 @@ describe("NotificationsPage", () => {
     const configAfterDisable = {
       ...configWithServices,
       services: configWithServices.services.map((service) =>
-        service.name === "My Webhook" ? { ...service, enabled: false } : service,
+        service.name === "My Webhook"
+          ? { ...service, enabled: false }
+          : service,
       ),
     };
     getNotificationsConfig
@@ -612,7 +667,9 @@ describe("NotificationsPage", () => {
     await screen.findByText(/notifications are disabled/i);
     await user.click(screen.getByRole("checkbox"));
 
-    expect(await screen.findByText(/failed to update notifications/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/failed to update notifications/i),
+    ).toBeInTheDocument();
     expect(screen.getByText(/notifications are disabled/i)).toBeInTheDocument();
   });
 
@@ -623,13 +680,17 @@ describe("NotificationsPage", () => {
       render(<NotificationsPage />);
 
       expect(
-        await screen.findByText(/no filters selected - all events will trigger notifications/i),
+        await screen.findByText(
+          /no filters selected - all events will trigger notifications/i,
+        ),
       ).toBeInTheDocument();
     });
 
     it("adds an event type to the filters when its badge is clicked", async () => {
       const user = userEvent.setup();
-      getNotificationsConfig.mockResolvedValue({ data: { ...config, event_filters: ["restart"] } });
+      getNotificationsConfig.mockResolvedValue({
+        data: { ...config, event_filters: ["restart"] },
+      });
       updateNotificationsConfig.mockResolvedValue({});
 
       render(<NotificationsPage />);
@@ -641,7 +702,9 @@ describe("NotificationsPage", () => {
           event_filters: ["restart", "quarantine"],
         }),
       );
-      expect(await screen.findByText(/event filters updated/i)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/event filters updated/i),
+      ).toBeInTheDocument();
       expect(screen.getByText(/container quarantine ✓/i)).toBeInTheDocument();
       expect(
         screen.queryByText(/no filters selected/i),
@@ -660,7 +723,9 @@ describe("NotificationsPage", () => {
       await user.click(await screen.findByText(/container restart/i));
 
       await waitFor(() =>
-        expect(updateNotificationsConfig).toHaveBeenCalledWith({ event_filters: ["quarantine"] }),
+        expect(updateNotificationsConfig).toHaveBeenCalledWith({
+          event_filters: ["quarantine"],
+        }),
       );
     });
 
@@ -673,7 +738,9 @@ describe("NotificationsPage", () => {
 
       await user.click(await screen.findByText("Auto Monitor"));
 
-      expect(await screen.findByText(/failed to update event filters/i)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/failed to update event filters/i),
+      ).toBeInTheDocument();
       expect(screen.queryByText(/auto monitor ✓/i)).not.toBeInTheDocument();
     });
   });
@@ -695,7 +762,9 @@ describe("NotificationsPage", () => {
 
     async function submitAndGetPayload(user) {
       await user.click(screen.getByRole("button", { name: /^add service$/i }));
-      await waitFor(() => expect(addNotificationService).toHaveBeenCalledTimes(1));
+      await waitFor(() =>
+        expect(addNotificationService).toHaveBeenCalledTimes(1),
+      );
       return addNotificationService.mock.calls[0][0];
     }
 
@@ -705,7 +774,10 @@ describe("NotificationsPage", () => {
         screen.getByPlaceholderText(/discord\.com\/api\/webhooks/i),
         "https://discord.com/api/webhooks/1",
       );
-      await user.type(screen.getByPlaceholderText("Docker Auto-Heal"), "autoheal-bot");
+      await user.type(
+        screen.getByPlaceholderText("Docker Auto-Heal"),
+        "autoheal-bot",
+      );
 
       expect(await submitAndGetPayload(user)).toEqual({
         name: "Discord",
@@ -748,10 +820,16 @@ describe("NotificationsPage", () => {
     it("sends the topic and optional credentials for an ntfy service", async () => {
       const user = await openAddModal("ntfy", "Ntfy");
       await user.type(screen.getByPlaceholderText("docker-autoheal"), "alerts");
-      await user.type(screen.getByPlaceholderText(/ntfy\.sh/i), "https://ntfy.example.com");
+      await user.type(
+        screen.getByPlaceholderText(/ntfy\.sh/i),
+        "https://ntfy.example.com",
+      );
       const [username] = screen.getAllByRole("textbox").slice(-1);
       await user.type(username, "me");
-      await user.type(document.querySelector('input[type="password"]'), "secret");
+      await user.type(
+        document.querySelector('input[type="password"]'),
+        "secret",
+      );
 
       expect(await submitAndGetPayload(user)).toEqual({
         name: "Ntfy",
@@ -779,7 +857,9 @@ describe("NotificationsPage", () => {
     });
 
     it("does not log the access token when saving an ntfy service fails", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       const user = await openAddModal("ntfy", "Ntfy");
       // Axios errors keep the request configuration, including the serialised body.
       addNotificationService.mockRejectedValue(
@@ -795,7 +875,9 @@ describe("NotificationsPage", () => {
 
       expect(await screen.findByText("Server error")).toBeInTheDocument();
       expect(consoleError).toHaveBeenCalled();
-      expect(JSON.stringify(consoleError.mock.calls)).not.toContain("tk_leak_check");
+      expect(JSON.stringify(consoleError.mock.calls)).not.toContain(
+        "tk_leak_check",
+      );
       consoleError.mockRestore();
     });
 
@@ -818,8 +900,14 @@ describe("NotificationsPage", () => {
 
     it("sends the user key and api token for a pushover service", async () => {
       const user = await openAddModal("pushover", "Pushover");
-      await user.type(screen.getByPlaceholderText("uQiRzpo4DXghDmr9QzzfQu27cmVRsG"), "ukey");
-      await user.type(screen.getByPlaceholderText("azGDORePK8gMaC0QOYAMyEEuzJnyUi"), "atok");
+      await user.type(
+        screen.getByPlaceholderText("uQiRzpo4DXghDmr9QzzfQu27cmVRsG"),
+        "ukey",
+      );
+      await user.type(
+        screen.getByPlaceholderText("azGDORePK8gMaC0QOYAMyEEuzJnyUi"),
+        "atok",
+      );
 
       expect(await submitAndGetPayload(user)).toEqual({
         name: "Pushover",
@@ -831,4 +919,3 @@ describe("NotificationsPage", () => {
     });
   });
 });
-

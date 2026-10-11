@@ -1,4 +1,4 @@
-import { Card, Form, Button } from 'react-bootstrap';
+import { Card, Form, Button } from "react-bootstrap";
 
 /**
  * ConfigImportExport Component
@@ -19,16 +19,13 @@ function ConfigImportExport({ onExport, onImport }) {
       </Card.Header>
       <Card.Body>
         <div className="mb-3">
-          <Button
-            variant="success"
-            className="w-100 mb-2"
-            onClick={onExport}
-          >
+          <Button variant="success" className="w-100 mb-2" onClick={onExport}>
             <i className="bi bi-download me-1"></i>
             Export Configuration
           </Button>
           <Form.Text className="d-block">
-            Download current configuration as JSON file (includes Uptime Kuma settings)
+            Download current configuration as JSON file (includes Uptime Kuma
+            settings)
           </Form.Text>
         </div>
 
@@ -49,4 +46,3 @@ function ConfigImportExport({ onExport, onImport }) {
 }
 
 export default ConfigImportExport;
-

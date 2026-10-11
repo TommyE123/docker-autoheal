@@ -1,4 +1,4 @@
-import { Modal, Button } from 'react-bootstrap';
+import { Modal, Button } from "react-bootstrap";
 
 /**
  * ValidationModal Component
@@ -13,7 +13,15 @@ import { Modal, Button } from 'react-bootstrap';
  * @param {Object} props.config - Current configuration object
  * @param {Function} props.onHide - Callback to close modal
  */
-function ValidationModal({ show, title, message, errors, suggestions, config, onHide }) {
+function ValidationModal({
+  show,
+  title,
+  message,
+  errors,
+  suggestions,
+  config,
+  onHide,
+}) {
   return (
     <Modal
       show={show}
@@ -46,35 +54,70 @@ function ValidationModal({ show, title, message, errors, suggestions, config, on
 
         {suggestions && suggestions.length > 0 && (
           <div className="alert alert-info">
-            <strong><i className="bi bi-lightbulb-fill me-2"></i>Recommended Solutions:</strong>
+            <strong>
+              <i className="bi bi-lightbulb-fill me-2"></i>Recommended
+              Solutions:
+            </strong>
             <ul className="mb-0 mt-2">
               {suggestions.map((suggestion, index) => (
-                <li key={index} className="mb-1">{suggestion}</li>
+                <li key={index} className="mb-1">
+                  {suggestion}
+                </li>
               ))}
             </ul>
           </div>
         )}
 
         <div className="alert alert-light border mt-3">
-          <strong><i className="bi bi-info-circle me-2"></i>Current Configuration:</strong>
+          <strong>
+            <i className="bi bi-info-circle me-2"></i>Current Configuration:
+          </strong>
           <div className="mt-2 small">
-            <div><strong>Monitoring Interval:</strong> {config?.monitor?.interval_seconds} seconds</div>
-            <div><strong>Cooldown:</strong> {config?.restart?.cooldown_seconds} seconds</div>
-            <div><strong>Max Restarts:</strong> {config?.restart?.max_restarts}</div>
-            <div><strong>Max Restarts Window:</strong> {config?.restart?.max_restarts_window_seconds} seconds</div>
+            <div>
+              <strong>Monitoring Interval:</strong>{" "}
+              {config?.monitor?.interval_seconds} seconds
+            </div>
+            <div>
+              <strong>Cooldown:</strong> {config?.restart?.cooldown_seconds}{" "}
+              seconds
+            </div>
+            <div>
+              <strong>Max Restarts:</strong> {config?.restart?.max_restarts}
+            </div>
+            <div>
+              <strong>Max Restarts Window:</strong>{" "}
+              {config?.restart?.max_restarts_window_seconds} seconds
+            </div>
           </div>
         </div>
 
         <div className="alert alert-success border mt-3">
-          <strong><i className="bi bi-check-circle me-2"></i>How These Settings Work Together:</strong>
+          <strong>
+            <i className="bi bi-check-circle me-2"></i>How These Settings Work
+            Together:
+          </strong>
           <ul className="mb-0 mt-2 small">
-            <li><strong>Monitoring Interval:</strong> How often the system checks container health</li>
-            <li><strong>Cooldown:</strong> Wait time between restart attempts</li>
-            <li><strong>Max Restarts:</strong> Maximum restart attempts before quarantine</li>
-            <li><strong>Max Restarts Window:</strong> Time window for counting restarts (must fit all restart attempts)</li>
+            <li>
+              <strong>Monitoring Interval:</strong> How often the system checks
+              container health
+            </li>
+            <li>
+              <strong>Cooldown:</strong> Wait time between restart attempts
+            </li>
+            <li>
+              <strong>Max Restarts:</strong> Maximum restart attempts before
+              quarantine
+            </li>
+            <li>
+              <strong>Max Restarts Window:</strong> Time window for counting
+              restarts (must fit all restart attempts)
+            </li>
           </ul>
           <div className="mt-2 small text-muted">
-            <em>Formula: Max Restarts Window ≥ MAX(Max Restarts × Cooldown, Max Restarts × Monitoring Interval)</em>
+            <em>
+              Formula: Max Restarts Window ≥ MAX(Max Restarts × Cooldown, Max
+              Restarts × Monitoring Interval)
+            </em>
           </div>
         </div>
       </Modal.Body>
@@ -89,4 +132,3 @@ function ValidationModal({ show, title, message, errors, suggestions, config, on
 }
 
 export default ValidationModal;
-

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Container,
   Row,
@@ -10,33 +10,33 @@ import {
   Modal,
   Alert,
   Badge,
-  Spinner
-} from 'react-bootstrap';
+  Spinner,
+} from "react-bootstrap";
 import {
   getNotificationsConfig,
   updateNotificationsConfig,
   addNotificationService,
   updateNotificationService,
   deleteNotificationService,
-  testNotificationService
-} from '../services/api';
-import { EVENT_TYPES } from '../constants/eventTypes';
+  testNotificationService,
+} from "../services/api";
+import { EVENT_TYPES } from "../constants/eventTypes";
 
 // Fields required for each service type, beyond the always-required name.
 // Mirrors the "*"-marked fields rendered by renderServiceFields() below.
 const REQUIRED_FIELDS_BY_TYPE = {
-  webhook: ['url'],
-  discord: ['url'],
-  slack: ['url'],
-  telegram: ['bot_token', 'chat_id'],
-  ntfy: ['topic'],
-  gotify: ['server_url', 'app_token'],
-  pushover: ['user_key', 'api_token']
+  webhook: ["url"],
+  discord: ["url"],
+  slack: ["url"],
+  telegram: ["bot_token", "chat_id"],
+  ntfy: ["topic"],
+  gotify: ["server_url", "app_token"],
+  pushover: ["user_key", "api_token"],
 };
 
 function isServiceFormValid(formData) {
-  const hasValue = (field) => String(formData[field] ?? '').trim() !== '';
-  if (!hasValue('name')) return false;
+  const hasValue = (field) => String(formData[field] ?? "").trim() !== "";
+  if (!hasValue("name")) return false;
   return (REQUIRED_FIELDS_BY_TYPE[formData.type] || []).every(hasValue);
 }
 
@@ -46,47 +46,51 @@ function NotificationsPage() {
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingService, setEditingService] = useState(null);
-  const [alert, setAlert] = useState({ show: false, message: '', variant: 'success' });
+  const [alert, setAlert] = useState({
+    show: false,
+    message: "",
+    variant: "success",
+  });
   const [testingService, setTestingService] = useState(null);
 
   const serviceTypes = [
-    { value: 'webhook', label: 'Generic Webhook' },
-    { value: 'discord', label: 'Discord' },
-    { value: 'slack', label: 'Slack' },
-    { value: 'telegram', label: 'Telegram' },
-    { value: 'ntfy', label: 'Ntfy' },
-    { value: 'gotify', label: 'Gotify' },
-    { value: 'pushover', label: 'Pushover' }
+    { value: "webhook", label: "Generic Webhook" },
+    { value: "discord", label: "Discord" },
+    { value: "slack", label: "Slack" },
+    { value: "telegram", label: "Telegram" },
+    { value: "ntfy", label: "Ntfy" },
+    { value: "gotify", label: "Gotify" },
+    { value: "pushover", label: "Pushover" },
   ];
 
   const [formData, setFormData] = useState({
-    name: '',
-    type: 'webhook',
+    name: "",
+    type: "webhook",
     enabled: true,
-    url: '',
+    url: "",
     headers: {},
-    username: '',
-    password: '',
-    bot_token: '',
-    chat_id: '',
-    topic: '',
-    server_url: '',
-    access_token: '',
-    app_token: '',
-    user_key: '',
-    api_token: ''
+    username: "",
+    password: "",
+    bot_token: "",
+    chat_id: "",
+    topic: "",
+    server_url: "",
+    access_token: "",
+    app_token: "",
+    user_key: "",
+    api_token: "",
   });
 
   const alertTimeoutRef = useRef(null);
 
   useEffect(() => () => clearTimeout(alertTimeoutRef.current), []);
 
-  const showAlert = useCallback((message, variant = 'success') => {
+  const showAlert = useCallback((message, variant = "success") => {
     setAlert({ show: true, message, variant });
     clearTimeout(alertTimeoutRef.current);
     alertTimeoutRef.current = setTimeout(
-      () => setAlert({ show: false, message: '', variant: 'success' }),
-      5000
+      () => setAlert({ show: false, message: "", variant: "success" }),
+      5000,
     );
   }, []);
 
@@ -96,8 +100,8 @@ function NotificationsPage() {
       const response = await getNotificationsConfig();
       setConfig(response.data);
     } catch (error) {
-      console.error('Failed to fetch notifications config:', error);
-      showAlert('Failed to load notifications configuration', 'danger');
+      console.error("Failed to fetch notifications config:", error);
+      showAlert("Failed to load notifications configuration", "danger");
     } finally {
       setLoading(false);
     }
@@ -112,10 +116,10 @@ function NotificationsPage() {
       setSaving(true);
       await updateNotificationsConfig({ enabled });
       setConfig({ ...config, enabled });
-      showAlert(`Notifications ${enabled ? 'enabled' : 'disabled'}`, 'success');
+      showAlert(`Notifications ${enabled ? "enabled" : "disabled"}`, "success");
     } catch (error) {
-      console.error('Failed to toggle notifications:', error);
-      showAlert('Failed to update notifications', 'danger');
+      console.error("Failed to toggle notifications:", error);
+      showAlert("Failed to update notifications", "danger");
     } finally {
       setSaving(false);
     }
@@ -126,10 +130,10 @@ function NotificationsPage() {
       setSaving(true);
       await updateNotificationsConfig({ event_filters: selectedEvents });
       setConfig({ ...config, event_filters: selectedEvents });
-      showAlert('Event filters updated', 'success');
+      showAlert("Event filters updated", "success");
     } catch (error) {
-      console.error('Failed to update event filters:', error);
-      showAlert('Failed to update event filters', 'danger');
+      console.error("Failed to update event filters:", error);
+      showAlert("Failed to update event filters", "danger");
     } finally {
       setSaving(false);
     }
@@ -138,7 +142,7 @@ function NotificationsPage() {
   const handleEventFilterToggle = (eventType) => {
     const current = config.event_filters || [];
     const updated = current.includes(eventType)
-      ? current.filter(e => e !== eventType)
+      ? current.filter((e) => e !== eventType)
       : [...current, eventType];
     handleEventFiltersChange(updated);
   };
@@ -150,21 +154,21 @@ function NotificationsPage() {
     } else {
       setEditingService(null);
       setFormData({
-        name: '',
-        type: 'webhook',
+        name: "",
+        type: "webhook",
         enabled: true,
-        url: '',
+        url: "",
         headers: {},
-        username: '',
-        password: '',
-        bot_token: '',
-        chat_id: '',
-        topic: '',
-        server_url: '',
-        access_token: '',
-        app_token: '',
-        user_key: '',
-        api_token: ''
+        username: "",
+        password: "",
+        bot_token: "",
+        chat_id: "",
+        topic: "",
+        server_url: "",
+        access_token: "",
+        app_token: "",
+        user_key: "",
+        api_token: "",
       });
     }
     setShowModal(true);
@@ -183,45 +187,53 @@ function NotificationsPage() {
       const cleanedData = {
         name: formData.name,
         type: formData.type,
-        enabled: formData.enabled
+        enabled: formData.enabled,
       };
 
       // Add type-specific fields
-      if (['webhook', 'discord', 'slack'].includes(formData.type) && formData.url) {
+      if (
+        ["webhook", "discord", "slack"].includes(formData.type) &&
+        formData.url
+      ) {
         cleanedData.url = formData.url;
       }
-      if (formData.type === 'webhook' && formData.headers && Object.keys(formData.headers).length > 0) {
+      if (
+        formData.type === "webhook" &&
+        formData.headers &&
+        Object.keys(formData.headers).length > 0
+      ) {
         cleanedData.headers = formData.headers;
       }
-      if (formData.type === 'discord' && formData.username) {
+      if (formData.type === "discord" && formData.username) {
         cleanedData.username = formData.username;
       }
-      if (formData.type === 'telegram') {
+      if (formData.type === "telegram") {
         if (formData.bot_token) cleanedData.bot_token = formData.bot_token;
         if (formData.chat_id) cleanedData.chat_id = formData.chat_id;
       }
-      if (formData.type === 'ntfy') {
+      if (formData.type === "ntfy") {
         if (formData.topic) cleanedData.topic = formData.topic;
         if (formData.server_url) cleanedData.server_url = formData.server_url;
         if (formData.username) cleanedData.username = formData.username;
         if (formData.password) cleanedData.password = formData.password;
-        if (formData.access_token) cleanedData.access_token = formData.access_token;
+        if (formData.access_token)
+          cleanedData.access_token = formData.access_token;
       }
-      if (formData.type === 'gotify') {
+      if (formData.type === "gotify") {
         if (formData.server_url) cleanedData.server_url = formData.server_url;
         if (formData.app_token) cleanedData.app_token = formData.app_token;
       }
-      if (formData.type === 'pushover') {
+      if (formData.type === "pushover") {
         if (formData.user_key) cleanedData.user_key = formData.user_key;
         if (formData.api_token) cleanedData.api_token = formData.api_token;
       }
 
       if (editingService) {
         await updateNotificationService(editingService.name, cleanedData);
-        showAlert('Notification service updated successfully', 'success');
+        showAlert("Notification service updated successfully", "success");
       } else {
         await addNotificationService(cleanedData);
-        showAlert('Notification service added successfully', 'success');
+        showAlert("Notification service added successfully", "success");
       }
 
       await fetchConfig();
@@ -229,26 +241,37 @@ function NotificationsPage() {
     } catch (error) {
       // Log the message and status only: the full Axios error carries the request body, which
       // can include credentials such as the ntfy access token.
-      console.error('Failed to save service:', error.message, error.response?.status);
-      showAlert(error.response?.data?.detail || 'Failed to save notification service', 'danger');
+      console.error(
+        "Failed to save service:",
+        error.message,
+        error.response?.status,
+      );
+      showAlert(
+        error.response?.data?.detail || "Failed to save notification service",
+        "danger",
+      );
     } finally {
       setSaving(false);
     }
   };
 
   const handleDeleteService = async (serviceName) => {
-    if (!window.confirm(`Are you sure you want to delete the service "${serviceName}"?`)) {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete the service "${serviceName}"?`,
+      )
+    ) {
       return;
     }
 
     try {
       setSaving(true);
       await deleteNotificationService(serviceName);
-      showAlert('Notification service deleted successfully', 'success');
+      showAlert("Notification service deleted successfully", "success");
       await fetchConfig();
     } catch (error) {
-      console.error('Failed to delete service:', error);
-      showAlert('Failed to delete notification service', 'danger');
+      console.error("Failed to delete service:", error);
+      showAlert("Failed to delete notification service", "danger");
     } finally {
       setSaving(false);
     }
@@ -258,10 +281,13 @@ function NotificationsPage() {
     try {
       setTestingService(serviceName);
       await testNotificationService(serviceName);
-      showAlert(`Test notification sent to "${serviceName}"`, 'success');
+      showAlert(`Test notification sent to "${serviceName}"`, "success");
     } catch (error) {
-      console.error('Failed to test service:', error);
-      showAlert(error.response?.data?.detail || 'Failed to send test notification', 'danger');
+      console.error("Failed to test service:", error);
+      showAlert(
+        error.response?.data?.detail || "Failed to send test notification",
+        "danger",
+      );
     } finally {
       setTestingService(null);
     }
@@ -269,15 +295,17 @@ function NotificationsPage() {
 
   const renderServiceFields = () => {
     switch (formData.type) {
-      case 'webhook':
+      case "webhook":
         return (
           <>
             <Form.Group className="mb-3">
               <Form.Label>Webhook URL *</Form.Label>
               <Form.Control
                 type="url"
-                value={formData.url || ''}
-                onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                value={formData.url || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, url: e.target.value })
+                }
                 placeholder="https://example.com/webhook"
                 required
               />
@@ -285,15 +313,17 @@ function NotificationsPage() {
           </>
         );
 
-      case 'discord':
+      case "discord":
         return (
           <>
             <Form.Group className="mb-3">
               <Form.Label>Discord Webhook URL *</Form.Label>
               <Form.Control
                 type="url"
-                value={formData.url || ''}
-                onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                value={formData.url || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, url: e.target.value })
+                }
                 placeholder="https://discord.com/api/webhooks/..."
                 required
               />
@@ -302,37 +332,43 @@ function NotificationsPage() {
               <Form.Label>Username (optional)</Form.Label>
               <Form.Control
                 type="text"
-                value={formData.username || ''}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                value={formData.username || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, username: e.target.value })
+                }
                 placeholder="Docker Auto-Heal"
               />
             </Form.Group>
           </>
         );
 
-      case 'slack':
+      case "slack":
         return (
           <Form.Group className="mb-3">
             <Form.Label>Slack Webhook URL *</Form.Label>
             <Form.Control
               type="url"
-              value={formData.url || ''}
-              onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+              value={formData.url || ""}
+              onChange={(e) =>
+                setFormData({ ...formData, url: e.target.value })
+              }
               placeholder="https://hooks.slack.com/services/..."
               required
             />
           </Form.Group>
         );
 
-      case 'telegram':
+      case "telegram":
         return (
           <>
             <Form.Group className="mb-3">
               <Form.Label>Bot Token *</Form.Label>
               <Form.Control
                 type="text"
-                value={formData.bot_token || ''}
-                onChange={(e) => setFormData({ ...formData, bot_token: e.target.value })}
+                value={formData.bot_token || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, bot_token: e.target.value })
+                }
                 placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
                 required
               />
@@ -341,8 +377,10 @@ function NotificationsPage() {
               <Form.Label>Chat ID *</Form.Label>
               <Form.Control
                 type="text"
-                value={formData.chat_id || ''}
-                onChange={(e) => setFormData({ ...formData, chat_id: e.target.value })}
+                value={formData.chat_id || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, chat_id: e.target.value })
+                }
                 placeholder="-1001234567890"
                 required
               />
@@ -350,15 +388,17 @@ function NotificationsPage() {
           </>
         );
 
-      case 'ntfy':
+      case "ntfy":
         return (
           <>
             <Form.Group className="mb-3">
               <Form.Label>Topic *</Form.Label>
               <Form.Control
                 type="text"
-                value={formData.topic || ''}
-                onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
+                value={formData.topic || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, topic: e.target.value })
+                }
                 placeholder="docker-autoheal"
                 required
               />
@@ -367,8 +407,10 @@ function NotificationsPage() {
               <Form.Label>Server URL (optional)</Form.Label>
               <Form.Control
                 type="url"
-                value={formData.server_url || ''}
-                onChange={(e) => setFormData({ ...formData, server_url: e.target.value })}
+                value={formData.server_url || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, server_url: e.target.value })
+                }
                 placeholder="https://ntfy.sh (default)"
               />
             </Form.Group>
@@ -376,40 +418,50 @@ function NotificationsPage() {
               <Form.Label>Username (optional)</Form.Label>
               <Form.Control
                 type="text"
-                value={formData.username || ''}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                value={formData.username || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, username: e.target.value })
+                }
               />
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Password (optional)</Form.Label>
               <Form.Control
                 type="password"
-                value={formData.password || ''}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                value={formData.password || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, password: e.target.value })
+                }
               />
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Access token (optional)</Form.Label>
               <Form.Control
                 type="password"
-                value={formData.access_token || ''}
-                onChange={(e) => setFormData({ ...formData, access_token: e.target.value })}
+                value={formData.access_token || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, access_token: e.target.value })
+                }
                 placeholder="tk_..."
               />
-              <Form.Text muted>Takes precedence over username/password.</Form.Text>
+              <Form.Text muted>
+                Takes precedence over username/password.
+              </Form.Text>
             </Form.Group>
           </>
         );
 
-      case 'gotify':
+      case "gotify":
         return (
           <>
             <Form.Group className="mb-3">
               <Form.Label>Server URL *</Form.Label>
               <Form.Control
                 type="url"
-                value={formData.server_url || ''}
-                onChange={(e) => setFormData({ ...formData, server_url: e.target.value })}
+                value={formData.server_url || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, server_url: e.target.value })
+                }
                 placeholder="https://gotify.example.com"
                 required
               />
@@ -418,8 +470,10 @@ function NotificationsPage() {
               <Form.Label>App Token *</Form.Label>
               <Form.Control
                 type="text"
-                value={formData.app_token || ''}
-                onChange={(e) => setFormData({ ...formData, app_token: e.target.value })}
+                value={formData.app_token || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, app_token: e.target.value })
+                }
                 placeholder="AaBbCcDdEeFf"
                 required
               />
@@ -427,15 +481,17 @@ function NotificationsPage() {
           </>
         );
 
-      case 'pushover':
+      case "pushover":
         return (
           <>
             <Form.Group className="mb-3">
               <Form.Label>User Key *</Form.Label>
               <Form.Control
                 type="text"
-                value={formData.user_key || ''}
-                onChange={(e) => setFormData({ ...formData, user_key: e.target.value })}
+                value={formData.user_key || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, user_key: e.target.value })
+                }
                 placeholder="uQiRzpo4DXghDmr9QzzfQu27cmVRsG"
                 required
               />
@@ -444,8 +500,10 @@ function NotificationsPage() {
               <Form.Label>API Token *</Form.Label>
               <Form.Control
                 type="text"
-                value={formData.api_token || ''}
-                onChange={(e) => setFormData({ ...formData, api_token: e.target.value })}
+                value={formData.api_token || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, api_token: e.target.value })
+                }
                 placeholder="azGDORePK8gMaC0QOYAMyEEuzJnyUi"
                 required
               />
@@ -473,7 +531,8 @@ function NotificationsPage() {
         <Col>
           <h2>Notifications</h2>
           <p className="text-muted">
-            Configure notification services to receive alerts for container events
+            Configure notification services to receive alerts for container
+            events
           </p>
         </Col>
       </Row>
@@ -497,7 +556,9 @@ function NotificationsPage() {
                 <div>
                   <h5>Notification System</h5>
                   <p className="text-muted mb-0">
-                    {config?.enabled ? 'Notifications are enabled' : 'Notifications are disabled'}
+                    {config?.enabled
+                      ? "Notifications are enabled"
+                      : "Notifications are disabled"}
                   </p>
                 </div>
                 <Form.Check
@@ -505,7 +566,7 @@ function NotificationsPage() {
                   checked={config?.enabled || false}
                   onChange={(e) => handleToggleNotifications(e.target.checked)}
                   disabled={saving}
-                  label={config?.enabled ? 'Enabled' : 'Disabled'}
+                  label={config?.enabled ? "Enabled" : "Disabled"}
                 />
               </div>
             </Card.Body>
@@ -520,21 +581,32 @@ function NotificationsPage() {
               <h5 className="mb-0">Event Filters</h5>
             </Card.Header>
             <Card.Body>
-              <p className="text-muted">Select which event types should trigger notifications</p>
+              <p className="text-muted">
+                Select which event types should trigger notifications
+              </p>
               <div className="d-flex flex-wrap gap-2">
                 {EVENT_TYPES.map((eventType) => (
                   <Badge
                     key={eventType.value}
-                    bg={config?.event_filters?.includes(eventType.value) ? 'primary' : 'secondary'}
-                    style={{ cursor: 'pointer', fontSize: '0.9rem', padding: '0.5rem 1rem' }}
+                    bg={
+                      config?.event_filters?.includes(eventType.value)
+                        ? "primary"
+                        : "secondary"
+                    }
+                    style={{
+                      cursor: "pointer",
+                      fontSize: "0.9rem",
+                      padding: "0.5rem 1rem",
+                    }}
                     onClick={() => handleEventFilterToggle(eventType.value)}
                   >
                     {eventType.label}
-                    {config?.event_filters?.includes(eventType.value) && ' ✓'}
+                    {config?.event_filters?.includes(eventType.value) && " ✓"}
                   </Badge>
                 ))}
               </div>
-              {(!config?.event_filters || config.event_filters.length === 0) && (
+              {(!config?.event_filters ||
+                config.event_filters.length === 0) && (
                 <Alert variant="info" className="mt-3 mb-0">
                   No filters selected - all events will trigger notifications
                 </Alert>
@@ -549,14 +621,19 @@ function NotificationsPage() {
           <Card>
             <Card.Header className="d-flex justify-content-between align-items-center">
               <h5 className="mb-0">Notification Services</h5>
-              <Button variant="primary" size="sm" onClick={() => handleOpenModal()}>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => handleOpenModal()}
+              >
                 + Add Service
               </Button>
             </Card.Header>
             <Card.Body>
               {config?.services?.length === 0 ? (
                 <Alert variant="info" className="mb-0">
-                  No notification services configured. Click &quot;Add Service&quot; to get started.
+                  No notification services configured. Click &quot;Add
+                  Service&quot; to get started.
                 </Alert>
               ) : (
                 <Table responsive striped hover>
@@ -574,12 +651,13 @@ function NotificationsPage() {
                         <td>{service.name}</td>
                         <td>
                           <Badge bg="info">
-                            {serviceTypes.find(t => t.value === service.type)?.label || service.type}
+                            {serviceTypes.find((t) => t.value === service.type)
+                              ?.label || service.type}
                           </Badge>
                         </td>
                         <td>
-                          <Badge bg={service.enabled ? 'success' : 'secondary'}>
-                            {service.enabled ? 'Enabled' : 'Disabled'}
+                          <Badge bg={service.enabled ? "success" : "secondary"}>
+                            {service.enabled ? "Enabled" : "Disabled"}
                           </Badge>
                         </td>
                         <td>
@@ -588,15 +666,22 @@ function NotificationsPage() {
                             size="sm"
                             className="me-2"
                             onClick={() => handleTestService(service.name)}
-                            disabled={testingService === service.name || !service.enabled}
+                            disabled={
+                              testingService === service.name ||
+                              !service.enabled
+                            }
                           >
                             {testingService === service.name ? (
                               <>
-                                <Spinner animation="border" size="sm" className="me-1" />
+                                <Spinner
+                                  animation="border"
+                                  size="sm"
+                                  className="me-1"
+                                />
                                 Testing...
                               </>
                             ) : (
-                              'Test'
+                              "Test"
                             )}
                           </Button>
                           <Button
@@ -629,7 +714,9 @@ function NotificationsPage() {
       <Modal show={showModal} onHide={handleCloseModal} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>
-            {editingService ? 'Edit Notification Service' : 'Add Notification Service'}
+            {editingService
+              ? "Edit Notification Service"
+              : "Add Notification Service"}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
@@ -639,7 +726,9 @@ function NotificationsPage() {
               <Form.Control
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
                 placeholder="My Discord Server"
                 required
                 disabled={!!editingService}
@@ -653,7 +742,9 @@ function NotificationsPage() {
               <Form.Label>Service Type *</Form.Label>
               <Form.Select
                 value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, type: e.target.value })
+                }
                 disabled={!!editingService}
               >
                 {serviceTypes.map((type) => (
@@ -669,7 +760,9 @@ function NotificationsPage() {
                 type="switch"
                 label="Enabled"
                 checked={formData.enabled}
-                onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
+                onChange={(e) =>
+                  setFormData({ ...formData, enabled: e.target.checked })
+                }
               />
             </Form.Group>
 
@@ -692,8 +785,10 @@ function NotificationsPage() {
                 <Spinner animation="border" size="sm" className="me-2" />
                 Saving...
               </>
+            ) : editingService ? (
+              "Update Service"
             ) : (
-              editingService ? 'Update Service' : 'Add Service'
+              "Add Service"
             )}
           </Button>
         </Modal.Footer>
@@ -703,4 +798,3 @@ function NotificationsPage() {
 }
 
 export default NotificationsPage;
-

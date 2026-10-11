@@ -1,4 +1,4 @@
-import { Card, Form, Button } from 'react-bootstrap';
+import { Card, Form, Button } from "react-bootstrap";
 
 /**
  * ObservabilitySettings Component
@@ -13,7 +13,7 @@ function ObservabilitySettings({ config, onConfigChange, onSubmit }) {
   const handleChange = (field, value) => {
     onConfigChange({
       ...config,
-      [field]: value
+      [field]: value,
     });
   };
 
@@ -36,7 +36,7 @@ function ObservabilitySettings({ config, onConfigChange, onSubmit }) {
             <Form.Label>Log Level</Form.Label>
             <Form.Select
               value={config.log_level}
-              onChange={(e) => handleChange('log_level', e.target.value)}
+              onChange={(e) => handleChange("log_level", e.target.value)}
             >
               <option value="DEBUG">DEBUG (Most verbose)</option>
               <option value="INFO">INFO (Recommended)</option>
@@ -44,7 +44,10 @@ function ObservabilitySettings({ config, onConfigChange, onSubmit }) {
               <option value="ERROR">ERROR</option>
               <option value="CRITICAL">CRITICAL (Least verbose)</option>
             </Form.Select>
-            <Form.Text>Controls logging verbosity. DEBUG shows all logs, CRITICAL shows only critical errors.</Form.Text>
+            <Form.Text>
+              Controls logging verbosity. DEBUG shows all logs, CRITICAL shows
+              only critical errors.
+            </Form.Text>
           </Form.Group>
 
           <Form.Group className="mb-3">
@@ -52,9 +55,13 @@ function ObservabilitySettings({ config, onConfigChange, onSubmit }) {
               type="checkbox"
               label="Enable Prometheus Metrics"
               checked={config.prometheus_enabled}
-              onChange={(e) => handleChange('prometheus_enabled', e.target.checked)}
+              onChange={(e) =>
+                handleChange("prometheus_enabled", e.target.checked)
+              }
             />
-            <Form.Text className="d-block">Export metrics on port 9090</Form.Text>
+            <Form.Text className="d-block">
+              Export metrics on port 9090
+            </Form.Text>
           </Form.Group>
 
           <Button type="submit" variant="primary">
@@ -68,4 +75,3 @@ function ObservabilitySettings({ config, onConfigChange, onSubmit }) {
 }
 
 export default ObservabilitySettings;
-

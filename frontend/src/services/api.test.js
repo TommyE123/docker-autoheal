@@ -39,7 +39,9 @@ describe("api service", () => {
 
   it("requests events with only the limit by default", () => {
     api.getEvents();
-    expect(mockInstance.get).toHaveBeenCalledWith("/events", { params: { limit: 50 } });
+    expect(mockInstance.get).toHaveBeenCalledWith("/events", {
+      params: { limit: 50 },
+    });
   });
 
   it("passes event_type and container, omitting empty values", () => {
@@ -49,7 +51,9 @@ describe("api service", () => {
     });
 
     api.getEvents(100, { eventType: "", container: "" });
-    expect(mockInstance.get).toHaveBeenLastCalledWith("/events", { params: { limit: 100 } });
+    expect(mockInstance.get).toHaveBeenLastCalledWith("/events", {
+      params: { limit: 100 },
+    });
   });
 
   it("requests containers including stopped ones when asked", () => {
