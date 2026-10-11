@@ -32,7 +32,8 @@ class TestInitDefaults:
 
     def test_initialize_creates_all_files(self):
         """Test that initialize_defaults creates all required files"""
-        initialize_defaults(self.temp_dir)
+        result = initialize_defaults(self.temp_dir)
+        assert result == self.temp_dir
 
         # Check all files were created
         assert (self.temp_dir / "config.json").exists()
