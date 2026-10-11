@@ -6,18 +6,23 @@ normalization, since a wrong auto-mapping could cause AutoHeal to act on
 the wrong container.
 """
 
-from app.uptime_kuma.matching import match_uptime_kuma_monitors, normalize_name
+from app.uptime_kuma.matching import (
+    ContainerNameInfo,
+    MonitorInfo,
+    match_uptime_kuma_monitors,
+    normalize_name,
+)
 from app.uptime_kuma.uptime_kuma_client import UptimeKumaClient
 
 
-def _container(stable_id, name, compose_service=None):
-    info = {"stable_id": stable_id, "name": name}
+def _container(stable_id: str, name: str, compose_service: str | None = None) -> ContainerNameInfo:
+    info: ContainerNameInfo = {"stable_id": stable_id, "name": name}
     if compose_service is not None:
         info["compose_service"] = compose_service
     return info
 
 
-def _monitor(friendly_name):
+def _monitor(friendly_name: str) -> MonitorInfo:
     return {"friendly_name": friendly_name}
 
 
