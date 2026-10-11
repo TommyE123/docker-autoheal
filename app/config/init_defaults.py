@@ -114,12 +114,16 @@ def init_data_file(file_path: Path, default_data: Any, description: str) -> bool
         return False
 
 
-def initialize_defaults(data_dir: Path = Path("/data")) -> None:
+def initialize_defaults(data_dir: Path = Path("/data")) -> Path:
     """
-    Initialize all default data files if they don't exist
+    Initialize all default data files if they don't exist.
 
     Args:
-        data_dir: Base data directory (default: /data)
+        data_dir: Base data directory (default: /data).
+
+    Returns:
+        The effective data directory used for initialization, including the
+        fallback directory if the requested directory could not be created.
     """
     logger.info("Initializing default data files...")
 
