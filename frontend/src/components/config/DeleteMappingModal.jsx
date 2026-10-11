@@ -1,4 +1,4 @@
-import { Modal, Button } from 'react-bootstrap';
+import { Modal, Button } from "react-bootstrap";
 
 /**
  * DeleteMappingModal Component
@@ -34,7 +34,8 @@ function DeleteMappingModal({ show, containerName, onHide, onConfirm }) {
         </div>
         <p className="text-muted small mb-0">
           <i className="bi bi-info-circle me-1"></i>
-          The container will no longer be automatically restarted based on the Uptime-Kuma monitor status.
+          The container will no longer be automatically restarted based on the
+          Uptime-Kuma monitor status.
         </p>
       </Modal.Body>
       <Modal.Footer>
@@ -52,4 +53,3 @@ function DeleteMappingModal({ show, containerName, onHide, onConfirm }) {
 }
 
 export default DeleteMappingModal;
-

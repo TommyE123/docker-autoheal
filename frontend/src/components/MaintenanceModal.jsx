@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { Modal, Button } from 'react-bootstrap';
+import { useEffect, useState } from "react";
+import { Modal, Button } from "react-bootstrap";
 
 function MaintenanceModal({ show, startTime, onDismiss }) {
-  const [elapsedTime, setElapsedTime] = useState('00:00:00');
+  const [elapsedTime, setElapsedTime] = useState("00:00:00");
 
   useEffect(() => {
     if (!show || !startTime) return;
@@ -17,7 +17,7 @@ function MaintenanceModal({ show, startTime, onDismiss }) {
       const seconds = diff % 60;
 
       setElapsedTime(
-        `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+        `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
       );
     };
 
@@ -44,7 +44,10 @@ function MaintenanceModal({ show, startTime, onDismiss }) {
       </Modal.Header>
       <Modal.Body className="text-center py-5">
         <div className="mb-4">
-          <i className="bi bi-exclamation-triangle-fill text-warning" style={{ fontSize: '4rem' }}></i>
+          <i
+            className="bi bi-exclamation-triangle-fill text-warning"
+            style={{ fontSize: "4rem" }}
+          ></i>
         </div>
         <h4 className="mb-3">Auto-Healing Suspended</h4>
         <p className="text-muted mb-4">
@@ -75,4 +78,3 @@ function MaintenanceModal({ show, startTime, onDismiss }) {
 }
 
 export default MaintenanceModal;
-

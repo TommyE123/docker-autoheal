@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within, waitFor, fireEvent, act } from "@testing-library/react";
+import {
+  render,
+  screen,
+  within,
+  waitFor,
+  fireEvent,
+  act,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../services/api", () => ({
@@ -68,13 +75,23 @@ const kumaEnabledConfig = {
 const containers = [{ id: "abc123", name: "web-app", status: "running" }];
 const monitors = [{ friendly_name: "web-monitor", status: 1 }];
 const mappings = [
-  { container_id: "abc123", monitor_friendly_name: "web-monitor", auto_mapped: false },
+  {
+    container_id: "abc123",
+    monitor_friendly_name: "web-monitor",
+    auto_mapped: false,
+  },
 ];
 
-function mockKumaGets({ monitors: m = [], mappings: mp = [], containers: c = [] } = {}) {
+function mockKumaGets({
+  monitors: m = [],
+  mappings: mp = [],
+  containers: c = [],
+} = {}) {
   api.get.mockImplementation((url) => {
-    if (url === "/uptime-kuma/monitors") return Promise.resolve({ data: { monitors: m } });
-    if (url === "/uptime-kuma/mappings") return Promise.resolve({ data: { mappings: mp } });
+    if (url === "/uptime-kuma/monitors")
+      return Promise.resolve({ data: { monitors: m } });
+    if (url === "/uptime-kuma/mappings")
+      return Promise.resolve({ data: { mappings: mp } });
     if (url === "/containers") return Promise.resolve({ data: c });
     return Promise.reject(new Error(`Unexpected GET ${url}`));
   });
@@ -152,7 +169,9 @@ describe("ConfigPage", () => {
     });
 
     it("keeps the page usable and logs an error when the Uptime Kuma data fails to load", async () => {
-      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       try {
         getConfig.mockResolvedValue({ data: kumaEnabledConfig });
         api.get.mockRejectedValue(new Error("kuma down"));
@@ -174,8 +193,10 @@ describe("ConfigPage", () => {
     it("renders the Uptime Kuma section when its endpoints return empty payloads", async () => {
       getConfig.mockResolvedValue({ data: kumaEnabledConfig });
       api.get.mockImplementation((url) => {
-        if (url === "/uptime-kuma/monitors") return Promise.resolve({ data: {} });
-        if (url === "/uptime-kuma/mappings") return Promise.resolve({ data: {} });
+        if (url === "/uptime-kuma/monitors")
+          return Promise.resolve({ data: {} });
+        if (url === "/uptime-kuma/mappings")
+          return Promise.resolve({ data: {} });
         if (url === "/containers") return Promise.resolve({ data: null });
         return Promise.reject(new Error(`Unexpected GET ${url}`));
       });
@@ -224,9 +245,14 @@ describe("ConfigPage", () => {
 
       const interval = screen.getAllByRole("spinbutton")[0];
       fireEvent.change(interval, { target: { value: "45" } });
-      await user.click(screen.getByRole("button", { name: /save monitor settings/i }));
+      await user.click(
+        screen.getByRole("button", { name: /save monitor settings/i }),
+      );
 
-      await waitForCalled(updateMonitorConfig, { ...config.monitor, interval_seconds: 45 });
+      await waitForCalled(updateMonitorConfig, {
+        ...config.monitor,
+        interval_seconds: 45,
+      });
     });
 
     it("saves the edited restart mode", async () => {
@@ -238,9 +264,14 @@ describe("ConfigPage", () => {
       await screen.findByText("Restart Policy");
 
       await user.selectOptions(screen.getAllByRole("combobox")[0], "health");
-      await user.click(screen.getByRole("button", { name: /save restart policy/i }));
+      await user.click(
+        screen.getByRole("button", { name: /save restart policy/i }),
+      );
 
-      await waitForCalled(updateRestartConfig, { ...config.restart, mode: "health" });
+      await waitForCalled(updateRestartConfig, {
+        ...config.restart,
+        mode: "health",
+      });
     });
 
     it("saves the edited observability settings", async () => {
@@ -252,8 +283,15 @@ describe("ConfigPage", () => {
       await screen.findByText(/configuration export\/import/i);
 
       await user.selectOptions(screen.getAllByRole("combobox")[1], "DEBUG");
-      await user.click(screen.getByText(/enable prometheus metrics/i).closest(".form-check").querySelector("input"));
-      await user.click(screen.getByRole("button", { name: /save observability settings/i }));
+      await user.click(
+        screen
+          .getByText(/enable prometheus metrics/i)
+          .closest(".form-check")
+          .querySelector("input"),
+      );
+      await user.click(
+        screen.getByRole("button", { name: /save observability settings/i }),
+      );
 
       await waitForCalled(updateObservabilityConfig, {
         ...config.observability,
@@ -272,7 +310,9 @@ describe("ConfigPage", () => {
 
       await user.clear(url);
       await user.type(url, "http://other.local");
-      await user.click(screen.getByRole("button", { name: /test connection/i }));
+      await user.click(
+        screen.getByRole("button", { name: /test connection/i }),
+      );
 
       await waitFor(() =>
         expect(api.post).toHaveBeenCalledWith(
@@ -336,7 +376,9 @@ describe("ConfigPage", () => {
       );
 
       expect(
-        await screen.findByText(/settings saved successfully! log level changed to info/i),
+        await screen.findByText(
+          /settings saved successfully! log level changed to info/i,
+        ),
       ).toBeInTheDocument();
       await waitForCalledTimes(getConfig, 2);
     });
@@ -354,7 +396,9 @@ describe("ConfigPage", () => {
       );
 
       expect(
-        await screen.findByText(/failed to update observability settings\. please try again\./i),
+        await screen.findByText(
+          /failed to update observability settings\. please try again\./i,
+        ),
       ).toBeInTheDocument();
     });
   });
@@ -402,7 +446,9 @@ describe("ConfigPage", () => {
   });
 
   describe("configuration import", () => {
-    const importFile = new File(["{}"], "config.json", { type: "application/json" });
+    const importFile = new File(["{}"], "config.json", {
+      type: "application/json",
+    });
 
     it("shows a success alert and refreshes the configuration when import succeeds", async () => {
       const user = userEvent.setup();
@@ -447,26 +493,35 @@ describe("ConfigPage", () => {
       render(<ConfigPage />);
       await screen.findByRole("button", { name: /test connection/i });
 
-      await user.click(screen.getByRole("button", { name: /test connection/i }));
+      await user.click(
+        screen.getByRole("button", { name: /test connection/i }),
+      );
 
       expect(
         await screen.findByText(/connection successful! found 5 monitors\./i),
       ).toBeInTheDocument();
       expect(api.post).toHaveBeenCalledWith(
         "/uptime-kuma/test-connection",
-        expect.objectContaining({ server_url: "http://kuma.local", api_token: "tok123" }),
+        expect.objectContaining({
+          server_url: "http://kuma.local",
+          api_token: "tok123",
+        }),
       );
     });
 
     it("shows the server-reported message when the connection is rejected", async () => {
       const user = userEvent.setup();
       getConfig.mockResolvedValue({ data: kumaReadyConfig });
-      api.post.mockResolvedValue({ data: { success: false, message: "Invalid API key" } });
+      api.post.mockResolvedValue({
+        data: { success: false, message: "Invalid API key" },
+      });
 
       render(<ConfigPage />);
       await screen.findByRole("button", { name: /test connection/i });
 
-      await user.click(screen.getByRole("button", { name: /test connection/i }));
+      await user.click(
+        screen.getByRole("button", { name: /test connection/i }),
+      );
 
       expect(await screen.findByText(/invalid api key/i)).toBeInTheDocument();
     });
@@ -479,7 +534,9 @@ describe("ConfigPage", () => {
       render(<ConfigPage />);
       await screen.findByRole("button", { name: /test connection/i });
 
-      await user.click(screen.getByRole("button", { name: /test connection/i }));
+      await user.click(
+        screen.getByRole("button", { name: /test connection/i }),
+      );
 
       expect(
         await screen.findByText(/connection failed: network error/i),
@@ -505,13 +562,19 @@ describe("ConfigPage", () => {
 
       render(<ConfigPage />);
       await screen.findByRole("button", { name: /test connection/i });
-      await user.click(screen.getByRole("button", { name: /test connection/i }));
+      await user.click(
+        screen.getByRole("button", { name: /test connection/i }),
+      );
       await screen.findByRole("button", { name: /enable integration/i });
 
-      await user.click(screen.getByRole("button", { name: /enable integration/i }));
+      await user.click(
+        screen.getByRole("button", { name: /enable integration/i }),
+      );
 
       expect(
-        await screen.findByText(/integration enabled! 1 auto-mappings created\./i),
+        await screen.findByText(
+          /integration enabled! 1 auto-mappings created\./i,
+        ),
       ).toBeInTheDocument();
       await waitForCalledTimes(getConfig, 2);
     });
@@ -531,10 +594,14 @@ describe("ConfigPage", () => {
 
       render(<ConfigPage />);
       await screen.findByRole("button", { name: /test connection/i });
-      await user.click(screen.getByRole("button", { name: /test connection/i }));
+      await user.click(
+        screen.getByRole("button", { name: /test connection/i }),
+      );
       await screen.findByRole("button", { name: /enable integration/i });
 
-      await user.click(screen.getByRole("button", { name: /enable integration/i }));
+      await user.click(
+        screen.getByRole("button", { name: /enable integration/i }),
+      );
 
       expect(
         await screen.findByText(/failed to enable integration: server error/i),
@@ -551,7 +618,9 @@ describe("ConfigPage", () => {
       render(<ConfigPage />);
       await screen.findByText("Active");
 
-      await user.click(screen.getByRole("button", { name: /disable integration/i }));
+      await user.click(
+        screen.getByRole("button", { name: /disable integration/i }),
+      );
       const dialog = await screen.findByRole("dialog");
       await user.click(within(dialog).getByRole("button", { name: /cancel/i }));
 
@@ -570,9 +639,13 @@ describe("ConfigPage", () => {
       render(<ConfigPage />);
       await screen.findByText("Active");
 
-      await user.click(screen.getByRole("button", { name: /disable integration/i }));
+      await user.click(
+        screen.getByRole("button", { name: /disable integration/i }),
+      );
       const dialog = await screen.findByRole("dialog");
-      await user.click(within(dialog).getByRole("button", { name: /disable integration/i }));
+      await user.click(
+        within(dialog).getByRole("button", { name: /disable integration/i }),
+      );
 
       expect(
         await screen.findByText(/integration disabled successfully/i),
@@ -590,9 +663,13 @@ describe("ConfigPage", () => {
       render(<ConfigPage />);
       await screen.findByText("Active");
 
-      await user.click(screen.getByRole("button", { name: /disable integration/i }));
+      await user.click(
+        screen.getByRole("button", { name: /disable integration/i }),
+      );
       const dialog = await screen.findByRole("dialog");
-      await user.click(within(dialog).getByRole("button", { name: /disable integration/i }));
+      await user.click(
+        within(dialog).getByRole("button", { name: /disable integration/i }),
+      );
 
       expect(
         await screen.findByText(/failed to disable integration: server error/i),
@@ -613,10 +690,13 @@ describe("ConfigPage", () => {
       const mappingsCard = screen
         .getByText("Container-Monitor Mappings")
         .closest(".card");
-      const [containerSelect, monitorSelect] = within(mappingsCard).getAllByRole("combobox");
+      const [containerSelect, monitorSelect] =
+        within(mappingsCard).getAllByRole("combobox");
       await user.selectOptions(containerSelect, "abc123");
       await user.selectOptions(monitorSelect, "web-monitor");
-      await user.click(within(mappingsCard).getByRole("button", { name: /^add$/i }));
+      await user.click(
+        within(mappingsCard).getByRole("button", { name: /^add$/i }),
+      );
 
       expect(
         await screen.findByText(/mapping added successfully!/i),
@@ -639,10 +719,13 @@ describe("ConfigPage", () => {
       const mappingsCard = screen
         .getByText("Container-Monitor Mappings")
         .closest(".card");
-      const [containerSelect, monitorSelect] = within(mappingsCard).getAllByRole("combobox");
+      const [containerSelect, monitorSelect] =
+        within(mappingsCard).getAllByRole("combobox");
       await user.selectOptions(containerSelect, "abc123");
       await user.selectOptions(monitorSelect, "web-monitor");
-      await user.click(within(mappingsCard).getByRole("button", { name: /^add$/i }));
+      await user.click(
+        within(mappingsCard).getByRole("button", { name: /^add$/i }),
+      );
 
       expect(
         await screen.findByText(/failed to add mapping: server error/i),
@@ -678,7 +761,9 @@ describe("ConfigPage", () => {
 
       await user.click(screen.getByRole("button", { name: /^delete$/i }));
       const dialog = await screen.findByRole("dialog");
-      await user.click(within(dialog).getByRole("button", { name: /delete mapping/i }));
+      await user.click(
+        within(dialog).getByRole("button", { name: /delete mapping/i }),
+      );
 
       expect(await screen.findByText(/mapping deleted!/i)).toBeInTheDocument();
       expect(api.delete).toHaveBeenCalledWith("/uptime-kuma/mappings/abc123");
@@ -695,7 +780,9 @@ describe("ConfigPage", () => {
 
       await user.click(screen.getByRole("button", { name: /^delete$/i }));
       const dialog = await screen.findByRole("dialog");
-      await user.click(within(dialog).getByRole("button", { name: /delete mapping/i }));
+      await user.click(
+        within(dialog).getByRole("button", { name: /delete mapping/i }),
+      );
 
       expect(
         await screen.findByText(/failed to delete mapping: server error/i),

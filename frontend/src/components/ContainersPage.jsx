@@ -1,12 +1,21 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Card, Table, Button, Badge, Form, Spinner, Modal, Alert } from 'react-bootstrap';
+import { useState, useEffect, useCallback } from "react";
+import {
+  Card,
+  Table,
+  Button,
+  Badge,
+  Form,
+  Spinner,
+  Modal,
+  Alert,
+} from "react-bootstrap";
 import {
   getContainers,
   updateContainerSelection,
   restartContainer,
   unquarantineContainer,
-  getContainerDetails
-} from '../services/api';
+  getContainerDetails,
+} from "../services/api";
 
 function ContainersPage() {
   const [containers, setContainers] = useState([]);
@@ -15,7 +24,12 @@ function ContainersPage() {
   const [showModal, setShowModal] = useState(false);
   const [modalContainer, setModalContainer] = useState(null);
   const [alert, setAlert] = useState(null);
-  const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null });
+  const [confirmModal, setConfirmModal] = useState({
+    show: false,
+    title: "",
+    message: "",
+    onConfirm: null,
+  });
 
   const showAlert = useCallback((variant, message) => {
     setAlert({ variant, message });
@@ -27,7 +41,7 @@ function ContainersPage() {
       const response = await getContainers(true); // Include stopped containers
       setContainers(response.data);
     } catch {
-      showAlert('danger', 'Failed to load containers');
+      showAlert("danger", "Failed to load containers");
     } finally {
       setLoading(false);
     }
@@ -46,11 +60,11 @@ function ContainersPage() {
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [fetchContainers]);
 
@@ -62,11 +76,11 @@ function ContainersPage() {
     if (confirmModal.onConfirm) {
       confirmModal.onConfirm();
     }
-    setConfirmModal({ show: false, title: '', message: '', onConfirm: null });
+    setConfirmModal({ show: false, title: "", message: "", onConfirm: null });
   };
 
   const handleCancelConfirm = () => {
-    setConfirmModal({ show: false, title: '', message: '', onConfirm: null });
+    setConfirmModal({ show: false, title: "", message: "", onConfirm: null });
   };
 
   const toggleSelection = (containerId) => {
@@ -83,61 +97,70 @@ function ContainersPage() {
     if (selectedContainers.size === containers.length) {
       setSelectedContainers(new Set());
     } else {
-      setSelectedContainers(new Set(containers.map(c => c.id)));
+      setSelectedContainers(new Set(containers.map((c) => c.id)));
     }
   };
 
   const handleEnableAutoheal = async () => {
     try {
       await updateContainerSelection(Array.from(selectedContainers), true);
-      showAlert('success', `Enabled auto-heal for ${selectedContainers.size} container(s)`);
+      showAlert(
+        "success",
+        `Enabled auto-heal for ${selectedContainers.size} container(s)`,
+      );
       setSelectedContainers(new Set());
       fetchContainers();
     } catch {
-      showAlert('danger', 'Failed to enable auto-heal');
+      showAlert("danger", "Failed to enable auto-heal");
     }
   };
 
   const handleDisableAutoheal = async () => {
     try {
       await updateContainerSelection(Array.from(selectedContainers), false);
-      showAlert('success', `Disabled auto-heal for ${selectedContainers.size} container(s)`);
+      showAlert(
+        "success",
+        `Disabled auto-heal for ${selectedContainers.size} container(s)`,
+      );
       setSelectedContainers(new Set());
       fetchContainers();
     } catch {
-      showAlert('danger', 'Failed to disable auto-heal');
+      showAlert("danger", "Failed to disable auto-heal");
     }
   };
 
   const handleRestart = async (containerId, containerName) => {
     showConfirm(
-      'Restart Container',
+      "Restart Container",
       `Are you sure you want to restart container "${containerName}"?`,
       async () => {
         try {
           await restartContainer(containerId);
-          showAlert('success', `Container "${containerName}" restarted`);
+          showAlert("success", `Container "${containerName}" restarted`);
           fetchContainers();
         } catch {
-          showAlert('danger', 'Failed to restart container');
+          showAlert("danger", "Failed to restart container");
         }
-      }
+      },
     );
   };
 
   const handleUnquarantine = async (containerId, containerName) => {
     showConfirm(
-      'Remove from Quarantine',
+      "Remove from Quarantine",
       `Are you sure you want to remove "${containerName}" from quarantine?`,
       async () => {
         try {
           await unquarantineContainer(containerId);
-          showAlert('success', `Container "${containerName}" removed from quarantine`);
+          showAlert(
+            "success",
+            `Container "${containerName}" removed from quarantine`,
+          );
           fetchContainers();
         } catch {
-          showAlert('danger', 'Failed to unquarantine container');
+          showAlert("danger", "Failed to unquarantine container");
         }
-      }
+      },
     );
   };
 
@@ -147,61 +170,69 @@ function ContainersPage() {
       setModalContainer(response.data);
       setShowModal(true);
     } catch {
-      showAlert('danger', 'Failed to load container details');
+      showAlert("danger", "Failed to load container details");
     }
   };
 
   const getStatusBadge = (status) => {
     const variants = {
-      running: 'success',
-      exited: 'danger',
-      paused: 'warning',
-      restarting: 'info'
+      running: "success",
+      exited: "danger",
+      paused: "warning",
+      restarting: "info",
     };
-    return <Badge bg={variants[status] || 'secondary'}>{status}</Badge>;
+    return <Badge bg={variants[status] || "secondary"}>{status}</Badge>;
   };
 
   const getHealthBadge = (health) => {
     if (!health) return <span className="text-muted">N/A</span>;
 
     const variants = {
-      healthy: 'success',
-      unhealthy: 'danger',
-      starting: 'warning'
+      healthy: "success",
+      unhealthy: "danger",
+      starting: "warning",
     };
-    return <Badge bg={variants[health.status] || 'secondary'}>{health.status}</Badge>;
+    return (
+      <Badge bg={variants[health.status] || "secondary"}>{health.status}</Badge>
+    );
   };
 
   const getUptimeKumaStatusBadge = (container) => {
     // Status codes: 0=down, 1=up, 2=pending, 3=maintenance
     const statusConfig = {
-      0: { variant: 'danger', icon: 'bi-x-circle-fill', text: 'Down' },
-      1: { variant: 'success', icon: 'bi-check-circle-fill', text: 'Up' },
-      2: { variant: 'warning', icon: 'bi-clock-fill', text: 'Pending' },
-      3: { variant: 'info', icon: 'bi-tools', text: 'Maintenance' },
-      4: { variant: 'secondary', icon: 'bi-link-45deg', text: 'Not Mapped' },
-      5: { variant: 'dark', icon: 'bi-slash-circle', text: 'Disabled' },
-      6: { variant: 'secondary', icon: 'bi-question-circle', text: 'Unknown' }
+      0: { variant: "danger", icon: "bi-x-circle-fill", text: "Down" },
+      1: { variant: "success", icon: "bi-check-circle-fill", text: "Up" },
+      2: { variant: "warning", icon: "bi-clock-fill", text: "Pending" },
+      3: { variant: "info", icon: "bi-tools", text: "Maintenance" },
+      4: { variant: "secondary", icon: "bi-link-45deg", text: "Not Mapped" },
+      5: { variant: "dark", icon: "bi-slash-circle", text: "Disabled" },
+      6: { variant: "secondary", icon: "bi-question-circle", text: "Unknown" },
     };
 
     var config = statusConfig[container.uptime_kuma_status] || {
-      variant: 'secondary',
-      icon: 'bi-question-circle',
-      text: 'Unknown'
+      variant: "secondary",
+      icon: "bi-question-circle",
+      text: "Unknown",
     };
 
     // If uptime kuma status is null or undefined, check if it's because it's not enabled or not mapped
-    if (container.uptime_kuma_status === null || container.uptime_kuma_status === undefined) {
+    if (
+      container.uptime_kuma_status === null ||
+      container.uptime_kuma_status === undefined
+    ) {
       if (!container.uptime_kuma_monitor_name) {
-          config = statusConfig[4]; // Not Mapped
+        config = statusConfig[4]; // Not Mapped
       } else if (container.uptime_kuma_monitor_name !== null) {
         // Mapped but status unavailable
-        config = statusConfig[6];  // unavailable
+        config = statusConfig[6]; // unavailable
       }
     }
 
     return (
-      <Badge bg={config.variant} title={container.uptime_kuma_monitor_name || ''}>
+      <Badge
+        bg={config.variant}
+        title={container.uptime_kuma_monitor_name || ""}
+      >
         {config.text}
       </Badge>
     );
@@ -219,7 +250,12 @@ function ContainersPage() {
   return (
     <>
       {alert && (
-        <Alert variant={alert.variant} dismissible className="alert-floating" onClose={() => setAlert(null)}>
+        <Alert
+          variant={alert.variant}
+          dismissible
+          className="alert-floating"
+          onClose={() => setAlert(null)}
+        >
           {alert.message}
         </Alert>
       )}
@@ -231,7 +267,12 @@ function ContainersPage() {
             Containers
           </h5>
           <div>
-            <Button variant="primary" size="sm" onClick={fetchContainers} className="me-2">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={fetchContainers}
+              className="me-2"
+            >
               <i className="bi bi-arrow-clockwise me-1"></i>
               Refresh
             </Button>
@@ -261,10 +302,13 @@ function ContainersPage() {
           <Table responsive hover className="mb-0">
             <thead>
               <tr>
-                <th style={{ width: '40px' }}>
+                <th style={{ width: "40px" }}>
                   <Form.Check
                     type="checkbox"
-                    checked={selectedContainers.size === containers.length && containers.length > 0}
+                    checked={
+                      selectedContainers.size === containers.length &&
+                      containers.length > 0
+                    }
                     onChange={toggleSelectAll}
                   />
                 </th>
@@ -290,7 +334,7 @@ function ContainersPage() {
                 containers.map((container) => (
                   <tr
                     key={container.id}
-                    style={{ cursor: 'pointer' }}
+                    style={{ cursor: "pointer" }}
                     onClick={() => showContainerDetails(container.id)}
                   >
                     <td onClick={(e) => e.stopPropagation()}>
@@ -300,18 +344,22 @@ function ContainersPage() {
                         onChange={() => toggleSelection(container.id)}
                       />
                     </td>
-                    <td><strong>{container.name}</strong></td>
-                    <td><code>{container.id}</code></td>
+                    <td>
+                      <strong>{container.name}</strong>
+                    </td>
+                    <td>
+                      <code>{container.id}</code>
+                    </td>
                     <td className="small">{container.image}</td>
                     <td>{getStatusBadge(container.status)}</td>
                     <td>{getHealthBadge(container.health)}</td>
                     <td>{getUptimeKumaStatusBadge(container)}</td>
                     <td>
-                      {container.monitored && (
-                        <Badge bg="info">Yes</Badge>
-                      )}
+                      {container.monitored && <Badge bg="info">Yes</Badge>}
                       {container.quarantined && (
-                        <Badge bg="warning" className="ms-1">Quarantined</Badge>
+                        <Badge bg="warning" className="ms-1">
+                          Quarantined
+                        </Badge>
                       )}
                     </td>
                     <td>{container.restart_count}</td>
@@ -319,7 +367,9 @@ function ContainersPage() {
                       <Button
                         variant="primary"
                         size="sm"
-                        onClick={() => handleRestart(container.id, container.name)}
+                        onClick={() =>
+                          handleRestart(container.id, container.name)
+                        }
                         className="me-1"
                         title="Restart"
                       >
@@ -329,7 +379,9 @@ function ContainersPage() {
                         <Button
                           variant="success"
                           size="sm"
-                          onClick={() => handleUnquarantine(container.id, container.name)}
+                          onClick={() =>
+                            handleUnquarantine(container.id, container.name)
+                          }
                           title="Unquarantine"
                         >
                           <i className="bi bi-unlock"></i>
@@ -355,21 +407,50 @@ function ContainersPage() {
               <h6>Basic Information</h6>
               <Table size="sm" bordered>
                 <tbody>
-                  <tr><th>ID:</th><td><code>{modalContainer.full_id}</code></td></tr>
-                  <tr><th>Name:</th><td>{modalContainer.name}</td></tr>
-                  <tr><th>Image:</th><td>{modalContainer.image}</td></tr>
-                  <tr><th>Status:</th><td>{getStatusBadge(modalContainer.status)}</td></tr>
-                  <tr><th>Exit Code:</th><td>{modalContainer.exit_code || 'N/A'}</td></tr>
-                  <tr><th>Restart Count:</th><td>{modalContainer.restart_count}</td></tr>
-                  <tr><th>Recent Restarts:</th><td>{modalContainer.recent_restart_count}</td></tr>
+                  <tr>
+                    <th>ID:</th>
+                    <td>
+                      <code>{modalContainer.full_id}</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>Name:</th>
+                    <td>{modalContainer.name}</td>
+                  </tr>
+                  <tr>
+                    <th>Image:</th>
+                    <td>{modalContainer.image}</td>
+                  </tr>
+                  <tr>
+                    <th>Status:</th>
+                    <td>{getStatusBadge(modalContainer.status)}</td>
+                  </tr>
+                  <tr>
+                    <th>Exit Code:</th>
+                    <td>{modalContainer.exit_code || "N/A"}</td>
+                  </tr>
+                  <tr>
+                    <th>Restart Count:</th>
+                    <td>{modalContainer.restart_count}</td>
+                  </tr>
+                  <tr>
+                    <th>Recent Restarts:</th>
+                    <td>{modalContainer.recent_restart_count}</td>
+                  </tr>
                 </tbody>
               </Table>
 
               <h6 className="mt-3">Monitoring</h6>
               <Table size="sm" bordered>
                 <tbody>
-                  <tr><th>Monitored:</th><td>{modalContainer.monitored ? 'Yes' : 'No'}</td></tr>
-                  <tr><th>Quarantined:</th><td>{modalContainer.quarantined ? 'Yes' : 'No'}</td></tr>
+                  <tr>
+                    <th>Monitored:</th>
+                    <td>{modalContainer.monitored ? "Yes" : "No"}</td>
+                  </tr>
+                  <tr>
+                    <th>Quarantined:</th>
+                    <td>{modalContainer.quarantined ? "Yes" : "No"}</td>
+                  </tr>
                 </tbody>
               </Table>
 
@@ -396,9 +477,7 @@ function ContainersPage() {
         <Modal.Header closeButton>
           <Modal.Title>{confirmModal.title}</Modal.Title>
         </Modal.Header>
-        <Modal.Body>
-          {confirmModal.message}
-        </Modal.Body>
+        <Modal.Body>{confirmModal.message}</Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={handleCancelConfirm}>
             Cancel
@@ -413,4 +492,3 @@ function ContainersPage() {
 }
 
 export default ContainersPage;
-
