@@ -80,18 +80,52 @@ describe("EventsPage", () => {
   });
 
   it("logs an error and stops loading when fetching events fails", async () => {
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     getEvents.mockRejectedValue(new Error("network error"));
 
     render(<EventsPage />);
 
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /failed to load events/i,
+    );
+
     expect(
-      await screen.findByText(/no events recorded yet/i),
-    ).toBeInTheDocument();
+      screen.queryByText(/no events recorded yet/i),
+    ).not.toBeInTheDocument();
+
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       "Failed to load events:",
       expect.any(Error),
     );
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("clears the fetch error after a successful retry", async () => {
+    const user = userEvent.setup();
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    getEvents
+      .mockRejectedValueOnce(new Error("network error"))
+      .mockResolvedValueOnce({ data: sampleEvents });
+
+    render(<EventsPage />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /failed to load events/i,
+    );
+
+    await user.click(screen.getByRole("button", { name: /refresh/i }));
+
+    expect(
+      await screen.findByRole("heading", { name: "web-app" }),
+    ).toBeInTheDocument();
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 
     consoleErrorSpy.mockRestore();
   });
@@ -201,7 +235,8 @@ describe("EventsPage", () => {
   });
 
   describe("filters and limit", () => {
-    const lastCall = () => getEvents.mock.calls[getEvents.mock.calls.length - 1];
+    const lastCall = () =>
+      getEvents.mock.calls[getEvents.mock.calls.length - 1];
 
     const renderPage = async () => {
       getEvents.mockResolvedValue({ data: sampleEvents });
@@ -240,9 +275,15 @@ describe("EventsPage", () => {
       const user = userEvent.setup();
       await renderPage();
 
-      await user.selectOptions(screen.getByLabelText("Event Type"), "quarantine");
+      await user.selectOptions(
+        screen.getByLabelText("Event Type"),
+        "quarantine",
+      );
       await waitFor(() =>
-        expect(lastCall()).toEqual([50, { eventType: "quarantine", container: "" }]),
+        expect(lastCall()).toEqual([
+          50,
+          { eventType: "quarantine", container: "" },
+        ]),
       );
 
       await user.selectOptions(screen.getByLabelText("Event Type"), "");
@@ -337,10 +378,16 @@ describe("EventsPage", () => {
         await renderPage();
 
         await user.selectOptions(screen.getByLabelText("Limit"), "100");
-        await user.selectOptions(screen.getByLabelText("Event Type"), "restart");
+        await user.selectOptions(
+          screen.getByLabelText("Event Type"),
+          "restart",
+        );
         await user.selectOptions(screen.getByLabelText("Container"), "db");
         await waitFor(() =>
-          expect(lastCall()).toEqual([100, { eventType: "restart", container: "db" }]),
+          expect(lastCall()).toEqual([
+            100,
+            { eventType: "restart", container: "db" },
+          ]),
         );
 
         getEvents.mockClear();
@@ -359,7 +406,9 @@ describe("EventsPage", () => {
       const user = userEvent.setup();
       let resolveStale;
       getEvents.mockResolvedValueOnce({ data: [] });
-      getContainers.mockResolvedValue({ data: [{ id: "abc123", name: "web-app" }] });
+      getContainers.mockResolvedValue({
+        data: [{ id: "abc123", name: "web-app" }],
+      });
       render(<EventsPage />);
       await screen.findByText(/no events recorded yet/i);
 
@@ -367,7 +416,10 @@ describe("EventsPage", () => {
       getEvents.mockImplementationOnce(
         () => new Promise((resolve) => (resolveStale = resolve)),
       );
-      await user.selectOptions(screen.getByLabelText("Event Type"), "quarantine");
+      await user.selectOptions(
+        screen.getByLabelText("Event Type"),
+        "quarantine",
+      );
 
       // ...while a newer selection resolves first.
       getEvents.mockResolvedValueOnce({ data: sampleEvents });
@@ -378,8 +430,12 @@ describe("EventsPage", () => {
         resolveStale({ data: multipleEvents });
       });
 
-      expect(screen.getByRole("heading", { name: "web-app" })).toBeInTheDocument();
-      expect(screen.queryByRole("heading", { name: "cache" })).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: "web-app" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("heading", { name: "cache" }),
+      ).not.toBeInTheDocument();
     });
 
     it("does not filter the returned events client-side", async () => {
@@ -393,7 +449,9 @@ describe("EventsPage", () => {
       // The mocked API still returns all events; the page shows what it gets.
       await waitFor(() => expect(lastCall()[1].eventType).toBe("restart"));
       expect(screen.getByRole("heading", { name: "db" })).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: "cache" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: "cache" }),
+      ).toBeInTheDocument();
     });
   });
 
@@ -401,8 +459,12 @@ describe("EventsPage", () => {
     let resolveFirst;
     let resolveSecond;
     getEvents
-      .mockImplementationOnce(() => new Promise((resolve) => (resolveFirst = resolve)))
-      .mockImplementationOnce(() => new Promise((resolve) => (resolveSecond = resolve)));
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (resolveFirst = resolve)),
+      )
+      .mockImplementationOnce(
+        () => new Promise((resolve) => (resolveSecond = resolve)),
+      );
 
     render(<EventsPage />);
     await waitFor(() => expect(getEvents).toHaveBeenCalledTimes(1));
@@ -418,7 +480,9 @@ describe("EventsPage", () => {
       resolveFirst({ data: multipleEvents });
     });
     expect(screen.getByText(/loading events/i)).toBeInTheDocument();
-    expect(screen.queryByText(/no events recorded yet/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/no events recorded yet/i),
+    ).not.toBeInTheDocument();
 
     await act(async () => {
       resolveSecond({ data: sampleEvents });
