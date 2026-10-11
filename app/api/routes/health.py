@@ -22,7 +22,7 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now(UTC).isoformat(),
         "docker_connected": state.docker_client.is_connected() if state.docker_client else False,
-        "monitoring_active": state.monitoring_engine._running if state.monitoring_engine else False
+        "monitoring_active": state.monitoring_engine._running if state.monitoring_engine else False,
     }
 
 
@@ -60,7 +60,7 @@ async def get_system_status():
             quarantined_containers=len(config_manager.get_quarantined_containers()),
             maintenance_mode=config_manager.is_maintenance_mode(),
             maintenance_start_time=maintenance_start.isoformat() if maintenance_start else None,
-            config=config
+            config=config,
         )
     except Exception as e:
         logger.error("Error getting system status: %s", e)

@@ -262,10 +262,7 @@ class TestParseMonitorsFromMetrics:
         survive parsing so the auto-mapper can see the ambiguity and refuse to
         guess; keying entries by name would silently keep only the last."""
         client = UptimeKumaClient("http://kuma.example", "token")
-        text = (
-            'monitor_status{monitor_name="Web"} 1\n'
-            'monitor_status{monitor_name="Web"} 0\n'
-        )
+        text = 'monitor_status{monitor_name="Web"} 1\nmonitor_status{monitor_name="Web"} 0\n'
 
         monitors = client._parse_monitors_from_metrics(text)
 
@@ -382,10 +379,7 @@ class TestGetMonitorStatusByName:
 
     async def test_returns_status_when_monitor_id_precedes_name(self, monkeypatch):
         """Regression test for #26."""
-        text = (
-            'monitor_status{monitor_id="5",monitor_name="My Website",'
-            'monitor_type="http"} 1\n'
-        )
+        text = 'monitor_status{monitor_id="5",monitor_name="My Website",monitor_type="http"} 1\n'
         _patch_session(monkeypatch, response=_FakeResponse(200, text))
         client = UptimeKumaClient("http://kuma.example", "token")
 

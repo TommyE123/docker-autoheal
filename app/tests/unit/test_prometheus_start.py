@@ -18,30 +18,30 @@ class TestPrometheusStart:
     def setup_mocks(self):
         """Set up common mocks for all tests"""
         # Mock DockerClientWrapper
-        self.docker_patcher = patch('app.main.DockerClientWrapper')
+        self.docker_patcher = patch("app.main.DockerClientWrapper")
         self.mock_docker = self.docker_patcher.start()
 
         # Mock MonitoringEngine
-        self.engine_patcher = patch('app.main.MonitoringEngine')
+        self.engine_patcher = patch("app.main.MonitoringEngine")
         self.mock_engine = self.engine_patcher.start()
         self.mock_engine.return_value.start = AsyncMock()
 
         # Mock UptimeKumaMonitor
-        self.kuma_patcher = patch('app.main.UptimeKumaMonitor')
+        self.kuma_patcher = patch("app.main.UptimeKumaMonitor")
         self.mock_kuma = self.kuma_patcher.start()
         self.mock_kuma.return_value.start = AsyncMock()
 
         # Mock init_api
-        self.api_patcher = patch('app.main.init_api')
+        self.api_patcher = patch("app.main.init_api")
         self.mock_api = self.api_patcher.start()
 
         # Mock notification_manager
-        self.notif_patcher = patch('app.main.notification_manager')
+        self.notif_patcher = patch("app.main.notification_manager")
         self.mock_notif = self.notif_patcher.start()
         self.mock_notif.start = AsyncMock()
 
         # Mock start_http_server
-        self.http_patcher = patch('app.main.start_http_server')
+        self.http_patcher = patch("app.main.start_http_server")
         self.mock_http_server = self.http_patcher.start()
 
         yield
@@ -71,7 +71,7 @@ class TestPrometheusStart:
     async def test_prometheus_starts_when_enabled_notifications_disabled(self):
         """Prometheus server should start when prometheus_enabled=True even if notifications are disabled"""
         config = self._make_config(prometheus_enabled=True, notifications_enabled=False)
-        with patch('app.main.config_manager') as mock_cm:
+        with patch("app.main.config_manager") as mock_cm:
             mock_cm.get_config.return_value = config
 
             service = AutoHealService()
@@ -83,7 +83,7 @@ class TestPrometheusStart:
     async def test_prometheus_starts_when_enabled_notifications_enabled(self):
         """Prometheus server should start when both prometheus and notifications are enabled"""
         config = self._make_config(prometheus_enabled=True, notifications_enabled=True)
-        with patch('app.main.config_manager') as mock_cm:
+        with patch("app.main.config_manager") as mock_cm:
             mock_cm.get_config.return_value = config
 
             service = AutoHealService()
@@ -95,7 +95,7 @@ class TestPrometheusStart:
     async def test_prometheus_does_not_start_when_disabled(self):
         """Prometheus server should NOT start when prometheus_enabled=False"""
         config = self._make_config(prometheus_enabled=False, notifications_enabled=True)
-        with patch('app.main.config_manager') as mock_cm:
+        with patch("app.main.config_manager") as mock_cm:
             mock_cm.get_config.return_value = config
 
             service = AutoHealService()
@@ -107,7 +107,7 @@ class TestPrometheusStart:
     async def test_prometheus_uses_configured_port(self):
         """Prometheus server should use the configured metrics_port"""
         config = self._make_config(prometheus_enabled=True, metrics_port=8080)
-        with patch('app.main.config_manager') as mock_cm:
+        with patch("app.main.config_manager") as mock_cm:
             mock_cm.get_config.return_value = config
 
             service = AutoHealService()

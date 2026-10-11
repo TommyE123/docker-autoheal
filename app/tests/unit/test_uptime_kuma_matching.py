@@ -26,7 +26,12 @@ class TestNormalizeName:
         assert normalize_name("Radarr") == normalize_name("radarr")
 
     def test_hyphen_underscore_and_space_are_equivalent(self):
-        variants = ["Steam-Headless", "steam_headless", "steam headless", "STEAM-HEADLESS"]
+        variants = [
+            "Steam-Headless",
+            "steam_headless",
+            "steam headless",
+            "STEAM-HEADLESS",
+        ]
         normalized = {normalize_name(v) for v in variants}
         assert len(normalized) == 1
 
@@ -228,9 +233,7 @@ class TestMatchUptimeKumaMonitors:
         assert result == [{"container_id": "myapp_web", "monitor_friendly_name": "Web"}]
         assert "standalone" not in caplog.text
 
-    def test_replicas_sharing_a_stable_id_claiming_different_monitors_are_dropped(
-        self, caplog
-    ):
+    def test_replicas_sharing_a_stable_id_claiming_different_monitors_are_dropped(self, caplog):
         """Compose replicas of one service share a stable_id, and the mapping is
         persisted under that stable_id. If the replicas match different monitors
         (one by container name, one by service name), persisting both would mean

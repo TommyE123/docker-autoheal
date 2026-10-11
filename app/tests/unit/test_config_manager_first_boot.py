@@ -62,7 +62,11 @@ def _assert_keys_match_model_fields(data: dict, model: type[BaseModel], path: st
                 _assert_keys_match_model_fields(value, field_type, f"{path}.{key}")
         elif isinstance(value, list) and get_origin(field_type) is list:
             item_types = get_args(field_type)
-            if len(item_types) == 1 and isinstance(item_types[0], type) and issubclass(item_types[0], BaseModel):
+            if (
+                len(item_types) == 1
+                and isinstance(item_types[0], type)
+                and issubclass(item_types[0], BaseModel)
+            ):
                 for index, item in enumerate(value):
                     _assert_keys_match_model_fields(item, item_types[0], f"{path}.{key}[{index}]")
 
@@ -73,7 +77,9 @@ def _valid_top_level_config() -> dict:
     itself) - a known-good baseline the meta-tests below deliberately
     corrupt in one specific way each, so each failure is isolated to the
     thing it's meant to prove the helper catches."""
-    return {key: value for key, value in get_default_config().items() if key != "custom_health_checks"}
+    return {
+        key: value for key, value in get_default_config().items() if key != "custom_health_checks"
+    }
 
 
 def _redirect_manager_paths(monkeypatch, data_dir: Path) -> None:
@@ -126,11 +132,15 @@ def test_get_default_config_keys_match_autohealconfig_schema():
     custom_health_checks is deliberately excluded - it's popped and parsed
     separately before AutoHealConfig is ever constructed, not a field of
     AutoHealConfig itself."""
-    _assert_keys_match_model_fields(_valid_top_level_config(), AutoHealConfig, "get_default_config()")
+    _assert_keys_match_model_fields(
+        _valid_top_level_config(), AutoHealConfig, "get_default_config()"
+    )
 
 
 def test_config_loader_registry_matches_autohealconfig_sections():
-    assert set(AutoHealConfig.model_fields) == set(_CONFIG_SECTION_MODELS) | {"uptime_kuma_mappings"}
+    assert set(AutoHealConfig.model_fields) == set(_CONFIG_SECTION_MODELS) | {
+        "uptime_kuma_mappings"
+    }
 
 
 def test_schema_parity_helper_detects_an_unknown_top_level_key():
@@ -172,7 +182,9 @@ def test_schema_parity_helper_detects_a_missing_nested_key():
     this helper only checked that *present* nested keys were valid, which
     would have missed this direction of drift entirely."""
     data = _valid_top_level_config()
-    data["notifications"] = {key: value for key, value in data["notifications"].items() if key != "enabled"}
+    data["notifications"] = {
+        key: value for key, value in data["notifications"].items() if key != "enabled"
+    }
 
     with pytest.raises(AssertionError, match="enabled"):
         _assert_keys_match_model_fields(data, AutoHealConfig, "root")

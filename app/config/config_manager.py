@@ -19,14 +19,18 @@ logger = logging.getLogger(__name__)
 
 class MonitorConfig(BaseModel):
     """Monitor configuration settings"""
+
     interval_seconds: int = Field(default=30, ge=1, description="Monitoring interval in seconds")
     label_key: str = Field(default="autoheal", description="Label key to filter containers")
     label_value: str = Field(default="true", description="Label value to filter containers")
-    include_all: bool = Field(default=False, description="Monitor all containers regardless of labels")
+    include_all: bool = Field(
+        default=False, description="Monitor all containers regardless of labels"
+    )
 
 
 class BackoffConfig(BaseModel):
     """Restart backoff configuration"""
+
     enabled: bool = Field(default=True, description="Enable exponential backoff")
     initial_seconds: int = Field(default=10, ge=1, description="Initial backoff delay in seconds")
     multiplier: float = Field(default=2.0, ge=1.0, description="Backoff multiplier")
@@ -34,65 +38,103 @@ class BackoffConfig(BaseModel):
 
 class RestartConfig(BaseModel):
     """Restart policy configuration"""
+
     mode: str = Field(default="on-failure", description="Restart mode: on-failure, health, or both")
     cooldown_seconds: int = Field(default=60, ge=0, description="Cooldown between restarts")
     max_restarts: int = Field(default=3, ge=1, description="Maximum restarts within window")
-    max_restarts_window_seconds: int = Field(default=600, ge=1, description="Time window for max restarts")
+    max_restarts_window_seconds: int = Field(
+        default=600, ge=1, description="Time window for max restarts"
+    )
     backoff: BackoffConfig = Field(default_factory=BackoffConfig)
-    respect_manual_stop: bool = Field(default=True, description="Respect manual container stops (exit code 0)")
+    respect_manual_stop: bool = Field(
+        default=True, description="Respect manual container stops (exit code 0)"
+    )
 
 
 class ContainersConfig(BaseModel):
     """Container selection configuration"""
-    selected: list[str] = Field(default_factory=list, description="Explicitly selected container IDs/names")
-    excluded: list[str] = Field(default_factory=list, description="Explicitly excluded container IDs/names")
-    restart_counts: dict[str, int] = Field(default_factory=dict, description="Restart counts by stable_id")
+
+    selected: list[str] = Field(
+        default_factory=list, description="Explicitly selected container IDs/names"
+    )
+    excluded: list[str] = Field(
+        default_factory=list, description="Explicitly excluded container IDs/names"
+    )
+    restart_counts: dict[str, int] = Field(
+        default_factory=dict, description="Restart counts by stable_id"
+    )
 
 
 class FiltersConfig(BaseModel):
     """Filtering rules for containers"""
-    whitelist_names: list[str] = Field(default_factory=list, description="Container name patterns to whitelist")
-    blacklist_names: list[str] = Field(default_factory=list, description="Container name patterns to blacklist")
-    whitelist_labels: list[dict[str, str]] = Field(default_factory=list, description="Label filters to whitelist")
-    blacklist_labels: list[dict[str, str]] = Field(default_factory=list, description="Label filters to blacklist")
+
+    whitelist_names: list[str] = Field(
+        default_factory=list, description="Container name patterns to whitelist"
+    )
+    blacklist_names: list[str] = Field(
+        default_factory=list, description="Container name patterns to blacklist"
+    )
+    whitelist_labels: list[dict[str, str]] = Field(
+        default_factory=list, description="Label filters to whitelist"
+    )
+    blacklist_labels: list[dict[str, str]] = Field(
+        default_factory=list, description="Label filters to blacklist"
+    )
 
 
 class UIConfig(BaseModel):
     """UI configuration settings"""
+
     enable: bool = Field(default=True, description="Enable web UI")
     listen_address: str = Field(default="0.0.0.0", description="UI listen address")
     listen_port: int = Field(default=3131, ge=1, le=65535, description="UI listen port")
     allow_export_json: bool = Field(default=True, description="Allow configuration export")
     allow_import_json: bool = Field(default=True, description="Allow configuration import")
-    max_log_entries: int = Field(default=50, ge=1, description="Maximum log entries to keep in memory")
+    max_log_entries: int = Field(
+        default=50, ge=1, description="Maximum log entries to keep in memory"
+    )
 
 
 class AlertsConfig(BaseModel):
     """Alerting configuration"""
+
     enabled: bool = Field(default=True, description="Enable alerts")
     webhook: str | None = Field(default=None, description="Webhook URL for alerts")
-    notify_on_quarantine: bool = Field(default=True, description="Send alert when container is quarantined")
+    notify_on_quarantine: bool = Field(
+        default=True, description="Send alert when container is quarantined"
+    )
 
 
 class ObservabilityConfig(BaseModel):
     """Observability and metrics configuration"""
+
     prometheus_enabled: bool = Field(default=True, description="Enable Prometheus metrics")
     metrics_port: int = Field(default=9090, ge=1, le=65535, description="Metrics endpoint port")
     log_format: str = Field(default="json", description="Log format: json or text")
-    log_level: str = Field(default="INFO", description="Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL")
+    log_level: str = Field(
+        default="INFO", description="Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL"
+    )
 
 
 class UptimeKumaConfig(BaseModel):
     """Uptime-Kuma integration configuration"""
+
     enabled: bool = Field(default=False, description="Enable Uptime-Kuma integration")
-    server_url: str = Field(default="", description="Uptime-Kuma server URL (e.g., http://localhost:3001)")
-    username: str = Field(default="", description="Uptime-Kuma username (optional for API key auth)")
+    server_url: str = Field(
+        default="", description="Uptime-Kuma server URL (e.g., http://localhost:3001)"
+    )
+    username: str = Field(
+        default="", description="Uptime-Kuma username (optional for API key auth)"
+    )
     api_token: str = Field(default="", description="Uptime-Kuma API token or password")
-    auto_restart_on_down: bool = Field(default=True, description="Auto-restart container when monitor is DOWN")
+    auto_restart_on_down: bool = Field(
+        default=True, description="Auto-restart container when monitor is DOWN"
+    )
 
 
 class UptimeKumaMapping(BaseModel):
     """Container to Uptime-Kuma monitor mapping"""
+
     container_id: str = Field(description="Container stable ID (stable across recreations)")
     monitor_friendly_name: str = Field(description="Uptime-Kuma monitor friendly name")
     auto_mapped: bool = Field(default=False, description="Whether this was auto-mapped")
@@ -100,12 +142,15 @@ class UptimeKumaMapping(BaseModel):
 
 class NotificationService(BaseModel):
     """Notification service configuration"""
+
     # Rejected values can be credentials (passwords, tokens); keep them out of the
     # ValidationError text that the API logs and returns.
     model_config = ConfigDict(hide_input_in_errors=True)
 
     name: str = Field(description="Service name (for identification)")
-    type: str = Field(description="Service type: webhook, discord, slack, telegram, ntfy, gotify, pushover")
+    type: str = Field(
+        description="Service type: webhook, discord, slack, telegram, ntfy, gotify, pushover"
+    )
     enabled: bool = Field(default=True, description="Enable this notification service")
 
     # Common fields
@@ -120,8 +165,13 @@ class NotificationService(BaseModel):
 
     # Ntfy
     topic: str | None = Field(default=None, description="Ntfy topic")
-    server_url: str | None = Field(default=None, description="Ntfy server URL (default: https://ntfy.sh)")
-    access_token: str | None = Field(default=None, description="Ntfy access token (takes precedence over username/password)")
+    server_url: str | None = Field(
+        default=None, description="Ntfy server URL (default: https://ntfy.sh)"
+    )
+    access_token: str | None = Field(
+        default=None,
+        description="Ntfy access token (takes precedence over username/password)",
+    )
 
     # Gotify
     app_token: str | None = Field(default=None, description="Gotify app token")
@@ -133,18 +183,27 @@ class NotificationService(BaseModel):
 
 class NotificationsConfig(BaseModel):
     """Notifications configuration"""
+
     model_config = ConfigDict(hide_input_in_errors=True)
 
     enabled: bool = Field(default=False, description="Enable notification system")
-    services: list[NotificationService] = Field(default_factory=list, description="List of notification services")
+    services: list[NotificationService] = Field(
+        default_factory=list, description="List of notification services"
+    )
     event_filters: list[str] = Field(
-        default_factory=lambda: ["restart", "quarantine", "auto_unquarantine", "auto_monitor"],
-        description="Event types to send notifications for (empty = all events)"
+        default_factory=lambda: [
+            "restart",
+            "quarantine",
+            "auto_unquarantine",
+            "auto_monitor",
+        ],
+        description="Event types to send notifications for (empty = all events)",
     )
 
 
 class AutoHealConfig(BaseModel):
     """Main auto-heal configuration"""
+
     monitor: MonitorConfig = Field(default_factory=MonitorConfig)
     containers: ContainersConfig = Field(default_factory=ContainersConfig)
     restart: RestartConfig = Field(default_factory=RestartConfig)
@@ -159,6 +218,7 @@ class AutoHealConfig(BaseModel):
 
 class HealthCheckConfig(BaseModel):
     """Custom health check configuration for a container"""
+
     container_id: str
     check_type: str = Field(description="Type: http, tcp, exec, or docker")
     interval_seconds: int = Field(default=30, ge=1)
@@ -175,6 +235,7 @@ class HealthCheckConfig(BaseModel):
 
 class AutoHealEvent(BaseModel):
     """Current auto-heal event log entry with a UTC-aware timestamp."""
+
     timestamp: datetime
     container_id: str
     container_name: str
@@ -313,17 +374,20 @@ class ConfigManager:
             return AutoHealConfig()
 
         try:
-            with self.CONFIG_FILE.open('r') as f:
+            with self.CONFIG_FILE.open("r") as f:
                 data = json.load(f)
         except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
             logger.warning(
-                "Config file %s is not valid JSON: %s, using defaults", self.CONFIG_FILE, e
+                "Config file %s is not valid JSON: %s, using defaults",
+                self.CONFIG_FILE,
+                e,
             )
             return AutoHealConfig()
 
         if not isinstance(data, dict):
             logger.warning(
-                "Config file %s did not contain a JSON object, using defaults", self.CONFIG_FILE
+                "Config file %s did not contain a JSON object, using defaults",
+                self.CONFIG_FILE,
             )
             return AutoHealConfig()
 
@@ -331,7 +395,7 @@ class ConfigManager:
         # AutoHealConfig section loading below, so a failure in one can never
         # cascade into resetting the other.
         self._custom_health_checks = self._parse_custom_health_checks(
-            data.pop('custom_health_checks', {})
+            data.pop("custom_health_checks", {})
         )
 
         config = self._build_config_from_sections(data)
@@ -344,7 +408,8 @@ class ConfigManager:
             return {cid: HealthCheckConfig(**hc) for cid, hc in raw.items()}
         except (ValidationError, TypeError, AttributeError) as error:
             logger.warning(
-                "Failed to load custom_health_checks from disk: %s, using defaults", error
+                "Failed to load custom_health_checks from disk: %s, using defaults",
+                error,
             )
             return {}
 
@@ -365,14 +430,15 @@ class ConfigManager:
             except (ValidationError, TypeError) as error:
                 logger.warning("Resetting config section '%s' to defaults: %s", name, error)
 
-        if 'uptime_kuma_mappings' in data:
+        if "uptime_kuma_mappings" in data:
             try:
-                sections['uptime_kuma_mappings'] = [
-                    UptimeKumaMapping(**item) for item in data['uptime_kuma_mappings']
+                sections["uptime_kuma_mappings"] = [
+                    UptimeKumaMapping(**item) for item in data["uptime_kuma_mappings"]
                 ]
             except (ValidationError, TypeError) as error:
                 logger.warning(
-                    "Resetting config section 'uptime_kuma_mappings' to defaults: %s", error
+                    "Resetting config section 'uptime_kuma_mappings' to defaults: %s",
+                    error,
                 )
 
         return AutoHealConfig(**sections)
@@ -381,10 +447,10 @@ class ConfigManager:
         """Save configuration to file"""
         try:
             config_dict = self._config.model_dump()
-            config_dict['custom_health_checks'] = {
+            config_dict["custom_health_checks"] = {
                 cid: hc.model_dump() for cid, hc in self._custom_health_checks.items()
             }
-            with self.CONFIG_FILE.open('w') as f:
+            with self.CONFIG_FILE.open("w") as f:
                 json.dump(config_dict, f, indent=2, default=str)
             logger.debug("Configuration saved to disk")
         except Exception as e:
@@ -394,13 +460,13 @@ class ConfigManager:
         """Load current and legacy events without losing valid history."""
         try:
             if self.EVENTS_FILE.exists():
-                with self.EVENTS_FILE.open('r') as f:
+                with self.EVENTS_FILE.open("r") as f:
                     data = json.load(f)
                     events: list[StoredAutoHealEvent] = []
                     for index, event in enumerate(data):
                         try:
                             events.append(AutoHealEvent(**event))
-                        except (ValidationError, TypeError):
+                        except ValidationError, TypeError:
                             try:
                                 events.append(LegacyAutoHealEvent(**event))
                                 logger.warning(
@@ -411,7 +477,9 @@ class ConfigManager:
                                 )
                             except (ValidationError, TypeError) as error:
                                 logger.warning(
-                                    "Skipping invalid event %d from disk: %s", index, error
+                                    "Skipping invalid event %d from disk: %s",
+                                    index,
+                                    error,
                                 )
                     logger.info("Loaded %s events from disk", len(events))
                     return events
@@ -422,8 +490,8 @@ class ConfigManager:
     def _save_events(self) -> None:
         """Save events to file"""
         try:
-            events_data = [event.model_dump(mode='json') for event in self._event_log]
-            with self.EVENTS_FILE.open('w') as f:
+            events_data = [event.model_dump(mode="json") for event in self._event_log]
+            with self.EVENTS_FILE.open("w") as f:
                 json.dump(events_data, f, indent=2, default=str)
             logger.debug("Saved %s events to disk", len(self._event_log))
         except Exception as e:
@@ -431,7 +499,7 @@ class ConfigManager:
 
     def _load_custom_health_checks(self) -> dict[str, HealthCheckConfig]:
         """Load custom health checks (already loaded in _load_config)"""
-        return getattr(self, '_custom_health_checks', {})
+        return getattr(self, "_custom_health_checks", {})
 
     # Restart counts are now stored in config.json, no separate file needed
 
@@ -439,7 +507,7 @@ class ConfigManager:
         """Load quarantine list from file or return empty set"""
         try:
             if self.QUARANTINE_FILE.exists():
-                with self.QUARANTINE_FILE.open('r') as f:
+                with self.QUARANTINE_FILE.open("r") as f:
                     data = json.load(f)
                     quarantine = set(data)
                     logger.info("Loaded %s quarantined containers from disk", len(quarantine))
@@ -451,10 +519,11 @@ class ConfigManager:
     def _save_quarantine(self) -> None:
         """Save quarantine list to file"""
         try:
-            with self.QUARANTINE_FILE.open('w') as f:
+            with self.QUARANTINE_FILE.open("w") as f:
                 json.dump(list(self._quarantined_containers), f, indent=2)
             logger.debug(
-                "Saved %s quarantined containers to disk", len(self._quarantined_containers)
+                "Saved %s quarantined containers to disk",
+                len(self._quarantined_containers),
             )
         except Exception as e:
             logger.error("Failed to save quarantine list to disk: %s", e)
@@ -463,10 +532,10 @@ class ConfigManager:
         """Load maintenance mode state from file"""
         try:
             if self.MAINTENANCE_FILE.exists():
-                with self.MAINTENANCE_FILE.open('r') as f:
+                with self.MAINTENANCE_FILE.open("r") as f:
                     data = json.load(f)
-                    enabled = data.get('enabled', False)
-                    start_time = data.get('start_time')
+                    enabled = data.get("enabled", False)
+                    start_time = data.get("start_time")
                     parsed_start_time = datetime.fromisoformat(start_time) if start_time else None
 
                     self._maintenance_mode = enabled
@@ -479,10 +548,12 @@ class ConfigManager:
         """Save maintenance mode state to file"""
         try:
             data = {
-                'enabled': self._maintenance_mode,
-                'start_time': self._maintenance_start_time.isoformat() if self._maintenance_start_time else None
+                "enabled": self._maintenance_mode,
+                "start_time": self._maintenance_start_time.isoformat()
+                if self._maintenance_start_time
+                else None,
             }
-            with self.MAINTENANCE_FILE.open('w') as f:
+            with self.MAINTENANCE_FILE.open("w") as f:
                 json.dump(data, f, indent=2)
             logger.debug("Saved maintenance mode state: %s", self._maintenance_mode)
         except Exception as e:
@@ -512,7 +583,7 @@ class ConfigManager:
         """Export configuration as JSON string"""
         with self._lock:
             config_dict = self._config.model_dump()
-            config_dict['custom_health_checks'] = {
+            config_dict["custom_health_checks"] = {
                 cid: hc.model_dump() for cid, hc in self._custom_health_checks.items()
             }
             return json.dumps(config_dict, indent=2, default=str)
@@ -523,7 +594,7 @@ class ConfigManager:
             config_dict = json.loads(json_str)
 
             # Extract and store custom health checks separately
-            custom_hc = config_dict.pop('custom_health_checks', {})
+            custom_hc = config_dict.pop("custom_health_checks", {})
 
             # Validate the full payload before assigning anything, so a
             # failure anywhere leaves the live config and custom health

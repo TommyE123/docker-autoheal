@@ -36,7 +36,10 @@ from app.config.config_manager import (
     AutoHealConfig,
     config_manager,
 )
-from app.docker_client.docker_client_wrapper import DockerClientWrapper, recovery_identifier
+from app.docker_client.docker_client_wrapper import (
+    DockerClientWrapper,
+    recovery_identifier,
+)
 from app.monitor.monitoring_engine import MonitoringEngine
 
 # ---------------------------------------------------------------------------
@@ -91,9 +94,7 @@ def make_container(
 
     if "monitoring.id" in labels:
         stable_id = labels["monitoring.id"]
-    elif labels.get("com.docker.compose.project") and labels.get(
-        "com.docker.compose.service"
-    ):
+    elif labels.get("com.docker.compose.project") and labels.get("com.docker.compose.service"):
         stable_id = f"{labels['com.docker.compose.project']}_{labels['com.docker.compose.service']}"
     else:
         stable_id = name
@@ -200,9 +201,7 @@ class FakeDockerClient:
         self.restart_calls.append(container.name)
         return self.restart_results.get(container.name, True)
 
-    def check_http_health(
-        self, container, endpoint, expected_status=200, timeout=5
-    ) -> bool:
+    def check_http_health(self, container, endpoint, expected_status=200, timeout=5) -> bool:
         if self.health_check_error is not None:
             raise self.health_check_error
         return self.health_results.get(container.name, True)

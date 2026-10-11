@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 class NotificationType(StrEnum):
     """Types of notification services"""
+
     WEBHOOK = "webhook"
     DISCORD = "discord"
     SLACK = "slack"
@@ -30,6 +31,7 @@ class NotificationType(StrEnum):
 
 class NotificationPriority(StrEnum):
     """Notification priority levels"""
+
     LOW = "low"
     NORMAL = "normal"
     HIGH = "high"
@@ -131,10 +133,7 @@ class NotificationManager:
             try:
                 # Wait for notification with timeout to allow checking _running flag
                 try:
-                    event = await asyncio.wait_for(
-                        self._notification_queue.get(),
-                        timeout=1.0
-                    )
+                    event = await asyncio.wait_for(self._notification_queue.get(), timeout=1.0)
                 except TimeoutError:
                     continue
 
@@ -245,7 +244,7 @@ class NotificationManager:
         title: str,
         message: str,
         event: AutoHealEvent,
-        priority: NotificationPriority
+        priority: NotificationPriority,
     ) -> None:
         """Send generic webhook notification"""
         if not service.url:
@@ -263,7 +262,7 @@ class NotificationManager:
                 "status": event.status,
                 "restart_count": event.restart_count,
                 "timestamp": event.timestamp.isoformat(),
-            }
+            },
         }
 
         # Add custom headers if configured
@@ -272,14 +271,12 @@ class NotificationManager:
             headers.update(service.headers)
 
         try:
-            async with self._session.post(
-                service.url,
-                json=payload,
-                headers=headers
-            ) as response:
+            async with self._session.post(service.url, json=payload, headers=headers) as response:
                 if response.status >= 400:
                     logger.error(
-                        "Webhook failed with status %s: %s", response.status, await response.text()
+                        "Webhook failed with status %s: %s",
+                        response.status,
+                        await response.text(),
                     )
                 else:
                     logger.info("Webhook notification sent successfully to %s", service.name)
@@ -292,7 +289,7 @@ class NotificationManager:
         title: str,
         message: str,
         event: AutoHealEvent,
-        priority: NotificationPriority
+        priority: NotificationPriority,
     ) -> None:
         """Send Discord webhook notification"""
         if not service.url:
@@ -301,25 +298,23 @@ class NotificationManager:
 
         # Color based on priority
         color_map = {
-            NotificationPriority.LOW: 0x95a5a6,      # Gray
-            NotificationPriority.NORMAL: 0x3498db,   # Blue
-            NotificationPriority.HIGH: 0xf39c12,     # Orange
-            NotificationPriority.CRITICAL: 0xe74c3c  # Red
+            NotificationPriority.LOW: 0x95A5A6,  # Gray
+            NotificationPriority.NORMAL: 0x3498DB,  # Blue
+            NotificationPriority.HIGH: 0xF39C12,  # Orange
+            NotificationPriority.CRITICAL: 0xE74C3C,  # Red
         }
 
         embed = {
             "title": title,
             "description": message.replace("**", ""),
-            "color": color_map.get(priority, 0x3498db),
+            "color": color_map.get(priority, 0x3498DB),
             "timestamp": event.timestamp.isoformat(),
-            "footer": {
-                "text": "Docker Auto-Heal"
-            }
+            "footer": {"text": "Docker Auto-Heal"},
         }
 
         payload = {
             "embeds": [embed],
-            "username": service.username or "Docker Auto-Heal"
+            "username": service.username or "Docker Auto-Heal",
         }
 
         try:
@@ -337,7 +332,7 @@ class NotificationManager:
         title: str,
         message: str,
         event: AutoHealEvent,
-        priority: NotificationPriority
+        priority: NotificationPriority,
     ) -> None:
         """Send Slack webhook notification"""
         if not service.url:
@@ -350,21 +345,9 @@ class NotificationManager:
         payload = {
             "text": title,
             "blocks": [
-                {
-                    "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": title
-                    }
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": slack_message
-                    }
-                }
-            ]
+                {"type": "header", "text": {"type": "plain_text", "text": title}},
+                {"type": "section", "text": {"type": "mrkdwn", "text": slack_message}},
+            ],
         }
 
         try:
@@ -382,7 +365,7 @@ class NotificationManager:
         title: str,
         message: str,
         event: AutoHealEvent,
-        priority: NotificationPriority
+        priority: NotificationPriority,
     ) -> None:
         """Send Telegram notification"""
         if not service.bot_token or not service.chat_id:
@@ -396,7 +379,7 @@ class NotificationManager:
         payload = {
             "chat_id": service.chat_id,
             "text": telegram_message,
-            "parse_mode": "Markdown"
+            "parse_mode": "Markdown",
         }
 
         try:
@@ -414,7 +397,7 @@ class NotificationManager:
         title: str,
         message: str,
         event: AutoHealEvent,
-        priority: NotificationPriority
+        priority: NotificationPriority,
     ) -> None:
         """Send ntfy.sh notification"""
         if not service.topic:
@@ -426,7 +409,7 @@ class NotificationManager:
             NotificationPriority.LOW: "1",
             NotificationPriority.NORMAL: "3",
             NotificationPriority.HIGH: "4",
-            NotificationPriority.CRITICAL: "5"
+            NotificationPriority.CRITICAL: "5",
         }
 
         server_url = service.server_url or "https://ntfy.sh"
@@ -435,7 +418,7 @@ class NotificationManager:
         headers = {
             "Title": title,
             "Priority": priority_map.get(priority, "3"),
-            "Tags": "whale,docker"
+            "Tags": "whale,docker",
         }
 
         # Add authentication if configured (access token takes precedence)
@@ -443,15 +426,14 @@ class NotificationManager:
             headers["Authorization"] = f"Bearer {service.access_token}"
         elif service.username and service.password:
             import base64
+
             credentials = f"{service.username}:{service.password}"
             encoded = base64.b64encode(credentials.encode()).decode()
             headers["Authorization"] = f"Basic {encoded}"
 
         try:
             async with self._session.post(
-                url,
-                data=message.replace("**", ""),
-                headers=headers
+                url, data=message.replace("**", ""), headers=headers
             ) as response:
                 if response.status >= 400:
                     logger.error("Ntfy failed with status %s", response.status)
@@ -466,7 +448,7 @@ class NotificationManager:
         title: str,
         message: str,
         event: AutoHealEvent,
-        priority: NotificationPriority
+        priority: NotificationPriority,
     ) -> None:
         """Send Gotify notification"""
         if not service.server_url or not service.app_token:
@@ -478,19 +460,17 @@ class NotificationManager:
             NotificationPriority.LOW: 2,
             NotificationPriority.NORMAL: 5,
             NotificationPriority.HIGH: 8,
-            NotificationPriority.CRITICAL: 10
+            NotificationPriority.CRITICAL: 10,
         }
 
         url = f"{service.server_url}/message"
         payload = {
             "title": title,
             "message": message.replace("**", ""),
-            "priority": priority_map.get(priority, 5)
+            "priority": priority_map.get(priority, 5),
         }
 
-        headers = {
-            "X-Gotify-Key": service.app_token
-        }
+        headers = {"X-Gotify-Key": service.app_token}
 
         try:
             async with self._session.post(url, json=payload, headers=headers) as response:
@@ -507,7 +487,7 @@ class NotificationManager:
         title: str,
         message: str,
         event: AutoHealEvent,
-        priority: NotificationPriority
+        priority: NotificationPriority,
     ) -> None:
         """Send Pushover notification"""
         if not service.user_key or not service.api_token:
@@ -519,7 +499,7 @@ class NotificationManager:
             NotificationPriority.LOW: -1,
             NotificationPriority.NORMAL: 0,
             NotificationPriority.HIGH: 1,
-            NotificationPriority.CRITICAL: 2
+            NotificationPriority.CRITICAL: 2,
         }
 
         url = "https://api.pushover.net/1/messages.json"
@@ -528,7 +508,7 @@ class NotificationManager:
             "user": service.user_key,
             "title": title,
             "message": message.replace("**", ""),
-            "priority": priority_map.get(priority, 0)
+            "priority": priority_map.get(priority, 0),
         }
 
         try:
@@ -563,7 +543,10 @@ class NotificationManager:
             return {"success": False, "message": f"Service '{service_name}' not found"}
 
         if not service.enabled:
-            return {"success": False, "message": f"Service '{service_name}' is disabled"}
+            return {
+                "success": False,
+                "message": f"Service '{service_name}' is disabled",
+            }
 
         # Create a test event
         test_event = AutoHealEvent(
@@ -573,7 +556,7 @@ class NotificationManager:
             event_type="test",
             restart_count=0,
             status="success",
-            message="This is a test notification from Docker Auto-Heal"
+            message="This is a test notification from Docker Auto-Heal",
         )
 
         title = "🧪 Test Notification"
@@ -596,16 +579,22 @@ class NotificationManager:
             elif service.type == NotificationType.PUSHOVER:
                 await self._send_pushover(service, title, message, test_event, priority)
             else:
-                return {"success": False, "message": f"Unsupported notification type: {service.type}"}
+                return {
+                    "success": False,
+                    "message": f"Unsupported notification type: {service.type}",
+                }
 
             return {"success": True, "message": "Test notification sent successfully"}
 
         except Exception as e:
             logger.error("Failed to send test notification: %s", e)
-            return {"success": False, "message": f"Failed to send test notification: {str(e)}"}
+            return {
+                "success": False,
+                "message": f"Failed to send test notification: {str(e)}",
+            }
 
 
 # Global notification manager instance
 notification_manager = NotificationManager()
 
-__all__ = ['NotificationManager']
+__all__ = ["NotificationManager"]

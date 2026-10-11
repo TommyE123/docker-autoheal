@@ -20,9 +20,7 @@ SEED = '{"monitor":{"label_key":"autoheal.dev"}}'
 
 
 def test_run_docker_stack_task_does_not_detect_an_ip():
-    tasks = json.loads(
-        (REPO_ROOT / ".vscode" / "tasks.json").read_text(encoding="utf-8")
-    )["tasks"]
+    tasks = json.loads((REPO_ROOT / ".vscode" / "tasks.json").read_text(encoding="utf-8"))["tasks"]
     task = next(t for t in tasks if t["label"] == "Autoheal: Run Docker Stack")
 
     assert task["command"] == (

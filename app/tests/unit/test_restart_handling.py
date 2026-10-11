@@ -97,7 +97,9 @@ class TestFailedRestart:
         assert config_manager.get_restart_count("web", 600) == 1
         assert "web" in engine._last_restart_times
 
-    async def test_failed_restart_does_not_reset_backoff(self, engine, docker_client, update_config):
+    async def test_failed_restart_does_not_reset_backoff(
+        self, engine, docker_client, update_config
+    ):
         update_config(lambda c: setattr(c.restart, "cooldown_seconds", 0))
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
@@ -123,7 +125,9 @@ class TestCooldown:
         assert config_manager.get_restart_count("web", 600) == 0
         assert config_manager.get_events() == []
 
-    async def test_restart_allowed_once_cooldown_expires(self, engine, docker_client, update_config):
+    async def test_restart_allowed_once_cooldown_expires(
+        self, engine, docker_client, update_config
+    ):
         update_config(lambda c: setattr(c.restart, "cooldown_seconds", 60))
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
@@ -276,7 +280,9 @@ class TestRestartBackoff:
 
         assert recorded_sleeps == [10]  # default initial_seconds
 
-    async def test_backoff_is_skipped_when_disabled(self, engine, docker_client, recorded_sleeps, update_config):
+    async def test_backoff_is_skipped_when_disabled(
+        self, engine, docker_client, recorded_sleeps, update_config
+    ):
         update_config(lambda c: setattr(c.restart.backoff, "enabled", False))
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
@@ -387,7 +393,9 @@ class TestQuarantineAlerts:
 
         assert config_manager.is_quarantined("web") is True
 
-    async def test_no_alert_when_alerts_disabled(self, engine, docker_client, update_config, monkeypatch):
+    async def test_no_alert_when_alerts_disabled(
+        self, engine, docker_client, update_config, monkeypatch
+    ):
         calls = []
         monkeypatch.setattr("requests.post", lambda *a, **k: calls.append(a))
 

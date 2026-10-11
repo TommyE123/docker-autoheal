@@ -2,6 +2,7 @@
 Uptime-Kuma API client for fetching monitor statuses
 Uses the /metrics endpoint with Basic Authentication
 """
+
 import logging
 import re
 
@@ -19,7 +20,7 @@ class UptimeKumaClient:
 
     def __init__(self, server_url: str, password: str, username: str = ""):
         """Configure the metrics endpoint and its Basic authentication header."""
-        self.server_url = server_url.rstrip('/')
+        self.server_url = server_url.rstrip("/")
         self.password = password
         self.username = username
         # Use Basic Auth with username (empty for API key) and password/API key
@@ -27,7 +28,7 @@ class UptimeKumaClient:
         # For user auth: username=username, password=password
         # Keep BasicAuth's Latin-1 default for compatibility with existing credentials.
         self.auth_header = aiohttp.encode_basic_auth(
-            username if username else '', password, encoding="latin1"
+            username if username else "", password, encoding="latin1"
         )
         self.session: aiohttp.ClientSession | None = None
 
@@ -39,13 +40,13 @@ class UptimeKumaClient:
                 async with session.get(
                     f"{self.server_url}/metrics",
                     headers={"Authorization": self.auth_header},
-                    timeout=aiohttp.ClientTimeout(total=10)
+                    timeout=aiohttp.ClientTimeout(total=10),
                 ) as response:
                     logger.debug("Response status: %s", response.status)
                     if response.status == 200:
                         text = await response.text()
                         # Check if we got valid metrics data
-                        has_metrics = 'monitor_status' in text or 'app_version' in text
+                        has_metrics = "monitor_status" in text or "app_version" in text
                         logger.debug("Has metrics data: %s", has_metrics)
                         return has_metrics
                     logger.warning("Unexpected response status: %s", response.status)
@@ -66,7 +67,7 @@ class UptimeKumaClient:
                 async with session.get(
                     f"{self.server_url}/metrics",
                     headers={"Authorization": self.auth_header},
-                    timeout=aiohttp.ClientTimeout(total=10)
+                    timeout=aiohttp.ClientTimeout(total=10),
                 ) as response:
                     if response.status != 200:
                         logger.error("Failed to fetch metrics: HTTP %s", response.status)
@@ -110,13 +111,15 @@ class UptimeKumaClient:
             status = int(match.group(2))
 
             # Generate a simple ID based on the name (since metrics don't provide IDs)
-            monitor_id = abs(hash(monitor_name)) % (10 ** 8)
+            monitor_id = abs(hash(monitor_name)) % (10**8)
 
-            monitors.append({
-                'id': monitor_id,
-                'friendly_name': monitor_name,
-                'status': status  # 0=down, 1=up, 2=pending, 3=maintenance
-            })
+            monitors.append(
+                {
+                    "id": monitor_id,
+                    "friendly_name": monitor_name,
+                    "status": status,  # 0=down, 1=up, 2=pending, 3=maintenance
+                }
+            )
 
         return monitors
 
@@ -125,8 +128,8 @@ class UptimeKumaClient:
         # Since we use hashed IDs, we need to fetch all monitors and find the matching one
         monitors = await self.get_all_monitors() or []
         for monitor in monitors:
-            if monitor['id'] == monitor_id:
-                return monitor['status']
+            if monitor["id"] == monitor_id:
+                return monitor["status"]
         return None
 
     async def get_monitor_status_by_name(self, monitor_name: str) -> int | None:
@@ -136,7 +139,7 @@ class UptimeKumaClient:
                 async with session.get(
                     f"{self.server_url}/metrics",
                     headers={"Authorization": self.auth_header},
-                    timeout=aiohttp.ClientTimeout(total=10)
+                    timeout=aiohttp.ClientTimeout(total=10),
                 ) as response:
                     if response.status != 200:
                         return None

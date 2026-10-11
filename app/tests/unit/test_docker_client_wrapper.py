@@ -27,7 +27,10 @@ def sdk_client() -> MagicMock:
 @pytest.fixture
 def wrapper(sdk_client) -> DockerClientWrapper:
     """A wrapper connected to the mock SDK client."""
-    with patch("app.docker_client.docker_client_wrapper.docker.DockerClient", return_value=sdk_client):
+    with patch(
+        "app.docker_client.docker_client_wrapper.docker.DockerClient",
+        return_value=sdk_client,
+    ):
         return DockerClientWrapper(base_url="unix://var/run/docker.sock")
 
 
@@ -222,7 +225,10 @@ class TestListingAndLookup:
         sdk_client.containers.list.side_effect = docker.errors.APIError("daemon gone")
         sdk_client.ping.side_effect = docker.errors.APIError("daemon gone")
 
-        with patch("app.docker_client.docker_client_wrapper.docker.DockerClient", return_value=sdk_client):
+        with patch(
+            "app.docker_client.docker_client_wrapper.docker.DockerClient",
+            return_value=sdk_client,
+        ):
             assert wrapper.list_containers() == []
 
     def test_get_container_returns_none_when_not_found(self, wrapper, sdk_client):
@@ -289,7 +295,10 @@ class TestContainerInfo:
 
         assert wrapper.get_container_info(container)["stable_id"] == "stack_web"
 
-    @pytest.mark.parametrize(("number", "recovery_id"), [("1", "compose:stack:web#1"), ("2", "compose:stack:web#2")])
+    @pytest.mark.parametrize(
+        ("number", "recovery_id"),
+        [("1", "compose:stack:web#1"), ("2", "compose:stack:web#2")],
+    )
     def test_recovery_id_is_per_compose_replica(self, wrapper, number, recovery_id):
         container = make_sdk_container(
             name=f"stack-web-{number}",
@@ -396,7 +405,11 @@ class TestContainerActions:
     def test_native_health_returns_unexpected_status_value(self, wrapper):
         """Unrecognised health status strings are passed through as-is."""
         container = make_sdk_container(
-            state={"Status": "running", "ExitCode": 0, "Health": {"Status": "weird_status"}}
+            state={
+                "Status": "running",
+                "ExitCode": 0,
+                "Health": {"Status": "weird_status"},
+            }
         )
 
         assert wrapper.get_docker_native_health(container) == "weird_status"

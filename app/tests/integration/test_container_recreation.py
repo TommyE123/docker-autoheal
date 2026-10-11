@@ -31,7 +31,9 @@ def test_restart_history_and_monitoring_survive_recreation(
     disposable_container,
 ):
     container_name = f"autoheal-recreate-{uuid.uuid4().hex[:12]}"
-    container = disposable_container(image="alpine:latest", name=container_name, command=["sleep", "300"])
+    container = disposable_container(
+        image="alpine:latest", name=container_name, command=["sleep", "300"]
+    )
 
     info = real_docker_client.get_container_info(container)
     stable_id = engine.get_stable_identifier(info)
@@ -54,7 +56,9 @@ def test_restart_history_and_monitoring_survive_recreation(
 
     # Recreate: remove the old container and start a new one with the same name.
     container.remove(force=True)
-    recreated = disposable_container(image="alpine:latest", name=container_name, command=["sleep", "300"])
+    recreated = disposable_container(
+        image="alpine:latest", name=container_name, command=["sleep", "300"]
+    )
     new_info = real_docker_client.get_container_info(recreated)
 
     assert new_info["full_id"] != original_full_id  # Docker assigned a brand new ID
@@ -74,7 +78,9 @@ def test_explicit_exclusion_persists_by_name_across_recreation(
     disposable_container,
 ):
     container_name = f"autoheal-exclude-{uuid.uuid4().hex[:12]}"
-    container = disposable_container(image="alpine:latest", name=container_name, command=["sleep", "300"])
+    container = disposable_container(
+        image="alpine:latest", name=container_name, command=["sleep", "300"]
+    )
     info = real_docker_client.get_container_info(container)
 
     config = isolated_config_manager.get_config()
@@ -83,6 +89,8 @@ def test_explicit_exclusion_persists_by_name_across_recreation(
     assert engine.should_monitor_container(container, info) is False
 
     container.remove(force=True)
-    recreated = disposable_container(image="alpine:latest", name=container_name, command=["sleep", "300"])
+    recreated = disposable_container(
+        image="alpine:latest", name=container_name, command=["sleep", "300"]
+    )
     new_info = real_docker_client.get_container_info(recreated)
     assert engine.should_monitor_container(recreated, new_info) is False

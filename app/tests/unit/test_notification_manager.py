@@ -192,7 +192,10 @@ async def test_test_notification_reports_failure_for_unknown_service(
 
     result = await manager.test_notification("Nonexistent Service")
 
-    assert result == {"success": False, "message": "Service 'Nonexistent Service' not found"}
+    assert result == {
+        "success": False,
+        "message": "Service 'Nonexistent Service' not found",
+    }
     assert manager._session.calls == []
 
 
@@ -211,7 +214,10 @@ async def test_send_discord_builds_embed_payload(isolated_config_manager, manage
     _configure_service(
         isolated_config_manager,
         NotificationService(
-            name="Discord", type="discord", enabled=True, url="https://example.invalid/discord"
+            name="Discord",
+            type="discord",
+            enabled=True,
+            url="https://example.invalid/discord",
         ),
     )
 
@@ -231,7 +237,10 @@ async def test_send_slack_builds_blocks_payload(isolated_config_manager, manager
     _configure_service(
         isolated_config_manager,
         NotificationService(
-            name="Slack", type="slack", enabled=True, url="https://example.invalid/slack"
+            name="Slack",
+            type="slack",
+            enabled=True,
+            url="https://example.invalid/slack",
         ),
     )
 
@@ -250,7 +259,11 @@ async def test_send_telegram_builds_message_and_url(isolated_config_manager, man
     _configure_service(
         isolated_config_manager,
         NotificationService(
-            name="Telegram", type="telegram", enabled=True, bot_token="abc123", chat_id="999"
+            name="Telegram",
+            type="telegram",
+            enabled=True,
+            bot_token="abc123",
+            chat_id="999",
         ),
     )
 
@@ -318,7 +331,11 @@ async def test_send_ntfy_with_access_token_sends_bearer_header(isolated_config_m
     _configure_service(
         isolated_config_manager,
         NotificationService(
-            name="Ntfy", type="ntfy", enabled=True, topic="alerts", access_token="tk_secret"
+            name="Ntfy",
+            type="ntfy",
+            enabled=True,
+            topic="alerts",
+            access_token="tk_secret",
         ),
     )
 
@@ -356,7 +373,11 @@ async def test_send_ntfy_access_token_not_logged(caplog, isolated_config_manager
     _configure_service(
         isolated_config_manager,
         NotificationService(
-            name="Ntfy", type="ntfy", enabled=True, topic="alerts", access_token="tk_secret"
+            name="Ntfy",
+            type="ntfy",
+            enabled=True,
+            topic="alerts",
+            access_token="tk_secret",
         ),
     )
 
@@ -378,7 +399,11 @@ async def test_send_ntfy_access_token_not_logged_on_exception(
     _configure_service(
         isolated_config_manager,
         NotificationService(
-            name="Ntfy", type="ntfy", enabled=True, topic="alerts", access_token="tk_secret"
+            name="Ntfy",
+            type="ntfy",
+            enabled=True,
+            topic="alerts",
+            access_token="tk_secret",
         ),
     )
 
@@ -415,7 +440,11 @@ async def test_send_pushover_builds_form_payload(isolated_config_manager, manage
     _configure_service(
         isolated_config_manager,
         NotificationService(
-            name="Pushover", type="pushover", enabled=True, user_key="userkey", api_token="apitoken"
+            name="Pushover",
+            type="pushover",
+            enabled=True,
+            user_key="userkey",
+            api_token="apitoken",
         ),
     )
 
@@ -462,10 +491,16 @@ async def test_process_notification_dispatches_only_to_enabled_known_services(
     config.notifications.enabled = True
     config.notifications.services = [
         NotificationService(
-            name="Webhook", type="webhook", enabled=True, url="https://example.invalid/webhook"
+            name="Webhook",
+            type="webhook",
+            enabled=True,
+            url="https://example.invalid/webhook",
         ),
         NotificationService(
-            name="Disabled", type="webhook", enabled=False, url="https://example.invalid/off"
+            name="Disabled",
+            type="webhook",
+            enabled=False,
+            url="https://example.invalid/off",
         ),
         NotificationService(name="Unknown", type="carrier-pigeon", enabled=True),
     ]
@@ -504,7 +539,10 @@ async def test_test_notification_reports_failure_for_unsupported_type(
 
     result = await manager.test_notification("Carrier Pigeon")
 
-    assert result == {"success": False, "message": "Unsupported notification type: carrier-pigeon"}
+    assert result == {
+        "success": False,
+        "message": "Unsupported notification type: carrier-pigeon",
+    }
 
 
 @pytest.mark.asyncio
@@ -565,7 +603,8 @@ async def test_notification_worker_keeps_polling_after_queue_wait_timeout(
         return await real_wait_for(awaitable, **kwargs)
 
     monkeypatch.setattr(
-        "app.notifications.notification_manager.asyncio.wait_for", wait_for_timing_out_once
+        "app.notifications.notification_manager.asyncio.wait_for",
+        wait_for_timing_out_once,
     )
 
     manager._running = True
@@ -593,7 +632,8 @@ async def test_start_stop_lifecycle_delivers_queued_notification(
     monkeypatch, isolated_config_manager
 ):
     monkeypatch.setattr(
-        "app.notifications.notification_manager.aiohttp.ClientSession", _FakeAiohttpSession
+        "app.notifications.notification_manager.aiohttp.ClientSession",
+        _FakeAiohttpSession,
     )
     _configure_webhook(isolated_config_manager)
 
@@ -622,7 +662,8 @@ async def test_start_stop_lifecycle_delivers_queued_notification(
 @pytest.mark.asyncio
 async def test_start_when_already_running_is_a_noop(monkeypatch, isolated_config_manager):
     monkeypatch.setattr(
-        "app.notifications.notification_manager.aiohttp.ClientSession", _FakeAiohttpSession
+        "app.notifications.notification_manager.aiohttp.ClientSession",
+        _FakeAiohttpSession,
     )
 
     instance = NotificationManager()
@@ -687,8 +728,14 @@ def _service_missing_pushover_credentials():
         (_service_missing_discord_url, "Discord webhook URL not configured"),
         (_service_missing_slack_url, "Slack webhook URL not configured"),
         (_service_missing_ntfy_topic, "Ntfy topic not configured"),
-        (_service_missing_gotify_credentials, "Gotify server URL or app token not configured"),
-        (_service_missing_pushover_credentials, "Pushover user key or API token not configured"),
+        (
+            _service_missing_gotify_credentials,
+            "Gotify server URL or app token not configured",
+        ),
+        (
+            _service_missing_pushover_credentials,
+            "Pushover user key or API token not configured",
+        ),
     ],
 )
 @pytest.mark.asyncio
@@ -707,7 +754,10 @@ async def test_missing_credentials_skip_request_without_calling_session(
 
 def _service_discord():
     return NotificationService(
-        name="Discord", type="discord", enabled=True, url="https://example.invalid/discord"
+        name="Discord",
+        type="discord",
+        enabled=True,
+        url="https://example.invalid/discord",
     )
 
 
@@ -719,7 +769,11 @@ def _service_slack():
 
 def _service_telegram():
     return NotificationService(
-        name="Telegram", type="telegram", enabled=True, bot_token="abc123", chat_id="999"
+        name="Telegram",
+        type="telegram",
+        enabled=True,
+        bot_token="abc123",
+        chat_id="999",
     )
 
 
@@ -739,7 +793,11 @@ def _service_gotify():
 
 def _service_pushover():
     return NotificationService(
-        name="Pushover", type="pushover", enabled=True, user_key="userkey", api_token="apitoken"
+        name="Pushover",
+        type="pushover",
+        enabled=True,
+        user_key="userkey",
+        api_token="apitoken",
     )
 
 

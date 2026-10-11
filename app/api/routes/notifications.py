@@ -20,7 +20,7 @@ async def get_notifications_config():
         return {
             "enabled": config.notifications.enabled,
             "services": [service.model_dump() for service in config.notifications.services],
-            "event_filters": config.notifications.event_filters
+            "event_filters": config.notifications.event_filters,
         }
     except Exception as e:
         logger.error("Error getting notifications config: %s", e)
@@ -55,8 +55,8 @@ async def update_notifications_config(notifications_config: dict):
             "config": {
                 "enabled": config.notifications.enabled,
                 "services": [s.model_dump() for s in config.notifications.services],
-                "event_filters": config.notifications.event_filters
-            }
+                "event_filters": config.notifications.event_filters,
+            },
         }
     except Exception as e:
         logger.error("Error updating notifications config: %s", e)
@@ -75,7 +75,10 @@ async def add_notification_service(service: dict):
         # Check if service with same name already exists
         for existing in config.notifications.services:
             if existing.name == new_service.name:
-                raise HTTPException(status_code=400, detail=f"Service with name '{new_service.name}' already exists")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Service with name '{new_service.name}' already exists",
+                )
 
         config.notifications.services.append(new_service)
         config_manager.update_config(config)
@@ -83,7 +86,7 @@ async def add_notification_service(service: dict):
         return {
             "status": "success",
             "message": f"Notification service '{new_service.name}' added",
-            "service": new_service.model_dump()
+            "service": new_service.model_dump(),
         }
     except HTTPException:
         raise
@@ -119,7 +122,7 @@ async def update_notification_service(service_name: str, service: dict):
         return {
             "status": "success",
             "message": f"Notification service '{service_name}' updated",
-            "service": updated_service.model_dump()
+            "service": updated_service.model_dump(),
         }
     except HTTPException:
         raise
@@ -147,7 +150,7 @@ async def delete_notification_service(service_name: str):
 
         return {
             "status": "success",
-            "message": f"Notification service '{service_name}' deleted"
+            "message": f"Notification service '{service_name}' deleted",
         }
     except HTTPException:
         raise
@@ -163,10 +166,7 @@ async def test_notification_service(service_name: str):
         result = await state.notification_manager.test_notification(service_name)
 
         if result["success"]:
-            return {
-                "status": "success",
-                "message": result["message"]
-            }
+            return {"status": "success", "message": result["message"]}
         raise HTTPException(status_code=400, detail=result["message"])
 
     except HTTPException:

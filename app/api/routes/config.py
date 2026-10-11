@@ -14,7 +14,12 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
-from app.config.config_manager import AutoHealConfig, MonitorConfig, RestartConfig, config_manager
+from app.config.config_manager import (
+    AutoHealConfig,
+    MonitorConfig,
+    RestartConfig,
+    config_manager,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +80,7 @@ async def export_config():
             content=json.loads(config_json),
             headers={
                 "Content-Disposition": f"attachment; filename=autoheal-config-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}.json"
-            }
+            },
         )
     except Exception as e:
         logger.error("Error exporting config: %s", e)
@@ -87,7 +92,7 @@ async def import_config(file: UploadFile = File(...)):
     """Import configuration from JSON file"""
     try:
         content = await file.read()
-        config_json = content.decode('utf-8')
+        config_json = content.decode("utf-8")
 
         config_manager.import_config(config_json)
 
@@ -110,11 +115,11 @@ async def update_observability_config(observability_config: dict):
 
             # Update log level directly without importing main
             level_map = {
-                'DEBUG': logging.DEBUG,
-                'INFO': logging.INFO,
-                'WARNING': logging.WARNING,
-                'ERROR': logging.ERROR,
-                'CRITICAL': logging.CRITICAL
+                "DEBUG": logging.DEBUG,
+                "INFO": logging.INFO,
+                "WARNING": logging.WARNING,
+                "ERROR": logging.ERROR,
+                "CRITICAL": logging.CRITICAL,
             }
             level = level_map.get(level_name.upper(), logging.INFO)
 

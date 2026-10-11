@@ -21,7 +21,7 @@ async def enable_maintenance_mode():
             "status": "success",
             "message": "Maintenance mode enabled",
             "maintenance_mode": True,
-            "maintenance_start_time": config_manager.get_maintenance_start_time().isoformat()
+            "maintenance_start_time": config_manager.get_maintenance_start_time().isoformat(),
         }
     except Exception as e:
         logger.error("Error enabling maintenance mode: %s", e)
@@ -37,7 +37,7 @@ async def disable_maintenance_mode():
         return {
             "status": "success",
             "message": "Maintenance mode disabled",
-            "maintenance_mode": False
+            "maintenance_mode": False,
         }
     except Exception as e:
         logger.error("Error disabling maintenance mode: %s", e)
@@ -51,7 +51,7 @@ async def get_maintenance_status():
         maintenance_start = config_manager.get_maintenance_start_time()
         return {
             "maintenance_mode": config_manager.is_maintenance_mode(),
-            "maintenance_start_time": maintenance_start.isoformat() if maintenance_start else None
+            "maintenance_start_time": maintenance_start.isoformat() if maintenance_start else None,
         }
     except Exception as e:
         logger.error("Error getting maintenance status: %s", e)

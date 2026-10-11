@@ -86,7 +86,9 @@ class TestQuarantinedContainerChecks:
         self, engine, docker_client, update_config
     ):
         update_config(lambda c: setattr(c.restart, "mode", "both"))
-        container, info = make_container(name="web", status="running", health={"status": "unhealthy"})
+        container, info = make_container(
+            name="web", status="running", health={"status": "unhealthy"}
+        )
         docker_client.add_container(container, info)
         config_manager.quarantine_container("web")
 
@@ -120,7 +122,9 @@ class TestQuarantinedContainerChecks:
 
         mock_notification_manager.send_event_notification.assert_awaited_once()
 
-    async def test_quarantine_recorded_under_container_name_is_honoured(self, engine, docker_client):
+    async def test_quarantine_recorded_under_container_name_is_honoured(
+        self, engine, docker_client
+    ):
         """Backwards compatibility: quarantine entries predating stable IDs."""
         container, info = make_container(
             name="stack-web-1",
@@ -186,8 +190,12 @@ class TestContainerDisappearance:
         assert config_manager.get_events() == []
 
     async def test_disappeared_container_during_full_cycle(self, engine, docker_client):
-        alive, alive_info = make_container(name="web", container_id="a" * 64, status="exited", exit_code=1)
-        gone, gone_info = make_container(name="ghost", container_id="f" * 64, status="exited", exit_code=1)
+        alive, alive_info = make_container(
+            name="web", container_id="a" * 64, status="exited", exit_code=1
+        )
+        gone, gone_info = make_container(
+            name="ghost", container_id="f" * 64, status="exited", exit_code=1
+        )
         docker_client.add_container(alive, alive_info)
         docker_client.add_container(gone, gone_info)
         docker_client._info.pop(gone.id)  # still listed, but no longer inspectable
@@ -197,8 +205,12 @@ class TestContainerDisappearance:
         assert docker_client.restart_calls == ["web"]
 
     async def test_inspection_error_does_not_stop_other_containers(self, engine, docker_client):
-        broken, broken_info = make_container(name="broken", container_id="b" * 64, status="exited", exit_code=1)
-        healthy, healthy_info = make_container(name="web", container_id="a" * 64, status="exited", exit_code=1)
+        broken, broken_info = make_container(
+            name="broken", container_id="b" * 64, status="exited", exit_code=1
+        )
+        healthy, healthy_info = make_container(
+            name="web", container_id="a" * 64, status="exited", exit_code=1
+        )
         docker_client.add_container(broken, broken_info)
         docker_client.add_container(healthy, healthy_info)
         docker_client.info_errors[broken.id] = RuntimeError("container is gone")
@@ -241,10 +253,18 @@ class TestCheckContainersDockerFailures:
         assert docker_client.restart_calls == []
 
     async def test_multiple_containers_are_checked_in_one_cycle(self, engine, docker_client):
-        crashed, crashed_info = make_container(name="crashed", container_id="a" * 64, status="exited", exit_code=1)
-        running, running_info = make_container(name="running", container_id="b" * 64, status="running")
+        crashed, crashed_info = make_container(
+            name="crashed", container_id="a" * 64, status="exited", exit_code=1
+        )
+        running, running_info = make_container(
+            name="running", container_id="b" * 64, status="running"
+        )
         unlabelled, unlabelled_info = make_container(
-            name="unlabelled", container_id="c" * 64, status="exited", exit_code=1, labels={}
+            name="unlabelled",
+            container_id="c" * 64,
+            status="exited",
+            exit_code=1,
+            labels={},
         )
         for container, info in (
             (crashed, crashed_info),

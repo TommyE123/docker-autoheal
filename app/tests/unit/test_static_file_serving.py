@@ -150,7 +150,12 @@ async def test_serve_static_file_unexpected_error_becomes_500(static_dir, monkey
         (api_module.serve_favicon, (), "favicon.svg", "image/svg+xml"),
         (api_module.serve_screenshot_narrow, (), "screenshot-narrow.png", "image/png"),
         (api_module.serve_screenshot_wide, (), "screenshot-wide.png", "image/png"),
-        (api_module.serve_workbox, ("abc123",), "workbox-abc123.js", "application/javascript"),
+        (
+            api_module.serve_workbox,
+            ("abc123",),
+            "workbox-abc123.js",
+            "application/javascript",
+        ),
         (api_module.serve_pwa_icon, ("192x192",), "pwa-192x192.png", "image/png"),
         (
             api_module.serve_maskable_icon,
@@ -175,9 +180,7 @@ async def test_pwa_root_endpoint_serves_expected_file(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "endpoint", [api_module.serve_pwa_icon, api_module.serve_maskable_icon]
-)
+@pytest.mark.parametrize("endpoint", [api_module.serve_pwa_icon, api_module.serve_maskable_icon])
 @pytest.mark.parametrize("size", ["../../etc/passwd", "192x192/../..", "abc"])
 async def test_icon_endpoints_reject_non_numeric_sizes(static_dir, endpoint, size):
     with pytest.raises(HTTPException) as exc_info:
@@ -393,7 +396,10 @@ async def test_serve_static_file_logs_unexpected_error(static_dir, monkeypatch, 
 
     monkeypatch.setattr(api_module, "get_static_file_path", explode)
 
-    with caplog.at_level("ERROR", logger=api_module.logger.name), pytest.raises(HTTPException):
+    with (
+        caplog.at_level("ERROR", logger=api_module.logger.name),
+        pytest.raises(HTTPException),
+    ):
         await serve_static_file("sw.js")
 
     assert "Error serving static file sw.js: filesystem went away" in caplog.text
