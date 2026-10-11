@@ -9,6 +9,10 @@ import aiohttp
 
 logger = logging.getLogger(__name__)
 
+# A genuine Uptime-Kuma sample: monitor_status or app_version at the start of a line,
+# followed by its label set. app_version is present even when no monitors exist.
+_METRICS_SAMPLE_PATTERN = re.compile(r"^(?:monitor_status|app_version)\{", re.MULTILINE)
+
 
 class UptimeKumaClient:
     """Client for interacting with Uptime-Kuma API using /metrics endpoint"""
@@ -50,8 +54,13 @@ class UptimeKumaClient:
             logger.warning("Failed to connect to Uptime-Kuma: %s", e)
             return False
 
-    async def get_all_monitors(self) -> list[dict]:
-        """Fetch all monitors from /metrics endpoint"""
+    async def get_all_monitors(self) -> list[dict] | None:
+        """Fetch all monitors from /metrics endpoint.
+
+        Returns None if the request fails or the response is not Uptime-Kuma metrics,
+        so callers can tell a failed fetch apart from a successful response that
+        contains no monitors (an empty list).
+        """
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(
@@ -61,15 +70,25 @@ class UptimeKumaClient:
                 ) as response:
                     if response.status != 200:
                         logger.error("Failed to fetch metrics: HTTP %s", response.status)
-                        return []
+                        return None
 
                     text = await response.text()
+                    # A 200 that is not Uptime-Kuma metrics (e.g. a proxy login page) is
+                    # a failed fetch, not an empty monitor list. Require a real metrics
+                    # sample at the start of a line, not just the marker text, so a page
+                    # that merely mentions "app_version" is rejected.
+                    if not _METRICS_SAMPLE_PATTERN.search(text):
+                        logger.error(
+                            "Failed to fetch monitors: response is not Uptime-Kuma metrics"
+                        )
+                        return None
+
                     monitors = self._parse_monitors_from_metrics(text)
                     logger.debug("Parsed %s monitors from metrics", len(monitors))
                     return monitors
         except Exception as e:
             logger.error("Failed to fetch monitors: %s", e)
-            return []
+            return None
 
     def _parse_monitors_from_metrics(self, metrics_text: str) -> list[dict]:
         """Parse monitor data from Prometheus metrics format"""
@@ -104,7 +123,7 @@ class UptimeKumaClient:
     async def get_monitor_status(self, monitor_id: int) -> int | None:
         """Get status of a specific monitor by ID"""
         # Since we use hashed IDs, we need to fetch all monitors and find the matching one
-        monitors = await self.get_all_monitors()
+        monitors = await self.get_all_monitors() or []
         for monitor in monitors:
             if monitor['id'] == monitor_id:
                 return monitor['status']
