@@ -199,8 +199,20 @@ class TestGetAllMonitors:
 
     @pytest.mark.parametrize(
         "body",
-        ["<html><body>Please sign in</body></html>", "", "some_other_metric 1\n"],
-        ids=["html-login-page", "empty-body", "unrelated-metrics"],
+        [
+            "<html><body>Please sign in</body></html>",
+            "",
+            "some_other_metric 1\n",
+            "<html><script>window.app_version = '1.23.0'</script></html>",
+            "<html>monitor_status unavailable</html>",
+        ],
+        ids=[
+            "html-login-page",
+            "empty-body",
+            "unrelated-metrics",
+            "html-mentioning-app-version",
+            "html-mentioning-monitor-status",
+        ],
     )
     async def test_returns_none_when_200_response_is_not_uptime_kuma_metrics(
         self, monkeypatch, body

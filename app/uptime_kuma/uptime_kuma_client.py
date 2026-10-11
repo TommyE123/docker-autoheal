@@ -9,6 +9,10 @@ import aiohttp
 
 logger = logging.getLogger(__name__)
 
+# A genuine Uptime-Kuma sample: monitor_status or app_version at the start of a line,
+# followed by its label set. app_version is present even when no monitors exist.
+_METRICS_SAMPLE_PATTERN = re.compile(r"^(?:monitor_status|app_version)\{", re.MULTILINE)
+
 
 class UptimeKumaClient:
     """Client for interacting with Uptime-Kuma API using /metrics endpoint"""
@@ -69,10 +73,11 @@ class UptimeKumaClient:
                         return None
 
                     text = await response.text()
-                    # Same validity check as connect(): a 200 that is not Uptime-Kuma
-                    # metrics (e.g. a proxy login page) is a failed fetch, not an
-                    # empty monitor list.
-                    if "monitor_status" not in text and "app_version" not in text:
+                    # A 200 that is not Uptime-Kuma metrics (e.g. a proxy login page) is
+                    # a failed fetch, not an empty monitor list. Require a real metrics
+                    # sample at the start of a line, not just the marker text, so a page
+                    # that merely mentions "app_version" is rejected.
+                    if not _METRICS_SAMPLE_PATTERN.search(text):
                         logger.error(
                             "Failed to fetch monitors: response is not Uptime-Kuma metrics"
                         )
