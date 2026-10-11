@@ -117,7 +117,9 @@ async def emit_one_event_of_each_type(engine, docker_client) -> None:
 
     # "auto_unquarantine": a quarantined container found healthy again.
     container, info = make_container(
-        name="auto-unquarantine-target", container_id=AUTO_UNQUARANTINE_ID, status="running"
+        name="auto-unquarantine-target",
+        container_id=AUTO_UNQUARANTINE_ID,
+        status="running",
     )
     docker_client.add_container(container, info)
     config_manager.quarantine_container("auto-unquarantine-target")

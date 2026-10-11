@@ -65,7 +65,9 @@ def test_restart_counts_persist_and_can_be_cleared(isolated_config_manager, monk
     assert reloaded.get_total_restart_count("web") == 0
 
 
-def test_restart_count_ignores_window_seconds_and_never_expires(isolated_config_manager):
+def test_restart_count_ignores_window_seconds_and_never_expires(
+    isolated_config_manager,
+):
     """get_restart_count() accepts a window_seconds argument for API
     compatibility, but the underlying counter (config.containers.restart_counts)
     has no timestamp component, so it is never actually filtered by window or
@@ -82,7 +84,9 @@ def test_restart_count_ignores_window_seconds_and_never_expires(isolated_config_
     assert isolated_config_manager.get_restart_count("web", window_seconds=10_000_000) == 3
 
 
-def test_cleanup_restart_counts_is_a_no_op_that_preserves_all_entries(isolated_config_manager):
+def test_cleanup_restart_counts_is_a_no_op_that_preserves_all_entries(
+    isolated_config_manager,
+):
     """cleanup_restart_counts() is documented in its own code comment as
     disabled ('DISABLED to preserve manual entries'), so restart counts for
     containers absent from active_container_ids must survive the call
@@ -270,7 +274,10 @@ def test_export_and_import_round_trip_reproduces_full_config_state(
     assert imported_config.uptime_kuma_mappings[0].container_id == "web"
     assert imported.get_custom_health_check("web") == http_check
     assert imported.get_custom_health_check("db") == tcp_check
-    assert imported.get_all_custom_health_checks() == {"web": http_check, "db": tcp_check}
+    assert imported.get_all_custom_health_checks() == {
+        "web": http_check,
+        "db": tcp_check,
+    }
     assert imported.get_total_restart_count("web") == 2
 
 

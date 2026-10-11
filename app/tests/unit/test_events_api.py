@@ -60,17 +60,19 @@ def test_events_api_serializes_utc_timestamp(isolated_config_manager):
 def test_events_api_preserves_legacy_naive_timestamp_text(isolated_config_manager):
     naive_timestamp = "2024-01-01T12:00:00"
     isolated_config_manager.EVENTS_FILE.write_text(
-        json.dumps([
-            {
-                "timestamp": naive_timestamp,
-                "container_id": "test-container",
-                "container_name": "test-container",
-                "event_type": "restart",
-                "restart_count": 1,
-                "status": "success",
-                "message": "legacy event",
-            }
-        ])
+        json.dumps(
+            [
+                {
+                    "timestamp": naive_timestamp,
+                    "container_id": "test-container",
+                    "container_name": "test-container",
+                    "event_type": "restart",
+                    "restart_count": 1,
+                    "status": "success",
+                    "message": "legacy event",
+                }
+            ]
+        )
     )
     isolated_config_manager._event_log = isolated_config_manager._load_events()
 
@@ -134,7 +136,9 @@ def test_events_can_be_filtered_by_event_type(isolated_config_manager):
     assert [e["container_name"] for e in events] == ["web", "db"]
 
 
-def test_events_can_be_filtered_by_container_substring_ignoring_case(isolated_config_manager):
+def test_events_can_be_filtered_by_container_substring_ignoring_case(
+    isolated_config_manager,
+):
     _seed(
         isolated_config_manager,
         ("Web (stack_web)", "restart"),
@@ -159,7 +163,9 @@ def test_filters_combine(isolated_config_manager):
     assert [(e["container_name"], e["event_type"]) for e in events] == [("web", "quarantine")]
 
 
-def test_empty_event_type_matches_only_events_with_an_empty_type(isolated_config_manager):
+def test_empty_event_type_matches_only_events_with_an_empty_type(
+    isolated_config_manager,
+):
     _seed(
         isolated_config_manager,
         ("web", "restart"),
@@ -180,7 +186,9 @@ def test_empty_container_matches_every_event(isolated_config_manager):
     assert [e["container_name"] for e in events] == ["web", "db"]
 
 
-def test_limit_applies_after_filtering_and_keeps_the_most_recent(isolated_config_manager):
+def test_limit_applies_after_filtering_and_keeps_the_most_recent(
+    isolated_config_manager,
+):
     _seed(
         isolated_config_manager,
         ("web", "restart"),

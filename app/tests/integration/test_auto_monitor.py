@@ -60,4 +60,6 @@ def test_container_with_monitor_label_is_auto_monitored(running_service, disposa
     finally:
         # Left unguarded deliberately: if restoring the original config fails,
         # the test must fail loudly, not leave the running service modified.
-        requests.put(f"{AUTOHEAL_BASE_URL}/api/config", json=original_config, timeout=5).raise_for_status()
+        requests.put(
+            f"{AUTOHEAL_BASE_URL}/api/config", json=original_config, timeout=5
+        ).raise_for_status()

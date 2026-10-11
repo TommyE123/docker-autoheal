@@ -23,7 +23,10 @@ docker_client: DockerClientWrapper | None = None
 monitoring_engine: MonitoringEngine | None = None
 
 
-def init_api(docker_client_instance: DockerClientWrapper, monitoring_engine_instance: MonitoringEngine):
+def init_api(
+    docker_client_instance: DockerClientWrapper,
+    monitoring_engine_instance: MonitoringEngine,
+):
     """Initialize API with Docker client and monitoring engine"""
     global docker_client, monitoring_engine
     docker_client = docker_client_instance

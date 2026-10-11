@@ -73,9 +73,7 @@ class TestConfigurationEndpoints:
             (update_restart_config, RestartConfig(mode="both", max_restarts=7)),
         ],
     )
-    async def test_configuration_update_errors_return_500(
-        self, monkeypatch, endpoint, payload
-    ):
+    async def test_configuration_update_errors_return_500(self, monkeypatch, endpoint, payload):
         monkeypatch.setattr(
             config_manager,
             "update_config",
@@ -112,7 +110,9 @@ class TestObservabilityConfig:
         assert config_manager.get_config().observability.log_level == "DEBUG"
         assert logging.getLogger().level == logging.DEBUG
 
-    async def test_update_observability_config_unrecognized_log_level_falls_back_to_info(self):
+    async def test_update_observability_config_unrecognized_log_level_falls_back_to_info(
+        self,
+    ):
         logging.getLogger().setLevel(logging.DEBUG)
 
         result = await update_observability_config({"log_level": "NOT_A_LEVEL"})
@@ -169,10 +169,7 @@ class TestConfigExportImport:
         response = await export_config()
 
         assert response.status_code == 200
-        assert (
-            "attachment; filename=autoheal-config-"
-            in response.headers["content-disposition"]
-        )
+        assert "attachment; filename=autoheal-config-" in response.headers["content-disposition"]
         body = json.loads(bytes(response.body))
         assert body["monitor"]["interval_seconds"] == 77
 
@@ -192,9 +189,7 @@ class TestConfigExportImport:
         new_config = config_manager.get_config()
         new_config.monitor.interval_seconds = 123
         payload = new_config.model_dump_json()
-        upload = UploadFile(
-            file=BytesIO(payload.encode("utf-8")), filename="config.json"
-        )
+        upload = UploadFile(file=BytesIO(payload.encode("utf-8")), filename="config.json")
 
         result = await api_import_config(upload)
 

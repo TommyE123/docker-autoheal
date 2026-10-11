@@ -63,9 +63,7 @@ class TestAutoHealServiceStop:
     @staticmethod
     def _messages(caplog, level):
         return [
-            r.getMessage()
-            for r in caplog.records
-            if r.name == "app.main" and r.levelname == level
+            r.getMessage() for r in caplog.records if r.name == "app.main" and r.levelname == level
         ]
 
     @pytest.mark.asyncio
@@ -116,9 +114,7 @@ class TestAutoHealServiceStop:
     async def test_stop_continues_after_notification_manager_stop_raises(self, caplog):
         service = AutoHealService()
         service.notification_manager = MagicMock()
-        service.notification_manager.stop = AsyncMock(
-            side_effect=RuntimeError("notif boom")
-        )
+        service.notification_manager.stop = AsyncMock(side_effect=RuntimeError("notif boom"))
         service.docker_client = MagicMock()
 
         with caplog.at_level("WARNING", logger="app.main"):
@@ -212,9 +208,7 @@ class TestAutoHealServiceStop:
             await service.stop()  # must not raise
 
         assert service.running is False
-        assert self._messages(caplog, "WARNING") == [
-            "Error closing Docker client: close boom"
-        ]
+        assert self._messages(caplog, "WARNING") == ["Error closing Docker client: close boom"]
         [record] = [r for r in caplog.records if r.levelname == "WARNING"]
         assert record.exc_info is not None
         assert isinstance(record.exc_info[1], RuntimeError)
@@ -238,9 +232,14 @@ class TestAutoHealServiceStartFailure:
 
     @pytest.mark.asyncio
     async def test_docker_client_init_failure_stops_notifications_and_reraises(self):
-        with patch('app.main.config_manager') as mock_cm, \
-             patch('app.main.DockerClientWrapper', side_effect=RuntimeError("docker unavailable")), \
-             patch('app.main.notification_manager') as mock_notif:
+        with (
+            patch("app.main.config_manager") as mock_cm,
+            patch(
+                "app.main.DockerClientWrapper",
+                side_effect=RuntimeError("docker unavailable"),
+            ),
+            patch("app.main.notification_manager") as mock_notif,
+        ):
             mock_cm.get_config.return_value = self._make_config()
             mock_notif.stop = AsyncMock()
 
@@ -255,11 +254,15 @@ class TestAutoHealServiceStartFailure:
             assert service.running is False
 
     @pytest.mark.asyncio
-    async def test_monitoring_engine_init_failure_reraises_and_keeps_docker_client(self):
-        with patch('app.main.config_manager') as mock_cm, \
-             patch('app.main.DockerClientWrapper'), \
-             patch('app.main.MonitoringEngine', side_effect=RuntimeError("engine broke")), \
-             patch('app.main.notification_manager') as mock_notif:
+    async def test_monitoring_engine_init_failure_reraises_and_keeps_docker_client(
+        self,
+    ):
+        with (
+            patch("app.main.config_manager") as mock_cm,
+            patch("app.main.DockerClientWrapper"),
+            patch("app.main.MonitoringEngine", side_effect=RuntimeError("engine broke")),
+            patch("app.main.notification_manager") as mock_notif,
+        ):
             mock_cm.get_config.return_value = self._make_config()
             mock_notif.stop = AsyncMock()
 
@@ -500,9 +503,11 @@ class TestAutoHealServiceStartFailure:
 
     @pytest.mark.asyncio
     async def test_config_load_failure_reraises_before_any_component_created(self):
-        with patch('app.main.config_manager') as mock_cm, \
-             patch('app.main.DockerClientWrapper') as mock_docker_cls, \
-             patch('app.main.notification_manager') as mock_notif:
+        with (
+            patch("app.main.config_manager") as mock_cm,
+            patch("app.main.DockerClientWrapper") as mock_docker_cls,
+            patch("app.main.notification_manager") as mock_notif,
+        ):
             mock_cm.get_config.side_effect = RuntimeError("config broke")
             mock_notif.stop = AsyncMock()
 
@@ -519,9 +524,11 @@ class TestAutoHealServiceStartFailure:
     async def test_startup_log_reports_the_api_version(self, caplog):
         # The version comes from the FastAPI app (kept current by Release Please),
         # not a literal in main.py that can go stale.
-        with patch('app.main.config_manager') as mock_cm, \
-             patch('app.main.notification_manager') as mock_notif, \
-             caplog.at_level("INFO", logger="app.main"):
+        with (
+            patch("app.main.config_manager") as mock_cm,
+            patch("app.main.notification_manager") as mock_notif,
+            caplog.at_level("INFO", logger="app.main"),
+        ):
             mock_cm.get_config.side_effect = RuntimeError("config broke")
             mock_notif.stop = AsyncMock()
 
@@ -532,13 +539,15 @@ class TestAutoHealServiceStartFailure:
 
     @pytest.mark.asyncio
     async def test_uptime_kuma_start_failure_does_not_abort_startup(self):
-        with patch('app.main.config_manager') as mock_cm, \
-             patch('app.main.DockerClientWrapper'), \
-             patch('app.main.MonitoringEngine') as mock_engine_cls, \
-             patch('app.main.UptimeKumaMonitor') as mock_kuma_cls, \
-             patch('app.main.init_api'), \
-             patch('app.main.notification_manager') as mock_notif, \
-             patch('app.main.start_http_server'):
+        with (
+            patch("app.main.config_manager") as mock_cm,
+            patch("app.main.DockerClientWrapper"),
+            patch("app.main.MonitoringEngine") as mock_engine_cls,
+            patch("app.main.UptimeKumaMonitor") as mock_kuma_cls,
+            patch("app.main.init_api"),
+            patch("app.main.notification_manager") as mock_notif,
+            patch("app.main.start_http_server"),
+        ):
             mock_cm.get_config.return_value = self._make_config(uptime_kuma_enabled=True)
             mock_engine_cls.return_value.start = AsyncMock()
             mock_kuma_cls.return_value.start = AsyncMock(side_effect=RuntimeError("kuma down"))
@@ -615,9 +624,7 @@ class TestUiUrl:
         assert get_ui_url(self._config()) == "http://192.0.2.10:3131"
 
     @pytest.mark.asyncio
-    async def test_startup_log_reports_the_public_url_when_supplied(
-        self, monkeypatch, caplog
-    ):
+    async def test_startup_log_reports_the_public_url_when_supplied(self, monkeypatch, caplog):
         monkeypatch.setenv("AUTOHEAL_PUBLIC_HOST", "192.0.2.10")
         monkeypatch.setenv("AUTOHEAL_PUBLIC_PORT", "3132")
 
@@ -648,10 +655,7 @@ class TestUiUrl:
         log = await self._start_and_capture_log(self._config(), caplog)
 
         assert "Web UI published on host port 3132 (container port 3131)" in log
-        assert (
-            "API documentation published on host port 3132 at /docs (container port 3131)"
-            in log
-        )
+        assert "API documentation published on host port 3132 at /docs (container port 3131)" in log
         assert "0.0.0.0" not in log
         assert "http://" not in log
         assert "listening on" not in log
@@ -671,9 +675,7 @@ class TestUiUrl:
         assert "available at" not in log
 
     @pytest.mark.asyncio
-    async def test_server_still_binds_to_all_interfaces_with_a_public_host_set(
-        self, monkeypatch
-    ):
+    async def test_server_still_binds_to_all_interfaces_with_a_public_host_set(self, monkeypatch):
         monkeypatch.setenv("AUTOHEAL_PUBLIC_HOST", "192.0.2.10")
         monkeypatch.setenv("AUTOHEAL_PUBLIC_PORT", "3132")
 
@@ -720,8 +722,10 @@ class TestRunApiServer:
         config.ui.listen_address = "127.0.0.1"
         config.ui.listen_port = 3131
 
-        with patch('app.main.config_manager') as mock_cm, \
-             patch('app.main.uvicorn') as mock_uvicorn:
+        with (
+            patch("app.main.config_manager") as mock_cm,
+            patch("app.main.uvicorn") as mock_uvicorn,
+        ):
             mock_cm.get_config.return_value = config
             mock_server_instance = MagicMock()
             mock_server_instance.serve = AsyncMock()
@@ -745,13 +749,13 @@ class TestAutoHealServiceRun:
     @pytest.mark.asyncio
     async def test_run_starts_loops_then_stops(self):
         service = AutoHealService()
-        service.start = AsyncMock(side_effect=lambda: setattr(service, 'running', True))
+        service.start = AsyncMock(side_effect=lambda: setattr(service, "running", True))
         service.stop = AsyncMock()
 
         async def fake_sleep(_delay):
             service.running = False
 
-        with patch('app.main.asyncio.sleep', side_effect=fake_sleep):
+        with patch("app.main.asyncio.sleep", side_effect=fake_sleep):
             await service.run()
 
         service.start.assert_awaited_once()
@@ -760,10 +764,10 @@ class TestAutoHealServiceRun:
     @pytest.mark.asyncio
     async def test_run_stops_on_cancelled_error_during_sleep(self):
         service = AutoHealService()
-        service.start = AsyncMock(side_effect=lambda: setattr(service, 'running', True))
+        service.start = AsyncMock(side_effect=lambda: setattr(service, "running", True))
         service.stop = AsyncMock()
 
-        with patch('app.main.asyncio.sleep', side_effect=asyncio.CancelledError):
+        with patch("app.main.asyncio.sleep", side_effect=asyncio.CancelledError):
             await service.run()  # CancelledError must be swallowed, not propagated
 
         service.stop.assert_awaited_once()
@@ -779,9 +783,11 @@ class TestMain:
         fake_service.run = AsyncMock()
         fake_service.running = False
 
-        with patch('app.main.signal.signal') as mock_signal, \
-             patch('app.main.AutoHealService', return_value=fake_service), \
-             patch('app.main.run_api_server', new=AsyncMock()):
+        with (
+            patch("app.main.signal.signal") as mock_signal,
+            patch("app.main.AutoHealService", return_value=fake_service),
+            patch("app.main.run_api_server", new=AsyncMock()),
+        ):
             await main_module.main()
 
             mock_signal.assert_any_call(signal.SIGINT, signal_handler)
@@ -797,9 +803,11 @@ class TestMain:
         fake_service.stop = AsyncMock()
         fake_service.running = True
 
-        with patch('app.main.signal.signal'), \
-             patch('app.main.AutoHealService', return_value=fake_service), \
-             patch('app.main.run_api_server', new=AsyncMock()):
+        with (
+            patch("app.main.signal.signal"),
+            patch("app.main.AutoHealService", return_value=fake_service),
+            patch("app.main.run_api_server", new=AsyncMock()),
+        ):
             await main_module.main()
 
             fake_service.stop.assert_awaited_once()
@@ -810,10 +818,12 @@ class TestMain:
         fake_service.run = MagicMock(return_value=None)
         fake_service.running = False
 
-        with patch('app.main.signal.signal'), \
-             patch('app.main.AutoHealService', return_value=fake_service), \
-             patch('app.main.run_api_server', new=MagicMock(return_value=None)), \
-             patch('app.main.asyncio.gather', side_effect=asyncio.CancelledError):
+        with (
+            patch("app.main.signal.signal"),
+            patch("app.main.AutoHealService", return_value=fake_service),
+            patch("app.main.run_api_server", new=MagicMock(return_value=None)),
+            patch("app.main.asyncio.gather", side_effect=asyncio.CancelledError),
+        ):
             await main_module.main()  # must not raise
 
     @pytest.mark.asyncio
@@ -823,10 +833,12 @@ class TestMain:
         fake_service.stop = AsyncMock()
         fake_service.running = True
 
-        with patch('app.main.signal.signal'), \
-             patch('app.main.AutoHealService', return_value=fake_service), \
-             patch('app.main.run_api_server', new=MagicMock(return_value=None)), \
-             patch('app.main.asyncio.gather', side_effect=RuntimeError("gather boom")):
+        with (
+            patch("app.main.signal.signal"),
+            patch("app.main.AutoHealService", return_value=fake_service),
+            patch("app.main.run_api_server", new=MagicMock(return_value=None)),
+            patch("app.main.asyncio.gather", side_effect=RuntimeError("gather boom")),
+        ):
             await main_module.main()  # must not raise
 
             fake_service.stop.assert_awaited_once()

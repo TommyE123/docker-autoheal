@@ -19,7 +19,9 @@ from app.api.routes.notifications import (
     update_notification_service,
     update_notifications_config,
 )
-from app.api.routes.notifications import test_notification_service as api_test_notification_service
+from app.api.routes.notifications import (
+    test_notification_service as api_test_notification_service,
+)
 from app.config.config_manager import NotificationService, config_manager
 
 
@@ -36,9 +38,7 @@ class TestNotificationsConfig:
         config = config_manager.get_config()
         config.notifications.enabled = True
         config.notifications.services = [
-            NotificationService(
-                name="Slack", type="slack", url="https://example.invalid/slack"
-            )
+            NotificationService(name="Slack", type="slack", url="https://example.invalid/slack")
         ]
         config_manager.update_config(config)
 
@@ -48,9 +48,7 @@ class TestNotificationsConfig:
         assert result["services"][0]["name"] == "Slack"
 
     async def test_update_notifications_config_updates_enabled_and_filters(self):
-        result = await update_notifications_config(
-            {"enabled": True, "event_filters": ["restart"]}
-        )
+        result = await update_notifications_config({"enabled": True, "event_filters": ["restart"]})
 
         assert result["status"] == "success"
         updated = config_manager.get_config()
@@ -92,9 +90,7 @@ class TestNotificationsConfig:
 
         assert exc_info.value.status_code == 500
 
-    async def test_update_notifications_config_persistence_error_returns_500(
-        self, monkeypatch
-    ):
+    async def test_update_notifications_config_persistence_error_returns_500(self, monkeypatch):
         monkeypatch.setattr(
             config_manager,
             "update_config",
@@ -211,9 +207,7 @@ class TestNotificationServiceCrud:
 
         assert exc_info.value.status_code == 404
 
-    async def test_update_notification_service_persistence_error_returns_500(
-        self, monkeypatch
-    ):
+    async def test_update_notification_service_persistence_error_returns_500(self, monkeypatch):
         await add_notification_service(
             {
                 "name": "Webhook",
@@ -252,9 +246,7 @@ class TestNotificationServiceCrud:
 
         assert exc_info.value.status_code == 404
 
-    async def test_delete_notification_service_persistence_error_returns_500(
-        self, monkeypatch
-    ):
+    async def test_delete_notification_service_persistence_error_returns_500(self, monkeypatch):
         await add_notification_service(
             {
                 "name": "Webhook",
@@ -286,7 +278,8 @@ class TestNotificationServiceTest:
             }
         )
         monkeypatch.setattr(
-            "app.api.state.notification_manager.test_notification", fake_test_notification
+            "app.api.state.notification_manager.test_notification",
+            fake_test_notification,
         )
 
         result = await api_test_notification_service("Webhook")
@@ -302,7 +295,8 @@ class TestNotificationServiceTest:
             return_value={"success": False, "message": "Service 'Webhook' not found"}
         )
         monkeypatch.setattr(
-            "app.api.state.notification_manager.test_notification", fake_test_notification
+            "app.api.state.notification_manager.test_notification",
+            fake_test_notification,
         )
 
         with pytest.raises(HTTPException) as exc_info:

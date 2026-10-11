@@ -25,11 +25,11 @@ class TestAutoUnquarantine:
 
         try:
             # Patch the data directory
-            with patch.object(ConfigManager, 'DATA_DIR', temp_dir):
-                with patch.object(ConfigManager, '_ensure_data_directory'):
+            with patch.object(ConfigManager, "DATA_DIR", temp_dir):
+                with patch.object(ConfigManager, "_ensure_data_directory"):
                     manager = ConfigManager.__new__(ConfigManager)
                     manager.DATA_DIR = temp_dir
-                    manager._lock = __import__('threading').RLock()
+                    manager._lock = __import__("threading").RLock()
                     manager._quarantined_containers = set()
 
                     # Test quarantine operations
@@ -51,8 +51,9 @@ class TestAutoUnquarantine:
         config = NotificationsConfig()
 
         # Check that auto_unquarantine is in the default filters
-        assert "auto_unquarantine" in config.event_filters, \
+        assert "auto_unquarantine" in config.event_filters, (
             "auto_unquarantine should be in default notification event filters"
+        )
 
     def test_auto_heal_event_model(self):
         """Test that AutoHealEvent can accept auto_unquarantine event type"""
@@ -66,7 +67,7 @@ class TestAutoUnquarantine:
             event_type="auto_unquarantine",
             restart_count=0,
             status="success",
-            message="Container automatically removed from quarantine - auto-healed and now healthy"
+            message="Container automatically removed from quarantine - auto-healed and now healthy",
         )
 
         assert event.event_type == "auto_unquarantine"
@@ -83,9 +84,10 @@ class TestAutoUnquarantine:
         mock_docker = Mock(spec=DockerClientWrapper)
         engine = MonitoringEngine(mock_docker)
 
-        with patch('app.monitor.monitoring_engine.config_manager') as mock_config, \
-             patch('app.monitor.monitoring_engine.notification_manager') as mock_notif:
-
+        with (
+            patch("app.monitor.monitoring_engine.config_manager") as mock_config,
+            patch("app.monitor.monitoring_engine.notification_manager") as mock_notif,
+        ):
             # Setup mocks
             mock_config.unquarantine_container = Mock()
             mock_config.clear_restart_history = Mock()
@@ -100,7 +102,7 @@ class TestAutoUnquarantine:
                 quarantine_id="test_stable_id",
                 recovery_id="test_stable_id",
                 container_name="test-container",
-                container_id="test123abc"
+                container_id="test123abc",
             )
 
             # Verify unquarantine was called
@@ -140,7 +142,7 @@ class TestAutoUnquarantine:
             "name": "test-container",
             "state": {"Status": "running"},
             "health": {"status": "healthy"},
-            "labels": {}
+            "labels": {},
         }
 
         # Create a side_effect that returns container_info when get_container_info is called
@@ -154,10 +156,14 @@ class TestAutoUnquarantine:
         engine.should_monitor_container = Mock(return_value=True)
         engine._evaluate_container_health = AsyncMock(return_value=(False, ""))
 
-        with patch('app.monitor.monitoring_engine.config_manager') as mock_config, \
-             patch('app.monitor.monitoring_engine.notification_manager') as mock_notif, \
-             patch('app.monitor.monitoring_engine.asyncio.to_thread', side_effect=mock_to_thread):
-
+        with (
+            patch("app.monitor.monitoring_engine.config_manager") as mock_config,
+            patch("app.monitor.monitoring_engine.notification_manager") as mock_notif,
+            patch(
+                "app.monitor.monitoring_engine.asyncio.to_thread",
+                side_effect=mock_to_thread,
+            ),
+        ):
             # Setup: container is quarantined by stable_id
             mock_config.is_maintenance_mode.return_value = False
             mock_config.is_quarantined.side_effect = lambda x: x == "test_stable_id"
@@ -200,7 +206,7 @@ class TestAutoUnquarantine:
             "name": "test-container",
             "state": {"Status": "running"},
             "health": {"status": "unhealthy"},
-            "labels": {}
+            "labels": {},
         }
 
         # Create a side_effect that returns container_info when get_container_info is called
@@ -212,19 +218,24 @@ class TestAutoUnquarantine:
         # Mock methods on engine BEFORE entering the with block
         engine.get_stable_identifier = Mock(return_value="test_stable_id")
         engine.should_monitor_container = Mock(return_value=True)
-        engine._evaluate_container_health = AsyncMock(return_value=(True, "Docker health check reports unhealthy"))
+        engine._evaluate_container_health = AsyncMock(
+            return_value=(True, "Docker health check reports unhealthy")
+        )
 
-        with patch('app.monitor.monitoring_engine.config_manager') as mock_config, \
-             patch('app.monitor.monitoring_engine.notification_manager') as mock_notif, \
-             patch('app.monitor.monitoring_engine.asyncio.to_thread', side_effect=mock_to_thread):
-
+        with (
+            patch("app.monitor.monitoring_engine.config_manager") as mock_config,
+            patch("app.monitor.monitoring_engine.notification_manager") as mock_notif,
+            patch(
+                "app.monitor.monitoring_engine.asyncio.to_thread",
+                side_effect=mock_to_thread,
+            ),
+        ):
             # Setup: container is quarantined
             mock_config.is_maintenance_mode.return_value = False
             mock_config.is_quarantined.side_effect = lambda x: x == "test_stable_id"
             mock_config.get_config.return_value = Mock()
             mock_config.unquarantine_container = Mock()
             mock_notif.send_event_notification = AsyncMock()
-
 
             # Call check single container
             await engine._check_single_container(mock_container)
@@ -234,4 +245,3 @@ class TestAutoUnquarantine:
 
             # Verify unquarantine was NOT called (container is still unhealthy)
             mock_config.unquarantine_container.assert_not_called()
-

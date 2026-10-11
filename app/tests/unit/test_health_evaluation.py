@@ -117,7 +117,11 @@ class TestCustomHealthChecks:
         docker_client.add_container(container, info)
         docker_client.health_results["web"] = False
         config_manager.add_custom_health_check(
-            HealthCheckConfig(container_id="web", check_type="http", http_endpoint="http://localhost/health")
+            HealthCheckConfig(
+                container_id="web",
+                check_type="http",
+                http_endpoint="http://localhost/health",
+            )
         )
 
         needs_restart, reason = await engine._evaluate_container_health(container, info)
@@ -165,7 +169,11 @@ class TestCustomHealthChecks:
         docker_client.add_container(container, info)
         docker_client.health_results["web"] = False
         config_manager.add_custom_health_check(
-            HealthCheckConfig(container_id="d" * 64, check_type="http", http_endpoint="http://localhost/")
+            HealthCheckConfig(
+                container_id="d" * 64,
+                check_type="http",
+                http_endpoint="http://localhost/",
+            )
         )
 
         needs_restart, reason = await engine._evaluate_container_health(container, info)
@@ -185,7 +193,9 @@ class TestCustomHealthChecks:
         assert needs_restart is True
         assert reason == "Custom health check failed (docker)"
 
-    async def test_docker_check_type_assumes_healthy_without_native_check(self, engine, docker_client):
+    async def test_docker_check_type_assumes_healthy_without_native_check(
+        self, engine, docker_client
+    ):
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
         docker_client.native_health["web"] = None
@@ -204,9 +214,12 @@ class TestCustomHealthChecks:
             HealthCheckConfig(container_id="web", check_type="carrier-pigeon")
         )
 
-        assert await engine._perform_custom_health_check(
-            container, config_manager.get_custom_health_check("web")
-        ) is True
+        assert (
+            await engine._perform_custom_health_check(
+                container, config_manager.get_custom_health_check("web")
+            )
+            is True
+        )
 
     async def test_health_check_error_is_reported_as_unhealthy(self, engine, docker_client):
         """A Docker API failure during a health check must not escape the engine."""
@@ -214,7 +227,9 @@ class TestCustomHealthChecks:
         docker_client.add_container(container, info)
         docker_client.health_check_error = RuntimeError("docker API unavailable")
         config_manager.add_custom_health_check(
-            HealthCheckConfig(container_id="web", check_type="http", http_endpoint="http://localhost/")
+            HealthCheckConfig(
+                container_id="web", check_type="http", http_endpoint="http://localhost/"
+            )
         )
 
         needs_restart, reason = await engine._evaluate_container_health(container, info)

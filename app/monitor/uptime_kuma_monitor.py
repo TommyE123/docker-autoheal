@@ -8,6 +8,7 @@ This module only handles Uptime Kuma-specific operations (SOLID principles):
 
 Core functionality (restarts, quarantine, events, etc.) is delegated to MonitoringEngine
 """
+
 import asyncio
 import logging
 from collections import Counter
@@ -45,20 +46,27 @@ class UptimeKumaMonitor:
                 return
 
             if not config.uptime_kuma.server_url or not config.uptime_kuma.api_token:
-                logger.info("Uptime-Kuma integration not configured yet - visit http://localhost:3131/config to set up")
+                logger.info(
+                    "Uptime-Kuma integration not configured yet - visit http://localhost:3131/config to set up"
+                )
                 return
 
             self.client = UptimeKumaClient(
                 config.uptime_kuma.server_url,
                 config.uptime_kuma.api_token,  # password (API key or user password)
-                config.uptime_kuma.username    # username (optional, empty for API key)
+                config.uptime_kuma.username,  # username (optional, empty for API key)
             )
 
             # Test connection
-            logger.info("Testing connection to Uptime-Kuma at %s...", config.uptime_kuma.server_url)
+            logger.info(
+                "Testing connection to Uptime-Kuma at %s...",
+                config.uptime_kuma.server_url,
+            )
             if not await self.client.connect():
                 logger.warning("Cannot connect to Uptime-Kuma at %s", config.uptime_kuma.server_url)
-                logger.info("Uptime-Kuma monitoring will remain disabled until connection is successful")
+                logger.info(
+                    "Uptime-Kuma monitoring will remain disabled until connection is successful"
+                )
                 return
 
             logger.info("Uptime-Kuma connection successful")
@@ -71,7 +79,9 @@ class UptimeKumaMonitor:
             self._task = asyncio.create_task(self._monitoring_loop())
         except Exception as e:
             logger.warning("Failed to start Uptime-Kuma monitor: %s", e)
-            logger.info("Uptime-Kuma integration is optional - the service will continue without it")
+            logger.info(
+                "Uptime-Kuma integration is optional - the service will continue without it"
+            )
 
     async def stop(self):
         """Stop Uptime-Kuma monitoring"""
@@ -95,7 +105,7 @@ class UptimeKumaMonitor:
             return
 
         monitors = await self.client.get_all_monitors() or []
-        self._monitor_cache = {m['friendly_name']: m for m in monitors}
+        self._monitor_cache = {m["friendly_name"]: m for m in monitors}
         logger.info("Cached %s Uptime-Kuma monitors", len(self._monitor_cache))
 
     async def _monitoring_loop(self):
@@ -151,7 +161,7 @@ class UptimeKumaMonitor:
         # identify a monitor only by that name. A name reported more than once is
         # ambiguous: picking either monitor's status could restart a container based
         # on a monitor that is not its own, so such a name yields no status at all.
-        status_by_name = {m['friendly_name']: m['status'] for m in monitors}
+        status_by_name = {m["friendly_name"]: m["status"] for m in monitors}
         monitor_count_by_name = Counter(m["friendly_name"] for m in monitors)
         ambiguous_mappings: set[tuple[str, str]] = set()
         # A container can have several mappings. If any of them is ambiguous, none
@@ -249,4 +259,3 @@ class UptimeKumaMonitor:
 
         # Status 0 = down
         return status == 0
-

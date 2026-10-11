@@ -45,7 +45,7 @@ async def get_events(
                 "event_type": event.event_type,
                 "restart_count": event.restart_count,
                 "status": event.status,
-                "message": event.message
+                "message": event.message,
             }
             for event in events
         ]

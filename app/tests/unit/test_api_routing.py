@@ -117,9 +117,7 @@ async def _request(
         nonlocal status, headers, body
         if message["type"] == "http.response.start":
             status = message["status"]
-            headers = {
-                key.decode().lower(): value.decode() for key, value in message["headers"]
-            }
+            headers = {key.decode().lower(): value.decode() for key, value in message["headers"]}
         elif message["type"] == "http.response.body":
             body += message.get("body", b"")
 
@@ -156,9 +154,7 @@ class TestRouterRegistration:
             first_positions.append((module.__name__, registered.index(first)))
 
         positions = [position for _, position in first_positions]
-        assert positions == sorted(positions), (
-            f"routers registered out of order: {first_positions}"
-        )
+        assert positions == sorted(positions), f"routers registered out of order: {first_positions}"
 
     def test_react_router_catch_all_is_registered_last(self):
         registered = _registered_routes()

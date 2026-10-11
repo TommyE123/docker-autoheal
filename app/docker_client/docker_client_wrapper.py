@@ -217,7 +217,7 @@ class DockerClientWrapper:
             return {
                 "status": health.get("Status"),  # healthy, unhealthy, starting
                 "failing_streak": health.get("FailingStreak", 0),
-                "log": health.get("Log", [])[-1] if health.get("Log") else None
+                "log": health.get("Log", [])[-1] if health.get("Log") else None,
             }
         return None
 
@@ -266,13 +266,18 @@ class DockerClientWrapper:
         """
         try:
             exec_result = container.exec_run(command)
-            return exec_result.exit_code, exec_result.output.decode('utf-8')
+            return exec_result.exit_code, exec_result.output.decode("utf-8")
         except Exception as e:
             logger.error("Failed to execute command in container %s: %s", container.name, e)
             return -1, str(e)
 
-    def check_http_health(self, container: Container, endpoint: str,
-                         expected_status: int = 200, timeout: int = 5) -> bool:
+    def check_http_health(
+        self,
+        container: Container,
+        endpoint: str,
+        expected_status: int = 200,
+        timeout: int = 5,
+    ) -> bool:
         """
         Perform HTTP health check on container
         Args:

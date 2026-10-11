@@ -79,9 +79,7 @@ class TestListContainers:
         assert result[0].uptime_kuma_status == 1
         assert result[0].uptime_kuma_monitor_name == "Web Monitor"
 
-    async def test_reports_unknown_status_when_uptime_kuma_monitor_not_initialized(
-        self, wired_api
-    ):
+    async def test_reports_unknown_status_when_uptime_kuma_monitor_not_initialized(self, wired_api):
         docker_client, engine = wired_api
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
@@ -97,9 +95,7 @@ class TestListContainers:
         assert result[0].uptime_kuma_status == 4
         assert result[0].uptime_kuma_monitor_name is None
 
-    async def test_reports_unmapped_status_when_uptime_kuma_monitor_has_no_mapping(
-        self, wired_api
-    ):
+    async def test_reports_unmapped_status_when_uptime_kuma_monitor_has_no_mapping(self, wired_api):
         docker_client, engine = wired_api
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
@@ -249,13 +245,9 @@ class TestUpdateContainerSelection:
             ),
         ],
     )
-    async def test_enabling_uses_label_based_stable_id(
-        self, wired_api, labels, expected_id
-    ):
+    async def test_enabling_uses_label_based_stable_id(self, wired_api, labels, expected_id):
         docker_client, _engine = wired_api
-        container, info = make_container(
-            name="api-1", container_id="a" * 64, labels=labels
-        )
+        container, info = make_container(name="api-1", container_id="a" * 64, labels=labels)
         docker_client.add_container(container, info)
 
         await update_container_selection(
@@ -264,9 +256,7 @@ class TestUpdateContainerSelection:
 
         assert expected_id in config_manager.get_config().containers.selected
 
-    async def test_disabling_unresolved_container_falls_back_to_identifier(
-        self, wired_api
-    ):
+    async def test_disabling_unresolved_container_falls_back_to_identifier(self, wired_api):
         config = config_manager.get_config()
         config.containers.selected = ["ghost-container"]
         config_manager.update_config(config)

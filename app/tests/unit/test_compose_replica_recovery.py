@@ -26,7 +26,11 @@ COMPOSE = {
 
 def replica(number, status="running", exit_code=0, container_id=None, extra_labels=None):
     """A replica of ``myapp``/``web`` with the given Compose container number."""
-    labels = {"autoheal": "true", **COMPOSE, "com.docker.compose.container-number": str(number)}
+    labels = {
+        "autoheal": "true",
+        **COMPOSE,
+        "com.docker.compose.container-number": str(number),
+    }
     labels.update(extra_labels or {})
     return make_container(
         name=f"myapp-web-{number}",
@@ -62,10 +66,22 @@ class TestRecoveryIdentifier:
     @pytest.mark.parametrize(
         ("labels", "expected"),
         [
-            ({**COMPOSE, "com.docker.compose.container-number": "2"}, "compose:myapp:web#2"),
-            ({**COMPOSE, "com.docker.compose.container-number": "10"}, "compose:myapp:web#10"),
-            ({**COMPOSE, "com.docker.compose.container-number": "1"}, "compose:myapp:web#1"),
-            ({**COMPOSE, "com.docker.compose.container-number": "01"}, "compose:myapp:web#1"),
+            (
+                {**COMPOSE, "com.docker.compose.container-number": "2"},
+                "compose:myapp:web#2",
+            ),
+            (
+                {**COMPOSE, "com.docker.compose.container-number": "10"},
+                "compose:myapp:web#10",
+            ),
+            (
+                {**COMPOSE, "com.docker.compose.container-number": "1"},
+                "compose:myapp:web#1",
+            ),
+            (
+                {**COMPOSE, "com.docker.compose.container-number": "01"},
+                "compose:myapp:web#1",
+            ),
             ({**COMPOSE}, "myapp_web"),
             ({**COMPOSE, "com.docker.compose.container-number": "-3"}, "myapp_web"),
             ({**COMPOSE, "com.docker.compose.container-number": ""}, "myapp_web"),
@@ -76,12 +92,20 @@ class TestRecoveryIdentifier:
         assert recovery_identifier("myapp_web", labels) == expected
 
     def test_explicit_monitoring_id_is_never_suffixed(self):
-        labels = {**COMPOSE, "monitoring.id": "shared", "com.docker.compose.container-number": "3"}
+        labels = {
+            **COMPOSE,
+            "monitoring.id": "shared",
+            "com.docker.compose.container-number": "3",
+        }
 
         assert recovery_identifier("shared", labels) == "monitoring.id:shared"
 
     def test_empty_monitoring_id_label_is_still_never_suffixed(self):
-        labels = {**COMPOSE, "monitoring.id": "", "com.docker.compose.container-number": "3"}
+        labels = {
+            **COMPOSE,
+            "monitoring.id": "",
+            "com.docker.compose.container-number": "3",
+        }
 
         assert recovery_identifier("", labels) == "monitoring.id:"
 
@@ -89,8 +113,14 @@ class TestRecoveryIdentifier:
         "labels",
         [
             {"com.docker.compose.container-number": "2"},
-            {"com.docker.compose.project": "myapp", "com.docker.compose.container-number": "2"},
-            {"com.docker.compose.service": "web", "com.docker.compose.container-number": "2"},
+            {
+                "com.docker.compose.project": "myapp",
+                "com.docker.compose.container-number": "2",
+            },
+            {
+                "com.docker.compose.service": "web",
+                "com.docker.compose.container-number": "2",
+            },
             {
                 "com.docker.compose.project": "",
                 "com.docker.compose.service": "web",
@@ -143,7 +173,9 @@ class TestRecoveryIdentifier:
 
     def test_generated_keys_stay_in_their_own_namespace(self):
         """A non-Compose name or an explicit ID cannot equal a generated Compose key."""
-        generated = recovery_identifier("myapp_web", {**COMPOSE, "com.docker.compose.container-number": "1"})
+        generated = recovery_identifier(
+            "myapp_web", {**COMPOSE, "com.docker.compose.container-number": "1"}
+        )
 
         assert generated == "compose:myapp:web#1"
         assert recovery_identifier(generated, {"monitoring.id": generated}) != generated
@@ -349,7 +381,10 @@ class TestApiReportsPerReplicaState:
 
         assert (replica_1["quarantined"], replica_1["total_restart_count"]) == (True, 1)
         assert replica_1["recent_restart_count"] == 1
-        assert (replica_2["quarantined"], replica_2["total_restart_count"]) == (False, 0)
+        assert (replica_2["quarantined"], replica_2["total_restart_count"]) == (
+            False,
+            0,
+        )
         assert replica_2["recent_restart_count"] == 0
 
     async def test_unquarantining_one_replica_leaves_the_other(self, wired_api, two_replicas):

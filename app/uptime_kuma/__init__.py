@@ -1,4 +1,3 @@
 """
 Uptime-Kuma integration module
 """
-

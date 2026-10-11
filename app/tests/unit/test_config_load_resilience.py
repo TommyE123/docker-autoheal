@@ -80,9 +80,7 @@ def _valid_config_dict() -> dict:
         ],
         "notifications": {
             "enabled": True,
-            "services": [
-                {"name": "discord-alerts", "type": "discord", "enabled": True}
-            ],
+            "services": [{"name": "discord-alerts", "type": "discord", "enabled": True}],
             "event_filters": ["restart"],
         },
     }
@@ -183,7 +181,9 @@ def test_non_object_json_root_falls_back_to_full_defaults(isolated_config_manage
     assert "did not contain a JSON object" in caplog.text
 
 
-def test_unparseable_json_falls_back_to_full_defaults_without_raising(isolated_config_manager, caplog):
+def test_unparseable_json_falls_back_to_full_defaults_without_raising(
+    isolated_config_manager, caplog
+):
     isolated_config_manager.CONFIG_FILE.write_text("{not valid json at all")
 
     config = isolated_config_manager._load_config()
@@ -262,9 +262,7 @@ def test_invalid_autoheal_section_does_not_prevent_custom_health_checks_loading(
     assert isolated_config_manager._custom_health_checks["web"].check_type == "http"
 
 
-def test_real_config_manager_init_retains_valid_sections_and_health_checks(
-    monkeypatch, tmp_path
-):
+def test_real_config_manager_init_retains_valid_sections_and_health_checks(monkeypatch, tmp_path):
     """Exercise the actual __init__ lifecycle, not just _load_config() in
     isolation: _load_custom_health_checks() only returns whatever
     _load_config() already set on self, so a real construction is the only
