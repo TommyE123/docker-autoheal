@@ -56,7 +56,12 @@ export const addHealthCheck = (healthCheck) => api.post('/healthchecks', healthC
 export const deleteHealthCheck = (containerId) => api.delete(`/healthchecks/${containerId}`);
 
 // Events
-export const getEvents = (limit = 50) => api.get('/events', { params: { limit } });
+export const getEvents = (limit = 50, { eventType, container } = {}) => {
+  const params = { limit };
+  if (eventType) params.event_type = eventType;
+  if (container) params.container = container;
+  return api.get('/events', { params });
+};
 export const clearEvents = () => api.delete('/events');
 
 // Maintenance Mode

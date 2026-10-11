@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import { Card, Button, Spinner, Badge, Alert, Modal } from 'react-bootstrap';
-import { getEvents, clearEvents } from '../services/api';
+import { useState, useEffect, useRef } from 'react';
+import { Card, Button, Spinner, Badge, Alert, Modal, Form } from 'react-bootstrap';
+import { getEvents, clearEvents, getContainers } from '../services/api';
+import { EVENT_TYPES } from '../constants/eventTypes';
 import { format } from 'date-fns';
 
 function EventsPage() {
@@ -8,15 +9,30 @@ function EventsPage() {
   const [loading, setLoading] = useState(true);
   const [alert, setAlert] = useState(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [eventType, setEventType] = useState('');
+  const [container, setContainer] = useState('');
+  const [limit, setLimit] = useState(50);
+  const [containers, setContainers] = useState([]);
+
+  const latestRequestId = useRef(0);
+
+  const filtersActive = eventType !== '' || container !== '';
 
   const fetchEvents = async () => {
+    // Only the most recently issued request may update state, so a slow
+    // response for an earlier selection cannot overwrite newer results.
+    const requestId = ++latestRequestId.current;
     try {
-      const response = await getEvents(50);
-      setEvents(response.data);
+      const response = await getEvents(limit, { eventType, container });
+      if (requestId === latestRequestId.current) {
+        setEvents(response.data);
+      }
     } catch (error) {
       console.error('Failed to load events:', error);
     } finally {
-      setLoading(false);
+      if (requestId === latestRequestId.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -44,6 +60,23 @@ function EventsPage() {
   };
 
   useEffect(() => {
+    const loadContainers = async () => {
+      try {
+        const response = await getContainers(true);
+        setContainers(response.data);
+      } catch (error) {
+        console.error('Failed to load containers:', error);
+      }
+    };
+    loadContainers();
+  }, []);
+
+  const handleClearFilters = () => {
+    setEventType('');
+    setContainer('');
+  };
+
+  useEffect(() => {
     fetchEvents();
 
     // Auto-refresh every 5 seconds
@@ -62,7 +95,8 @@ function EventsPage() {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventType, container, limit]);
 
   const getEventVariant = (status) => {
     const variants = {
@@ -98,11 +132,52 @@ function EventsPage() {
           <i className="bi bi-clock-history me-2"></i>
           Event Log
         </h5>
-        <div>
-          <Button variant="primary" size="sm" onClick={fetchEvents} className="me-2">
+        <div className="d-flex align-items-center flex-wrap gap-2">
+          <Form.Select
+            size="sm"
+            aria-label="Event Type"
+            style={{ width: 'auto' }}
+            value={eventType}
+            onChange={(e) => setEventType(e.target.value)}
+          >
+            <option value="">All event types</option>
+            {EVENT_TYPES.map((type) => (
+              <option key={type.value} value={type.value}>{type.label}</option>
+            ))}
+          </Form.Select>
+          <Form.Select
+            size="sm"
+            aria-label="Container"
+            style={{ width: 'auto' }}
+            value={container}
+            onChange={(e) => setContainer(e.target.value)}
+          >
+            <option value="">All containers</option>
+            {containers.map((c) => (
+              <option key={c.id} value={c.name}>{c.name}</option>
+            ))}
+          </Form.Select>
+          <Form.Select
+            size="sm"
+            aria-label="Limit"
+            style={{ width: 'auto' }}
+            value={limit}
+            onChange={(e) => setLimit(Number(e.target.value))}
+          >
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+          </Form.Select>
+          <Button variant="primary" size="sm" onClick={fetchEvents}>
             <i className="bi bi-arrow-clockwise me-1"></i>
             Refresh
           </Button>
+          {filtersActive && (
+            <Button variant="outline-secondary" size="sm" onClick={handleClearFilters}>
+              <i className="bi bi-funnel me-1"></i>
+              Clear Filters
+            </Button>
+          )}
           <Button
             variant="danger"
             size="sm"
