@@ -21,9 +21,9 @@ def serve_react_app():
     except FileNotFoundError:
         return HTMLResponse(
             content="<h1>Docker Auto-Heal Service</h1>"
-                   "<p>React UI not found. Please build the frontend first:</p>"
-                   "<pre>cd frontend && npm install && npm run build</pre>"
-                   "<p>API documentation is available at <a href='/docs'>/docs</a></p>"
+            "<p>React UI not found. Please build the frontend first:</p>"
+            "<pre>cd frontend && npm install && npm run build</pre>"
+            "<p>API documentation is available at <a href='/docs'>/docs</a></p>"
         )
 
 
@@ -47,7 +47,7 @@ MEDIA_TYPE_MAP = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".gif": "image/gif",
-    ".webp": "image/webp"
+    ".webp": "image/webp",
 }
 
 # PWA-critical files that must be served at root level
@@ -57,7 +57,7 @@ PWA_ROOT_FILES = {
     "registerSW.js": "application/javascript",
     "favicon.svg": "image/svg+xml",
     "screenshot-narrow.png": "image/png",
-    "screenshot-wide.png": "image/png"
+    "screenshot-wide.png": "image/png",
 }
 
 
@@ -77,7 +77,10 @@ def get_static_file_path(filename: str) -> Path:
         resolved_static = STATIC_DIR.resolve()
 
         # Check if the file is within the static directory
-        if resolved_static not in resolved_path.parents and resolved_path.parent != resolved_static:
+        if (
+            resolved_static not in resolved_path.parents
+            and resolved_path.parent != resolved_static
+        ):
             raise HTTPException(status_code=400, detail="Invalid file path")
     except (ValueError, OSError):
         raise HTTPException(status_code=400, detail="Invalid file path")
@@ -88,7 +91,9 @@ def get_static_file_path(filename: str) -> Path:
     return file_path
 
 
-async def serve_static_file(filename: str, media_type: str | None = None) -> FileResponse:
+async def serve_static_file(
+    filename: str, media_type: str | None = None
+) -> FileResponse:
     """Generic handler for serving static files with validation"""
     try:
         file_path = get_static_file_path(filename)
@@ -172,38 +177,39 @@ async def serve_favicon():
 # ==================== React Router Catch-All ====================
 
 # Patterns to exclude from React Router catch-all
-EXCLUDED_PATH_PREFIXES = {
-    "api/",
-    "docs",
-    "redoc",
-    "openapi.json",
-    "assets/",
-    "static/"
-}
+EXCLUDED_PATH_PREFIXES = {"api/", "docs", "redoc", "openapi.json", "assets/", "static/"}
 
 EXCLUDED_FILE_PATTERNS = {
     "manifest.json",
     "sw.js",
     "registerSW.js",
     "favicon.svg",
-    "favicon.ico"
+    "favicon.ico",
 }
 
-EXCLUDED_PATH_PATTERNS = {
-    "workbox-",
-    "pwa-",
-    "maskable-icon-",
-    "screenshot-"
-}
+EXCLUDED_PATH_PATTERNS = {"workbox-", "pwa-", "maskable-icon-", "screenshot-"}
 
 STATIC_FILE_EXTENSIONS = {
-    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp",  # Images
-    ".js", ".mjs", ".cjs",  # JavaScript
-    ".json", ".webmanifest",  # JSON/Manifest
-    ".css", ".scss", ".sass",  # Styles
-    ".woff", ".woff2", ".ttf", ".eot",  # Fonts
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".svg",
+    ".webp",  # Images
+    ".js",
+    ".mjs",
+    ".cjs",  # JavaScript
+    ".json",
+    ".webmanifest",  # JSON/Manifest
+    ".css",
+    ".scss",
+    ".sass",  # Styles
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",  # Fonts
     ".ico",  # Icons
-    ".map"  # Source maps
+    ".map",  # Source maps
 }
 
 

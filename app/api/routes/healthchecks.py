@@ -30,9 +30,13 @@ async def add_health_check(health_check: HealthCheckConfig):
         if not info:
             raise HTTPException(status_code=500, detail="Unable to inspect container")
 
-        stable_id = monitoring_engine.get_stable_identifier(info) if monitoring_engine else None
+        stable_id = (
+            monitoring_engine.get_stable_identifier(info) if monitoring_engine else None
+        )
         if not stable_id:
-            raise HTTPException(status_code=500, detail="Unable to resolve container stable identifier")
+            raise HTTPException(
+                status_code=500, detail="Unable to resolve container stable identifier"
+            )
 
         # Store by stable_id so the check survives container recreation
         # (image updates, `docker compose up --force-recreate`, etc.),
@@ -40,7 +44,10 @@ async def add_health_check(health_check: HealthCheckConfig):
         health_check.container_id = stable_id
 
         config_manager.add_custom_health_check(health_check)
-        return {"status": "success", "message": f"Health check added for container {health_check.container_id}"}
+        return {
+            "status": "success",
+            "message": f"Health check added for container {health_check.container_id}",
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -66,9 +73,13 @@ async def get_health_check(container_id: str):
         if not info:
             raise HTTPException(status_code=500, detail="Unable to inspect container")
 
-        stable_id = monitoring_engine.get_stable_identifier(info) if monitoring_engine else None
+        stable_id = (
+            monitoring_engine.get_stable_identifier(info) if monitoring_engine else None
+        )
         if not stable_id:
-            raise HTTPException(status_code=500, detail="Unable to resolve container stable identifier")
+            raise HTTPException(
+                status_code=500, detail="Unable to resolve container stable identifier"
+            )
 
         health_check = config_manager.get_custom_health_check(stable_id)
         if not health_check:
@@ -76,7 +87,10 @@ async def get_health_check(container_id: str):
             # persisted before stable-ID storage that haven't been re-added.
             health_check = config_manager.get_custom_health_check(container.id)
         if not health_check:
-            raise HTTPException(status_code=404, detail="No custom health check found for this container")
+            raise HTTPException(
+                status_code=404,
+                detail="No custom health check found for this container",
+            )
         return health_check
     except HTTPException:
         raise
@@ -103,9 +117,13 @@ async def delete_health_check(container_id: str):
         if not info:
             raise HTTPException(status_code=500, detail="Unable to inspect container")
 
-        stable_id = monitoring_engine.get_stable_identifier(info) if monitoring_engine else None
+        stable_id = (
+            monitoring_engine.get_stable_identifier(info) if monitoring_engine else None
+        )
         if not stable_id:
-            raise HTTPException(status_code=500, detail="Unable to resolve container stable identifier")
+            raise HTTPException(
+                status_code=500, detail="Unable to resolve container stable identifier"
+            )
 
         # Remove whichever key the check is actually stored under: the
         # stable ID, or (for checks persisted before stable-ID storage)
@@ -114,7 +132,10 @@ async def delete_health_check(container_id: str):
         if not config_manager.get_custom_health_check(remove_key):
             remove_key = container.id
         config_manager.remove_custom_health_check(remove_key)
-        return {"status": "success", "message": f"Health check removed for container {container_id}"}
+        return {
+            "status": "success",
+            "message": f"Health check removed for container {container_id}",
+        }
     except HTTPException:
         raise
     except Exception as e:

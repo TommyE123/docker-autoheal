@@ -39,7 +39,9 @@ def _wait_for_auto_monitor_event(container_id: str) -> bool:
     return False
 
 
-def test_container_with_monitor_label_is_auto_monitored(running_service, disposable_container):
+def test_container_with_monitor_label_is_auto_monitored(
+    running_service, disposable_container
+):
     # Snapshot the real config before touching anything, so it can be restored
     # exactly afterward - auto-monitoring will mutate containers.selected.
     response = requests.get(f"{AUTOHEAL_BASE_URL}/api/config", timeout=5)
@@ -51,7 +53,9 @@ def test_container_with_monitor_label_is_auto_monitored(running_service, disposa
     label = {monitor["label_key"]: monitor["label_value"]}
 
     container_name = f"autoheal-automonitor-{uuid.uuid4().hex[:12]}"
-    container = disposable_container(image="nginx:alpine", name=container_name, labels=label)
+    container = disposable_container(
+        image="nginx:alpine", name=container_name, labels=label
+    )
 
     try:
         assert _wait_for_auto_monitor_event(container.id), (
@@ -60,4 +64,6 @@ def test_container_with_monitor_label_is_auto_monitored(running_service, disposa
     finally:
         # Left unguarded deliberately: if restoring the original config fails,
         # the test must fail loudly, not leave the running service modified.
-        requests.put(f"{AUTOHEAL_BASE_URL}/api/config", json=original_config, timeout=5).raise_for_status()
+        requests.put(
+            f"{AUTOHEAL_BASE_URL}/api/config", json=original_config, timeout=5
+        ).raise_for_status()

@@ -18,30 +18,22 @@ def get_default_config() -> dict[str, Any]:
             "interval_seconds": 30,
             "label_key": "autoheal",
             "label_value": "true",
-            "include_all": False
+            "include_all": False,
         },
-        "containers": {
-            "selected": [],
-            "excluded": [],
-            "restart_counts": {}
-        },
+        "containers": {"selected": [], "excluded": [], "restart_counts": {}},
         "restart": {
             "mode": "on-failure",
             "cooldown_seconds": 60,
             "max_restarts": 3,
             "max_restarts_window_seconds": 600,
-            "backoff": {
-                "enabled": True,
-                "initial_seconds": 10,
-                "multiplier": 2.0
-            },
-            "respect_manual_stop": True
+            "backoff": {"enabled": True, "initial_seconds": 10, "multiplier": 2.0},
+            "respect_manual_stop": True,
         },
         "filters": {
             "whitelist_names": [],
             "blacklist_names": [],
             "whitelist_labels": [],
-            "blacklist_labels": []
+            "blacklist_labels": [],
         },
         "ui": {
             "enable": True,
@@ -49,33 +41,34 @@ def get_default_config() -> dict[str, Any]:
             "listen_port": 3131,
             "allow_export_json": True,
             "allow_import_json": True,
-            "max_log_entries": 50
+            "max_log_entries": 50,
         },
-        "alerts": {
-            "enabled": True,
-            "webhook": None,
-            "notify_on_quarantine": True
-        },
+        "alerts": {"enabled": True, "webhook": None, "notify_on_quarantine": True},
         "observability": {
             "prometheus_enabled": True,
             "metrics_port": 9090,
             "log_format": "json",
-            "log_level": "INFO"
+            "log_level": "INFO",
         },
         "uptime_kuma": {
             "enabled": False,
             "server_url": "",
             "username": "",
             "api_token": "",
-            "auto_restart_on_down": True
+            "auto_restart_on_down": True,
         },
         "uptime_kuma_mappings": [],
         "notifications": {
             "enabled": False,
             "services": [],
-            "event_filters": ["restart", "quarantine", "auto_unquarantine", "auto_monitor"]
+            "event_filters": [
+                "restart",
+                "quarantine",
+                "auto_unquarantine",
+                "auto_monitor",
+            ],
         },
-        "custom_health_checks": {}
+        "custom_health_checks": {},
     }
 
 
@@ -91,10 +84,7 @@ def get_default_quarantine() -> list:
 
 def get_default_maintenance() -> dict[str, Any]:
     """Get default maintenance mode settings"""
-    return {
-        "enabled": False,
-        "start_time": None
-    }
+    return {"enabled": False, "start_time": None}
 
 
 def init_data_file(file_path: Path, default_data: Any, description: str) -> bool:
@@ -115,7 +105,7 @@ def init_data_file(file_path: Path, default_data: Any, description: str) -> bool
 
     try:
         file_path.parent.mkdir(parents=True, exist_ok=True)
-        with file_path.open('w') as f:
+        with file_path.open("w") as f:
             json.dump(default_data, f, indent=2)
         logger.info("Created default %s at %s", description, file_path)
         return True
@@ -176,7 +166,9 @@ def initialize_defaults(data_dir: Path = Path("/data")) -> None:
         files_created += 1
 
     if files_created > 0:
-        logger.info("Initialization complete: %s default file(s) created", files_created)
+        logger.info(
+            "Initialization complete: %s default file(s) created", files_created
+        )
     else:
         logger.info("All data files already exist, no initialization needed")
 
@@ -196,13 +188,13 @@ def reset_to_defaults(data_dir: Path = Path("/data")) -> None:
         "config.json": get_default_config(),
         "events.json": get_default_events(),
         "quarantine.json": get_default_quarantine(),
-        "maintenance.json": get_default_maintenance()
+        "maintenance.json": get_default_maintenance(),
     }
 
     for filename, default_data in files.items():
         file_path = data_dir / filename
         try:
-            with file_path.open('w') as f:
+            with file_path.open("w") as f:
                 json.dump(default_data, f, indent=2)
             logger.info("Reset %s to defaults", filename)
         except Exception as e:
@@ -216,31 +208,32 @@ if __name__ == "__main__":
     import argparse
 
     logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s'
+        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
     )
 
     parser = argparse.ArgumentParser(
-        description='Initialize or reset Docker Auto-Heal data files'
+        description="Initialize or reset Docker Auto-Heal data files"
     )
     parser.add_argument(
-        '--reset',
-        action='store_true',
-        help='Reset all data files to defaults (WARNING: Deletes existing data!)'
+        "--reset",
+        action="store_true",
+        help="Reset all data files to defaults (WARNING: Deletes existing data!)",
     )
     parser.add_argument(
-        '--data-dir',
+        "--data-dir",
         type=str,
-        default='./data',
-        help='Data directory path (default: ./data)'
+        default="./data",
+        help="Data directory path (default: ./data)",
     )
 
     args = parser.parse_args()
     data_dir = Path(args.data_dir)
 
     if args.reset:
-        confirm = input(f"WARNING: This will reset all data files in {data_dir} to defaults. Continue? (yes/no): ")
-        if confirm.lower() == 'yes':
+        confirm = input(
+            f"WARNING: This will reset all data files in {data_dir} to defaults. Continue? (yes/no): "
+        )
+        if confirm.lower() == "yes":
             reset_to_defaults(data_dir)
             print("Reset complete!")
         else:
@@ -248,4 +241,3 @@ if __name__ == "__main__":
     else:
         initialize_defaults(data_dir)
         print("Initialization complete!")
-

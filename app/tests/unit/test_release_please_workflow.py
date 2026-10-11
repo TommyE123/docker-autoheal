@@ -13,7 +13,9 @@ import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-WORKFLOW = (REPO_ROOT / ".github" / "workflows" / "release-please.yml").read_text(encoding="utf-8")
+WORKFLOW = (REPO_ROOT / ".github" / "workflows" / "release-please.yml").read_text(
+    encoding="utf-8"
+)
 AUTO_MERGE_WORKFLOW = (
     REPO_ROOT / ".github" / "workflows" / "release-please-auto-merge.yml"
 ).read_text(encoding="utf-8")
@@ -47,8 +49,7 @@ def test_config_bootstraps_from_the_last_real_release_commit():
     }
 
     actual_sections = {
-        section["type"]: section["section"]
-        for section in config["changelog-sections"]
+        section["type"]: section["section"] for section in config["changelog-sections"]
     }
 
     assert actual_sections == expected_sections
@@ -70,7 +71,9 @@ def test_version_file_matches_the_manifest():
     # it must exist and agree with the manifest, or release-please's next
     # bump would be calculated from the wrong starting point.
     manifest = json.loads((REPO_ROOT / ".release-please-manifest.json").read_text())
-    assert (REPO_ROOT / "version.txt").read_text(encoding="utf-8").strip() == manifest["."]
+    assert (REPO_ROOT / "version.txt").read_text(encoding="utf-8").strip() == manifest[
+        "."
+    ]
 
 
 def test_api_version_is_bumped_by_release_please_and_matches_the_manifest():
@@ -84,7 +87,9 @@ def test_api_version_is_bumped_by_release_please_and_matches_the_manifest():
     assert "app/api/api.py" in config["packages"]["."]["extra-files"]
 
     api_source = (REPO_ROOT / "app" / "api" / "api.py").read_text(encoding="utf-8")
-    annotated = [line for line in api_source.splitlines() if "x-release-please-version" in line]
+    annotated = [
+        line for line in api_source.splitlines() if "x-release-please-version" in line
+    ]
     assert len(annotated) == 1
     assert f'version="{manifest["."]}"' in annotated[0]
 
@@ -157,7 +162,9 @@ def test_weekly_workflow_has_a_race_safe_concurrency_group():
 def test_weekly_workflow_matches_the_release_pr_by_repository_specific_characteristics():
     # Title/version is explicitly excluded as the selector since it changes
     # every release; match on the PR's stable, repository-specific shape.
-    assert '--base main --state open --label "autorelease: pending"' in AUTO_MERGE_WORKFLOW
+    assert (
+        '--base main --state open --label "autorelease: pending"' in AUTO_MERGE_WORKFLOW
+    )
     assert '.headRefName == "release-please--branches--main"' in AUTO_MERGE_WORKFLOW
     assert ".headRepositoryOwner.login == $owner" in AUTO_MERGE_WORKFLOW
     assert ".headRepository.name == $repo" in AUTO_MERGE_WORKFLOW

@@ -99,7 +99,8 @@ async def _request(
         "root_path": "",
         "headers": [(b"host", b"testserver")]
         + [
-            (key.lower().encode(), value.encode()) for key, value in (request_headers or {}).items()
+            (key.lower().encode(), value.encode())
+            for key, value in (request_headers or {}).items()
         ],
         "client": ("127.0.0.1", 12345),
         "server": ("testserver", 80),
@@ -118,7 +119,8 @@ async def _request(
         if message["type"] == "http.response.start":
             status = message["status"]
             headers = {
-                key.decode().lower(): value.decode() for key, value in message["headers"]
+                key.decode().lower(): value.decode()
+                for key, value in message["headers"]
             }
         elif message["type"] == "http.response.body":
             body += message.get("body", b"")
@@ -140,7 +142,9 @@ class TestRouterRegistration:
             }
             assert module_routes, f"{module.__name__} exposes no routes"
             missing = module_routes - registered
-            assert not missing, f"{module.__name__} routes not registered: {sorted(missing)}"
+            assert not missing, (
+                f"{module.__name__} routes not registered: {sorted(missing)}"
+            )
 
     def test_routers_are_registered_in_the_expected_order(self):
         registered = _registered_routes()

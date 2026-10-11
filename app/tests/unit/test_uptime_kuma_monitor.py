@@ -257,7 +257,9 @@ class TestUpdateStatusCache:
         monitor = UptimeKumaMonitor()
         _install_client(
             monitor,
-            FakeUptimeKumaClient(monitors=[{"friendly_name": "Other Monitor", "status": 1}]),
+            FakeUptimeKumaClient(
+                monitors=[{"friendly_name": "Other Monitor", "status": 1}]
+            ),
         )
 
         await monitor._update_status_cache()
@@ -270,7 +272,9 @@ class TestUpdateStatusCache:
         monitor._container_status_cache["web"] = 0
         _install_client(
             monitor,
-            FakeUptimeKumaClient(monitors=[{"friendly_name": "Other Monitor", "status": 1}]),
+            FakeUptimeKumaClient(
+                monitors=[{"friendly_name": "Other Monitor", "status": 1}]
+            ),
         )
 
         await monitor._update_status_cache()
@@ -307,7 +311,9 @@ class TestUpdateStatusCache:
         monitor._container_status_cache["old"] = 0
         _install_client(
             monitor,
-            FakeUptimeKumaClient(monitors=[{"friendly_name": "Web Monitor", "status": 1}]),
+            FakeUptimeKumaClient(
+                monitors=[{"friendly_name": "Web Monitor", "status": 1}]
+            ),
         )
 
         await monitor._update_status_cache()
@@ -319,13 +325,17 @@ class TestUpdateStatusCache:
         [("Web Monitor", "Deleted Monitor"), ("Deleted Monitor", "Web Monitor")],
         ids=["present-mapping-first", "present-mapping-last"],
     )
-    async def test_duplicate_mappings_keep_status_from_present_monitor(self, monitor_names):
+    async def test_duplicate_mappings_keep_status_from_present_monitor(
+        self, monitor_names
+    ):
         for monitor_name in monitor_names:
             _add_mapping("web", monitor_name)
         monitor = UptimeKumaMonitor()
         _install_client(
             monitor,
-            FakeUptimeKumaClient(monitors=[{"friendly_name": "Web Monitor", "status": 0}]),
+            FakeUptimeKumaClient(
+                monitors=[{"friendly_name": "Web Monitor", "status": 0}]
+            ),
         )
 
         await monitor._update_status_cache()
@@ -337,7 +347,9 @@ class TestUpdateStatusCache:
         [(1, 0), (0, 1)],
         ids=["up-then-down", "down-then-up"],
     )
-    async def test_duplicate_friendly_name_is_ambiguous_and_not_cached(self, statuses, caplog):
+    async def test_duplicate_friendly_name_is_ambiguous_and_not_cached(
+        self, statuses, caplog
+    ):
         """Two monitors sharing the mapped name must not resolve to either one."""
         _add_mapping("db", "Database")
         monitor = UptimeKumaMonitor()
@@ -487,7 +499,9 @@ class TestUpdateStatusCache:
         [("Database", "Web Monitor"), ("Web Monitor", "Database")],
         ids=["ambiguous-first", "ambiguous-last"],
     )
-    async def test_container_with_any_ambiguous_mapping_gets_no_status(self, mapped_names):
+    async def test_container_with_any_ambiguous_mapping_gets_no_status(
+        self, mapped_names
+    ):
         """A container's other, unique mapping must not restore a status that its
         ambiguous mapping dropped, whatever order the mappings are stored in."""
         for name in mapped_names:
@@ -622,7 +636,9 @@ class TestShouldRestartFromUptimeKuma:
         _enable_uptime_kuma(auto_restart_on_down=True)
         _add_mapping("web", "Web Monitor")
         monitor = UptimeKumaMonitor()
-        fake_client = FakeUptimeKumaClient(monitors=[{"friendly_name": "Web Monitor", "status": 0}])
+        fake_client = FakeUptimeKumaClient(
+            monitors=[{"friendly_name": "Web Monitor", "status": 0}]
+        )
         _install_client(monitor, fake_client)
         assert await monitor.should_restart_from_uptime_kuma("web") is True
 
@@ -694,7 +710,9 @@ class TestShouldRestartFromUptimeKuma:
         _enable_uptime_kuma(auto_restart_on_down=True)
         _add_mapping("db", "Database")
         monitor = UptimeKumaMonitor()
-        fake_client = FakeUptimeKumaClient(monitors=[{"friendly_name": "Database", "status": 0}])
+        fake_client = FakeUptimeKumaClient(
+            monitors=[{"friendly_name": "Database", "status": 0}]
+        )
         _install_client(monitor, fake_client)
         assert await monitor.should_restart_from_uptime_kuma("db") is True
 

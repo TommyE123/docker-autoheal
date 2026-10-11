@@ -19,7 +19,9 @@ from app.api.routes.notifications import (
     update_notification_service,
     update_notifications_config,
 )
-from app.api.routes.notifications import test_notification_service as api_test_notification_service
+from app.api.routes.notifications import (
+    test_notification_service as api_test_notification_service,
+)
 from app.config.config_manager import NotificationService, config_manager
 
 
@@ -122,7 +124,9 @@ class TestNotificationServiceCrud:
         assert result["service"]["name"] == "Webhook"
         assert config_manager.get_config().notifications.services[0].name == "Webhook"
 
-    async def test_add_notification_service_validation_error_hides_credentials(self, caplog):
+    async def test_add_notification_service_validation_error_hides_credentials(
+        self, caplog
+    ):
         with pytest.raises(HTTPException) as exc_info:
             await add_notification_service(
                 {
@@ -286,7 +290,8 @@ class TestNotificationServiceTest:
             }
         )
         monkeypatch.setattr(
-            "app.api.state.notification_manager.test_notification", fake_test_notification
+            "app.api.state.notification_manager.test_notification",
+            fake_test_notification,
         )
 
         result = await api_test_notification_service("Webhook")
@@ -302,7 +307,8 @@ class TestNotificationServiceTest:
             return_value={"success": False, "message": "Service 'Webhook' not found"}
         )
         monkeypatch.setattr(
-            "app.api.state.notification_manager.test_notification", fake_test_notification
+            "app.api.state.notification_manager.test_notification",
+            fake_test_notification,
         )
 
         with pytest.raises(HTTPException) as exc_info:

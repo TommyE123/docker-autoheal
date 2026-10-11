@@ -32,7 +32,11 @@ async def list_containers(include_stopped: bool = False):
 
         # Use the uptime_kuma_monitor from monitoring_engine if available
         uptime_kuma_monitor = None
-        if uptime_kuma_enabled and monitoring_engine and hasattr(monitoring_engine, 'uptime_kuma_monitor'):
+        if (
+            uptime_kuma_enabled
+            and monitoring_engine
+            and hasattr(monitoring_engine, "uptime_kuma_monitor")
+        ):
             uptime_kuma_monitor = monitoring_engine.uptime_kuma_monitor
 
         for container in containers:
@@ -54,7 +58,9 @@ async def list_containers(include_stopped: bool = False):
             quarantined = config_manager.is_quarantined(recovery_id)
 
             # Get locally tracked restart count (persists across container recreations)
-            locally_tracked_restarts = config_manager.get_total_restart_count(recovery_id)
+            locally_tracked_restarts = config_manager.get_total_restart_count(
+                recovery_id
+            )
 
             # Check for Uptime Kuma mapping and status using uptime_kuma_monitor
             uptime_kuma_status = None
@@ -70,7 +76,9 @@ async def list_containers(include_stopped: bool = False):
                             break
 
                     # Get cached status from uptime_kuma_monitor
-                    uptime_kuma_status = uptime_kuma_monitor.get_container_status(stable_id)
+                    uptime_kuma_status = uptime_kuma_monitor.get_container_status(
+                        stable_id
+                    )
             elif uptime_kuma_enabled and not uptime_kuma_monitor:
                 # Uptime-Kuma integration enabled but monitor not initialized
                 uptime_kuma_status = 4  # Indicate unknown status
@@ -89,7 +97,7 @@ async def list_containers(include_stopped: bool = False):
                 monitored=monitored,
                 quarantined=quarantined,
                 uptime_kuma_status=uptime_kuma_status,
-                uptime_kuma_monitor_name=uptime_kuma_monitor_name
+                uptime_kuma_monitor_name=uptime_kuma_monitor_name,
             )
             result.append(container_info)
 
@@ -123,8 +131,7 @@ async def get_container_details(container_id: str):
 
         # Get locally tracked restart counts (using recovery_id)
         recent_restart_count = config_manager.get_restart_count(
-            recovery_id,
-            config_manager.get_config().restart.max_restarts_window_seconds
+            recovery_id, config_manager.get_config().restart.max_restarts_window_seconds
         )
         total_restart_count = config_manager.get_total_restart_count(recovery_id)
 
@@ -152,7 +159,7 @@ async def get_container_details(container_id: str):
             "quarantined": quarantined,
             "recent_restart_count": recent_restart_count,
             "total_restart_count": total_restart_count,
-            "custom_health_check": custom_hc
+            "custom_health_check": custom_hc,
         }
     except HTTPException:
         raise
@@ -214,7 +221,8 @@ async def update_container_selection(request: ContainerSelectionRequest):
                     if cid not in config.containers.selected:
                         config.containers.selected.append(cid)
                         logger.debug(
-                            "Added container %s to selected list (container not resolved)", cid
+                            "Added container %s to selected list (container not resolved)",
+                            cid,
                         )
                     if cid in config.containers.excluded:
                         config.containers.excluded.remove(cid)
@@ -260,7 +268,8 @@ async def update_container_selection(request: ContainerSelectionRequest):
                     if cid not in config.containers.excluded:
                         config.containers.excluded.append(cid)
                         logger.debug(
-                            "Added container %s to excluded list (container not resolved)", cid
+                            "Added container %s to excluded list (container not resolved)",
+                            cid,
                         )
                     if cid in config.containers.selected:
                         config.containers.selected.remove(cid)
@@ -273,7 +282,10 @@ async def update_container_selection(request: ContainerSelectionRequest):
             "enabled" if request.enabled else "disabled",
         )
 
-        return {"status": "success", "message": f"Updated {len(request.container_ids)} containers"}
+        return {
+            "status": "success",
+            "message": f"Updated {len(request.container_ids)} containers",
+        }
     except Exception as e:
         logger.exception("Error updating container selection: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
@@ -294,7 +306,10 @@ async def restart_container_manual(container_id: str):
         success = docker_client.restart_container(container)
 
         if success:
-            return {"status": "success", "message": f"Container {container_id} restarted"}
+            return {
+                "status": "success",
+                "message": f"Container {container_id} restarted",
+            }
         raise HTTPException(status_code=500, detail="Failed to restart container")
     except HTTPException:
         raise
@@ -333,14 +348,17 @@ async def unquarantine_container(container_id: str):
             event_type="unquarantine",
             restart_count=0,
             status="success",
-            message="Container un-quarantined by user request"
+            message="Container un-quarantined by user request",
         )
         config_manager.add_event(event)
 
         # Send notification for quarantine event
         await state.notification_manager.send_event_notification(event)
 
-        return {"status": "success", "message": f"Container {container_name} removed from quarantine"}
+        return {
+            "status": "success",
+            "message": f"Container {container_name} removed from quarantine",
+        }
     except HTTPException:
         raise
     except Exception as e:

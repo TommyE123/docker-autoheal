@@ -61,11 +61,17 @@ class TestStableIdentifier:
             "com.docker.compose.project": "stack",
             "com.docker.compose.service": "web",
         }
-        _, old_info = make_container(name="stack-web-1", container_id="a" * 64, labels=labels)
-        _, new_info = make_container(name="stack-web-1", container_id="c" * 64, labels=labels)
+        _, old_info = make_container(
+            name="stack-web-1", container_id="a" * 64, labels=labels
+        )
+        _, new_info = make_container(
+            name="stack-web-1", container_id="c" * 64, labels=labels
+        )
 
         assert old_info["full_id"] != new_info["full_id"]
-        assert engine.get_stable_identifier(old_info) == engine.get_stable_identifier(new_info)
+        assert engine.get_stable_identifier(old_info) == engine.get_stable_identifier(
+            new_info
+        )
 
 
 class TestShouldMonitorContainer:
@@ -117,13 +123,17 @@ class TestShouldMonitorContainer:
         assert engine.should_monitor_container(container, info) is True
 
     def test_blacklist_name_pattern_excludes_container(self, engine, update_config):
-        container, info = make_container(name="db-replica-1", labels={"autoheal": "true"})
+        container, info = make_container(
+            name="db-replica-1", labels={"autoheal": "true"}
+        )
         update_config(lambda c: c.filters.blacklist_names.append("db-*"))
 
         assert engine.should_monitor_container(container, info) is False
 
     def test_whitelist_name_pattern_requires_a_match(self, engine, update_config):
-        matching, matching_info = make_container(name="web-1", labels={"autoheal": "true"})
+        matching, matching_info = make_container(
+            name="web-1", labels={"autoheal": "true"}
+        )
         other, other_info = make_container(name="worker-1", labels={"autoheal": "true"})
         update_config(lambda c: c.filters.whitelist_names.append("web-*"))
 

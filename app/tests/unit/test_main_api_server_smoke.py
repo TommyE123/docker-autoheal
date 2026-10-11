@@ -123,12 +123,15 @@ class TestRunApiServerRealUvicornSmoke:
                     _RecordingServer.instances[0].force_exit = True
                     with suppress(TimeoutError):
                         await asyncio.wait_for(
-                            asyncio.shield(server_task), timeout=_SHUTDOWN_TIMEOUT_SECONDS
+                            asyncio.shield(server_task),
+                            timeout=_SHUTDOWN_TIMEOUT_SECONDS,
                         )
                 if not server_task.done():
                     server_task.cancel()
                     try:
-                        await asyncio.wait_for(server_task, timeout=_SHUTDOWN_TIMEOUT_SECONDS)
+                        await asyncio.wait_for(
+                            server_task, timeout=_SHUTDOWN_TIMEOUT_SECONDS
+                        )
                     except asyncio.CancelledError:
                         pass
                     except TimeoutError:

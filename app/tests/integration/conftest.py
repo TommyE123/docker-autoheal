@@ -24,8 +24,12 @@ from app.tests.unit.conftest import isolated_config_manager  # noqa: F401
 
 # Defaults to the development stack (docker-compose.dev.yml), never the production port 3131.
 # Override with AUTOHEAL_BASE_URL / AUTOHEAL_METRICS_URL to point at another instance.
-AUTOHEAL_BASE_URL = os.environ.get("AUTOHEAL_BASE_URL", "http://localhost:3132").rstrip("/")
-AUTOHEAL_METRICS_URL = os.environ.get("AUTOHEAL_METRICS_URL", "http://localhost:9091").rstrip("/")
+AUTOHEAL_BASE_URL = os.environ.get("AUTOHEAL_BASE_URL", "http://localhost:3132").rstrip(
+    "/"
+)
+AUTOHEAL_METRICS_URL = os.environ.get(
+    "AUTOHEAL_METRICS_URL", "http://localhost:9091"
+).rstrip("/")
 
 try:
     import docker
@@ -77,8 +81,13 @@ def disposable_container(real_docker_client):
     created = []
 
     def _run(image: str = "nginx:alpine", **run_kwargs):
-        name = run_kwargs.pop("name", None) or f"autoheal-integration-{uuid.uuid4().hex[:12]}"
-        container = client.containers.run(image=image, name=name, detach=True, **run_kwargs)
+        name = (
+            run_kwargs.pop("name", None)
+            or f"autoheal-integration-{uuid.uuid4().hex[:12]}"
+        )
+        container = client.containers.run(
+            image=image, name=name, detach=True, **run_kwargs
+        )
         created.append(container)
         return container
 

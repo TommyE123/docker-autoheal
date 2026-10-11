@@ -41,7 +41,9 @@ async def _collect_response(app: Any) -> tuple[int, dict[str, str], bytes]:
     start = next(m for m in messages if m["type"] == "http.response.start")
     status = start["status"]
     headers = {k.decode(): v.decode() for k, v in start["headers"]}
-    body = b"".join(m.get("body", b"") for m in messages if m["type"] == "http.response.body")
+    body = b"".join(
+        m.get("body", b"") for m in messages if m["type"] == "http.response.body"
+    )
     return status, headers, body
 
 
@@ -150,7 +152,12 @@ async def test_serve_static_file_unexpected_error_becomes_500(static_dir, monkey
         (api_module.serve_favicon, (), "favicon.svg", "image/svg+xml"),
         (api_module.serve_screenshot_narrow, (), "screenshot-narrow.png", "image/png"),
         (api_module.serve_screenshot_wide, (), "screenshot-wide.png", "image/png"),
-        (api_module.serve_workbox, ("abc123",), "workbox-abc123.js", "application/javascript"),
+        (
+            api_module.serve_workbox,
+            ("abc123",),
+            "workbox-abc123.js",
+            "application/javascript",
+        ),
         (api_module.serve_pwa_icon, ("192x192",), "pwa-192x192.png", "image/png"),
         (
             api_module.serve_maskable_icon,
@@ -266,7 +273,9 @@ def test_serve_react_app_falls_back_when_frontend_is_not_built(tmp_path, monkeyp
 
 def test_serve_react_app_reads_index_html_as_utf8(tmp_path, monkeypatch):
     (tmp_path / "static").mkdir()
-    (tmp_path / "static" / "index.html").write_text("<title>ok</title>", encoding="utf-8")
+    (tmp_path / "static" / "index.html").write_text(
+        "<title>ok</title>", encoding="utf-8"
+    )
     monkeypatch.chdir(tmp_path)
     real_open = api_module.Path.open
     encodings = []
@@ -393,7 +402,10 @@ async def test_serve_static_file_logs_unexpected_error(static_dir, monkeypatch, 
 
     monkeypatch.setattr(api_module, "get_static_file_path", explode)
 
-    with caplog.at_level("ERROR", logger=api_module.logger.name), pytest.raises(HTTPException):
+    with (
+        caplog.at_level("ERROR", logger=api_module.logger.name),
+        pytest.raises(HTTPException),
+    ):
         await serve_static_file("sw.js")
 
     assert "Error serving static file sw.js: filesystem went away" in caplog.text

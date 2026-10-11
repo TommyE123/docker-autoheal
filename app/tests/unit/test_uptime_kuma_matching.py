@@ -26,7 +26,12 @@ class TestNormalizeName:
         assert normalize_name("Radarr") == normalize_name("radarr")
 
     def test_hyphen_underscore_and_space_are_equivalent(self):
-        variants = ["Steam-Headless", "steam_headless", "steam headless", "STEAM-HEADLESS"]
+        variants = [
+            "Steam-Headless",
+            "steam_headless",
+            "steam headless",
+            "STEAM-HEADLESS",
+        ]
         normalized = {normalize_name(v) for v in variants}
         assert len(normalized) == 1
 
@@ -69,12 +74,16 @@ class TestMatchUptimeKumaMonitors:
         # actual Docker name may be something else entirely (e.g.
         # "vpn-apps-trawl-1"), so only the compose service name, not the
         # full stable ID, should be compared against the monitor name.
-        containers = [_container("vpn-apps_trawl", "vpn-apps-trawl-1", compose_service="trawl")]
+        containers = [
+            _container("vpn-apps_trawl", "vpn-apps-trawl-1", compose_service="trawl")
+        ]
         monitors = [_monitor("Trawl")]
 
         result = match_uptime_kuma_monitors(containers, monitors)
 
-        assert result == [{"container_id": "vpn-apps_trawl", "monitor_friendly_name": "Trawl"}]
+        assert result == [
+            {"container_id": "vpn-apps_trawl", "monitor_friendly_name": "Trawl"}
+        ]
 
     def test_sabnzbd_and_qbittorrent_style_capitalisation(self):
         containers = [
@@ -197,7 +206,9 @@ class TestMatchUptimeKumaMonitors:
         assert "vpn-apps_trawl" in caplog.text
         assert "already taken by a higher-precedence container" in caplog.text
 
-    def test_two_compose_services_sharing_a_monitor_name_are_left_unmapped(self, caplog):
+    def test_two_compose_services_sharing_a_monitor_name_are_left_unmapped(
+        self, caplog
+    ):
         containers = [
             _container("stack-a_redis", "stack-a-redis-1", compose_service="redis"),
             _container("stack-b_redis", "stack-b-redis-1", compose_service="redis"),

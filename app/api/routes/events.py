@@ -31,7 +31,9 @@ async def get_events(
             events = [event for event in events if event.event_type == event_type]
         if container is not None:
             needle = container.lower()
-            events = [event for event in events if needle in event.container_name.lower()]
+            events = [
+                event for event in events if needle in event.container_name.lower()
+            ]
         events = events[-limit:]
         return [
             {
@@ -45,7 +47,7 @@ async def get_events(
                 "event_type": event.event_type,
                 "restart_count": event.restart_count,
                 "status": event.status,
-                "message": event.message
+                "message": event.message,
             }
             for event in events
         ]

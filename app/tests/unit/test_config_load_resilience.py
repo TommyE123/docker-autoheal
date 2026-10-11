@@ -112,7 +112,9 @@ def test_fully_valid_config_loads_unchanged(isolated_config_manager):
     assert config.notifications.services[0].name == "discord-alerts"
 
 
-def test_single_invalid_section_only_resets_that_section(isolated_config_manager, caplog):
+def test_single_invalid_section_only_resets_that_section(
+    isolated_config_manager, caplog
+):
     payload = _valid_config_dict()
     # cooldown_seconds must be an int; this makes the whole 'restart' section fail.
     payload["restart"]["cooldown_seconds"] = "not-a-number"
@@ -138,7 +140,9 @@ def test_single_invalid_section_only_resets_that_section(isolated_config_manager
     assert "Resetting config section 'restart' to defaults" in caplog.text
 
 
-def test_multiple_invalid_sections_are_each_reset_independently(isolated_config_manager, caplog):
+def test_multiple_invalid_sections_are_each_reset_independently(
+    isolated_config_manager, caplog
+):
     payload = _valid_config_dict()
     payload["restart"]["cooldown_seconds"] = "not-a-number"
     payload["ui"]["listen_port"] = "not-a-port"
@@ -174,7 +178,9 @@ def test_missing_config_file_returns_defaults(isolated_config_manager):
     assert config == AutoHealConfig()
 
 
-def test_non_object_json_root_falls_back_to_full_defaults(isolated_config_manager, caplog):
+def test_non_object_json_root_falls_back_to_full_defaults(
+    isolated_config_manager, caplog
+):
     isolated_config_manager.CONFIG_FILE.write_text(json.dumps(["not", "an", "object"]))
 
     config = isolated_config_manager._load_config()
@@ -183,7 +189,9 @@ def test_non_object_json_root_falls_back_to_full_defaults(isolated_config_manage
     assert "did not contain a JSON object" in caplog.text
 
 
-def test_unparseable_json_falls_back_to_full_defaults_without_raising(isolated_config_manager, caplog):
+def test_unparseable_json_falls_back_to_full_defaults_without_raising(
+    isolated_config_manager, caplog
+):
     isolated_config_manager.CONFIG_FILE.write_text("{not valid json at all")
 
     config = isolated_config_manager._load_config()
@@ -283,9 +291,13 @@ def test_real_config_manager_init_retains_valid_sections_and_health_checks(
     monkeypatch.setattr(ConfigManager, "DATA_DIR", tmp_path)
     monkeypatch.setattr(ConfigManager, "CONFIG_FILE", tmp_path / "config.json")
     monkeypatch.setattr(ConfigManager, "EVENTS_FILE", tmp_path / "events.json")
-    monkeypatch.setattr(ConfigManager, "RESTART_COUNTS_FILE", tmp_path / "restart_counts.json")
+    monkeypatch.setattr(
+        ConfigManager, "RESTART_COUNTS_FILE", tmp_path / "restart_counts.json"
+    )
     monkeypatch.setattr(ConfigManager, "QUARANTINE_FILE", tmp_path / "quarantine.json")
-    monkeypatch.setattr(ConfigManager, "MAINTENANCE_FILE", tmp_path / "maintenance.json")
+    monkeypatch.setattr(
+        ConfigManager, "MAINTENANCE_FILE", tmp_path / "maintenance.json"
+    )
 
     manager = ConfigManager()
 

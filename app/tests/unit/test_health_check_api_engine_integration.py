@@ -56,7 +56,9 @@ class TestCustomHealthCheckDiscoveryAcrossRecreation:
         docker_client.health_results[container.name] = False
 
         result = await add_health_check(
-            HealthCheckConfig(container_id="stack-web-1", check_type="tcp", tcp_port=8080)
+            HealthCheckConfig(
+                container_id="stack-web-1", check_type="tcp", tcp_port=8080
+            )
         )
         assert result["status"] == "success"
 
@@ -74,11 +76,15 @@ class TestCustomHealthCheckDiscoveryAcrossRecreation:
         the engine afterwards.
         """
         docker_client, engine = wired_api
-        original_container, original_info = self._compose_container(container_id="a" * 64)
+        original_container, original_info = self._compose_container(
+            container_id="a" * 64
+        )
         docker_client.add_container(original_container, original_info)
 
         await add_health_check(
-            HealthCheckConfig(container_id="stack-web-1", check_type="tcp", tcp_port=8080)
+            HealthCheckConfig(
+                container_id="stack-web-1", check_type="tcp", tcp_port=8080
+            )
         )
 
         stable_id = engine.get_stable_identifier(original_info)
@@ -113,7 +119,9 @@ class TestCustomHealthCheckDiscoveryAcrossRecreation:
         docker_client.health_results[container.name] = False
 
         await add_health_check(
-            HealthCheckConfig(container_id="stack-web-1", check_type="tcp", tcp_port=8080)
+            HealthCheckConfig(
+                container_id="stack-web-1", check_type="tcp", tcp_port=8080
+            )
         )
         needs_restart, _ = await engine._evaluate_container_health(container, info)
         assert needs_restart is True

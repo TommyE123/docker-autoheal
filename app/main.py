@@ -34,11 +34,8 @@ LOG_FILE = LOG_DIR / "autoheal.log"
 # Configure logging (will be updated with config)
 logging.basicConfig(
     level=logging.INFO,  # Default, will be updated
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler(str(LOG_FILE))
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler(str(LOG_FILE))],
 )
 
 logger = logging.getLogger(__name__)
@@ -47,19 +44,22 @@ logger.info("Logging to: %s", LOG_FILE)
 
 class CancelledErrorFilter(logging.Filter):
     """Filter to suppress CancelledError from uvicorn.error logs during shutdown"""
+
     def filter(self, record):
         # Suppress CancelledError tracebacks from uvicorn (these are expected during shutdown)
-        return not (record.name == "uvicorn.error" and "CancelledError" in record.getMessage())
+        return not (
+            record.name == "uvicorn.error" and "CancelledError" in record.getMessage()
+        )
 
 
 def update_log_level(level_name: str):
     """Update logging level for all loggers"""
     level_map = {
-        'DEBUG': logging.DEBUG,
-        'INFO': logging.INFO,
-        'WARNING': logging.WARNING,
-        'ERROR': logging.ERROR,
-        'CRITICAL': logging.CRITICAL
+        "DEBUG": logging.DEBUG,
+        "INFO": logging.INFO,
+        "WARNING": logging.WARNING,
+        "ERROR": logging.ERROR,
+        "CRITICAL": logging.CRITICAL,
     }
     level = level_map.get(level_name.upper(), logging.INFO)
 
@@ -76,12 +76,23 @@ def update_log_level(level_name: str):
 
     logger.info("Log level set to: %s", level_name)
 
+
 # Prometheus metrics
-container_restarts = Counter('autoheal_container_restarts_total', 'Total container restarts', ['container_name'])
-containers_monitored = Gauge('autoheal_containers_monitored', 'Number of containers being monitored')
-containers_quarantined = Gauge('autoheal_containers_quarantined', 'Number of quarantined containers')
-health_checks_total = Counter('autoheal_health_checks_total', 'Total health checks performed')
-health_checks_failed = Counter('autoheal_health_checks_failed', 'Failed health checks', ['container_name'])
+container_restarts = Counter(
+    "autoheal_container_restarts_total", "Total container restarts", ["container_name"]
+)
+containers_monitored = Gauge(
+    "autoheal_containers_monitored", "Number of containers being monitored"
+)
+containers_quarantined = Gauge(
+    "autoheal_containers_quarantined", "Number of quarantined containers"
+)
+health_checks_total = Counter(
+    "autoheal_health_checks_total", "Total health checks performed"
+)
+health_checks_failed = Counter(
+    "autoheal_health_checks_failed", "Failed health checks", ["container_name"]
+)
 
 
 class AutoHealService:
@@ -107,7 +118,8 @@ class AutoHealService:
             update_log_level(config.observability.log_level)
 
             logger.info(
-                "Configuration loaded: monitoring interval=%ss", config.monitor.interval_seconds
+                "Configuration loaded: monitoring interval=%ss",
+                config.monitor.interval_seconds,
             )
 
             # Initialize Docker client
@@ -136,14 +148,17 @@ class AutoHealService:
                     config.observability.metrics_port,
                 )
                 # start_http_server returns (server, thread); keep the server so stop() can close it
-                self.metrics_server = start_http_server(config.observability.metrics_port)[0]
+                self.metrics_server = start_http_server(
+                    config.observability.metrics_port
+                )[0]
 
             # Start notification manager
             logger.info("Starting notification manager...")
             await self.notification_manager.start()
             if config.notifications.enabled:
                 logger.info(
-                    "Notifications enabled with %s service(s)", len(config.notifications.services)
+                    "Notifications enabled with %s service(s)",
+                    len(config.notifications.services),
                 )
 
             # Start monitoring engine
@@ -231,7 +246,9 @@ class AutoHealService:
                     try:
                         close_step()
                     except Exception as e:
-                        logger.warning("Error stopping metrics server: %s", e, exc_info=True)
+                        logger.warning(
+                            "Error stopping metrics server: %s", e, exc_info=True
+                        )
                 self.metrics_server = None
             if self.docker_client:
                 try:
@@ -298,7 +315,7 @@ async def run_api_server():
         port=config.ui.listen_port,
         log_level="warning",  # Set to warning to suppress info logs
         access_log=False,  # Completely disable access logs
-        log_config=None  # Use default logging config
+        log_config=None,  # Use default logging config
     )
 
     server = uvicorn.Server(uvicorn_config)
@@ -321,7 +338,7 @@ async def main():
         await asyncio.gather(
             service.run(),
             run_api_server(),
-            return_exceptions=True  # Don't propagate CancelledError
+            return_exceptions=True,  # Don't propagate CancelledError
         )
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt")

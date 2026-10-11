@@ -41,7 +41,9 @@ def _make_event(container_id="web"):
     )
 
 
-def test_configuration_changes_survive_a_fresh_manager(isolated_config_manager, monkeypatch):
+def test_configuration_changes_survive_a_fresh_manager(
+    isolated_config_manager, monkeypatch
+):
     config = isolated_config_manager.get_config()
     config.monitor.interval_seconds = 45
     isolated_config_manager.update_config(config)
@@ -52,7 +54,9 @@ def test_configuration_changes_survive_a_fresh_manager(isolated_config_manager, 
     assert reloaded.get_config().monitor.interval_seconds == 45
 
 
-def test_restart_counts_persist_and_can_be_cleared(isolated_config_manager, monkeypatch):
+def test_restart_counts_persist_and_can_be_cleared(
+    isolated_config_manager, monkeypatch
+):
     isolated_config_manager.record_restart("web")
     isolated_config_manager.record_restart("web")
 
@@ -65,7 +69,9 @@ def test_restart_counts_persist_and_can_be_cleared(isolated_config_manager, monk
     assert reloaded.get_total_restart_count("web") == 0
 
 
-def test_restart_count_ignores_window_seconds_and_never_expires(isolated_config_manager):
+def test_restart_count_ignores_window_seconds_and_never_expires(
+    isolated_config_manager,
+):
     """get_restart_count() accepts a window_seconds argument for API
     compatibility, but the underlying counter (config.containers.restart_counts)
     has no timestamp component, so it is never actually filtered by window or
@@ -79,10 +85,14 @@ def test_restart_count_ignores_window_seconds_and_never_expires(isolated_config_
     # full total, because no time-based filtering is actually applied.
     assert isolated_config_manager.get_restart_count("web", window_seconds=1) == 3
     # A huge window returns the same total, confirming window_seconds has no effect.
-    assert isolated_config_manager.get_restart_count("web", window_seconds=10_000_000) == 3
+    assert (
+        isolated_config_manager.get_restart_count("web", window_seconds=10_000_000) == 3
+    )
 
 
-def test_cleanup_restart_counts_is_a_no_op_that_preserves_all_entries(isolated_config_manager):
+def test_cleanup_restart_counts_is_a_no_op_that_preserves_all_entries(
+    isolated_config_manager,
+):
     """cleanup_restart_counts() is documented in its own code comment as
     disabled ('DISABLED to preserve manual entries'), so restart counts for
     containers absent from active_container_ids must survive the call
@@ -123,7 +133,9 @@ def test_fresh_manager_reports_empty_state_for_every_tracked_area(
     assert fresh.get_all_custom_health_checks() == {}
 
 
-def test_quarantine_state_persists_and_can_be_removed(isolated_config_manager, monkeypatch):
+def test_quarantine_state_persists_and_can_be_removed(
+    isolated_config_manager, monkeypatch
+):
     isolated_config_manager.quarantine_container("web")
 
     _redirect_manager_paths(monkeypatch, isolated_config_manager.DATA_DIR)
@@ -137,7 +149,9 @@ def test_quarantine_state_persists_and_can_be_removed(isolated_config_manager, m
     assert reloaded.get_quarantined_containers() == set()
 
 
-def test_maintenance_mode_persists_and_can_be_disabled(isolated_config_manager, monkeypatch):
+def test_maintenance_mode_persists_and_can_be_disabled(
+    isolated_config_manager, monkeypatch
+):
     isolated_config_manager.enable_maintenance_mode()
     started_at = isolated_config_manager.get_maintenance_start_time()
 
@@ -152,7 +166,9 @@ def test_maintenance_mode_persists_and_can_be_disabled(isolated_config_manager, 
     assert reloaded.get_maintenance_start_time() is None
 
 
-def test_custom_health_checks_persist_and_can_be_removed(isolated_config_manager, monkeypatch):
+def test_custom_health_checks_persist_and_can_be_removed(
+    isolated_config_manager, monkeypatch
+):
     health_check = HealthCheckConfig(
         container_id="web",
         check_type="http",
@@ -186,7 +202,9 @@ def test_event_log_respects_configured_maximum(isolated_config_manager, update_c
     ]
 
 
-def test_event_log_persists_across_a_fresh_manager(isolated_config_manager, monkeypatch):
+def test_event_log_persists_across_a_fresh_manager(
+    isolated_config_manager, monkeypatch
+):
     isolated_config_manager.add_event(_make_event("first"))
     isolated_config_manager.add_event(_make_event("second"))
 
@@ -270,7 +288,10 @@ def test_export_and_import_round_trip_reproduces_full_config_state(
     assert imported_config.uptime_kuma_mappings[0].container_id == "web"
     assert imported.get_custom_health_check("web") == http_check
     assert imported.get_custom_health_check("db") == tcp_check
-    assert imported.get_all_custom_health_checks() == {"web": http_check, "db": tcp_check}
+    assert imported.get_all_custom_health_checks() == {
+        "web": http_check,
+        "db": tcp_check,
+    }
     assert imported.get_total_restart_count("web") == 2
 
 
@@ -283,7 +304,9 @@ def test_import_config_with_invalid_custom_health_check_leaves_state_unchanged(
     disk - mirroring the already-covered invalid-main-config case."""
     isolated_config_manager.get_config().monitor.interval_seconds = 30
     original_interval = isolated_config_manager.get_config().monitor.interval_seconds
-    http_check = HealthCheckConfig(container_id="web", check_type="http", http_endpoint="/healthz")
+    http_check = HealthCheckConfig(
+        container_id="web", check_type="http", http_endpoint="/healthz"
+    )
     isolated_config_manager.add_custom_health_check(http_check)
     original_custom_checks = isolated_config_manager.get_all_custom_health_checks()
 
@@ -300,27 +323,38 @@ def test_import_config_with_invalid_custom_health_check_leaves_state_unchanged(
     with pytest.raises(ValidationError):
         isolated_config_manager.import_config(payload)
 
-    assert isolated_config_manager.get_config().monitor.interval_seconds == original_interval
-    assert isolated_config_manager.get_all_custom_health_checks() == original_custom_checks
+    assert (
+        isolated_config_manager.get_config().monitor.interval_seconds
+        == original_interval
+    )
+    assert (
+        isolated_config_manager.get_all_custom_health_checks() == original_custom_checks
+    )
     saved = json.loads(isolated_config_manager.CONFIG_FILE.read_text())
     assert saved["monitor"]["interval_seconds"] == original_interval
 
 
-def test_config_write_failure_is_logged_and_does_not_escape(isolated_config_manager, caplog):
+def test_config_write_failure_is_logged_and_does_not_escape(
+    isolated_config_manager, caplog
+):
     with patch("pathlib.Path.open", side_effect=OSError("disk full")):
         isolated_config_manager.update_config(isolated_config_manager.get_config())
 
     assert "Failed to save config to disk: disk full" in caplog.text
 
 
-def test_events_write_failure_is_logged_and_does_not_escape(isolated_config_manager, caplog):
+def test_events_write_failure_is_logged_and_does_not_escape(
+    isolated_config_manager, caplog
+):
     with patch("pathlib.Path.open", side_effect=OSError("disk full")):
         isolated_config_manager.add_event(_make_event("web"))
 
     assert "Failed to save events to disk: disk full" in caplog.text
 
 
-def test_quarantine_write_failure_is_logged_and_does_not_escape(isolated_config_manager, caplog):
+def test_quarantine_write_failure_is_logged_and_does_not_escape(
+    isolated_config_manager, caplog
+):
     with patch("pathlib.Path.open", side_effect=OSError("disk full")):
         isolated_config_manager.quarantine_container("web")
 

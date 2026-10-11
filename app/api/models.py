@@ -30,7 +30,9 @@ class ContainerInfo(BaseModel):
     restart_count: int
     monitored: bool
     quarantined: bool
-    uptime_kuma_status: int | None = None  # 0=down, 1=up, 2=pending, 3=maintenance, None=not mapped/disabled
+    uptime_kuma_status: int | None = (
+        None  # 0=down, 1=up, 2=pending, 3=maintenance, None=not mapped/disabled
+    )
     uptime_kuma_monitor_name: str | None = None
 
 

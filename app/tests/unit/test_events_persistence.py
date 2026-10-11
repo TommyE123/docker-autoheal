@@ -48,7 +48,9 @@ def test_add_event_appends_to_the_log(isolated_config_manager):
 
     events = isolated_config_manager.get_events()
     assert len(events) == 5
-    assert [e.container_name for e in events] == [f"test-container-{i}" for i in range(5)]
+    assert [e.container_name for e in events] == [
+        f"test-container-{i}" for i in range(5)
+    ]
 
 
 def test_clear_events_empties_the_log(isolated_config_manager):
@@ -83,9 +85,7 @@ def test_naive_timestamp_is_rejected():
 def test_non_utc_aware_timestamp_is_rejected():
     with pytest.raises(ValidationError, match="timestamp must be UTC"):
         AutoHealEvent(
-            timestamp=datetime(
-                2024, 1, 1, 13, 0, tzinfo=timezone(timedelta(hours=1))
-            ),
+            timestamp=datetime(2024, 1, 1, 13, 0, tzinfo=timezone(timedelta(hours=1))),
             container_id="test-container",
             container_name="test-container",
             event_type="restart",
@@ -104,7 +104,9 @@ def test_utc_event_saves_and_reloads(isolated_config_manager):
     assert reloaded_events == [event]
 
 
-def test_historical_naive_event_is_preserved_without_becoming_current_event(isolated_config_manager):
+def test_historical_naive_event_is_preserved_without_becoming_current_event(
+    isolated_config_manager,
+):
     naive_timestamp = "2024-01-01T12:00:00"
     isolated_config_manager.EVENTS_FILE.write_text(
         json.dumps([_event_payload(0, naive_timestamp)])
@@ -156,14 +158,18 @@ def test_loading_events_skips_invalid_record_and_retains_valid_history(
     assert "Skipping invalid event 2 from disk" in caplog.text
 
 
-def test_mixed_historical_and_utc_events_are_preserved_when_saved(isolated_config_manager):
+def test_mixed_historical_and_utc_events_are_preserved_when_saved(
+    isolated_config_manager,
+):
     naive_timestamp = "2024-01-01T12:00:00"
     utc_timestamp = "2024-01-02T12:00:00+00:00"
     isolated_config_manager.EVENTS_FILE.write_text(
-        json.dumps([
-            _event_payload(0, naive_timestamp),
-            _event_payload(1, utc_timestamp),
-        ])
+        json.dumps(
+            [
+                _event_payload(0, naive_timestamp),
+                _event_payload(1, utc_timestamp),
+            ]
+        )
     )
 
     isolated_config_manager._event_log = isolated_config_manager._load_events()

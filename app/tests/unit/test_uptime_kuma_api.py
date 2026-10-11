@@ -55,7 +55,9 @@ class TestUptimeKumaConnection:
         assert result["monitor_count"] == 2
 
     async def test_failed_monitor_fetch_reports_zero_monitors(self, monkeypatch):
-        fake_client = FakeUptimeKumaClient(connect_result=True, get_all_monitors_fails=True)
+        fake_client = FakeUptimeKumaClient(
+            connect_result=True, get_all_monitors_fails=True
+        )
         monkeypatch.setattr(
             "app.uptime_kuma.uptime_kuma_client.UptimeKumaClient",
             lambda *a, **k: fake_client,
@@ -189,7 +191,9 @@ class TestUptimeKumaIntegration:
         config = config_manager.get_config()
         config.uptime_kuma_mappings = [
             UptimeKumaMapping(
-                container_id="web", monitor_friendly_name="Manual Web", auto_mapped=False
+                container_id="web",
+                monitor_friendly_name="Manual Web",
+                auto_mapped=False,
             ),
             UptimeKumaMapping(
                 container_id="db", monitor_friendly_name="Stale DB", auto_mapped=True

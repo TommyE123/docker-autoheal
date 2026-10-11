@@ -112,7 +112,9 @@ class TestObservabilityConfig:
         assert config_manager.get_config().observability.log_level == "DEBUG"
         assert logging.getLogger().level == logging.DEBUG
 
-    async def test_update_observability_config_unrecognized_log_level_falls_back_to_info(self):
+    async def test_update_observability_config_unrecognized_log_level_falls_back_to_info(
+        self,
+    ):
         logging.getLogger().setLevel(logging.DEBUG)
 
         result = await update_observability_config({"log_level": "NOT_A_LEVEL"})
@@ -131,7 +133,9 @@ class TestObservabilityConfig:
         assert updated.log_level == original_log_level
 
     async def test_update_observability_config_updates_log_format_only(self):
-        original_prometheus_enabled = config_manager.get_config().observability.prometheus_enabled
+        original_prometheus_enabled = (
+            config_manager.get_config().observability.prometheus_enabled
+        )
 
         await update_observability_config({"log_format": "text"})
 
@@ -146,7 +150,9 @@ class TestObservabilityConfig:
 
         assert config_manager.get_config().restart.mode == original_restart_mode
 
-    async def test_update_observability_config_unexpected_error_returns_500(self, monkeypatch):
+    async def test_update_observability_config_unexpected_error_returns_500(
+        self, monkeypatch
+    ):
         monkeypatch.setattr(
             config_manager,
             "update_config",

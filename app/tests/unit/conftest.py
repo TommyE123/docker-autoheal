@@ -36,7 +36,10 @@ from app.config.config_manager import (
     AutoHealConfig,
     config_manager,
 )
-from app.docker_client.docker_client_wrapper import DockerClientWrapper, recovery_identifier
+from app.docker_client.docker_client_wrapper import (
+    DockerClientWrapper,
+    recovery_identifier,
+)
 from app.monitor.monitoring_engine import MonitoringEngine
 
 # ---------------------------------------------------------------------------

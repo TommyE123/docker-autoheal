@@ -96,7 +96,9 @@ def _drop_stable_id_collisions(
     matches_per_stable_id: dict[str, int] = {}
     for match in matched_by_container.values():
         container_id = match["container_id"]
-        matches_per_stable_id[container_id] = matches_per_stable_id.get(container_id, 0) + 1
+        matches_per_stable_id[container_id] = (
+            matches_per_stable_id.get(container_id, 0) + 1
+        )
 
     results: list[UptimeKumaMatch] = []
     for position in sorted(matched_by_container):
@@ -182,7 +184,9 @@ def match_uptime_kuma_monitors(
             if tier < len(names):
                 norm = normalize_name(names[tier])
                 indices = {
-                    index for index in monitor_indices_by_norm.get(norm, []) if index in available
+                    index
+                    for index in monitor_indices_by_norm.get(norm, [])
+                    if index in available
                 }
             candidates[position] = indices
 

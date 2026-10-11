@@ -51,7 +51,9 @@ class TestExitStatusEvaluation:
         assert needs_restart is False
         assert reason == "Manual stop (exit 0)"
 
-    async def test_clean_exit_restarts_when_manual_stop_not_respected(self, engine, update_config):
+    async def test_clean_exit_restarts_when_manual_stop_not_respected(
+        self, engine, update_config
+    ):
         update_config(lambda c: setattr(c.restart, "respect_manual_stop", False))
         container, info = make_container(status="exited", exit_code=0)
 
@@ -76,9 +78,13 @@ class TestDockerNativeHealthEvaluation:
     """Docker health-check driven restart decisions."""
 
     @pytest.mark.parametrize("mode", ["health", "both"])
-    async def test_unhealthy_container_triggers_restart(self, engine, update_config, mode):
+    async def test_unhealthy_container_triggers_restart(
+        self, engine, update_config, mode
+    ):
         update_config(lambda c: setattr(c.restart, "mode", mode))
-        container, info = make_container(health={"status": "unhealthy", "failing_streak": 3})
+        container, info = make_container(
+            health={"status": "unhealthy", "failing_streak": 3}
+        )
 
         needs_restart, reason = await engine._evaluate_container_health(container, info)
 
@@ -87,7 +93,9 @@ class TestDockerNativeHealthEvaluation:
 
     async def test_healthy_container_needs_no_restart(self, engine, update_config):
         update_config(lambda c: setattr(c.restart, "mode", "both"))
-        container, info = make_container(health={"status": "healthy", "failing_streak": 0})
+        container, info = make_container(
+            health={"status": "healthy", "failing_streak": 0}
+        )
 
         needs_restart, reason = await engine._evaluate_container_health(container, info)
 
@@ -117,7 +125,11 @@ class TestCustomHealthChecks:
         docker_client.add_container(container, info)
         docker_client.health_results["web"] = False
         config_manager.add_custom_health_check(
-            HealthCheckConfig(container_id="web", check_type="http", http_endpoint="http://localhost/health")
+            HealthCheckConfig(
+                container_id="web",
+                check_type="http",
+                http_endpoint="http://localhost/health",
+            )
         )
 
         needs_restart, reason = await engine._evaluate_container_health(container, info)
@@ -151,7 +163,9 @@ class TestCustomHealthChecks:
         docker_client.add_container(container, info)
         docker_client.health_results["stack-web-1"] = False
         config_manager.add_custom_health_check(
-            HealthCheckConfig(container_id="stack_web", check_type="exec", exec_command=["true"])
+            HealthCheckConfig(
+                container_id="stack_web", check_type="exec", exec_command=["true"]
+            )
         )
 
         needs_restart, reason = await engine._evaluate_container_health(container, info)
@@ -159,13 +173,19 @@ class TestCustomHealthChecks:
         assert needs_restart is True
         assert reason == "Custom health check failed (exec)"
 
-    async def test_custom_check_is_found_by_full_container_id(self, engine, docker_client):
+    async def test_custom_check_is_found_by_full_container_id(
+        self, engine, docker_client
+    ):
         """Health checks registered against a raw container ID still resolve."""
         container, info = make_container(name="web", container_id="d" * 64)
         docker_client.add_container(container, info)
         docker_client.health_results["web"] = False
         config_manager.add_custom_health_check(
-            HealthCheckConfig(container_id="d" * 64, check_type="http", http_endpoint="http://localhost/")
+            HealthCheckConfig(
+                container_id="d" * 64,
+                check_type="http",
+                http_endpoint="http://localhost/",
+            )
         )
 
         needs_restart, reason = await engine._evaluate_container_health(container, info)
@@ -185,7 +205,9 @@ class TestCustomHealthChecks:
         assert needs_restart is True
         assert reason == "Custom health check failed (docker)"
 
-    async def test_docker_check_type_assumes_healthy_without_native_check(self, engine, docker_client):
+    async def test_docker_check_type_assumes_healthy_without_native_check(
+        self, engine, docker_client
+    ):
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
         docker_client.native_health["web"] = None
@@ -197,24 +219,33 @@ class TestCustomHealthChecks:
 
         assert needs_restart is False
 
-    async def test_unknown_check_type_is_treated_as_healthy(self, engine, docker_client):
+    async def test_unknown_check_type_is_treated_as_healthy(
+        self, engine, docker_client
+    ):
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
         config_manager.add_custom_health_check(
             HealthCheckConfig(container_id="web", check_type="carrier-pigeon")
         )
 
-        assert await engine._perform_custom_health_check(
-            container, config_manager.get_custom_health_check("web")
-        ) is True
+        assert (
+            await engine._perform_custom_health_check(
+                container, config_manager.get_custom_health_check("web")
+            )
+            is True
+        )
 
-    async def test_health_check_error_is_reported_as_unhealthy(self, engine, docker_client):
+    async def test_health_check_error_is_reported_as_unhealthy(
+        self, engine, docker_client
+    ):
         """A Docker API failure during a health check must not escape the engine."""
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
         docker_client.health_check_error = RuntimeError("docker API unavailable")
         config_manager.add_custom_health_check(
-            HealthCheckConfig(container_id="web", check_type="http", http_endpoint="http://localhost/")
+            HealthCheckConfig(
+                container_id="web", check_type="http", http_endpoint="http://localhost/"
+            )
         )
 
         needs_restart, reason = await engine._evaluate_container_health(container, info)
@@ -229,18 +260,24 @@ class TestUptimeKumaEvaluation:
 
     async def test_monitor_down_triggers_restart(self, engine):
         engine.uptime_kuma_monitor = MagicMock()
-        engine.uptime_kuma_monitor.should_restart_from_uptime_kuma = AsyncMock(return_value=True)
+        engine.uptime_kuma_monitor.should_restart_from_uptime_kuma = AsyncMock(
+            return_value=True
+        )
         container, info = make_container(name="web")
 
         needs_restart, reason = await engine._evaluate_container_health(container, info)
 
         assert needs_restart is True
         assert reason == "Uptime-Kuma monitor reports DOWN"
-        engine.uptime_kuma_monitor.should_restart_from_uptime_kuma.assert_awaited_once_with("web")
+        engine.uptime_kuma_monitor.should_restart_from_uptime_kuma.assert_awaited_once_with(
+            "web"
+        )
 
     async def test_monitor_up_needs_no_restart(self, engine):
         engine.uptime_kuma_monitor = MagicMock()
-        engine.uptime_kuma_monitor.should_restart_from_uptime_kuma = AsyncMock(return_value=False)
+        engine.uptime_kuma_monitor.should_restart_from_uptime_kuma = AsyncMock(
+            return_value=False
+        )
         container, info = make_container(name="web")
 
         needs_restart, reason = await engine._evaluate_container_health(container, info)

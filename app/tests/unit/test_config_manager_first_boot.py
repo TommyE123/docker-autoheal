@@ -31,7 +31,9 @@ from app.config.config_manager import (
 from app.config.init_defaults import get_default_config
 
 
-def _assert_keys_match_model_fields(data: dict, model: type[BaseModel], path: str) -> None:
+def _assert_keys_match_model_fields(
+    data: dict, model: type[BaseModel], path: str
+) -> None:
     """Recursively assert data's keys exactly match model's fields, at every level.
 
     Pydantic v2's default `extra` behaviour is to silently ignore an unknown
@@ -62,9 +64,15 @@ def _assert_keys_match_model_fields(data: dict, model: type[BaseModel], path: st
                 _assert_keys_match_model_fields(value, field_type, f"{path}.{key}")
         elif isinstance(value, list) and get_origin(field_type) is list:
             item_types = get_args(field_type)
-            if len(item_types) == 1 and isinstance(item_types[0], type) and issubclass(item_types[0], BaseModel):
+            if (
+                len(item_types) == 1
+                and isinstance(item_types[0], type)
+                and issubclass(item_types[0], BaseModel)
+            ):
                 for index, item in enumerate(value):
-                    _assert_keys_match_model_fields(item, item_types[0], f"{path}.{key}[{index}]")
+                    _assert_keys_match_model_fields(
+                        item, item_types[0], f"{path}.{key}[{index}]"
+                    )
 
 
 def _valid_top_level_config() -> dict:
@@ -73,7 +81,11 @@ def _valid_top_level_config() -> dict:
     itself) - a known-good baseline the meta-tests below deliberately
     corrupt in one specific way each, so each failure is isolated to the
     thing it's meant to prove the helper catches."""
-    return {key: value for key, value in get_default_config().items() if key != "custom_health_checks"}
+    return {
+        key: value
+        for key, value in get_default_config().items()
+        if key != "custom_health_checks"
+    }
 
 
 def _redirect_manager_paths(monkeypatch, data_dir: Path) -> None:
@@ -96,7 +108,9 @@ def _redirect_manager_paths(monkeypatch, data_dir: Path) -> None:
         monkeypatch.setattr(ConfigManager, attribute, path)
 
 
-def test_first_boot_on_empty_data_dir_matches_autohealconfig_defaults(monkeypatch, tmp_path):
+def test_first_boot_on_empty_data_dir_matches_autohealconfig_defaults(
+    monkeypatch, tmp_path
+):
     """A real ConfigManager() constructed against a brand-new, empty data
     directory must produce exactly what a bare AutoHealConfig() would -
     proving get_default_config()'s hand-maintained dict and AutoHealConfig's
@@ -126,11 +140,15 @@ def test_get_default_config_keys_match_autohealconfig_schema():
     custom_health_checks is deliberately excluded - it's popped and parsed
     separately before AutoHealConfig is ever constructed, not a field of
     AutoHealConfig itself."""
-    _assert_keys_match_model_fields(_valid_top_level_config(), AutoHealConfig, "get_default_config()")
+    _assert_keys_match_model_fields(
+        _valid_top_level_config(), AutoHealConfig, "get_default_config()"
+    )
 
 
 def test_config_loader_registry_matches_autohealconfig_sections():
-    assert set(AutoHealConfig.model_fields) == set(_CONFIG_SECTION_MODELS) | {"uptime_kuma_mappings"}
+    assert set(AutoHealConfig.model_fields) == set(_CONFIG_SECTION_MODELS) | {
+        "uptime_kuma_mappings"
+    }
 
 
 def test_schema_parity_helper_detects_an_unknown_top_level_key():
@@ -172,7 +190,9 @@ def test_schema_parity_helper_detects_a_missing_nested_key():
     this helper only checked that *present* nested keys were valid, which
     would have missed this direction of drift entirely."""
     data = _valid_top_level_config()
-    data["notifications"] = {key: value for key, value in data["notifications"].items() if key != "enabled"}
+    data["notifications"] = {
+        key: value for key, value in data["notifications"].items() if key != "enabled"
+    }
 
     with pytest.raises(AssertionError, match="enabled"):
         _assert_keys_match_model_fields(data, AutoHealConfig, "root")
