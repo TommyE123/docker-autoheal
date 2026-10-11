@@ -24,7 +24,7 @@ from app.api.routes.uptime_kuma import (
 from app.api.routes.uptime_kuma import (
     test_uptime_kuma_connection as api_test_uptime_kuma_connection,
 )
-from app.config.config_manager import config_manager
+from app.config.config_manager import UptimeKumaMapping, config_manager
 from app.tests.unit.conftest import FakeUptimeKumaClient, make_container
 
 
@@ -164,6 +164,56 @@ class TestUptimeKumaIntegration:
 
         assert result["success"] is True
         assert result["auto_mappings"] == []
+
+    async def test_enable_preserves_manual_mappings_and_refreshes_auto_mappings(
+        self, wired_api, monkeypatch
+    ):
+        docker_client, _engine = wired_api
+        for name, cid in (("web", "a"), ("db", "b"), ("newsvc", "c")):
+            container, info = make_container(name=name, container_id=cid * 64)
+            docker_client.add_container(container, info)
+        config = config_manager.get_config()
+        config.uptime_kuma_mappings = [
+            UptimeKumaMapping(
+                container_id="web", monitor_friendly_name="Manual Web", auto_mapped=False
+            ),
+            UptimeKumaMapping(
+                container_id="db", monitor_friendly_name="Stale DB", auto_mapped=True
+            ),
+            UptimeKumaMapping(
+                container_id="old_service",
+                monitor_friendly_name="Old Service",
+                auto_mapped=True,
+            ),
+        ]
+        config_manager.update_config(config)
+        fake_client = FakeUptimeKumaClient(
+            monitors=[
+                {"friendly_name": "web"},
+                {"friendly_name": "db"},
+                {"friendly_name": "newsvc"},
+            ]
+        )
+        monkeypatch.setattr(
+            "app.uptime_kuma.uptime_kuma_client.UptimeKumaClient",
+            lambda *a, **k: fake_client,
+        )
+
+        result = await enable_uptime_kuma_integration(
+            {"server_url": "http://kuma.example", "api_token": "token"}
+        )
+
+        persisted = {
+            m.container_id: (m.monitor_friendly_name, m.auto_mapped)
+            for m in config_manager.get_config().uptime_kuma_mappings
+        }
+        assert persisted == {
+            "web": ("Manual Web", False),  # manual preserved, beats auto match
+            "db": ("db", True),  # stale auto replaced by fresh auto
+            "newsvc": ("newsvc", True),  # new container auto-mapped
+        }
+        assert len(config_manager.get_config().uptime_kuma_mappings) == 3
+        assert {m["container_id"] for m in result["auto_mappings"]} == {"db", "newsvc"}
 
     async def test_get_monitors_when_integration_disabled_returns_400(self):
         with pytest.raises(HTTPException) as exc_info:
