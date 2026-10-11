@@ -39,9 +39,7 @@ def wired_api(monkeypatch, docker_client, engine):
 @pytest.mark.asyncio
 class TestUptimeKumaConnection:
     async def test_successful_connection_reports_monitor_count(self, monkeypatch):
-        fake_client = FakeUptimeKumaClient(
-            connect_result=True, monitors=[{"id": 1}, {"id": 2}]
-        )
+        fake_client = FakeUptimeKumaClient(connect_result=True, monitors=[{"id": 1}, {"id": 2}])
         monkeypatch.setattr(
             "app.uptime_kuma.uptime_kuma_client.UptimeKumaClient",
             lambda *a, **k: fake_client,
@@ -55,9 +53,7 @@ class TestUptimeKumaConnection:
         assert result["monitor_count"] == 2
 
     async def test_failed_monitor_fetch_reports_zero_monitors(self, monkeypatch):
-        fake_client = FakeUptimeKumaClient(
-            connect_result=True, get_all_monitors_fails=True
-        )
+        fake_client = FakeUptimeKumaClient(connect_result=True, get_all_monitors_fails=True)
         monkeypatch.setattr(
             "app.uptime_kuma.uptime_kuma_client.UptimeKumaClient",
             lambda *a, **k: fake_client,
@@ -77,9 +73,7 @@ class TestUptimeKumaConnection:
             lambda *a, **k: fake_client,
         )
 
-        result = await api_test_uptime_kuma_connection(
-            {"server_url": "http://kuma.example"}
-        )
+        result = await api_test_uptime_kuma_connection({"server_url": "http://kuma.example"})
 
         assert result["success"] is False
 
@@ -89,9 +83,7 @@ class TestUptimeKumaConnection:
             MagicMock(side_effect=RuntimeError("connection exploded")),
         )
 
-        result = await api_test_uptime_kuma_connection(
-            {"server_url": "http://kuma.example"}
-        )
+        result = await api_test_uptime_kuma_connection({"server_url": "http://kuma.example"})
 
         assert result["success"] is False
         assert result["message"] == "Connection error: connection exploded"
@@ -99,9 +91,7 @@ class TestUptimeKumaConnection:
 
 @pytest.mark.asyncio
 class TestUptimeKumaIntegration:
-    async def test_enable_auto_maps_containers_by_matching_name(
-        self, wired_api, monkeypatch
-    ):
+    async def test_enable_auto_maps_containers_by_matching_name(self, wired_api, monkeypatch):
         docker_client, _engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, info)
@@ -161,9 +151,7 @@ class TestUptimeKumaIntegration:
         assert persisted[0].monitor_friendly_name == "Trawl"
         assert persisted[0].auto_mapped is True
 
-    async def test_enable_skips_containers_without_stable_ids(
-        self, wired_api, monkeypatch
-    ):
+    async def test_enable_skips_containers_without_stable_ids(self, wired_api, monkeypatch):
         docker_client, _engine = wired_api
         container, _info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, _info)
@@ -264,9 +252,7 @@ class TestUptimeKumaIntegration:
         config.uptime_kuma.enabled = True
         config_manager.update_config(config)
         fake_client = MagicMock()
-        fake_client.get_all_monitors = AsyncMock(
-            side_effect=RuntimeError("server unavailable")
-        )
+        fake_client.get_all_monitors = AsyncMock(side_effect=RuntimeError("server unavailable"))
         monkeypatch.setattr(
             "app.uptime_kuma.uptime_kuma_client.UptimeKumaClient",
             lambda *a, **k: fake_client,
@@ -308,9 +294,7 @@ class TestUptimeKumaIntegration:
 
     async def test_enable_client_error_returns_500(self, wired_api, monkeypatch):
         fake_client = MagicMock()
-        fake_client.get_all_monitors = AsyncMock(
-            side_effect=RuntimeError("server unavailable")
-        )
+        fake_client.get_all_monitors = AsyncMock(side_effect=RuntimeError("server unavailable"))
         monkeypatch.setattr(
             "app.uptime_kuma.uptime_kuma_client.UptimeKumaClient",
             lambda *a, **k: fake_client,

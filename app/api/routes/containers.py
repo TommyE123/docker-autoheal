@@ -58,9 +58,7 @@ async def list_containers(include_stopped: bool = False):
             quarantined = config_manager.is_quarantined(recovery_id)
 
             # Get locally tracked restart count (persists across container recreations)
-            locally_tracked_restarts = config_manager.get_total_restart_count(
-                recovery_id
-            )
+            locally_tracked_restarts = config_manager.get_total_restart_count(recovery_id)
 
             # Check for Uptime Kuma mapping and status using uptime_kuma_monitor
             uptime_kuma_status = None
@@ -76,9 +74,7 @@ async def list_containers(include_stopped: bool = False):
                             break
 
                     # Get cached status from uptime_kuma_monitor
-                    uptime_kuma_status = uptime_kuma_monitor.get_container_status(
-                        stable_id
-                    )
+                    uptime_kuma_status = uptime_kuma_monitor.get_container_status(stable_id)
             elif uptime_kuma_enabled and not uptime_kuma_monitor:
                 # Uptime-Kuma integration enabled but monitor not initialized
                 uptime_kuma_status = 4  # Indicate unknown status

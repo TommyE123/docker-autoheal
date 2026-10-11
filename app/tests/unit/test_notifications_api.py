@@ -38,9 +38,7 @@ class TestNotificationsConfig:
         config = config_manager.get_config()
         config.notifications.enabled = True
         config.notifications.services = [
-            NotificationService(
-                name="Slack", type="slack", url="https://example.invalid/slack"
-            )
+            NotificationService(name="Slack", type="slack", url="https://example.invalid/slack")
         ]
         config_manager.update_config(config)
 
@@ -50,9 +48,7 @@ class TestNotificationsConfig:
         assert result["services"][0]["name"] == "Slack"
 
     async def test_update_notifications_config_updates_enabled_and_filters(self):
-        result = await update_notifications_config(
-            {"enabled": True, "event_filters": ["restart"]}
-        )
+        result = await update_notifications_config({"enabled": True, "event_filters": ["restart"]})
 
         assert result["status"] == "success"
         updated = config_manager.get_config()
@@ -94,9 +90,7 @@ class TestNotificationsConfig:
 
         assert exc_info.value.status_code == 500
 
-    async def test_update_notifications_config_persistence_error_returns_500(
-        self, monkeypatch
-    ):
+    async def test_update_notifications_config_persistence_error_returns_500(self, monkeypatch):
         monkeypatch.setattr(
             config_manager,
             "update_config",
@@ -124,9 +118,7 @@ class TestNotificationServiceCrud:
         assert result["service"]["name"] == "Webhook"
         assert config_manager.get_config().notifications.services[0].name == "Webhook"
 
-    async def test_add_notification_service_validation_error_hides_credentials(
-        self, caplog
-    ):
+    async def test_add_notification_service_validation_error_hides_credentials(self, caplog):
         with pytest.raises(HTTPException) as exc_info:
             await add_notification_service(
                 {
@@ -215,9 +207,7 @@ class TestNotificationServiceCrud:
 
         assert exc_info.value.status_code == 404
 
-    async def test_update_notification_service_persistence_error_returns_500(
-        self, monkeypatch
-    ):
+    async def test_update_notification_service_persistence_error_returns_500(self, monkeypatch):
         await add_notification_service(
             {
                 "name": "Webhook",
@@ -256,9 +246,7 @@ class TestNotificationServiceCrud:
 
         assert exc_info.value.status_code == 404
 
-    async def test_delete_notification_service_persistence_error_returns_500(
-        self, monkeypatch
-    ):
+    async def test_delete_notification_service_persistence_error_returns_500(self, monkeypatch):
         await add_notification_service(
             {
                 "name": "Webhook",

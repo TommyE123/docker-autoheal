@@ -174,9 +174,7 @@ class DockerClientWrapper:
                     stable_id = container.name
 
             # Get image info for tracking
-            image_name = (
-                container.image.tags[0] if container.image.tags else container.image.id
-            )
+            image_name = container.image.tags[0] if container.image.tags else container.image.id
             image_id = attrs.get("Image", "")
 
             # Get network info for uniqueness
@@ -203,12 +201,8 @@ class DockerClientWrapper:
                 "restart_count": attrs.get("RestartCount", 0),
                 "health": self._get_health_status(attrs),
                 "restart_policy": attrs.get("HostConfig", {}).get("RestartPolicy", {}),
-                "compose_project": labels.get(
-                    "com.docker.compose.project"
-                ),  # NEW: Compose project
-                "compose_service": labels.get(
-                    "com.docker.compose.service"
-                ),  # NEW: Compose service
+                "compose_project": labels.get("com.docker.compose.project"),  # NEW: Compose project
+                "compose_service": labels.get("com.docker.compose.service"),  # NEW: Compose service
             }
         except Exception as e:
             logger.error("Failed to get container info for %s: %s", container.name, e)
@@ -237,9 +231,7 @@ class DockerClientWrapper:
             True if restart successful, False otherwise
         """
         try:
-            logger.info(
-                "Restarting container %s (%s)", container.name, container.id[:12]
-            )
+            logger.info("Restarting container %s (%s)", container.name, container.id[:12])
             container.restart(timeout=timeout)
             return True
         except Exception as e:
@@ -263,9 +255,7 @@ class DockerClientWrapper:
             logger.error("Failed to stop container %s: %s", container.name, e)
             return False
 
-    def execute_command(
-        self, container: Container, command: list[str]
-    ) -> tuple[int, str]:
+    def execute_command(self, container: Container, command: list[str]) -> tuple[int, str]:
         """
         Execute command in container
         Args:
@@ -278,9 +268,7 @@ class DockerClientWrapper:
             exec_result = container.exec_run(command)
             return exec_result.exit_code, exec_result.output.decode("utf-8")
         except Exception as e:
-            logger.error(
-                "Failed to execute command in container %s: %s", container.name, e
-            )
+            logger.error("Failed to execute command in container %s: %s", container.name, e)
             return -1, str(e)
 
     def check_http_health(
@@ -317,9 +305,7 @@ class DockerClientWrapper:
                 return False
 
             # Replace localhost/127.0.0.1 with container IP
-            endpoint = endpoint.replace("localhost", ip_address).replace(
-                "127.0.0.1", ip_address
-            )
+            endpoint = endpoint.replace("localhost", ip_address).replace("127.0.0.1", ip_address)
 
             response = requests.get(endpoint, timeout=timeout)
             return response.status_code == expected_status
@@ -342,9 +328,7 @@ class DockerClientWrapper:
             logger.error("Failed to get events stream: %s", e)
             return None
 
-    def check_tcp_health(
-        self, container: Container, port: int, timeout: int = 5
-    ) -> bool:
+    def check_tcp_health(self, container: Container, port: int, timeout: int = 5) -> bool:
         """
         Perform TCP health check on container
         Args:

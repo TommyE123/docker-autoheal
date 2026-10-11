@@ -31,9 +31,7 @@ from app.config.config_manager import (
 from app.config.init_defaults import get_default_config
 
 
-def _assert_keys_match_model_fields(
-    data: dict, model: type[BaseModel], path: str
-) -> None:
+def _assert_keys_match_model_fields(data: dict, model: type[BaseModel], path: str) -> None:
     """Recursively assert data's keys exactly match model's fields, at every level.
 
     Pydantic v2's default `extra` behaviour is to silently ignore an unknown
@@ -70,9 +68,7 @@ def _assert_keys_match_model_fields(
                 and issubclass(item_types[0], BaseModel)
             ):
                 for index, item in enumerate(value):
-                    _assert_keys_match_model_fields(
-                        item, item_types[0], f"{path}.{key}[{index}]"
-                    )
+                    _assert_keys_match_model_fields(item, item_types[0], f"{path}.{key}[{index}]")
 
 
 def _valid_top_level_config() -> dict:
@@ -82,9 +78,7 @@ def _valid_top_level_config() -> dict:
     corrupt in one specific way each, so each failure is isolated to the
     thing it's meant to prove the helper catches."""
     return {
-        key: value
-        for key, value in get_default_config().items()
-        if key != "custom_health_checks"
+        key: value for key, value in get_default_config().items() if key != "custom_health_checks"
     }
 
 
@@ -108,9 +102,7 @@ def _redirect_manager_paths(monkeypatch, data_dir: Path) -> None:
         monkeypatch.setattr(ConfigManager, attribute, path)
 
 
-def test_first_boot_on_empty_data_dir_matches_autohealconfig_defaults(
-    monkeypatch, tmp_path
-):
+def test_first_boot_on_empty_data_dir_matches_autohealconfig_defaults(monkeypatch, tmp_path):
     """A real ConfigManager() constructed against a brand-new, empty data
     directory must produce exactly what a bare AutoHealConfig() would -
     proving get_default_config()'s hand-maintained dict and AutoHealConfig's

@@ -98,9 +98,7 @@ class MonitoringEngine:
         Returns:
             Recovery identifier string
         """
-        return recovery_identifier(
-            self.get_stable_identifier(info), info.get("labels", {})
-        )
+        return recovery_identifier(self.get_stable_identifier(info), info.get("labels", {}))
 
     @staticmethod
     def _auto_monitor_stable_id(labels: dict, container_name: str) -> str:
@@ -261,9 +259,7 @@ class MonitoringEngine:
 
             if status == "running":
                 # Reuse existing health evaluation - if needs_restart is False, container is healthy
-                needs_restart, reason = await self._evaluate_container_health(
-                    container, info
-                )
+                needs_restart, reason = await self._evaluate_container_health(container, info)
                 if not needs_restart:
                     # Container is healthy, auto-remove from quarantine
                     await self._auto_unquarantine_container(
@@ -435,9 +431,7 @@ class MonitoringEngine:
             if not custom_hc:
                 custom_hc = config_manager.get_custom_health_check(container_id)
             if custom_hc:
-                health_ok = await self._perform_custom_health_check(
-                    container, custom_hc
-                )
+                health_ok = await self._perform_custom_health_check(container, custom_hc)
                 if not health_ok:
                     return True, f"Custom health check failed ({custom_hc.check_type})"
 
@@ -450,9 +444,7 @@ class MonitoringEngine:
 
         # Check Uptime-Kuma monitor status (if configured and enabled)
         if hasattr(self, "uptime_kuma_monitor") and self.uptime_kuma_monitor:
-            if await self.uptime_kuma_monitor.should_restart_from_uptime_kuma(
-                stable_id
-            ):
+            if await self.uptime_kuma_monitor.should_restart_from_uptime_kuma(stable_id):
                 return True, "Uptime-Kuma monitor reports DOWN"
 
         return False, ""
@@ -496,9 +488,7 @@ class MonitoringEngine:
                 status = await asyncio.to_thread(
                     self.docker_client.get_docker_native_health, container
                 )
-                return (
-                    status == "healthy" if status else True
-                )  # Assume healthy if no check
+                return status == "healthy" if status else True  # Assume healthy if no check
             logger.warning("Unknown health check type: %s", check_type)
             return True
         except Exception as e:
@@ -530,9 +520,7 @@ class MonitoringEngine:
             # Reset backoff delays
             if recovery_id in self._backoff_delays:
                 config = config_manager.get_config()
-                self._backoff_delays[recovery_id] = (
-                    config.restart.backoff.initial_seconds
-                )
+                self._backoff_delays[recovery_id] = config.restart.backoff.initial_seconds
 
             # Log the event
             event = AutoHealEvent(
@@ -556,9 +544,7 @@ class MonitoringEngine:
             )
 
         except Exception as e:
-            logger.error(
-                "Error auto-unquarantining container %s: %s", container_name, e
-            )
+            logger.error("Error auto-unquarantining container %s: %s", container_name, e)
 
     async def _handle_container_restart(
         self, container: Container, info: dict, reason: str
@@ -585,9 +571,7 @@ class MonitoringEngine:
         # 2. Auto-generated names (uses compose service name)
         # 3. Name conflicts (uses compose project + service)
 
-        logger.debug(
-            "Using recovery_id '%s' for container %s", recovery_id, container_name
-        )
+        logger.debug("Using recovery_id '%s' for container %s", recovery_id, container_name)
 
         # Check cooldown (using recovery_id)
         last_restart = self._last_restart_times.get(recovery_id)
@@ -663,9 +647,7 @@ class MonitoringEngine:
             recovery_id,
             reason,
         )
-        success = await asyncio.to_thread(
-            self.docker_client.restart_container, container
-        )
+        success = await asyncio.to_thread(self.docker_client.restart_container, container)
 
         # Record restart (using recovery_id - persists across ID changes and handles all edge cases)
         config_manager.record_restart(recovery_id)
@@ -726,9 +708,7 @@ class MonitoringEngine:
                 "message": event.message,
             }
 
-            response = await asyncio.to_thread(
-                requests.post, webhook_url, json=payload, timeout=5
-            )
+            response = await asyncio.to_thread(requests.post, webhook_url, json=payload, timeout=5)
 
             if response.status_code == 200:
                 logger.info("Alert sent successfully for %s", event.container_name)
@@ -857,9 +837,7 @@ class MonitoringEngine:
             for container in containers:
                 try:
                     # Get container info including labels
-                    info = await asyncio.to_thread(
-                        self.docker_client.get_container_info, container
-                    )
+                    info = await asyncio.to_thread(self.docker_client.get_container_info, container)
 
                     if not info:
                         continue
@@ -867,19 +845,14 @@ class MonitoringEngine:
                     labels = info.get("labels", {})
 
                     # Check if container has the configured monitoring label (autoheal=true by default)
-                    if (
-                        labels.get(config.monitor.label_key)
-                        != config.monitor.label_value
-                    ):
+                    if labels.get(config.monitor.label_key) != config.monitor.label_value:
                         continue
 
                     selected_before = len(config.containers.selected)
                     try:
                         event_obj = self._auto_monitor_container(
                             config,
-                            stable_id=self._auto_monitor_stable_id(
-                                labels, info.get("name")
-                            ),
+                            stable_id=self._auto_monitor_stable_id(labels, info.get("name")),
                             container_id=info.get("full_id"),
                             container_name=info.get("name"),
                             startup=True,
@@ -894,9 +867,7 @@ class MonitoringEngine:
                         await notification_manager.send_event_notification(event_obj)
 
                 except Exception as e:
-                    logger.exception(
-                        "Error processing container during initial scan: %s", e
-                    )
+                    logger.exception("Error processing container during initial scan: %s", e)
                     continue
 
             # Save configuration if any containers were added
@@ -935,9 +906,7 @@ class MonitoringEngine:
                     )
 
                     if not events:
-                        logger.warning(
-                            "Failed to get event stream, retrying in 10 seconds..."
-                        )
+                        logger.warning("Failed to get event stream, retrying in 10 seconds...")
                         import time
 
                         time.sleep(10)
@@ -956,9 +925,7 @@ class MonitoringEngine:
                     time.sleep(10)
 
         # Start the event thread
-        thread = threading.Thread(
-            target=event_thread, daemon=True, name="docker-events"
-        )
+        thread = threading.Thread(target=event_thread, daemon=True, name="docker-events")
         thread.start()
         logger.debug("Docker event listener thread started")
 
@@ -1006,20 +973,14 @@ class MonitoringEngine:
             )
 
             # Get the container object
-            container = await asyncio.to_thread(
-                self.docker_client.get_container, container_id
-            )
+            container = await asyncio.to_thread(self.docker_client.get_container, container_id)
 
             if not container:
-                logger.warning(
-                    "Could not retrieve container %s after start event", container_name
-                )
+                logger.warning("Could not retrieve container %s after start event", container_name)
                 return
 
             # Get container info including labels
-            info = await asyncio.to_thread(
-                self.docker_client.get_container_info, container
-            )
+            info = await asyncio.to_thread(self.docker_client.get_container_info, container)
 
             labels = info.get("labels", {})
 

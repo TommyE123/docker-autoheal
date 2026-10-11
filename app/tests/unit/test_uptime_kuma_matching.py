@@ -74,16 +74,12 @@ class TestMatchUptimeKumaMonitors:
         # actual Docker name may be something else entirely (e.g.
         # "vpn-apps-trawl-1"), so only the compose service name, not the
         # full stable ID, should be compared against the monitor name.
-        containers = [
-            _container("vpn-apps_trawl", "vpn-apps-trawl-1", compose_service="trawl")
-        ]
+        containers = [_container("vpn-apps_trawl", "vpn-apps-trawl-1", compose_service="trawl")]
         monitors = [_monitor("Trawl")]
 
         result = match_uptime_kuma_monitors(containers, monitors)
 
-        assert result == [
-            {"container_id": "vpn-apps_trawl", "monitor_friendly_name": "Trawl"}
-        ]
+        assert result == [{"container_id": "vpn-apps_trawl", "monitor_friendly_name": "Trawl"}]
 
     def test_sabnzbd_and_qbittorrent_style_capitalisation(self):
         containers = [
@@ -206,9 +202,7 @@ class TestMatchUptimeKumaMonitors:
         assert "vpn-apps_trawl" in caplog.text
         assert "already taken by a higher-precedence container" in caplog.text
 
-    def test_two_compose_services_sharing_a_monitor_name_are_left_unmapped(
-        self, caplog
-    ):
+    def test_two_compose_services_sharing_a_monitor_name_are_left_unmapped(self, caplog):
         containers = [
             _container("stack-a_redis", "stack-a-redis-1", compose_service="redis"),
             _container("stack-b_redis", "stack-b-redis-1", compose_service="redis"),
@@ -239,9 +233,7 @@ class TestMatchUptimeKumaMonitors:
         assert result == [{"container_id": "myapp_web", "monitor_friendly_name": "Web"}]
         assert "standalone" not in caplog.text
 
-    def test_replicas_sharing_a_stable_id_claiming_different_monitors_are_dropped(
-        self, caplog
-    ):
+    def test_replicas_sharing_a_stable_id_claiming_different_monitors_are_dropped(self, caplog):
         """Compose replicas of one service share a stable_id, and the mapping is
         persisted under that stable_id. If the replicas match different monitors
         (one by container name, one by service name), persisting both would mean

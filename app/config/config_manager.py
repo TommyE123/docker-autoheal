@@ -20,15 +20,9 @@ logger = logging.getLogger(__name__)
 class MonitorConfig(BaseModel):
     """Monitor configuration settings"""
 
-    interval_seconds: int = Field(
-        default=30, ge=1, description="Monitoring interval in seconds"
-    )
-    label_key: str = Field(
-        default="autoheal", description="Label key to filter containers"
-    )
-    label_value: str = Field(
-        default="true", description="Label value to filter containers"
-    )
+    interval_seconds: int = Field(default=30, ge=1, description="Monitoring interval in seconds")
+    label_key: str = Field(default="autoheal", description="Label key to filter containers")
+    label_value: str = Field(default="true", description="Label value to filter containers")
     include_all: bool = Field(
         default=False, description="Monitor all containers regardless of labels"
     )
@@ -38,24 +32,16 @@ class BackoffConfig(BaseModel):
     """Restart backoff configuration"""
 
     enabled: bool = Field(default=True, description="Enable exponential backoff")
-    initial_seconds: int = Field(
-        default=10, ge=1, description="Initial backoff delay in seconds"
-    )
+    initial_seconds: int = Field(default=10, ge=1, description="Initial backoff delay in seconds")
     multiplier: float = Field(default=2.0, ge=1.0, description="Backoff multiplier")
 
 
 class RestartConfig(BaseModel):
     """Restart policy configuration"""
 
-    mode: str = Field(
-        default="on-failure", description="Restart mode: on-failure, health, or both"
-    )
-    cooldown_seconds: int = Field(
-        default=60, ge=0, description="Cooldown between restarts"
-    )
-    max_restarts: int = Field(
-        default=3, ge=1, description="Maximum restarts within window"
-    )
+    mode: str = Field(default="on-failure", description="Restart mode: on-failure, health, or both")
+    cooldown_seconds: int = Field(default=60, ge=0, description="Cooldown between restarts")
+    max_restarts: int = Field(default=3, ge=1, description="Maximum restarts within window")
     max_restarts_window_seconds: int = Field(
         default=600, ge=1, description="Time window for max restarts"
     )
@@ -102,12 +88,8 @@ class UIConfig(BaseModel):
     enable: bool = Field(default=True, description="Enable web UI")
     listen_address: str = Field(default="0.0.0.0", description="UI listen address")
     listen_port: int = Field(default=3131, ge=1, le=65535, description="UI listen port")
-    allow_export_json: bool = Field(
-        default=True, description="Allow configuration export"
-    )
-    allow_import_json: bool = Field(
-        default=True, description="Allow configuration import"
-    )
+    allow_export_json: bool = Field(default=True, description="Allow configuration export")
+    allow_import_json: bool = Field(default=True, description="Allow configuration import")
     max_log_entries: int = Field(
         default=50, ge=1, description="Maximum log entries to keep in memory"
     )
@@ -126,12 +108,8 @@ class AlertsConfig(BaseModel):
 class ObservabilityConfig(BaseModel):
     """Observability and metrics configuration"""
 
-    prometheus_enabled: bool = Field(
-        default=True, description="Enable Prometheus metrics"
-    )
-    metrics_port: int = Field(
-        default=9090, ge=1, le=65535, description="Metrics endpoint port"
-    )
+    prometheus_enabled: bool = Field(default=True, description="Enable Prometheus metrics")
+    metrics_port: int = Field(default=9090, ge=1, le=65535, description="Metrics endpoint port")
     log_format: str = Field(default="json", description="Log format: json or text")
     log_level: str = Field(
         default="INFO", description="Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL"
@@ -157,9 +135,7 @@ class UptimeKumaConfig(BaseModel):
 class UptimeKumaMapping(BaseModel):
     """Container to Uptime-Kuma monitor mapping"""
 
-    container_id: str = Field(
-        description="Container stable ID (stable across recreations)"
-    )
+    container_id: str = Field(description="Container stable ID (stable across recreations)")
     monitor_friendly_name: str = Field(description="Uptime-Kuma monitor friendly name")
     auto_mapped: bool = Field(default=False, description="Whether this was auto-mapped")
 
@@ -178,12 +154,8 @@ class NotificationService(BaseModel):
     enabled: bool = Field(default=True, description="Enable this notification service")
 
     # Common fields
-    url: str | None = Field(
-        default=None, description="Webhook URL (webhook, discord, slack)"
-    )
-    headers: dict[str, str] | None = Field(
-        default=None, description="Custom headers for webhook"
-    )
+    url: str | None = Field(default=None, description="Webhook URL (webhook, discord, slack)")
+    headers: dict[str, str] | None = Field(default=None, description="Custom headers for webhook")
     username: str | None = Field(default=None, description="Username (discord, ntfy)")
     password: str | None = Field(default=None, description="Password (ntfy)")
 
@@ -357,9 +329,7 @@ class ConfigManager:
         # Load persisted data or initialize with defaults
         self._config = self._load_config()
         self._event_log: list[StoredAutoHealEvent] = self._load_events()
-        self._custom_health_checks: dict[str, HealthCheckConfig] = (
-            self._load_custom_health_checks()
-        )
+        self._custom_health_checks: dict[str, HealthCheckConfig] = self._load_custom_health_checks()
         # _container_restart_counts removed - now stored in self._config.containers.restart_counts
         self._quarantined_containers: set = self._load_quarantine()
         self._maintenance_mode: bool = False
@@ -458,9 +428,7 @@ class ConfigManager:
             try:
                 sections[name] = model(**data[name])
             except (ValidationError, TypeError) as error:
-                logger.warning(
-                    "Resetting config section '%s' to defaults: %s", name, error
-                )
+                logger.warning("Resetting config section '%s' to defaults: %s", name, error)
 
         if "uptime_kuma_mappings" in data:
             try:
@@ -498,7 +466,7 @@ class ConfigManager:
                     for index, event in enumerate(data):
                         try:
                             events.append(AutoHealEvent(**event))
-                        except (ValidationError, TypeError):
+                        except ValidationError, TypeError:
                             try:
                                 events.append(LegacyAutoHealEvent(**event))
                                 logger.warning(
@@ -542,9 +510,7 @@ class ConfigManager:
                 with self.QUARANTINE_FILE.open("r") as f:
                     data = json.load(f)
                     quarantine = set(data)
-                    logger.info(
-                        "Loaded %s quarantined containers from disk", len(quarantine)
-                    )
+                    logger.info("Loaded %s quarantined containers from disk", len(quarantine))
                     return quarantine
         except Exception as e:
             logger.warning("Failed to load quarantine list from disk: %s", e)
@@ -570,15 +536,11 @@ class ConfigManager:
                     data = json.load(f)
                     enabled = data.get("enabled", False)
                     start_time = data.get("start_time")
-                    parsed_start_time = (
-                        datetime.fromisoformat(start_time) if start_time else None
-                    )
+                    parsed_start_time = datetime.fromisoformat(start_time) if start_time else None
 
                     self._maintenance_mode = enabled
                     self._maintenance_start_time = parsed_start_time
-                    logger.info(
-                        "Loaded maintenance mode state: %s", self._maintenance_mode
-                    )
+                    logger.info("Loaded maintenance mode state: %s", self._maintenance_mode)
         except Exception as e:
             logger.warning("Failed to load maintenance mode from disk: %s", e)
 

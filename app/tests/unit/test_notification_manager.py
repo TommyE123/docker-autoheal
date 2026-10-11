@@ -79,9 +79,7 @@ def _configure_webhook(isolated_config_manager, event_filters=None, enabled=True
             url="https://example.invalid/webhook",
         )
     ]
-    config.notifications.event_filters = (
-        event_filters if event_filters is not None else []
-    )
+    config.notifications.event_filters = event_filters if event_filters is not None else []
     isolated_config_manager.update_config(config)
     return config
 
@@ -155,9 +153,7 @@ async def test_send_event_notification_skips_filtered_out_event_types(
 async def test_send_event_notification_noop_when_notifications_disabled(
     isolated_config_manager, manager
 ):
-    _configure_webhook(
-        isolated_config_manager, event_filters=["restart"], enabled=False
-    )
+    _configure_webhook(isolated_config_manager, event_filters=["restart"], enabled=False)
 
     await manager.send_event_notification(_make_event("restart"))
 
@@ -204,15 +200,11 @@ async def test_test_notification_reports_failure_for_unknown_service(
 
 
 def test_format_notification_maps_event_type_to_title_and_priority(manager):
-    title, _message, priority = manager._format_notification(
-        _make_event("unquarantine")
-    )
+    title, _message, priority = manager._format_notification(_make_event("unquarantine"))
     assert title == "Container Unquarantined"
     assert priority == NotificationPriority.NORMAL
 
-    title, _message, priority = manager._format_notification(
-        _make_event("unknown_event")
-    )
+    title, _message, priority = manager._format_notification(_make_event("unknown_event"))
     assert title == "Unknown Event"
     assert priority == NotificationPriority.NORMAL
 
@@ -285,9 +277,7 @@ async def test_send_telegram_builds_message_and_url(isolated_config_manager, man
 
 
 @pytest.mark.asyncio
-async def test_send_telegram_skips_when_not_configured(
-    isolated_config_manager, manager
-):
+async def test_send_telegram_skips_when_not_configured(isolated_config_manager, manager):
     _configure_service(
         isolated_config_manager,
         NotificationService(name="Telegram", type="telegram", enabled=True),
@@ -318,10 +308,7 @@ async def test_send_ntfy_builds_headers_with_auth(isolated_config_manager, manag
     call = manager._session.calls[0]
     assert call["url"] == "https://ntfy.example.invalid/alerts"
     assert call["headers"]["Priority"] == "4"  # HIGH priority
-    assert (
-        call["headers"]["Authorization"]
-        == "Basic " + base64.b64encode(b"user:pass").decode()
-    )
+    assert call["headers"]["Authorization"] == "Basic " + base64.b64encode(b"user:pass").decode()
     assert "**" not in call["data"]
 
 
@@ -340,9 +327,7 @@ async def test_send_ntfy_without_credentials_sends_no_authorization(
 
 
 @pytest.mark.asyncio
-async def test_send_ntfy_with_access_token_sends_bearer_header(
-    isolated_config_manager, manager
-):
+async def test_send_ntfy_with_access_token_sends_bearer_header(isolated_config_manager, manager):
     _configure_service(
         isolated_config_manager,
         NotificationService(
@@ -383,9 +368,7 @@ async def test_send_ntfy_access_token_takes_precedence_over_basic_auth(
 
 @pytest.mark.parametrize("status", [200, 500])
 @pytest.mark.asyncio
-async def test_send_ntfy_access_token_not_logged(
-    caplog, isolated_config_manager, manager, status
-):
+async def test_send_ntfy_access_token_not_logged(caplog, isolated_config_manager, manager, status):
     manager._session = _FakeSession(status=status)
     _configure_service(
         isolated_config_manager,
@@ -475,9 +458,7 @@ async def test_send_pushover_builds_form_payload(isolated_config_manager, manage
 
 
 @pytest.mark.asyncio
-async def test_webhook_error_status_is_logged_not_raised(
-    caplog, isolated_config_manager, manager
-):
+async def test_webhook_error_status_is_logged_not_raised(caplog, isolated_config_manager, manager):
     manager._session = _FakeSession(status=500)
     _configure_webhook(isolated_config_manager)
 
@@ -488,9 +469,7 @@ async def test_webhook_error_status_is_logged_not_raised(
 
 
 @pytest.mark.asyncio
-async def test_webhook_exception_is_caught_and_logged(
-    caplog, isolated_config_manager, manager
-):
+async def test_webhook_exception_is_caught_and_logged(caplog, isolated_config_manager, manager):
     class _RaisingSession:
         def post(self, *args, **kwargs):
             raise ConnectionError("network unreachable")
@@ -501,9 +480,7 @@ async def test_webhook_exception_is_caught_and_logged(
     with caplog.at_level(logging.ERROR):
         await manager._process_notification(_make_event("restart"))
 
-    assert any(
-        "Failed to send webhook notification" in r.message for r in caplog.records
-    )
+    assert any("Failed to send webhook notification" in r.message for r in caplog.records)
 
 
 @pytest.mark.asyncio
@@ -683,9 +660,7 @@ async def test_start_stop_lifecycle_delivers_queued_notification(
 
 
 @pytest.mark.asyncio
-async def test_start_when_already_running_is_a_noop(
-    monkeypatch, isolated_config_manager
-):
+async def test_start_when_already_running_is_a_noop(monkeypatch, isolated_config_manager):
     monkeypatch.setattr(
         "app.notifications.notification_manager.aiohttp.ClientSession",
         _FakeAiohttpSession,
@@ -882,9 +857,7 @@ async def test_request_exception_is_caught_and_logged(
 
 
 @pytest.mark.asyncio
-async def test_send_webhook_includes_priority_and_custom_headers(
-    isolated_config_manager, manager
-):
+async def test_send_webhook_includes_priority_and_custom_headers(isolated_config_manager, manager):
     """Webhook is the only provider whose payload carries a raw priority value
     and supports arbitrary custom headers; neither is exercised elsewhere."""
     _configure_service(
@@ -982,22 +955,14 @@ async def test_one_provider_failure_does_not_block_other_notifications(
     config = isolated_config_manager.get_config()
     config.notifications.enabled = True
     config.notifications.services = [
-        NotificationService(
-            name="Webhook", type="webhook", enabled=True, url=failing_url
-        ),
-        NotificationService(
-            name="Discord", type="discord", enabled=True, url=working_url
-        ),
+        NotificationService(name="Webhook", type="webhook", enabled=True, url=failing_url),
+        NotificationService(name="Discord", type="discord", enabled=True, url=working_url),
     ]
     isolated_config_manager.update_config(config)
 
     with caplog.at_level(logging.ERROR):
-        await asyncio.wait_for(
-            manager._process_notification(_make_event("restart")), timeout=2
-        )
+        await asyncio.wait_for(manager._process_notification(_make_event("restart")), timeout=2)
 
     called_urls = {call["url"] for call in manager._session.calls}
     assert called_urls == {failing_url, working_url}
-    assert any(
-        "Failed to send webhook notification" in r.message for r in caplog.records
-    )
+    assert any("Failed to send webhook notification" in r.message for r in caplog.records)

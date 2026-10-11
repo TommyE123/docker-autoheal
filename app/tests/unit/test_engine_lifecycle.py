@@ -58,9 +58,7 @@ def quiet_loops(monkeypatch):
 class TestStartStop:
     """Engine start/stop state transitions."""
 
-    async def test_start_marks_engine_running_and_creates_tasks(
-        self, engine, quiet_loops
-    ):
+    async def test_start_marks_engine_running_and_creates_tasks(self, engine, quiet_loops):
         await engine.start()
         try:
             assert engine._running is True
@@ -80,9 +78,7 @@ class TestStartStop:
         finally:
             await engine.stop()
 
-    async def test_stop_cancels_tasks_and_clears_running_flag(
-        self, engine, quiet_loops
-    ):
+    async def test_stop_cancels_tasks_and_clears_running_flag(self, engine, quiet_loops):
         await engine.start()
 
         await engine.stop()
@@ -113,9 +109,7 @@ class TestStartStop:
 class TestScanExistingContainers:
     """Startup discovery of containers already running with ``autoheal=true``."""
 
-    async def test_labelled_container_is_added_to_monitoring(
-        self, engine, docker_client
-    ):
+    async def test_labelled_container_is_added_to_monitoring(self, engine, docker_client):
         container, info = make_container(name="web", labels={"autoheal": "true"})
         docker_client.add_container(container, info)
 
@@ -279,9 +273,7 @@ class TestScanExistingContainers:
 
         assert config_manager.get_config().containers.selected == ["web"]
 
-    async def test_compose_container_is_added_under_its_stable_id(
-        self, engine, docker_client
-    ):
+    async def test_compose_container_is_added_under_its_stable_id(self, engine, docker_client):
         container, info = make_container(
             name="stack-web-1",
             labels={
@@ -316,9 +308,7 @@ class TestScanExistingContainers:
         assert config_manager.get_config().containers.selected == []
         assert config_manager.get_events() == []
 
-    async def test_container_with_non_true_autoheal_value_is_ignored(
-        self, engine, docker_client
-    ):
+    async def test_container_with_non_true_autoheal_value_is_ignored(self, engine, docker_client):
         container, info = make_container(name="web", labels={"autoheal": "false"})
         docker_client.add_container(container, info)
 
@@ -341,9 +331,7 @@ class TestScanExistingContainers:
         assert config_manager.get_config().containers.selected == ["web"]
         assert [e.event_type for e in config_manager.get_events()] == ["auto_monitor"]
         mock_notification_manager.send_event_notification.assert_awaited_once()
-        (notified_event,) = (
-            mock_notification_manager.send_event_notification.await_args.args
-        )
+        (notified_event,) = mock_notification_manager.send_event_notification.await_args.args
         assert notified_event.event_type == "auto_monitor"
 
     async def test_already_selected_container_is_not_added_twice(
@@ -358,9 +346,7 @@ class TestScanExistingContainers:
         assert config_manager.get_config().containers.selected == ["web"]
         assert config_manager.get_events() == []
 
-    async def test_excluded_container_is_not_added(
-        self, engine, docker_client, update_config
-    ):
+    async def test_excluded_container_is_not_added(self, engine, docker_client, update_config):
         update_config(lambda c: c.containers.excluded.append("web"))
         container, info = make_container(name="web", labels={"autoheal": "true"})
         docker_client.add_container(container, info)
@@ -369,9 +355,7 @@ class TestScanExistingContainers:
 
         assert config_manager.get_config().containers.selected == []
 
-    async def test_scan_is_skipped_when_docker_is_unavailable(
-        self, engine, docker_client
-    ):
+    async def test_scan_is_skipped_when_docker_is_unavailable(self, engine, docker_client):
         container, info = make_container(name="web", labels={"autoheal": "true"})
         docker_client.add_container(container, info)
         docker_client.connected = False
@@ -380,9 +364,7 @@ class TestScanExistingContainers:
 
         assert config_manager.get_config().containers.selected == []
 
-    async def test_scan_start_log_names_the_configured_label(
-        self, engine, caplog, update_config
-    ):
+    async def test_scan_start_log_names_the_configured_label(self, engine, caplog, update_config):
         update_config(monitor_label("heal", "yes"))
 
         with caplog.at_level("INFO"):
@@ -400,9 +382,7 @@ class TestScanExistingContainers:
 
         assert config_manager.get_config().containers.selected == []
 
-    async def test_one_failing_container_does_not_abort_the_scan(
-        self, engine, docker_client
-    ):
+    async def test_one_failing_container_does_not_abort_the_scan(self, engine, docker_client):
         broken, broken_info = make_container(
             name="broken", container_id="b" * 64, labels={"autoheal": "true"}
         )
@@ -429,9 +409,7 @@ class TestScanExistingContainers:
 class TestProcessContainerStartEvent:
     """Auto-monitoring of containers started after the engine is running."""
 
-    async def test_labelled_container_is_added_on_start_event(
-        self, engine, docker_client
-    ):
+    async def test_labelled_container_is_added_on_start_event(self, engine, docker_client):
         container, info = make_container(name="web", labels={"autoheal": "true"})
         docker_client.add_container(container, info)
 
@@ -482,9 +460,7 @@ class TestProcessContainerStartEvent:
         )
         docker_client.add_container(container, info)
 
-        await engine._process_container_start_event(
-            start_event(container.id, "stack-web-1")
-        )
+        await engine._process_container_start_event(start_event(container.id, "stack-web-1"))
 
         assert config_manager.get_config().containers.selected == ["stack_web"]
 
@@ -564,12 +540,8 @@ class TestProcessContainerStartEvent:
         docker_client.add_container(empty_value, empty_info)
         docker_client.add_container(other_value, other_info)
 
-        await engine._process_container_start_event(
-            start_event(empty_value.id, "empty")
-        )
-        await engine._process_container_start_event(
-            start_event(other_value.id, "other")
-        )
+        await engine._process_container_start_event(start_event(empty_value.id, "empty"))
+        await engine._process_container_start_event(start_event(other_value.id, "other"))
 
         assert config_manager.get_config().containers.selected == ["empty"]
 
@@ -601,9 +573,7 @@ class TestProcessContainerStartEvent:
             "Automatically added to monitoring due to heal=yes label (stable_id: web)"
         )
 
-    async def test_compose_container_is_added_under_its_stable_id(
-        self, engine, docker_client
-    ):
+    async def test_compose_container_is_added_under_its_stable_id(self, engine, docker_client):
         container, info = make_container(
             name="stack-web-1",
             labels={
@@ -614,15 +584,11 @@ class TestProcessContainerStartEvent:
         )
         docker_client.add_container(container, info)
 
-        await engine._process_container_start_event(
-            start_event(container.id, "stack-web-1")
-        )
+        await engine._process_container_start_event(start_event(container.id, "stack-web-1"))
 
         assert config_manager.get_config().containers.selected == ["stack_web"]
 
-    async def test_real_docker_daemon_event_shape_is_handled(
-        self, engine, docker_client
-    ):
+    async def test_real_docker_daemon_event_shape_is_handled(self, engine, docker_client):
         """
         Regression test for #78.
 
@@ -671,32 +637,22 @@ class TestProcessContainerStartEvent:
             "com.docker.compose.project": "stack",
             "com.docker.compose.service": "web",
         }
-        old, old_info = make_container(
-            name="stack-web-1", container_id="a" * 64, labels=labels
-        )
+        old, old_info = make_container(name="stack-web-1", container_id="a" * 64, labels=labels)
         docker_client.add_container(old, old_info)
         await engine._process_container_start_event(start_event(old.id, "stack-web-1"))
 
-        new, new_info = make_container(
-            name="stack-web-1", container_id="c" * 64, labels=labels
-        )
+        new, new_info = make_container(name="stack-web-1", container_id="c" * 64, labels=labels)
         docker_client.add_container(new, new_info)
         await engine._process_container_start_event(start_event(new.id, "stack-web-1"))
 
         assert config_manager.get_config().containers.selected == ["stack_web"]
         assert len(config_manager.get_events()) == 1
 
-    async def test_event_name_attribute_labels_the_container(
-        self, engine, docker_client
-    ):
-        container, info = make_container(
-            name="inspected-name", labels={"autoheal": "true"}
-        )
+    async def test_event_name_attribute_labels_the_container(self, engine, docker_client):
+        container, info = make_container(name="inspected-name", labels={"autoheal": "true"})
         docker_client.add_container(container, info)
 
-        await engine._process_container_start_event(
-            start_event(container.id, "event-name")
-        )
+        await engine._process_container_start_event(start_event(container.id, "event-name"))
 
         assert config_manager.get_config().containers.selected == ["event-name"]
         (event,) = config_manager.get_events()
@@ -738,9 +694,7 @@ class TestProcessContainerStartEvent:
         mock_notification_manager.send_event_notification.assert_awaited_once()
 
     async def test_event_without_container_id_is_ignored(self, engine):
-        await engine._process_container_start_event(
-            {"Actor": {"Attributes": {"name": "web"}}}
-        )
+        await engine._process_container_start_event({"Actor": {"Attributes": {"name": "web"}}})
 
         assert config_manager.get_config().containers.selected == []
 
@@ -757,9 +711,7 @@ class TestProcessContainerStartEvent:
 
         assert config_manager.get_config().containers.selected == []
 
-    async def test_excluded_container_is_ignored(
-        self, engine, docker_client, update_config
-    ):
+    async def test_excluded_container_is_ignored(self, engine, docker_client, update_config):
         update_config(lambda c: c.containers.excluded.append("web"))
         container, info = make_container(name="web", labels={"autoheal": "true"})
         docker_client.add_container(container, info)
@@ -777,9 +729,7 @@ class TestProcessContainerStartEvent:
 
         assert config_manager.get_config().containers.selected == []
 
-    async def test_container_with_non_true_autoheal_value_is_ignored(
-        self, engine, docker_client
-    ):
+    async def test_container_with_non_true_autoheal_value_is_ignored(self, engine, docker_client):
         container, info = make_container(name="web", labels={"autoheal": "false"})
         docker_client.add_container(container, info)
 
@@ -801,9 +751,7 @@ class TestProcessContainerStartEvent:
         assert config_manager.get_config().containers.selected == ["web"]
         assert [e.event_type for e in config_manager.get_events()] == ["auto_monitor"]
         mock_notification_manager.send_event_notification.assert_awaited_once()
-        (notified_event,) = (
-            mock_notification_manager.send_event_notification.await_args.args
-        )
+        (notified_event,) = mock_notification_manager.send_event_notification.await_args.args
         assert notified_event.event_type == "auto_monitor"
 
 
@@ -1032,9 +980,7 @@ def dev_label_config(update_config):
 class TestCustomMonitorLabel:
     """Auto-discovery honours ``monitor.label_key``/``label_value`` (#369)."""
 
-    async def test_scan_and_event_use_default_label_by_default(
-        self, engine, docker_client
-    ):
+    async def test_scan_and_event_use_default_label_by_default(self, engine, docker_client):
         prod, prod_info = make_container(
             name="prod", container_id="a" * 64, labels={"autoheal": "true"}
         )

@@ -36,9 +36,7 @@ def uninitialized_api(monkeypatch):
 
 @pytest.mark.asyncio
 class TestHealthCheck:
-    async def test_reports_disconnected_and_inactive_when_uninitialized(
-        self, uninitialized_api
-    ):
+    async def test_reports_disconnected_and_inactive_when_uninitialized(self, uninitialized_api):
         result = await health_check()
 
         assert result["docker_connected"] is False
@@ -54,9 +52,7 @@ class TestHealthCheck:
         assert result["docker_connected"] is True
         assert result["monitoring_active"] is True
 
-    async def test_init_api_updates_shared_state(
-        self, monkeypatch, docker_client, engine
-    ):
+    async def test_init_api_updates_shared_state(self, monkeypatch, docker_client, engine):
         monkeypatch.setattr(state, "docker_client", None)
         monkeypatch.setattr(state, "monitoring_engine", None)
 

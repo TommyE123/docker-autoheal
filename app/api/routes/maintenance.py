@@ -51,9 +51,7 @@ async def get_maintenance_status():
         maintenance_start = config_manager.get_maintenance_start_time()
         return {
             "maintenance_mode": config_manager.is_maintenance_mode(),
-            "maintenance_start_time": maintenance_start.isoformat()
-            if maintenance_start
-            else None,
+            "maintenance_start_time": maintenance_start.isoformat() if maintenance_start else None,
         }
     except Exception as e:
         logger.error("Error getting maintenance status: %s", e)

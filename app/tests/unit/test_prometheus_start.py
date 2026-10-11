@@ -53,9 +53,7 @@ class TestPrometheusStart:
         self.notif_patcher.stop()
         self.http_patcher.stop()
 
-    def _make_config(
-        self, prometheus_enabled=True, notifications_enabled=False, metrics_port=9090
-    ):
+    def _make_config(self, prometheus_enabled=True, notifications_enabled=False, metrics_port=9090):
         """Create a mock config object"""
         config = MagicMock()
         config.observability.prometheus_enabled = prometheus_enabled

@@ -30,9 +30,7 @@ async def add_health_check(health_check: HealthCheckConfig):
         if not info:
             raise HTTPException(status_code=500, detail="Unable to inspect container")
 
-        stable_id = (
-            monitoring_engine.get_stable_identifier(info) if monitoring_engine else None
-        )
+        stable_id = monitoring_engine.get_stable_identifier(info) if monitoring_engine else None
         if not stable_id:
             raise HTTPException(
                 status_code=500, detail="Unable to resolve container stable identifier"
@@ -73,9 +71,7 @@ async def get_health_check(container_id: str):
         if not info:
             raise HTTPException(status_code=500, detail="Unable to inspect container")
 
-        stable_id = (
-            monitoring_engine.get_stable_identifier(info) if monitoring_engine else None
-        )
+        stable_id = monitoring_engine.get_stable_identifier(info) if monitoring_engine else None
         if not stable_id:
             raise HTTPException(
                 status_code=500, detail="Unable to resolve container stable identifier"
@@ -117,9 +113,7 @@ async def delete_health_check(container_id: str):
         if not info:
             raise HTTPException(status_code=500, detail="Unable to inspect container")
 
-        stable_id = (
-            monitoring_engine.get_stable_identifier(info) if monitoring_engine else None
-        )
+        stable_id = monitoring_engine.get_stable_identifier(info) if monitoring_engine else None
         if not stable_id:
             raise HTTPException(
                 status_code=500, detail="Unable to resolve container stable identifier"

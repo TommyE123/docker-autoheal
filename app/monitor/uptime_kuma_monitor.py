@@ -32,9 +32,7 @@ class UptimeKumaMonitor:
         self._running = False
         self._task: asyncio.Task | None = None
         self._monitor_cache: dict[str, dict] = {}  # Cache monitor IDs by friendly name
-        self._container_status_cache: dict[
-            str, int
-        ] = {}  # Cache of stable_id -> status
+        self._container_status_cache: dict[str, int] = {}  # Cache of stable_id -> status
         # (stable_id, monitor name) mappings already warned about as ambiguous
         self._ambiguous_mappings: set[tuple[str, str]] = set()
 
@@ -44,9 +42,7 @@ class UptimeKumaMonitor:
             config = config_manager.get_config()
 
             if not config.uptime_kuma.enabled:
-                logger.info(
-                    "Uptime-Kuma integration is disabled - configure it via UI to enable"
-                )
+                logger.info("Uptime-Kuma integration is disabled - configure it via UI to enable")
                 return
 
             if not config.uptime_kuma.server_url or not config.uptime_kuma.api_token:
@@ -67,9 +63,7 @@ class UptimeKumaMonitor:
                 config.uptime_kuma.server_url,
             )
             if not await self.client.connect():
-                logger.warning(
-                    "Cannot connect to Uptime-Kuma at %s", config.uptime_kuma.server_url
-                )
+                logger.warning("Cannot connect to Uptime-Kuma at %s", config.uptime_kuma.server_url)
                 logger.info(
                     "Uptime-Kuma monitoring will remain disabled until connection is successful"
                 )
@@ -244,9 +238,7 @@ class UptimeKumaMonitor:
         if not config.uptime_kuma_mappings:
             return False
 
-        return any(
-            mapping.container_id == stable_id for mapping in config.uptime_kuma_mappings
-        )
+        return any(mapping.container_id == stable_id for mapping in config.uptime_kuma_mappings)
 
     async def should_restart_from_uptime_kuma(self, stable_id: str) -> bool:
         config = config_manager.get_config()

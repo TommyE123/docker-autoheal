@@ -129,9 +129,7 @@ class TestRunApiServerRealUvicornSmoke:
                 if not server_task.done():
                     server_task.cancel()
                     try:
-                        await asyncio.wait_for(
-                            server_task, timeout=_SHUTDOWN_TIMEOUT_SECONDS
-                        )
+                        await asyncio.wait_for(server_task, timeout=_SHUTDOWN_TIMEOUT_SECONDS)
                     except asyncio.CancelledError:
                         pass
                     except TimeoutError:

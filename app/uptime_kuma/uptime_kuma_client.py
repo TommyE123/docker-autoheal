@@ -70,9 +70,7 @@ class UptimeKumaClient:
                     timeout=aiohttp.ClientTimeout(total=10),
                 ) as response:
                     if response.status != 200:
-                        logger.error(
-                            "Failed to fetch metrics: HTTP %s", response.status
-                        )
+                        logger.error("Failed to fetch metrics: HTTP %s", response.status)
                         return None
 
                     text = await response.text()
@@ -106,9 +104,7 @@ class UptimeKumaClient:
         # so monitor_name must be matched anywhere within the label set, not just as the first
         # label. The optional "preceded by { or ," group anchors monitor_name to a full label
         # key so a custom tag like custom_monitor_name isn't matched as a substring.
-        status_pattern = (
-            r'monitor_status\{(?:[^}]*,)?monitor_name="([^"]+)"[^}]*\}\s+(\d+)'
-        )
+        status_pattern = r'monitor_status\{(?:[^}]*,)?monitor_name="([^"]+)"[^}]*\}\s+(\d+)'
 
         for match in re.finditer(status_pattern, metrics_text):
             monitor_name = match.group(1)

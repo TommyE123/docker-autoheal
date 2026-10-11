@@ -39,9 +39,7 @@ class TestCheckSingleContainer:
         assert event_types() == ["restart"]
 
     async def test_unmonitored_container_is_ignored(self, engine, docker_client):
-        container, info = make_container(
-            name="web", status="exited", exit_code=1, labels={}
-        )
+        container, info = make_container(name="web", status="exited", exit_code=1, labels={})
         docker_client.add_container(container, info)
 
         await engine._check_single_container(container)
@@ -58,9 +56,7 @@ class TestCheckSingleContainer:
         assert docker_client.restart_calls == []
         assert config_manager.get_events() == []
 
-    async def test_checks_resume_when_maintenance_mode_is_disabled(
-        self, engine, docker_client
-    ):
+    async def test_checks_resume_when_maintenance_mode_is_disabled(self, engine, docker_client):
         container, info = make_container(name="web", status="exited", exit_code=1)
         docker_client.add_container(container, info)
         config_manager.enable_maintenance_mode()
@@ -76,9 +72,7 @@ class TestCheckSingleContainer:
 class TestQuarantinedContainerChecks:
     """A quarantined container is skipped until it heals itself."""
 
-    async def test_quarantined_unhealthy_container_is_skipped(
-        self, engine, docker_client
-    ):
+    async def test_quarantined_unhealthy_container_is_skipped(self, engine, docker_client):
         container, info = make_container(name="web", status="exited", exit_code=1)
         docker_client.add_container(container, info)
         config_manager.quarantine_container("web")
@@ -103,9 +97,7 @@ class TestQuarantinedContainerChecks:
         assert config_manager.is_quarantined("web") is True
         assert docker_client.restart_calls == []
 
-    async def test_recovered_container_is_auto_unquarantined(
-        self, engine, docker_client
-    ):
+    async def test_recovered_container_is_auto_unquarantined(self, engine, docker_client):
         container, info = make_container(name="web", status="running")
         docker_client.add_container(container, info)
         config_manager.quarantine_container("web")
@@ -151,12 +143,8 @@ class TestQuarantinedContainerChecks:
         assert config_manager.is_quarantined("stack-web-1") is False
         assert event_types() == ["auto_unquarantine"]
 
-    async def test_quarantine_recorded_under_container_id_is_honoured(
-        self, engine, docker_client
-    ):
-        container, info = make_container(
-            name="web", container_id="e" * 64, status="running"
-        )
+    async def test_quarantine_recorded_under_container_id_is_honoured(self, engine, docker_client):
+        container, info = make_container(name="web", container_id="e" * 64, status="running")
         docker_client.add_container(container, info)
         config_manager.quarantine_container("e" * 64)
 
@@ -164,9 +152,7 @@ class TestQuarantinedContainerChecks:
 
         assert config_manager.is_quarantined("e" * 64) is False
 
-    async def test_quarantine_survives_container_recreation(
-        self, engine, docker_client
-    ):
+    async def test_quarantine_survives_container_recreation(self, engine, docker_client):
         """A recreated compose container keeps its quarantine via the stable ID."""
         labels = {
             "autoheal": "true",
@@ -193,9 +179,7 @@ class TestQuarantinedContainerChecks:
 class TestContainerDisappearance:
     """Containers can vanish between being listed and being inspected."""
 
-    async def test_disappeared_container_is_handled_without_error(
-        self, engine, docker_client
-    ):
+    async def test_disappeared_container_is_handled_without_error(self, engine, docker_client):
         container, info = make_container(name="web", status="exited", exit_code=1)
         docker_client.add_container(container, info)
         docker_client.remove_container(container)  # inspection now returns {}
@@ -220,9 +204,7 @@ class TestContainerDisappearance:
 
         assert docker_client.restart_calls == ["web"]
 
-    async def test_inspection_error_does_not_stop_other_containers(
-        self, engine, docker_client
-    ):
+    async def test_inspection_error_does_not_stop_other_containers(self, engine, docker_client):
         broken, broken_info = make_container(
             name="broken", container_id="b" * 64, status="exited", exit_code=1
         )
@@ -252,9 +234,7 @@ class TestCheckContainersDockerFailures:
         assert docker_client.reconnect_calls == 1
         assert docker_client.restart_calls == ["web"]
 
-    async def test_gives_up_for_this_cycle_when_reconnect_fails(
-        self, engine, docker_client
-    ):
+    async def test_gives_up_for_this_cycle_when_reconnect_fails(self, engine, docker_client):
         container, info = make_container(name="web", status="exited", exit_code=1)
         docker_client.add_container(container, info)
         docker_client.connected = False
@@ -272,9 +252,7 @@ class TestCheckContainersDockerFailures:
 
         assert docker_client.restart_calls == []
 
-    async def test_multiple_containers_are_checked_in_one_cycle(
-        self, engine, docker_client
-    ):
+    async def test_multiple_containers_are_checked_in_one_cycle(self, engine, docker_client):
         crashed, crashed_info = make_container(
             name="crashed", container_id="a" * 64, status="exited", exit_code=1
         )

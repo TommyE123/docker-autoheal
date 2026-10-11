@@ -100,9 +100,7 @@ class NotificationManager:
 
         # Check event filters
         if not self._should_notify_for_event(event):
-            logger.debug(
-                "Event type '%s' filtered out, skipping notification", event.event_type
-            )
+            logger.debug("Event type '%s' filtered out, skipping notification", event.event_type)
             return
 
         # Queue the notification
@@ -135,9 +133,7 @@ class NotificationManager:
             try:
                 # Wait for notification with timeout to allow checking _running flag
                 try:
-                    event = await asyncio.wait_for(
-                        self._notification_queue.get(), timeout=1.0
-                    )
+                    event = await asyncio.wait_for(self._notification_queue.get(), timeout=1.0)
                 except TimeoutError:
                     continue
 
@@ -172,33 +168,19 @@ class NotificationManager:
 
             try:
                 if service.type == NotificationType.WEBHOOK:
-                    tasks.append(
-                        self._send_webhook(service, title, message, event, priority)
-                    )
+                    tasks.append(self._send_webhook(service, title, message, event, priority))
                 elif service.type == NotificationType.DISCORD:
-                    tasks.append(
-                        self._send_discord(service, title, message, event, priority)
-                    )
+                    tasks.append(self._send_discord(service, title, message, event, priority))
                 elif service.type == NotificationType.SLACK:
-                    tasks.append(
-                        self._send_slack(service, title, message, event, priority)
-                    )
+                    tasks.append(self._send_slack(service, title, message, event, priority))
                 elif service.type == NotificationType.TELEGRAM:
-                    tasks.append(
-                        self._send_telegram(service, title, message, event, priority)
-                    )
+                    tasks.append(self._send_telegram(service, title, message, event, priority))
                 elif service.type == NotificationType.NTFY:
-                    tasks.append(
-                        self._send_ntfy(service, title, message, event, priority)
-                    )
+                    tasks.append(self._send_ntfy(service, title, message, event, priority))
                 elif service.type == NotificationType.GOTIFY:
-                    tasks.append(
-                        self._send_gotify(service, title, message, event, priority)
-                    )
+                    tasks.append(self._send_gotify(service, title, message, event, priority))
                 elif service.type == NotificationType.PUSHOVER:
-                    tasks.append(
-                        self._send_pushover(service, title, message, event, priority)
-                    )
+                    tasks.append(self._send_pushover(service, title, message, event, priority))
                 else:
                     logger.warning("Unsupported notification type: %s", service.type)
 
@@ -212,9 +194,7 @@ class NotificationManager:
                 if isinstance(result, Exception):
                     logger.error("Notification failed: %s", result)
 
-    def _format_notification(
-        self, event: AutoHealEvent
-    ) -> tuple[str, str, NotificationPriority]:
+    def _format_notification(self, event: AutoHealEvent) -> tuple[str, str, NotificationPriority]:
         """
         Format notification content based on event
 
@@ -243,9 +223,7 @@ class NotificationManager:
             "unquarantine": "Container Unquarantined",
             "auto_unquarantine": "Container Auto-Unquarantined",
         }
-        title = title_map.get(
-            event.event_type, f"{event.event_type.replace('_', ' ').title()}"
-        )
+        title = title_map.get(event.event_type, f"{event.event_type.replace('_', ' ').title()}")
 
         # Format message
         timestamp = event.timestamp.strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -293,9 +271,7 @@ class NotificationManager:
             headers.update(service.headers)
 
         try:
-            async with self._session.post(
-                service.url, json=payload, headers=headers
-            ) as response:
+            async with self._session.post(service.url, json=payload, headers=headers) as response:
                 if response.status >= 400:
                     logger.error(
                         "Webhook failed with status %s: %s",
@@ -303,9 +279,7 @@ class NotificationManager:
                         await response.text(),
                     )
                 else:
-                    logger.info(
-                        "Webhook notification sent successfully to %s", service.name
-                    )
+                    logger.info("Webhook notification sent successfully to %s", service.name)
         except Exception as e:
             logger.error("Failed to send webhook notification: %s", e)
 
@@ -346,13 +320,9 @@ class NotificationManager:
         try:
             async with self._session.post(service.url, json=payload) as response:
                 if response.status >= 400:
-                    logger.error(
-                        "Discord webhook failed with status %s", response.status
-                    )
+                    logger.error("Discord webhook failed with status %s", response.status)
                 else:
-                    logger.info(
-                        "Discord notification sent successfully to %s", service.name
-                    )
+                    logger.info("Discord notification sent successfully to %s", service.name)
         except Exception as e:
             logger.error("Failed to send Discord notification: %s", e)
 
@@ -385,9 +355,7 @@ class NotificationManager:
                 if response.status >= 400:
                     logger.error("Slack webhook failed with status %s", response.status)
                 else:
-                    logger.info(
-                        "Slack notification sent successfully to %s", service.name
-                    )
+                    logger.info("Slack notification sent successfully to %s", service.name)
         except Exception as e:
             logger.error("Failed to send Slack notification: %s", e)
 
@@ -419,9 +387,7 @@ class NotificationManager:
                 if response.status >= 400:
                     logger.error("Telegram API failed with status %s", response.status)
                 else:
-                    logger.info(
-                        "Telegram notification sent successfully to %s", service.name
-                    )
+                    logger.info("Telegram notification sent successfully to %s", service.name)
         except Exception as e:
             logger.error("Failed to send Telegram notification: %s", e)
 
@@ -472,9 +438,7 @@ class NotificationManager:
                 if response.status >= 400:
                     logger.error("Ntfy failed with status %s", response.status)
                 else:
-                    logger.info(
-                        "Ntfy notification sent successfully to %s", service.name
-                    )
+                    logger.info("Ntfy notification sent successfully to %s", service.name)
         except Exception as e:
             logger.error("Failed to send Ntfy notification: %s", e)
 
@@ -509,15 +473,11 @@ class NotificationManager:
         headers = {"X-Gotify-Key": service.app_token}
 
         try:
-            async with self._session.post(
-                url, json=payload, headers=headers
-            ) as response:
+            async with self._session.post(url, json=payload, headers=headers) as response:
                 if response.status >= 400:
                     logger.error("Gotify failed with status %s", response.status)
                 else:
-                    logger.info(
-                        "Gotify notification sent successfully to %s", service.name
-                    )
+                    logger.info("Gotify notification sent successfully to %s", service.name)
         except Exception as e:
             logger.error("Failed to send Gotify notification: %s", e)
 
@@ -556,9 +516,7 @@ class NotificationManager:
                 if response.status >= 400:
                     logger.error("Pushover failed with status %s", response.status)
                 else:
-                    logger.info(
-                        "Pushover notification sent successfully to %s", service.name
-                    )
+                    logger.info("Pushover notification sent successfully to %s", service.name)
         except Exception as e:
             logger.error("Failed to send Pushover notification: %s", e)
 

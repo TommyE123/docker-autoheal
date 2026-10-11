@@ -94,15 +94,11 @@ async def enable_uptime_kuma_integration(integration_config: dict):
         # Manual mappings are explicit user decisions: keep them and let them
         # win over any freshly generated auto-mapping for the same container.
         manual_mappings = [
-            mapping
-            for mapping in config.uptime_kuma_mappings
-            if not mapping.auto_mapped
+            mapping for mapping in config.uptime_kuma_mappings if not mapping.auto_mapped
         ]
         manual_container_ids = {mapping.container_id for mapping in manual_mappings}
         auto_mappings = [
-            mapping
-            for mapping in auto_mappings
-            if mapping.container_id not in manual_container_ids
+            mapping for mapping in auto_mappings if mapping.container_id not in manual_container_ids
         ]
 
         config.uptime_kuma_mappings = manual_mappings + auto_mappings
@@ -138,9 +134,7 @@ async def get_uptime_kuma_monitors():
     config = config_manager.get_config()
 
     if not config.uptime_kuma.enabled:
-        raise HTTPException(
-            status_code=400, detail="Uptime-Kuma integration not enabled"
-        )
+        raise HTTPException(status_code=400, detail="Uptime-Kuma integration not enabled")
 
     try:
         client = UptimeKumaClient(

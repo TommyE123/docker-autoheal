@@ -80,9 +80,7 @@ def _valid_config_dict() -> dict:
         ],
         "notifications": {
             "enabled": True,
-            "services": [
-                {"name": "discord-alerts", "type": "discord", "enabled": True}
-            ],
+            "services": [{"name": "discord-alerts", "type": "discord", "enabled": True}],
             "event_filters": ["restart"],
         },
     }
@@ -112,9 +110,7 @@ def test_fully_valid_config_loads_unchanged(isolated_config_manager):
     assert config.notifications.services[0].name == "discord-alerts"
 
 
-def test_single_invalid_section_only_resets_that_section(
-    isolated_config_manager, caplog
-):
+def test_single_invalid_section_only_resets_that_section(isolated_config_manager, caplog):
     payload = _valid_config_dict()
     # cooldown_seconds must be an int; this makes the whole 'restart' section fail.
     payload["restart"]["cooldown_seconds"] = "not-a-number"
@@ -140,9 +136,7 @@ def test_single_invalid_section_only_resets_that_section(
     assert "Resetting config section 'restart' to defaults" in caplog.text
 
 
-def test_multiple_invalid_sections_are_each_reset_independently(
-    isolated_config_manager, caplog
-):
+def test_multiple_invalid_sections_are_each_reset_independently(isolated_config_manager, caplog):
     payload = _valid_config_dict()
     payload["restart"]["cooldown_seconds"] = "not-a-number"
     payload["ui"]["listen_port"] = "not-a-port"
@@ -178,9 +172,7 @@ def test_missing_config_file_returns_defaults(isolated_config_manager):
     assert config == AutoHealConfig()
 
 
-def test_non_object_json_root_falls_back_to_full_defaults(
-    isolated_config_manager, caplog
-):
+def test_non_object_json_root_falls_back_to_full_defaults(isolated_config_manager, caplog):
     isolated_config_manager.CONFIG_FILE.write_text(json.dumps(["not", "an", "object"]))
 
     config = isolated_config_manager._load_config()
@@ -270,9 +262,7 @@ def test_invalid_autoheal_section_does_not_prevent_custom_health_checks_loading(
     assert isolated_config_manager._custom_health_checks["web"].check_type == "http"
 
 
-def test_real_config_manager_init_retains_valid_sections_and_health_checks(
-    monkeypatch, tmp_path
-):
+def test_real_config_manager_init_retains_valid_sections_and_health_checks(monkeypatch, tmp_path):
     """Exercise the actual __init__ lifecycle, not just _load_config() in
     isolation: _load_custom_health_checks() only returns whatever
     _load_config() already set on self, so a real construction is the only
@@ -291,13 +281,9 @@ def test_real_config_manager_init_retains_valid_sections_and_health_checks(
     monkeypatch.setattr(ConfigManager, "DATA_DIR", tmp_path)
     monkeypatch.setattr(ConfigManager, "CONFIG_FILE", tmp_path / "config.json")
     monkeypatch.setattr(ConfigManager, "EVENTS_FILE", tmp_path / "events.json")
-    monkeypatch.setattr(
-        ConfigManager, "RESTART_COUNTS_FILE", tmp_path / "restart_counts.json"
-    )
+    monkeypatch.setattr(ConfigManager, "RESTART_COUNTS_FILE", tmp_path / "restart_counts.json")
     monkeypatch.setattr(ConfigManager, "QUARANTINE_FILE", tmp_path / "quarantine.json")
-    monkeypatch.setattr(
-        ConfigManager, "MAINTENANCE_FILE", tmp_path / "maintenance.json"
-    )
+    monkeypatch.setattr(ConfigManager, "MAINTENANCE_FILE", tmp_path / "maintenance.json")
 
     manager = ConfigManager()
 

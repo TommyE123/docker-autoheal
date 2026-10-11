@@ -63,9 +63,7 @@ class TestAutoHealServiceStop:
     @staticmethod
     def _messages(caplog, level):
         return [
-            r.getMessage()
-            for r in caplog.records
-            if r.name == "app.main" and r.levelname == level
+            r.getMessage() for r in caplog.records if r.name == "app.main" and r.levelname == level
         ]
 
     @pytest.mark.asyncio
@@ -88,21 +86,15 @@ class TestAutoHealServiceStop:
         order = []
 
         service.uptime_kuma_monitor = MagicMock()
-        service.uptime_kuma_monitor.stop = AsyncMock(
-            side_effect=lambda: order.append("kuma")
-        )
+        service.uptime_kuma_monitor.stop = AsyncMock(side_effect=lambda: order.append("kuma"))
         service.monitoring_engine = MagicMock()
-        service.monitoring_engine.stop = AsyncMock(
-            side_effect=lambda: order.append("engine")
-        )
+        service.monitoring_engine.stop = AsyncMock(side_effect=lambda: order.append("engine"))
         service.notification_manager = MagicMock()
         service.notification_manager.stop = AsyncMock(
             side_effect=lambda: order.append("notifications")
         )
         service.docker_client = MagicMock()
-        service.docker_client.close = MagicMock(
-            side_effect=lambda: order.append("docker")
-        )
+        service.docker_client.close = MagicMock(side_effect=lambda: order.append("docker"))
 
         await service.stop()
 
@@ -122,9 +114,7 @@ class TestAutoHealServiceStop:
     async def test_stop_continues_after_notification_manager_stop_raises(self, caplog):
         service = AutoHealService()
         service.notification_manager = MagicMock()
-        service.notification_manager.stop = AsyncMock(
-            side_effect=RuntimeError("notif boom")
-        )
+        service.notification_manager.stop = AsyncMock(side_effect=RuntimeError("notif boom"))
         service.docker_client = MagicMock()
 
         with caplog.at_level("WARNING", logger="app.main"):
@@ -167,9 +157,7 @@ class TestAutoHealServiceStop:
     async def test_stop_continues_after_kuma_stop_raises(self, caplog):
         service = AutoHealService()
         service.uptime_kuma_monitor = MagicMock()
-        service.uptime_kuma_monitor.stop = AsyncMock(
-            side_effect=RuntimeError("kuma boom")
-        )
+        service.uptime_kuma_monitor.stop = AsyncMock(side_effect=RuntimeError("kuma boom"))
         service.monitoring_engine = MagicMock()
         service.monitoring_engine.stop = AsyncMock()
         service.notification_manager = MagicMock()
@@ -193,9 +181,7 @@ class TestAutoHealServiceStop:
     async def test_stop_continues_after_engine_stop_raises(self, caplog):
         service = AutoHealService()
         service.monitoring_engine = MagicMock()
-        service.monitoring_engine.stop = AsyncMock(
-            side_effect=RuntimeError("engine boom")
-        )
+        service.monitoring_engine.stop = AsyncMock(side_effect=RuntimeError("engine boom"))
         service.notification_manager = MagicMock()
         service.notification_manager.stop = AsyncMock()
         service.docker_client = MagicMock()
@@ -222,9 +208,7 @@ class TestAutoHealServiceStop:
             await service.stop()  # must not raise
 
         assert service.running is False
-        assert self._messages(caplog, "WARNING") == [
-            "Error closing Docker client: close boom"
-        ]
+        assert self._messages(caplog, "WARNING") == ["Error closing Docker client: close boom"]
         [record] = [r for r in caplog.records if r.levelname == "WARNING"]
         assert record.exc_info is not None
         assert isinstance(record.exc_info[1], RuntimeError)
@@ -276,9 +260,7 @@ class TestAutoHealServiceStartFailure:
         with (
             patch("app.main.config_manager") as mock_cm,
             patch("app.main.DockerClientWrapper"),
-            patch(
-                "app.main.MonitoringEngine", side_effect=RuntimeError("engine broke")
-            ),
+            patch("app.main.MonitoringEngine", side_effect=RuntimeError("engine broke")),
             patch("app.main.notification_manager") as mock_notif,
         ):
             mock_cm.get_config.return_value = self._make_config()
@@ -435,9 +417,7 @@ class TestAutoHealServiceStartFailure:
             patch("app.main.get_ui_url", side_effect=RuntimeError("late failure")),
             patch("app.main.notification_manager") as mock_notif,
         ):
-            mock_cm.get_config.return_value = self._make_config(
-                uptime_kuma_enabled=True
-            )
+            mock_cm.get_config.return_value = self._make_config(uptime_kuma_enabled=True)
             engine = mock_engine_cls.return_value
             engine.start = AsyncMock()
             engine.stop = AsyncMock()
@@ -465,9 +445,7 @@ class TestAutoHealServiceStartFailure:
         with (
             patch("app.main.config_manager") as mock_cm,
             patch("app.main.DockerClientWrapper") as mock_docker_cls,
-            patch(
-                "app.main.MonitoringEngine", side_effect=RuntimeError("engine broke")
-            ),
+            patch("app.main.MonitoringEngine", side_effect=RuntimeError("engine broke")),
             patch("app.main.notification_manager") as mock_notif,
         ):
             mock_cm.get_config.return_value = self._make_config()
@@ -483,9 +461,7 @@ class TestAutoHealServiceStartFailure:
             mock_notif.stop.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_notification_stop_error_does_not_mask_the_startup_error(
-        self, caplog
-    ):
+    async def test_notification_stop_error_does_not_mask_the_startup_error(self, caplog):
         startup_error = RuntimeError("engine broke")
         with (
             patch("app.main.config_manager") as mock_cm,
@@ -513,9 +489,7 @@ class TestAutoHealServiceStartFailure:
         with (
             patch("app.main.config_manager") as mock_cm,
             patch("app.main.DockerClientWrapper") as mock_docker_cls,
-            patch(
-                "app.main.MonitoringEngine", side_effect=RuntimeError("engine broke")
-            ),
+            patch("app.main.MonitoringEngine", side_effect=RuntimeError("engine broke")),
         ):
             mock_cm.get_config.return_value = self._make_config()
 
@@ -561,10 +535,7 @@ class TestAutoHealServiceStartFailure:
             with pytest.raises(RuntimeError):
                 await AutoHealService().start()
 
-        assert (
-            f"Starting Docker Auto-Heal Service v{main_module.app.version}"
-            in caplog.text
-        )
+        assert f"Starting Docker Auto-Heal Service v{main_module.app.version}" in caplog.text
 
     @pytest.mark.asyncio
     async def test_uptime_kuma_start_failure_does_not_abort_startup(self):
@@ -577,13 +548,9 @@ class TestAutoHealServiceStartFailure:
             patch("app.main.notification_manager") as mock_notif,
             patch("app.main.start_http_server"),
         ):
-            mock_cm.get_config.return_value = self._make_config(
-                uptime_kuma_enabled=True
-            )
+            mock_cm.get_config.return_value = self._make_config(uptime_kuma_enabled=True)
             mock_engine_cls.return_value.start = AsyncMock()
-            mock_kuma_cls.return_value.start = AsyncMock(
-                side_effect=RuntimeError("kuma down")
-            )
+            mock_kuma_cls.return_value.start = AsyncMock(side_effect=RuntimeError("kuma down"))
             mock_notif.start = AsyncMock()
 
             service = AutoHealService()
@@ -657,9 +624,7 @@ class TestUiUrl:
         assert get_ui_url(self._config()) == "http://192.0.2.10:3131"
 
     @pytest.mark.asyncio
-    async def test_startup_log_reports_the_public_url_when_supplied(
-        self, monkeypatch, caplog
-    ):
+    async def test_startup_log_reports_the_public_url_when_supplied(self, monkeypatch, caplog):
         monkeypatch.setenv("AUTOHEAL_PUBLIC_HOST", "192.0.2.10")
         monkeypatch.setenv("AUTOHEAL_PUBLIC_PORT", "3132")
 
@@ -690,10 +655,7 @@ class TestUiUrl:
         log = await self._start_and_capture_log(self._config(), caplog)
 
         assert "Web UI published on host port 3132 (container port 3131)" in log
-        assert (
-            "API documentation published on host port 3132 at /docs (container port 3131)"
-            in log
-        )
+        assert "API documentation published on host port 3132 at /docs (container port 3131)" in log
         assert "0.0.0.0" not in log
         assert "http://" not in log
         assert "listening on" not in log
@@ -713,9 +675,7 @@ class TestUiUrl:
         assert "available at" not in log
 
     @pytest.mark.asyncio
-    async def test_server_still_binds_to_all_interfaces_with_a_public_host_set(
-        self, monkeypatch
-    ):
+    async def test_server_still_binds_to_all_interfaces_with_a_public_host_set(self, monkeypatch):
         monkeypatch.setenv("AUTOHEAL_PUBLIC_HOST", "192.0.2.10")
         monkeypatch.setenv("AUTOHEAL_PUBLIC_PORT", "3132")
 
@@ -781,9 +741,7 @@ class TestRunApiServer:
                 access_log=False,
                 log_config=None,
             )
-            mock_uvicorn.Server.assert_called_once_with(
-                mock_uvicorn.Config.return_value
-            )
+            mock_uvicorn.Server.assert_called_once_with(mock_uvicorn.Config.return_value)
             mock_server_instance.serve.assert_awaited_once()
 
 

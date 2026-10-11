@@ -19,9 +19,7 @@ async def get_notifications_config():
         config = config_manager.get_config()
         return {
             "enabled": config.notifications.enabled,
-            "services": [
-                service.model_dump() for service in config.notifications.services
-            ],
+            "services": [service.model_dump() for service in config.notifications.services],
             "event_filters": config.notifications.event_filters,
         }
     except Exception as e:
@@ -117,9 +115,7 @@ async def update_notification_service(service_name: str, service: dict):
                 break
 
         if not found:
-            raise HTTPException(
-                status_code=404, detail=f"Service '{service_name}' not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Service '{service_name}' not found")
 
         config_manager.update_config(config)
 
@@ -148,9 +144,7 @@ async def delete_notification_service(service_name: str):
         ]
 
         if len(config.notifications.services) == original_count:
-            raise HTTPException(
-                status_code=404, detail=f"Service '{service_name}' not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Service '{service_name}' not found")
 
         config_manager.update_config(config)
 

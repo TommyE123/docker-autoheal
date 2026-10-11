@@ -62,9 +62,7 @@ def record_starting(caplog, prefix: str, level: int) -> logging.LogRecord:
     return matches[0]
 
 
-def assert_error_with_traceback(
-    caplog, message: str, exc_type: type[BaseException]
-) -> None:
+def assert_error_with_traceback(caplog, message: str, exc_type: type[BaseException]) -> None:
     record = record_for(caplog, message, logging.ERROR)
     assert record.exc_info is not None
     assert record.exc_info[0] is exc_type
@@ -97,9 +95,7 @@ class TestErrorsLoggedWithTraceback:
         )
 
     @pytest.mark.asyncio
-    async def test_container_selection_failure(
-        self, caplog, monkeypatch, docker_client, engine
-    ):
+    async def test_container_selection_failure(self, caplog, monkeypatch, docker_client, engine):
         monkeypatch.setattr("app.api.state.docker_client", docker_client)
         monkeypatch.setattr("app.api.state.monitoring_engine", engine)
         monkeypatch.setattr(
@@ -156,9 +152,7 @@ class TestErrorsLoggedWithTraceback:
         assert_error_with_traceback(caplog, "Service error: cannot run", RuntimeError)
 
     @pytest.mark.asyncio
-    async def test_monitor_loop_error_is_logged_and_retried(
-        self, caplog, engine, recorded_sleeps
-    ):
+    async def test_monitor_loop_error_is_logged_and_retried(self, caplog, engine, recorded_sleeps):
         async def failing_check():
             engine._running = False
             raise RuntimeError("check exploded")
@@ -179,9 +173,7 @@ class TestErrorsLoggedWithTraceback:
 
         await engine._check_containers()
 
-        assert_error_with_traceback(
-            caplog, "Error checking containers: list failed", RuntimeError
-        )
+        assert_error_with_traceback(caplog, "Error checking containers: list failed", RuntimeError)
 
     @pytest.mark.asyncio
     async def test_single_container_check_error_has_no_traceback(
@@ -189,20 +181,14 @@ class TestErrorsLoggedWithTraceback:
     ):
         container, info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, info)
-        engine._check_single_container = AsyncMock(
-            side_effect=RuntimeError("bad container")
-        )
+        engine._check_single_container = AsyncMock(side_effect=RuntimeError("bad container"))
 
         await engine._check_containers()
 
-        assert_error_without_traceback(
-            caplog, "Error checking container web: bad container"
-        )
+        assert_error_without_traceback(caplog, "Error checking container web: bad container")
 
     @pytest.mark.asyncio
-    async def test_initial_scan_per_container_error(
-        self, caplog, engine, docker_client
-    ):
+    async def test_initial_scan_per_container_error(self, caplog, engine, docker_client):
         container, info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, info)
         docker_client.info_errors[container.id] = RuntimeError("inspect failed")
@@ -328,9 +314,7 @@ class TestUnexercisedFallbackLogging:
 
         manager._ensure_data_directory()
 
-        assert record_starting(
-            caplog, "Failed to create data directory: ", logging.ERROR
-        )
+        assert record_starting(caplog, "Failed to create data directory: ", logging.ERROR)
         record_for(caplog, "Using fallback data directory: data", logging.WARNING)
 
     def test_unreadable_events_file_is_logged(self, caplog):
@@ -353,13 +337,9 @@ class TestUnexercisedFallbackLogging:
 
         assert init_data_file(target, {}, "config.json") is False
 
-        record_starting(
-            caplog, f"Failed to create config.json at {target}: ", logging.ERROR
-        )
+        record_starting(caplog, f"Failed to create config.json at {target}: ", logging.ERROR)
 
-    def test_initialize_defaults_directory_fallback(
-        self, caplog, tmp_path, monkeypatch
-    ):
+    def test_initialize_defaults_directory_fallback(self, caplog, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         blocker = tmp_path / "blocker"
         blocker.write_text("not a directory")
@@ -367,9 +347,7 @@ class TestUnexercisedFallbackLogging:
 
         initialize_defaults(data_dir)
 
-        record_starting(
-            caplog, f"Failed to create data directory {data_dir}: ", logging.ERROR
-        )
+        record_starting(caplog, f"Failed to create data directory {data_dir}: ", logging.ERROR)
         record_for(caplog, "Using fallback data directory: data", logging.WARNING)
 
     def test_initialize_defaults_logs_directory_failure(self, caplog, tmp_path):
@@ -411,9 +389,7 @@ class TestUnexercisedFallbackLogging:
 
         assert client.check_http_health(container, "http://localhost/health") is False
 
-        record_for(
-            caplog, "HTTP health check failed for web: reload failed", logging.WARNING
-        )
+        record_for(caplog, "HTTP health check failed for web: reload failed", logging.WARNING)
 
     @pytest.mark.asyncio
     async def test_notification_preparation_error(
@@ -446,17 +422,13 @@ class TestUnexercisedFallbackLogging:
         assert_error_without_traceback(caplog, "Notification failed: send failed")
 
     @pytest.mark.asyncio
-    async def test_test_notification_failure(
-        self, caplog, isolated_config_manager, monkeypatch
-    ):
+    async def test_test_notification_failure(self, caplog, isolated_config_manager, monkeypatch):
         manager = NotificationManager()
         _configure_webhook(isolated_config_manager)
         monkeypatch.setattr(
             manager, "_send_webhook", AsyncMock(side_effect=RuntimeError("send failed"))
         )
-        service_name = (
-            isolated_config_manager.get_config().notifications.services[0].name
-        )
+        service_name = isolated_config_manager.get_config().notifications.services[0].name
 
         result = await manager.test_notification(service_name)
 
@@ -464,9 +436,7 @@ class TestUnexercisedFallbackLogging:
             "success": False,
             "message": "Failed to send test notification: send failed",
         }
-        assert_error_without_traceback(
-            caplog, "Failed to send test notification: send failed"
-        )
+        assert_error_without_traceback(caplog, "Failed to send test notification: send failed")
 
 
 # ---------------------------------------------------------------------------
@@ -497,27 +467,21 @@ class _BodySession(_FakeSession):
 
 class TestWebhookFailureLogging:
     @pytest.mark.asyncio
-    async def test_error_status_includes_response_body(
-        self, caplog, isolated_config_manager
-    ):
+    async def test_error_status_includes_response_body(self, caplog, isolated_config_manager):
         manager = NotificationManager()
         manager._session = _BodySession(_BodyResponse(502, "upstream said no"))
         _configure_webhook(isolated_config_manager)
 
         await manager._process_notification(_make_event("restart"))
 
-        assert_error_without_traceback(
-            caplog, "Webhook failed with status 502: upstream said no"
-        )
+        assert_error_without_traceback(caplog, "Webhook failed with status 502: upstream said no")
 
     @pytest.mark.asyncio
     async def test_unreadable_response_body_falls_into_the_generic_handler(
         self, caplog, isolated_config_manager
     ):
         manager = NotificationManager()
-        manager._session = _BodySession(
-            _BodyResponse(500, RuntimeError("body unreadable"))
-        )
+        manager._session = _BodySession(_BodyResponse(500, RuntimeError("body unreadable")))
         _configure_webhook(isolated_config_manager)
 
         await manager._process_notification(_make_event("restart"))
@@ -526,15 +490,11 @@ class TestWebhookFailureLogging:
             caplog, "Failed to send webhook notification: body unreadable"
         )
         assert not [
-            r
-            for r in caplog.records
-            if r.getMessage().startswith("Webhook failed with status")
+            r for r in caplog.records if r.getMessage().startswith("Webhook failed with status")
         ]
 
     @pytest.mark.asyncio
-    async def test_body_is_read_even_when_error_logging_is_disabled(
-        self, isolated_config_manager
-    ):
+    async def test_body_is_read_even_when_error_logging_is_disabled(self, isolated_config_manager):
         body_reads = []
 
         class _CountingResponse(_BodyResponse):
@@ -545,14 +505,10 @@ class TestWebhookFailureLogging:
         manager = NotificationManager()
         manager._session = _BodySession(_CountingResponse(500, ""))
         _configure_webhook(isolated_config_manager)
-        logging.getLogger("app.notifications.notification_manager").setLevel(
-            logging.CRITICAL
-        )
+        logging.getLogger("app.notifications.notification_manager").setLevel(logging.CRITICAL)
         try:
             await manager._process_notification(_make_event("restart"))
         finally:
-            logging.getLogger("app.notifications.notification_manager").setLevel(
-                logging.NOTSET
-            )
+            logging.getLogger("app.notifications.notification_manager").setLevel(logging.NOTSET)
 
         assert body_reads == [1]

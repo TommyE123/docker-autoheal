@@ -77,12 +77,9 @@ def get_static_file_path(filename: str) -> Path:
         resolved_static = STATIC_DIR.resolve()
 
         # Check if the file is within the static directory
-        if (
-            resolved_static not in resolved_path.parents
-            and resolved_path.parent != resolved_static
-        ):
+        if resolved_static not in resolved_path.parents and resolved_path.parent != resolved_static:
             raise HTTPException(status_code=400, detail="Invalid file path")
-    except (ValueError, OSError):
+    except ValueError, OSError:
         raise HTTPException(status_code=400, detail="Invalid file path")
 
     if not file_path.exists() or not file_path.is_file():
@@ -91,9 +88,7 @@ def get_static_file_path(filename: str) -> Path:
     return file_path
 
 
-async def serve_static_file(
-    filename: str, media_type: str | None = None
-) -> FileResponse:
+async def serve_static_file(filename: str, media_type: str | None = None) -> FileResponse:
     """Generic handler for serving static files with validation"""
     try:
         file_path = get_static_file_path(filename)

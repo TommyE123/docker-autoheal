@@ -72,9 +72,7 @@ class _FakeSession:
         return False
 
 
-def _patch_session(
-    monkeypatch, response=None, exc: Exception | None = None
-) -> _FakeSession:
+def _patch_session(monkeypatch, response=None, exc: Exception | None = None) -> _FakeSession:
     session = _FakeSession(response=response, exc=exc)
     monkeypatch.setattr(
         "app.uptime_kuma.uptime_kuma_client.aiohttp.ClientSession",
@@ -128,16 +126,12 @@ class TestConnect:
         assert await client.connect() is True
 
     async def test_returns_true_when_only_app_version_present(self, monkeypatch):
-        _patch_session(
-            monkeypatch, response=_FakeResponse(200, 'app_version{version="1.0"} 1\n')
-        )
+        _patch_session(monkeypatch, response=_FakeResponse(200, 'app_version{version="1.0"} 1\n'))
         client = UptimeKumaClient("http://kuma.example", "token")
 
         assert await client.connect() is True
 
-    async def test_returns_false_when_response_has_no_metrics_markers(
-        self, monkeypatch
-    ):
+    async def test_returns_false_when_response_has_no_metrics_markers(self, monkeypatch):
         _patch_session(monkeypatch, response=_FakeResponse(200, "not metrics data"))
         client = UptimeKumaClient("http://kuma.example", "token")
 
@@ -268,10 +262,7 @@ class TestParseMonitorsFromMetrics:
         survive parsing so the auto-mapper can see the ambiguity and refuse to
         guess; keying entries by name would silently keep only the last."""
         client = UptimeKumaClient("http://kuma.example", "token")
-        text = (
-            'monitor_status{monitor_name="Web"} 1\n'
-            'monitor_status{monitor_name="Web"} 0\n'
-        )
+        text = 'monitor_status{monitor_name="Web"} 1\nmonitor_status{monitor_name="Web"} 0\n'
 
         monitors = client._parse_monitors_from_metrics(text)
 
@@ -379,9 +370,7 @@ class TestGetMonitorStatusByName:
 
         assert await client.get_monitor_status_by_name("Web") is None
 
-    async def test_monitor_name_with_regex_special_characters_is_escaped(
-        self, monkeypatch
-    ):
+    async def test_monitor_name_with_regex_special_characters_is_escaped(self, monkeypatch):
         text = 'monitor_status{monitor_name="DB (prod)"} 1\n'
         _patch_session(monkeypatch, response=_FakeResponse(200, text))
         client = UptimeKumaClient("http://kuma.example", "token")
@@ -390,18 +379,13 @@ class TestGetMonitorStatusByName:
 
     async def test_returns_status_when_monitor_id_precedes_name(self, monkeypatch):
         """Regression test for #26."""
-        text = (
-            'monitor_status{monitor_id="5",monitor_name="My Website",'
-            'monitor_type="http"} 1\n'
-        )
+        text = 'monitor_status{monitor_id="5",monitor_name="My Website",monitor_type="http"} 1\n'
         _patch_session(monkeypatch, response=_FakeResponse(200, text))
         client = UptimeKumaClient("http://kuma.example", "token")
 
         assert await client.get_monitor_status_by_name("My Website") == 1
 
-    async def test_custom_tag_whose_name_ends_in_monitor_name_is_not_matched(
-        self, monkeypatch
-    ):
+    async def test_custom_tag_whose_name_ends_in_monitor_name_is_not_matched(self, monkeypatch):
         """A custom tag like custom_monitor_name must not be matched as monitor_name
         just because it contains that substring."""
         text = 'monitor_status{custom_monitor_name="ghost"} 1\n'

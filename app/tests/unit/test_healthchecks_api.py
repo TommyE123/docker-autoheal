@@ -60,9 +60,7 @@ class TestHealthCheckManagement:
     async def test_add_health_check_unknown_container_returns_404(self, wired_api):
         with pytest.raises(HTTPException) as exc_info:
             await add_health_check(
-                HealthCheckConfig(
-                    container_id="does-not-exist", check_type="tcp", tcp_port=8080
-                )
+                HealthCheckConfig(container_id="does-not-exist", check_type="tcp", tcp_port=8080)
             )
 
         assert exc_info.value.status_code == 404
@@ -100,9 +98,7 @@ class TestHealthCheckManagement:
 
         assert exc_info.value.status_code == 404
 
-    async def test_get_health_check_falls_back_to_legacy_full_docker_id(
-        self, wired_api
-    ):
+    async def test_get_health_check_falls_back_to_legacy_full_docker_id(self, wired_api):
         docker_client, _engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, info)
@@ -117,9 +113,7 @@ class TestHealthCheckManagement:
         assert result.container_id == "a" * 64
         assert result.check_type == "tcp"
 
-    async def test_get_health_check_prefers_stable_id_over_legacy_full_docker_id(
-        self, wired_api
-    ):
+    async def test_get_health_check_prefers_stable_id_over_legacy_full_docker_id(self, wired_api):
         docker_client, _engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, info)
@@ -255,9 +249,7 @@ class TestHealthCheckManagement:
         assert exc_info.value.status_code == 500
         assert "Unable to inspect container" in exc_info.value.detail
 
-    async def test_add_health_check_rejects_when_stable_id_cannot_be_resolved(
-        self, wired_api
-    ):
+    async def test_add_health_check_rejects_when_stable_id_cannot_be_resolved(self, wired_api):
         docker_client, engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, info)
@@ -275,9 +267,7 @@ class TestHealthCheckManagement:
         assert exc_info.value.status_code == 500
         assert "Unable to resolve container stable identifier" in exc_info.value.detail
 
-    async def test_get_health_check_rejects_when_container_inspection_fails(
-        self, wired_api
-    ):
+    async def test_get_health_check_rejects_when_container_inspection_fails(self, wired_api):
         docker_client, engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, info)
@@ -293,9 +283,7 @@ class TestHealthCheckManagement:
         assert exc_info.value.status_code == 500
         assert "Unable to inspect container" in exc_info.value.detail
 
-    async def test_get_health_check_rejects_when_stable_id_cannot_be_resolved(
-        self, wired_api
-    ):
+    async def test_get_health_check_rejects_when_stable_id_cannot_be_resolved(self, wired_api):
         docker_client, engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, info)
@@ -311,9 +299,7 @@ class TestHealthCheckManagement:
         assert exc_info.value.status_code == 500
         assert "Unable to resolve container stable identifier" in exc_info.value.detail
 
-    async def test_delete_health_check_rejects_when_container_inspection_fails(
-        self, wired_api
-    ):
+    async def test_delete_health_check_rejects_when_container_inspection_fails(self, wired_api):
         docker_client, engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, info)
@@ -329,9 +315,7 @@ class TestHealthCheckManagement:
         assert exc_info.value.status_code == 500
         assert "Unable to inspect container" in exc_info.value.detail
 
-    async def test_delete_health_check_rejects_when_stable_id_cannot_be_resolved(
-        self, wired_api
-    ):
+    async def test_delete_health_check_rejects_when_stable_id_cannot_be_resolved(self, wired_api):
         docker_client, engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, info)
@@ -370,9 +354,7 @@ class TestHealthCheckManagement:
         config_manager.add_custom_health_check = original_add
         assert exc_info.value.status_code == 500
 
-    async def test_get_health_check_handles_unexpected_error(
-        self, wired_api, monkeypatch
-    ):
+    async def test_get_health_check_handles_unexpected_error(self, wired_api, monkeypatch):
         docker_client, engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, info)
@@ -391,9 +373,7 @@ class TestHealthCheckManagement:
         config_manager.get_custom_health_check = original_get
         assert exc_info.value.status_code == 500
 
-    async def test_delete_health_check_handles_unexpected_error(
-        self, wired_api, monkeypatch
-    ):
+    async def test_delete_health_check_handles_unexpected_error(self, wired_api, monkeypatch):
         docker_client, engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, info)

@@ -47,9 +47,7 @@ class CancelledErrorFilter(logging.Filter):
 
     def filter(self, record):
         # Suppress CancelledError tracebacks from uvicorn (these are expected during shutdown)
-        return not (
-            record.name == "uvicorn.error" and "CancelledError" in record.getMessage()
-        )
+        return not (record.name == "uvicorn.error" and "CancelledError" in record.getMessage())
 
 
 def update_log_level(level_name: str):
@@ -87,9 +85,7 @@ containers_monitored = Gauge(
 containers_quarantined = Gauge(
     "autoheal_containers_quarantined", "Number of quarantined containers"
 )
-health_checks_total = Counter(
-    "autoheal_health_checks_total", "Total health checks performed"
-)
+health_checks_total = Counter("autoheal_health_checks_total", "Total health checks performed")
 health_checks_failed = Counter(
     "autoheal_health_checks_failed", "Failed health checks", ["container_name"]
 )
@@ -148,9 +144,7 @@ class AutoHealService:
                     config.observability.metrics_port,
                 )
                 # start_http_server returns (server, thread); keep the server so stop() can close it
-                self.metrics_server = start_http_server(
-                    config.observability.metrics_port
-                )[0]
+                self.metrics_server = start_http_server(config.observability.metrics_port)[0]
 
             # Start notification manager
             logger.info("Starting notification manager...")
@@ -218,24 +212,18 @@ class AutoHealService:
                 try:
                     await self.uptime_kuma_monitor.stop()
                 except Exception as e:
-                    logger.warning(
-                        "Error stopping Uptime-Kuma monitor: %s", e, exc_info=True
-                    )
+                    logger.warning("Error stopping Uptime-Kuma monitor: %s", e, exc_info=True)
 
             if self.monitoring_engine:
                 try:
                     await self.monitoring_engine.stop()
                 except Exception as e:
-                    logger.warning(
-                        "Error stopping monitoring engine: %s", e, exc_info=True
-                    )
+                    logger.warning("Error stopping monitoring engine: %s", e, exc_info=True)
 
             try:
                 await self.notification_manager.stop()
             except Exception as e:
-                logger.warning(
-                    "Error stopping notification manager: %s", e, exc_info=True
-                )
+                logger.warning("Error stopping notification manager: %s", e, exc_info=True)
         finally:
             if self.metrics_server:
                 # Separate attempts so a failed shutdown() still closes the socket.
@@ -246,9 +234,7 @@ class AutoHealService:
                     try:
                         close_step()
                     except Exception as e:
-                        logger.warning(
-                            "Error stopping metrics server: %s", e, exc_info=True
-                        )
+                        logger.warning("Error stopping metrics server: %s", e, exc_info=True)
                 self.metrics_server = None
             if self.docker_client:
                 try:

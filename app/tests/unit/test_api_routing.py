@@ -99,8 +99,7 @@ async def _request(
         "root_path": "",
         "headers": [(b"host", b"testserver")]
         + [
-            (key.lower().encode(), value.encode())
-            for key, value in (request_headers or {}).items()
+            (key.lower().encode(), value.encode()) for key, value in (request_headers or {}).items()
         ],
         "client": ("127.0.0.1", 12345),
         "server": ("testserver", 80),
@@ -118,10 +117,7 @@ async def _request(
         nonlocal status, headers, body
         if message["type"] == "http.response.start":
             status = message["status"]
-            headers = {
-                key.decode().lower(): value.decode()
-                for key, value in message["headers"]
-            }
+            headers = {key.decode().lower(): value.decode() for key, value in message["headers"]}
         elif message["type"] == "http.response.body":
             body += message.get("body", b"")
 
@@ -142,9 +138,7 @@ class TestRouterRegistration:
             }
             assert module_routes, f"{module.__name__} exposes no routes"
             missing = module_routes - registered
-            assert not missing, (
-                f"{module.__name__} routes not registered: {sorted(missing)}"
-            )
+            assert not missing, f"{module.__name__} routes not registered: {sorted(missing)}"
 
     def test_routers_are_registered_in_the_expected_order(self):
         registered = _registered_routes()
@@ -160,9 +154,7 @@ class TestRouterRegistration:
             first_positions.append((module.__name__, registered.index(first)))
 
         positions = [position for _, position in first_positions]
-        assert positions == sorted(positions), (
-            f"routers registered out of order: {first_positions}"
-        )
+        assert positions == sorted(positions), f"routers registered out of order: {first_positions}"
 
     def test_react_router_catch_all_is_registered_last(self):
         registered = _registered_routes()

@@ -105,9 +105,7 @@ class TestClientCleanup:
             if record.name == cls.LOGGER
         ]
 
-    def test_reconnect_closes_the_previous_client_before_connecting(
-        self, wrapper, sdk_client
-    ):
+    def test_reconnect_closes_the_previous_client_before_connecting(self, wrapper, sdk_client):
         new_client = MagicMock()
         events = []
         sdk_client.close.side_effect = lambda: events.append("close old")
@@ -140,9 +138,7 @@ class TestClientCleanup:
             (logging.INFO, "Connected to Docker daemon at unix://var/run/docker.sock"),
         ]
 
-    def test_reconnect_without_a_client_does_not_try_to_close_one(
-        self, wrapper, caplog
-    ):
+    def test_reconnect_without_a_client_does_not_try_to_close_one(self, wrapper, caplog):
         wrapper._client = None
         caplog.set_level(logging.DEBUG, logger=self.LOGGER)
 
@@ -166,9 +162,7 @@ class TestClientCleanup:
         sdk_client_cls.assert_called_once_with(base_url="tcp://docker-proxy:2375")
         client.close.assert_called_once_with()
 
-    def test_failed_ping_on_reconnect_closes_the_new_client(
-        self, wrapper, sdk_client, caplog
-    ):
+    def test_failed_ping_on_reconnect_closes_the_new_client(self, wrapper, sdk_client, caplog):
         new_client = MagicMock()
         new_client.ping.side_effect = docker.errors.APIError("daemon gone")
         caplog.set_level(logging.DEBUG, logger=self.LOGGER)
@@ -186,9 +180,7 @@ class TestClientCleanup:
             (logging.ERROR, "Reconnection failed: daemon gone"),
         ]
 
-    def test_close_error_after_failed_ping_does_not_replace_the_ping_error(
-        self, caplog
-    ):
+    def test_close_error_after_failed_ping_does_not_replace_the_ping_error(self, caplog):
         client = MagicMock()
         client.ping.side_effect = docker.errors.APIError("daemon gone")
         client.close.side_effect = OSError("close failed")
@@ -205,14 +197,10 @@ class TestClientCleanup:
             (logging.ERROR, "Failed to connect to Docker daemon: daemon gone"),
         ]
 
-    def test_client_creation_failure_keeps_the_previous_client(
-        self, wrapper, sdk_client, caplog
-    ):
+    def test_client_creation_failure_keeps_the_previous_client(self, wrapper, sdk_client, caplog):
         caplog.set_level(logging.DEBUG, logger=self.LOGGER)
 
-        with patch(
-            self.SDK_CLIENT, side_effect=docker.errors.DockerException("still down")
-        ):
+        with patch(self.SDK_CLIENT, side_effect=docker.errors.DockerException("still down")):
             assert wrapper.reconnect() is False
 
         sdk_client.close.assert_called_once_with()
@@ -244,9 +232,7 @@ class TestListingAndLookup:
             assert wrapper.list_containers() == []
 
     def test_get_container_returns_none_when_not_found(self, wrapper, sdk_client):
-        sdk_client.containers.get.side_effect = docker.errors.NotFound(
-            "no such container"
-        )
+        sdk_client.containers.get.side_effect = docker.errors.NotFound("no such container")
 
         assert wrapper.get_container("missing") is None
 
@@ -435,9 +421,7 @@ class TestContainerActions:
 
         assert wrapper.get_docker_native_health(container) is None
 
-    def test_native_health_is_none_when_container_disappears_during_inspection(
-        self, wrapper
-    ):
+    def test_native_health_is_none_when_container_disappears_during_inspection(self, wrapper):
         container = make_sdk_container()
         container.reload.side_effect = docker.errors.NotFound("no such container")
 
@@ -566,22 +550,16 @@ class TestTcpHealth:
         container = make_sdk_container()
         container.attrs["NetworkSettings"] = {"Networks": {"bridge": {"IPAddress": ""}}}
 
-        with patch(
-            "app.docker_client.docker_client_wrapper.socket.socket"
-        ) as mock_socket_cls:
+        with patch("app.docker_client.docker_client_wrapper.socket.socket") as mock_socket_cls:
             assert wrapper.check_tcp_health(container, port=8080) is False
 
         mock_socket_cls.assert_not_called()
 
-    def test_tcp_health_check_fails_when_container_disappears_during_inspection(
-        self, wrapper
-    ):
+    def test_tcp_health_check_fails_when_container_disappears_during_inspection(self, wrapper):
         container = make_sdk_container()
         container.reload.side_effect = docker.errors.NotFound("no such container")
 
-        with patch(
-            "app.docker_client.docker_client_wrapper.socket.socket"
-        ) as mock_socket_cls:
+        with patch("app.docker_client.docker_client_wrapper.socket.socket") as mock_socket_cls:
             assert wrapper.check_tcp_health(container, port=8080) is False
 
         mock_socket_cls.assert_not_called()
@@ -596,9 +574,7 @@ class TestEvents:
         stream = wrapper.get_events(decode=True, filters={"type": "container"})
 
         assert list(stream) == [{"status": "start"}]
-        sdk_client.events.assert_called_once_with(
-            decode=True, filters={"type": "container"}
-        )
+        sdk_client.events.assert_called_once_with(decode=True, filters={"type": "container"})
 
     def test_events_returns_none_on_failure(self, wrapper, sdk_client):
         sdk_client.events.side_effect = docker.errors.APIError("boom")

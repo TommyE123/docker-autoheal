@@ -41,9 +41,7 @@ async def _collect_response(app: Any) -> tuple[int, dict[str, str], bytes]:
     start = next(m for m in messages if m["type"] == "http.response.start")
     status = start["status"]
     headers = {k.decode(): v.decode() for k, v in start["headers"]}
-    body = b"".join(
-        m.get("body", b"") for m in messages if m["type"] == "http.response.body"
-    )
+    body = b"".join(m.get("body", b"") for m in messages if m["type"] == "http.response.body")
     return status, headers, body
 
 
@@ -182,9 +180,7 @@ async def test_pwa_root_endpoint_serves_expected_file(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "endpoint", [api_module.serve_pwa_icon, api_module.serve_maskable_icon]
-)
+@pytest.mark.parametrize("endpoint", [api_module.serve_pwa_icon, api_module.serve_maskable_icon])
 @pytest.mark.parametrize("size", ["../../etc/passwd", "192x192/../..", "abc"])
 async def test_icon_endpoints_reject_non_numeric_sizes(static_dir, endpoint, size):
     with pytest.raises(HTTPException) as exc_info:
@@ -273,9 +269,7 @@ def test_serve_react_app_falls_back_when_frontend_is_not_built(tmp_path, monkeyp
 
 def test_serve_react_app_reads_index_html_as_utf8(tmp_path, monkeypatch):
     (tmp_path / "static").mkdir()
-    (tmp_path / "static" / "index.html").write_text(
-        "<title>ok</title>", encoding="utf-8"
-    )
+    (tmp_path / "static" / "index.html").write_text("<title>ok</title>", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     real_open = api_module.Path.open
     encodings = []

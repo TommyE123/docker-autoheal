@@ -16,24 +16,18 @@ from app.tests.unit.conftest import make_container
 
 def events_of_type(event_type: str) -> list:
     """Return the recorded events of a given type."""
-    return [
-        event for event in config_manager.get_events() if event.event_type == event_type
-    ]
+    return [event for event in config_manager.get_events() if event.event_type == event_type]
 
 
 @pytest.mark.asyncio
 class TestRestartDecision:
     """The happy path: an unhealthy container is restarted and recorded."""
 
-    async def test_successful_restart_records_event_and_state(
-        self, engine, docker_client
-    ):
+    async def test_successful_restart_records_event_and_state(self, engine, docker_client):
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
 
-        await engine._handle_container_restart(
-            container, info, "Container exited with code 1"
-        )
+        await engine._handle_container_restart(container, info, "Container exited with code 1")
 
         assert docker_client.restart_calls == ["web"]
         assert config_manager.get_restart_count("web", 600) == 1
@@ -57,9 +51,7 @@ class TestRestartDecision:
 
         mock_notification_manager.send_event_notification.assert_awaited_once()
 
-    async def test_restart_is_recorded_against_the_stable_id(
-        self, engine, docker_client
-    ):
+    async def test_restart_is_recorded_against_the_stable_id(self, engine, docker_client):
         """Compose containers are tracked by ``project_service``, not by name."""
         container, info = make_container(
             name="stack-web-1",
@@ -82,9 +74,7 @@ class TestRestartDecision:
 class TestFailedRestart:
     """A restart that the Docker API rejects."""
 
-    async def test_failed_restart_is_recorded_as_a_failure_event(
-        self, engine, docker_client
-    ):
+    async def test_failed_restart_is_recorded_as_a_failure_event(self, engine, docker_client):
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
         docker_client.restart_results["web"] = False
@@ -96,9 +86,7 @@ class TestFailedRestart:
         assert restarts[0].status == "failure"
         assert "Restart failed" in restarts[0].message
 
-    async def test_failed_restart_still_counts_towards_the_threshold(
-        self, engine, docker_client
-    ):
+    async def test_failed_restart_still_counts_towards_the_threshold(self, engine, docker_client):
         """Existing behaviour: failures count, so a broken container is quarantined."""
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
@@ -194,9 +182,7 @@ class TestCooldown:
 class TestRestartThresholdAndQuarantine:
     """Exceeding ``max_restarts`` quarantines the container instead of restarting."""
 
-    async def test_container_is_quarantined_at_the_threshold(
-        self, engine, docker_client
-    ):
+    async def test_container_is_quarantined_at_the_threshold(self, engine, docker_client):
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
         for _ in range(3):  # default max_restarts
@@ -213,9 +199,7 @@ class TestRestartThresholdAndQuarantine:
         assert quarantines[0].restart_count == 3
         assert "exceeded 3 restarts" in quarantines[0].message
 
-    async def test_container_below_threshold_is_still_restarted(
-        self, engine, docker_client
-    ):
+    async def test_container_below_threshold_is_still_restarted(self, engine, docker_client):
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
         for _ in range(2):
@@ -261,9 +245,7 @@ class TestRestartThresholdAndQuarantine:
         assert config_manager.is_quarantined("stack_web") is True
         assert config_manager.is_quarantined("stack-web-1") is False
 
-    async def test_custom_threshold_is_honoured(
-        self, engine, docker_client, update_config
-    ):
+    async def test_custom_threshold_is_honoured(self, engine, docker_client, update_config):
         update_config(lambda c: setattr(c.restart, "max_restarts", 1))
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
@@ -290,9 +272,7 @@ class TestRestartThresholdAndQuarantine:
 class TestRestartBackoff:
     """Exponential backoff between restart attempts."""
 
-    async def test_initial_backoff_delay_is_applied(
-        self, engine, docker_client, recorded_sleeps
-    ):
+    async def test_initial_backoff_delay_is_applied(self, engine, docker_client, recorded_sleeps):
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
 
@@ -312,9 +292,7 @@ class TestRestartBackoff:
         assert recorded_sleeps == []
         assert docker_client.restart_calls == ["web"]
 
-    async def test_backoff_resets_after_a_successful_restart(
-        self, engine, docker_client
-    ):
+    async def test_backoff_resets_after_a_successful_restart(self, engine, docker_client):
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
 
@@ -385,9 +363,7 @@ class TestQuarantineAlerts:
             return response()
 
         monkeypatch.setattr("requests.post", fake_post)
-        update_config(
-            lambda c: setattr(c.alerts, "webhook", "http://alerts.invalid/hook")
-        )
+        update_config(lambda c: setattr(c.alerts, "webhook", "http://alerts.invalid/hook"))
 
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
@@ -406,9 +382,7 @@ class TestQuarantineAlerts:
             raise RuntimeError("webhook unreachable")
 
         monkeypatch.setattr("requests.post", fake_post)
-        update_config(
-            lambda c: setattr(c.alerts, "webhook", "http://alerts.invalid/hook")
-        )
+        update_config(lambda c: setattr(c.alerts, "webhook", "http://alerts.invalid/hook"))
 
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
@@ -453,9 +427,7 @@ class TestAlertResponseHandling:
             return type("Response", (), {"status_code": 500})()
 
         monkeypatch.setattr("requests.post", fake_post)
-        update_config(
-            lambda c: setattr(c.alerts, "webhook", "http://alerts.invalid/hook")
-        )
+        update_config(lambda c: setattr(c.alerts, "webhook", "http://alerts.invalid/hook"))
 
         container, info = make_container(name="web")
         docker_client.add_container(container, info)

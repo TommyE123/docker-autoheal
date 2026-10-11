@@ -73,9 +73,7 @@ class TestConfigurationEndpoints:
             (update_restart_config, RestartConfig(mode="both", max_restarts=7)),
         ],
     )
-    async def test_configuration_update_errors_return_500(
-        self, monkeypatch, endpoint, payload
-    ):
+    async def test_configuration_update_errors_return_500(self, monkeypatch, endpoint, payload):
         monkeypatch.setattr(
             config_manager,
             "update_config",
@@ -133,9 +131,7 @@ class TestObservabilityConfig:
         assert updated.log_level == original_log_level
 
     async def test_update_observability_config_updates_log_format_only(self):
-        original_prometheus_enabled = (
-            config_manager.get_config().observability.prometheus_enabled
-        )
+        original_prometheus_enabled = config_manager.get_config().observability.prometheus_enabled
 
         await update_observability_config({"log_format": "text"})
 
@@ -150,9 +146,7 @@ class TestObservabilityConfig:
 
         assert config_manager.get_config().restart.mode == original_restart_mode
 
-    async def test_update_observability_config_unexpected_error_returns_500(
-        self, monkeypatch
-    ):
+    async def test_update_observability_config_unexpected_error_returns_500(self, monkeypatch):
         monkeypatch.setattr(
             config_manager,
             "update_config",
@@ -175,10 +169,7 @@ class TestConfigExportImport:
         response = await export_config()
 
         assert response.status_code == 200
-        assert (
-            "attachment; filename=autoheal-config-"
-            in response.headers["content-disposition"]
-        )
+        assert "attachment; filename=autoheal-config-" in response.headers["content-disposition"]
         body = json.loads(bytes(response.body))
         assert body["monitor"]["interval_seconds"] == 77
 
@@ -198,9 +189,7 @@ class TestConfigExportImport:
         new_config = config_manager.get_config()
         new_config.monitor.interval_seconds = 123
         payload = new_config.model_dump_json()
-        upload = UploadFile(
-            file=BytesIO(payload.encode("utf-8")), filename="config.json"
-        )
+        upload = UploadFile(file=BytesIO(payload.encode("utf-8")), filename="config.json")
 
         result = await api_import_config(upload)
 

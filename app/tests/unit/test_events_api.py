@@ -160,9 +160,7 @@ def test_filters_combine(isolated_config_manager):
 
     events = asyncio.run(get_events(event_type="quarantine", container="web"))
 
-    assert [(e["container_name"], e["event_type"]) for e in events] == [
-        ("web", "quarantine")
-    ]
+    assert [(e["container_name"], e["event_type"]) for e in events] == [("web", "quarantine")]
 
 
 def test_empty_event_type_matches_only_events_with_an_empty_type(
@@ -226,9 +224,7 @@ async def test_invalid_limit_is_rejected_with_422(isolated_config_manager, limit
 async def test_filters_are_honoured_over_http(isolated_config_manager):
     _seed(isolated_config_manager, ("web", "restart"), ("db", "quarantine"))
 
-    status, body, _ = await _request(
-        "GET", "/api/events", query="event_type=quarantine"
-    )
+    status, body, _ = await _request("GET", "/api/events", query="event_type=quarantine")
 
     assert status == 200
     assert [e["container_name"] for e in json.loads(body)] == ["db"]

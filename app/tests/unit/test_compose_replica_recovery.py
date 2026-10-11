@@ -24,9 +24,7 @@ COMPOSE = {
 }
 
 
-def replica(
-    number, status="running", exit_code=0, container_id=None, extra_labels=None
-):
+def replica(number, status="running", exit_code=0, container_id=None, extra_labels=None):
     """A replica of ``myapp``/``web`` with the given Compose container number."""
     labels = {
         "autoheal": "true",
@@ -190,9 +188,7 @@ class TestRecoveryIdentifier:
             "monitoring.id:myapp_web"
         )
 
-    def test_engine_uses_per_service_stable_id_and_per_replica_recovery_id(
-        self, engine
-    ):
+    def test_engine_uses_per_service_stable_id_and_per_replica_recovery_id(self, engine):
         _, info = replica(2)
 
         assert engine.get_stable_identifier(info) == "myapp_web"
@@ -214,12 +210,7 @@ class TestReplicasRecoverIndependently:
         await engine._handle_container_restart(a, a_info, "unhealthy")
 
         assert config_manager.get_total_restart_count("compose:myapp:web#1") == 2
-        assert (
-            config_manager.get_total_restart_count(
-                engine.get_recovery_identifier(b_info)
-            )
-            == 0
-        )
+        assert config_manager.get_total_restart_count(engine.get_recovery_identifier(b_info)) == 0
 
     async def test_cooldown_is_per_replica(
         self, engine, docker_client, two_replicas, update_config
@@ -243,9 +234,7 @@ class TestReplicasRecoverIndependently:
 
         await engine._handle_container_restart(b, b_info, "unhealthy")
 
-        assert recorded_sleeps == [
-            config_manager.get_config().restart.backoff.initial_seconds
-        ]
+        assert recorded_sleeps == [config_manager.get_config().restart.backoff.initial_seconds]
 
     async def test_quarantining_one_replica_does_not_stop_another_being_restarted(
         self, engine, docker_client
@@ -270,16 +259,10 @@ class TestReplicasRecoverIndependently:
         await quarantine(engine, b, b_info)
 
         assert config_manager.get_quarantined_containers() == {"compose:myapp:web#2"}
-        quarantines = [
-            e for e in config_manager.get_events() if e.event_type == "quarantine"
-        ]
-        assert [e.container_name for e in quarantines] == [
-            "myapp-web-2 (compose:myapp:web#2)"
-        ]
+        quarantines = [e for e in config_manager.get_events() if e.event_type == "quarantine"]
+        assert [e.container_name for e in quarantines] == ["myapp-web-2 (compose:myapp:web#2)"]
 
-    async def test_healthy_replica_does_not_unquarantine_another(
-        self, engine, two_replicas
-    ):
+    async def test_healthy_replica_does_not_unquarantine_another(self, engine, two_replicas):
         (a, a_info), (b, _b_info) = two_replicas
         await quarantine(engine, a, a_info)
 
@@ -287,11 +270,7 @@ class TestReplicasRecoverIndependently:
 
         assert config_manager.is_quarantined("compose:myapp:web#1")
         assert config_manager.get_total_restart_count("compose:myapp:web#1") == 3
-        assert not [
-            e
-            for e in config_manager.get_events()
-            if e.event_type == "auto_unquarantine"
-        ]
+        assert not [e for e in config_manager.get_events() if e.event_type == "auto_unquarantine"]
 
     async def test_healthy_quarantined_replica_unquarantines_only_itself(
         self, engine, docker_client
@@ -317,18 +296,10 @@ class TestReplicasRecoverIndependently:
         assert config_manager.is_quarantined("compose:myapp:web#1")
         assert config_manager.get_total_restart_count("compose:myapp:web#1") == 3
         assert engine._backoff_delays["compose:myapp:web#1"] == 999
-        events = [
-            e
-            for e in config_manager.get_events()
-            if e.event_type == "auto_unquarantine"
-        ]
-        assert [e.container_name for e in events] == [
-            "myapp-web-2 (compose:myapp:web#2)"
-        ]
+        events = [e for e in config_manager.get_events() if e.event_type == "auto_unquarantine"]
+        assert [e.container_name for e in events] == ["myapp-web-2 (compose:myapp:web#2)"]
 
-    async def test_recreated_replica_keeps_its_restart_count(
-        self, engine, docker_client
-    ):
+    async def test_recreated_replica_keeps_its_restart_count(self, engine, docker_client):
         b, b_info = replica(2)
         docker_client.add_container(b, b_info)
         await engine._handle_container_restart(b, b_info, "unhealthy")
@@ -344,9 +315,7 @@ class TestReplicasRecoverIndependently:
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("no_cooldown")
 class TestUnscaledComposeService:
-    async def test_single_replica_is_keyed_by_its_container_number(
-        self, engine, docker_client
-    ):
+    async def test_single_replica_is_keyed_by_its_container_number(self, engine, docker_client):
         container, info = replica(1)
         docker_client.add_container(container, info)
 
@@ -376,9 +345,7 @@ class TestExplicitMonitoringIdIsShared:
 
 
 class TestConfigurationStaysPerService:
-    def test_selection_by_service_id_monitors_every_replica(
-        self, engine, update_config
-    ):
+    def test_selection_by_service_id_monitors_every_replica(self, engine, update_config):
         update_config(lambda c: c.containers.selected.append("myapp_web"))
         b, b_info = replica(2, extra_labels={"autoheal": "false"})
 
@@ -394,9 +361,7 @@ def wired_api(monkeypatch, docker_client, engine):
 
 @pytest.mark.asyncio
 class TestApiReportsPerReplicaState:
-    async def test_list_shows_quarantine_and_count_per_replica(
-        self, wired_api, two_replicas
-    ):
+    async def test_list_shows_quarantine_and_count_per_replica(self, wired_api, two_replicas):
         config_manager.quarantine_container("compose:myapp:web#2")
         config_manager.record_restart("compose:myapp:web#2")
 
@@ -422,9 +387,7 @@ class TestApiReportsPerReplicaState:
         )
         assert replica_2["recent_restart_count"] == 0
 
-    async def test_unquarantining_one_replica_leaves_the_other(
-        self, wired_api, two_replicas
-    ):
+    async def test_unquarantining_one_replica_leaves_the_other(self, wired_api, two_replicas):
         for key in ("compose:myapp:web#1", "compose:myapp:web#2"):
             config_manager.quarantine_container(key)
             config_manager.record_restart(key)
@@ -435,7 +398,4 @@ class TestApiReportsPerReplicaState:
         assert config_manager.get_total_restart_count("compose:myapp:web#2") == 0
         assert config_manager.is_quarantined("compose:myapp:web#1")
         assert config_manager.get_total_restart_count("compose:myapp:web#1") == 1
-        assert (
-            config_manager.get_events()[-1].container_name
-            == "myapp-web-2 (compose:myapp:web#2)"
-        )
+        assert config_manager.get_events()[-1].container_name == "myapp-web-2 (compose:myapp:web#2)"

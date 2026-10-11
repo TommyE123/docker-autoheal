@@ -48,9 +48,7 @@ def test_add_event_appends_to_the_log(isolated_config_manager):
 
     events = isolated_config_manager.get_events()
     assert len(events) == 5
-    assert [e.container_name for e in events] == [
-        f"test-container-{i}" for i in range(5)
-    ]
+    assert [e.container_name for e in events] == [f"test-container-{i}" for i in range(5)]
 
 
 def test_clear_events_empties_the_log(isolated_config_manager):
@@ -108,9 +106,7 @@ def test_historical_naive_event_is_preserved_without_becoming_current_event(
     isolated_config_manager,
 ):
     naive_timestamp = "2024-01-01T12:00:00"
-    isolated_config_manager.EVENTS_FILE.write_text(
-        json.dumps([_event_payload(0, naive_timestamp)])
-    )
+    isolated_config_manager.EVENTS_FILE.write_text(json.dumps([_event_payload(0, naive_timestamp)]))
 
     events = isolated_config_manager._load_events()
 

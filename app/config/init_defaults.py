@@ -166,9 +166,7 @@ def initialize_defaults(data_dir: Path = Path("/data")) -> None:
         files_created += 1
 
     if files_created > 0:
-        logger.info(
-            "Initialization complete: %s default file(s) created", files_created
-        )
+        logger.info("Initialization complete: %s default file(s) created", files_created)
     else:
         logger.info("All data files already exist, no initialization needed")
 
@@ -207,13 +205,9 @@ if __name__ == "__main__":
     # For testing and manual initialization
     import argparse
 
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-    parser = argparse.ArgumentParser(
-        description="Initialize or reset Docker Auto-Heal data files"
-    )
+    parser = argparse.ArgumentParser(description="Initialize or reset Docker Auto-Heal data files")
     parser.add_argument(
         "--reset",
         action="store_true",
