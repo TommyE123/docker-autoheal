@@ -296,3 +296,18 @@ def test_real_config_manager_init_retains_valid_sections_and_health_checks(
     assert manager._config.filters.whitelist_names == ["web-*"]
     assert "web" in manager._custom_health_checks
     assert manager._custom_health_checks["web"].check_type == "http"
+
+
+def test_rejected_notification_credentials_are_not_logged_on_section_reset(
+    isolated_config_manager, caplog
+):
+    payload = _valid_config_dict()
+    # A non-string access_token fails validation of the whole 'notifications' section.
+    payload["notifications"]["services"][0]["access_token"] = {"value": "tk_leak_check"}
+    _write_config(isolated_config_manager, payload)
+
+    config = isolated_config_manager._load_config()
+
+    assert config.notifications.services == []
+    assert "Resetting config section 'notifications' to defaults" in caplog.text
+    assert "tk_leak_check" not in caplog.text

@@ -63,10 +63,14 @@ function and the changed text, not by name.
 `.github/workflows/mutation-testing.yml` runs the same `./mutation.sh`, always the full
 suite. It runs:
 
-- automatically on pull requests to `main`, and on pushes to `main`, that change
-  `app/**/*.py` (production code or tests), `requirements*.txt`, `pyproject.toml`,
-  `mutation.sh`, the `Dockerfile` (which sets the Python version) or the workflow itself;
-  documentation-only and other unrelated changes do not run it;
+- automatically on pull requests to `main` that change
+  `app/**/*.py` (production code or tests), `requirements-dev.txt` (it pins Mutmut and
+  pytest), `pyproject.toml`, `mutation.sh`, the `Dockerfile` (which sets the Python
+  version) or the workflow itself; documentation-only and other unrelated changes, and
+  runtime dependency bumps in `requirements.txt`, do not run it. Release Please pull
+  requests (branches starting `release-please--`, which only bump the version in
+  `app/api/api.py`) are skipped, and pushes to `main` do not run it: the badge comes from
+  the updater, not from a run on `main`;
 - manually, from the Actions tab (**Mutation Testing** -> **Run
   workflow**).
 
@@ -77,33 +81,73 @@ The workflow:
 
 - installs `requirements-dev.txt` on the Python version the `Dockerfile` uses;
 - starts from an empty `mutants/` (and never caches it);
-- is grouped by ref: a new push to a pull request cancels that PR's in-progress run, while runs on `main` and manual runs are never cancelled once running (a newer run can still replace one that is only queued);
+- is grouped by ref: a new push to a pull request cancels that PR's in-progress run, while manual runs are never cancelled once running (a newer run can still replace one that is only queued);
 - is informational: it is not a required check, has no score threshold, and must not be
   made one.
 
 The README badge shows the mutation score stored in `.github/badges/mutation.json`, a
 small Shields endpoint file on `main`. `mutmut badge` generates it from the exported
-stats; nothing calculates the score by hand. The score equals the **Detected** figure in
-the job summary, since no mutants are skipped. It is informational only: the run succeeds
+stats; nothing calculates the score by hand. The job summary's **Detected** figure and
+the pull request comment use that same score. It is informational only: the run succeeds
 whatever the score, so no threshold is implied, and it is not a gate.
 
-The file is updated by the pull request that changes the score:
+The file is **not** updated by pull requests. A full `./mutation.sh` run leaves it alone
+unless `UPDATE_MUTATION_BADGE=1` is set, so ordinary local and pull request runs never
+modify it, and the badge keeps showing the last committed score between refreshes.
 
-- A full `./mutation.sh` run (no arguments) rewrites the file locally.
-  Focused runs leave it alone, because they score only part of the target.
-- On a pull request from this repository, the workflow's `commit-badge` job commits the
-  new file to the PR branch as `ci: update mutation badge`, unless it is unchanged. Only
-  that job has a write token. Fork pull requests get no write token, so they never
-  commit: they add a notice and a line to the job summary if the file differs. The new
-  file is in the `mutation-badge` artifact. Runs on `main` never commit.
-- The commit is pushed with the `BADGE_PUSH_TOKEN` repository secret, a fine-grained
-  personal access token with **Contents: read and write** on this repository. A push made
-  with `GITHUB_TOKEN` would not start the PR's other checks, leaving the required ones
-  missing on the new head. The badge commit does start them, but the workflow's `gate` job
-  skips the mutation run for it, since the commit only changes the badge file. If the token
-  expires or is removed, or branch protection rejects the push, the `commit-badge` job
-  fails (the mutation job itself stays green) and the badge keeps its last score.
-- If the file is left stale, the badge simply keeps showing the last committed score.
+The `Update Mutation Results` workflow (`.github/workflows/update-mutation-results.yml`)
+refreshes it:
+
+- It has only a `workflow_dispatch` trigger and no GitHub `schedule`. Run it from the
+  Actions tab, or let an external scheduler (cron-job.org) call the `workflow_dispatch`
+  API. The caller's token is configured outside the repository. It always checks out and
+  tests `main`; a dispatch against any other ref fails immediately with an error.
+- It runs the same full `./mutation.sh` with `UPDATE_MUTATION_BADGE=1`, then compares the
+  new score with the one tracked on `main`. The result is tied to the exact `main` commit
+  that was tested; if `main` has moved by the time the run finishes, nothing is published
+  or closed and the workflow must be run again.
+- It then hands the tracked file to
+  [`peter-evans/create-pull-request`](https://github.com/peter-evans/create-pull-request)
+  (pinned by commit SHA), which owns the branch and PR lifecycle:
+  - On a change it commits only `.github/badges/mutation.json` to
+    `chore/update-mutation-results` and opens a pull request to `main`, or updates the one
+    already open. The title is `chore: update mutation results (65.8% → 66.7%)`; when the
+    score is unchanged or cannot be read from either file it is
+    `chore: update mutation results`. If the score dropped, the PR body starts with a
+    warning. A drop never fails the workflow.
+  - With no change it creates nothing, and closes (and deletes the branch of) an update PR
+    left open by an earlier run, because the result has caught up.
+- Before enabling auto-merge it checks that the PR changes only the badge file, and the
+  merge request is bound to the exact commit the action pushed, so it fails if the head
+  changes in between.
+- Its `GITHUB_TOKEN` is read-only. Writes use the `BADGE_PUSH_TOKEN` repository secret, a
+  fine-grained personal access token with **Contents** and **Pull requests**: read and
+  write, which only the pull request and auto-merge steps are given. A push or PR made
+  with `GITHUB_TOKEN` would not start the PR's other checks.
+
+### Why the updater PR auto-merges
+
+The updater is scheduled externally (cron-job.org) shortly before Release Please runs. Its
+PR exists only to persist the generated result safely on `main`, so the workflow enables
+auto-merge (squash) on it and GitHub merges it once the required PR checks pass. No
+approval is required for it. A change in the score is informational: a drop is warned
+about in the PR body but is not a release blocker, does not fail the workflow and does not
+stop the PR merging or delay Release Please. This needs **Allow auto-merge** enabled in
+the repository settings.
+
+### Mutation runs and the updater PR
+
+The Mutation Testing workflow runs on source and test pull requests according to its path
+filters, which do not include `.github/badges/mutation.json`. The updater workflow runs the
+full mutation process itself against `main`, and its PR carries only the resulting JSON, so
+that PR does not trigger another full mutation run. That avoids running the 4-5 minute
+mutation job again for a badge-only change. Its other checks run as for any pull request.
+
+On a pull request from this repository, a short comment shows this PR's score next to the
+score tracked on `main`, with the change. It is one comment per PR, found by a hidden
+marker and edited in place on every run rather than added to. Only a separate job holds
+the write token for it; fork PRs get no comment (the job summary still has the numbers).
+It is informational and never blocks a merge.
 
 Find results on the workflow run page (for a pull request, the **Mutmut**
 check's details link):

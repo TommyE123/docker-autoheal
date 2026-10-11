@@ -29,3 +29,4 @@ rules:
       .github/workflows/release-please-auto-merge.yml
       .github/workflows/semantic-pr-title.yml
       .github/workflows/tests.yml
+      .github/workflows/update-mutation-results.yml

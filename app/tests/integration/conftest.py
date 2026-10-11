@@ -2,12 +2,13 @@
 Shared fixtures for the Docker Auto-Heal integration suite.
 
 Unlike ``app/tests/unit``, these tests exercise the real Docker SDK and/or a
-running Auto-Heal service (``http://localhost:3131``). They are never
+running Auto-Heal service (the development stack on ``http://localhost:3132`` by default). They are never
 collected by a plain ``pytest`` run (see ``pytest.ini``'s ``testpaths`` and
 ``docs/developer/testing.md``) and every test here is skipped, rather than failed, when
 the resource it needs isn't available.
 """
 
+import os
 import uuid
 
 import pytest
@@ -21,7 +22,10 @@ from app.docker_client.docker_client_wrapper import DockerClientWrapper
 # exactly the same behaviour.
 from app.tests.unit.conftest import isolated_config_manager  # noqa: F401
 
-AUTOHEAL_BASE_URL = "http://localhost:3131"
+# Defaults to the development stack (docker-compose.dev.yml), never the production port 3131.
+# Override with AUTOHEAL_BASE_URL / AUTOHEAL_METRICS_URL to point at another instance.
+AUTOHEAL_BASE_URL = os.environ.get("AUTOHEAL_BASE_URL", "http://localhost:3132").rstrip("/")
+AUTOHEAL_METRICS_URL = os.environ.get("AUTOHEAL_METRICS_URL", "http://localhost:9091").rstrip("/")
 
 try:
     import docker
@@ -48,7 +52,7 @@ def real_docker_client():
 
 @pytest.fixture
 def running_service():
-    """Skip the test unless a live Auto-Heal service answers on localhost:3131."""
+    """Skip the test unless a live Auto-Heal service answers at AUTOHEAL_BASE_URL."""
     try:
         response = requests.get(f"{AUTOHEAL_BASE_URL}/health", timeout=3)
         response.raise_for_status()

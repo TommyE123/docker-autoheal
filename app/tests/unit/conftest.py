@@ -36,7 +36,7 @@ from app.config.config_manager import (
     AutoHealConfig,
     config_manager,
 )
-from app.docker_client.docker_client_wrapper import DockerClientWrapper
+from app.docker_client.docker_client_wrapper import DockerClientWrapper, recovery_identifier
 from app.monitor.monitoring_engine import MonitoringEngine
 
 # ---------------------------------------------------------------------------
@@ -103,6 +103,7 @@ def make_container(
         "full_id": container_id,
         "name": name,
         "stable_id": stable_id,
+        "recovery_id": recovery_identifier(stable_id, labels),
         "image": "example:latest",
         "image_id": "sha256:" + ("b" * 64),
         "status": status,

@@ -154,5 +154,5 @@ data/
 .lint/
 
 # Playwright E2E output
-frontend/test-results/
-frontend/playwright-report/
+frontend/test-results-ui/
+frontend/playwright-report-ui/
