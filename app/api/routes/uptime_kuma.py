@@ -92,8 +92,18 @@ async def enable_uptime_kuma_integration(integration_config: dict):
             for match in matches
         ]
 
-        # Add auto-mappings to config
-        config.uptime_kuma_mappings = auto_mappings
+        # Manual mappings are explicit user decisions: keep them and let them
+        # win over any freshly generated auto-mapping for the same container.
+        manual_mappings = [
+            mapping for mapping in config.uptime_kuma_mappings if not mapping.auto_mapped
+        ]
+        manual_container_ids = {mapping.container_id for mapping in manual_mappings}
+        auto_mappings = [
+            mapping for mapping in auto_mappings
+            if mapping.container_id not in manual_container_ids
+        ]
+
+        config.uptime_kuma_mappings = manual_mappings + auto_mappings
         config_manager.update_config(config)
 
         # Restart Uptime-Kuma monitor
