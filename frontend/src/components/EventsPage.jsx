@@ -16,6 +16,7 @@ function EventsPage() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [alert, setAlert] = useState(null);
+  const [eventsError, setEventsError] = useState(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [eventType, setEventType] = useState("");
   const [container, setContainer] = useState("");
@@ -32,11 +33,17 @@ function EventsPage() {
     const requestId = ++latestRequestId.current;
     try {
       const response = await getEvents(limit, { eventType, container });
+
       if (requestId === latestRequestId.current) {
         setEvents(response.data);
+        setEventsError(null);
       }
     } catch (error) {
       console.error("Failed to load events:", error);
+
+      if (requestId === latestRequestId.current) {
+        setEventsError("Failed to load events. Please try again.");
+      }
     } finally {
       if (requestId === latestRequestId.current) {
         setLoading(false);
@@ -213,6 +220,12 @@ function EventsPage() {
       </Card.Header>
 
       <Card.Body style={{ maxHeight: "600px", overflowY: "auto" }}>
+        {eventsError && (
+          <Alert variant="danger" className="mb-3">
+            {eventsError}
+          </Alert>
+        )}
+
         {alert && (
           <Alert
             variant={alert.type}
@@ -224,9 +237,11 @@ function EventsPage() {
           </Alert>
         )}
         {events.length === 0 ? (
-          <div className="text-center py-4 text-muted">
-            No events recorded yet
-          </div>
+          eventsError ? null : (
+            <div className="text-center py-4 text-muted">
+              No events recorded yet
+            </div>
+          )
         ) : (
           <div className="event-list">
             {[...events].reverse().map((event, index) => (

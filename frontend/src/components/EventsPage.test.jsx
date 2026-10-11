@@ -87,13 +87,45 @@ describe("EventsPage", () => {
 
     render(<EventsPage />);
 
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /failed to load events/i,
+    );
+
     expect(
-      await screen.findByText(/no events recorded yet/i),
-    ).toBeInTheDocument();
+      screen.queryByText(/no events recorded yet/i),
+    ).not.toBeInTheDocument();
+
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       "Failed to load events:",
       expect.any(Error),
     );
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("clears the fetch error after a successful retry", async () => {
+    const user = userEvent.setup();
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    getEvents
+      .mockRejectedValueOnce(new Error("network error"))
+      .mockResolvedValueOnce({ data: sampleEvents });
+
+    render(<EventsPage />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /failed to load events/i,
+    );
+
+    await user.click(screen.getByRole("button", { name: /refresh/i }));
+
+    expect(
+      await screen.findByRole("heading", { name: "web-app" }),
+    ).toBeInTheDocument();
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 
     consoleErrorSpy.mockRestore();
   });
@@ -459,5 +491,43 @@ describe("EventsPage", () => {
       await screen.findByRole("heading", { name: "web-app" }),
     ).toBeInTheDocument();
     expect(screen.queryByText(/loading events/i)).not.toBeInTheDocument();
+  });
+
+  it("ignores a stale request failure after a newer request succeeds", async () => {
+    const user = userEvent.setup();
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    let rejectStale;
+
+    getEvents.mockResolvedValueOnce({ data: sampleEvents });
+
+    render(<EventsPage />);
+
+    await screen.findByRole("heading", { name: "web-app" });
+
+    // Start an older request that stays pending.
+    getEvents.mockImplementationOnce(
+      () => new Promise((_, reject) => (rejectStale = reject)),
+    );
+    await user.click(screen.getByRole("button", { name: /refresh/i }));
+
+    // A newer request succeeds first.
+    getEvents.mockResolvedValueOnce({ data: multipleEvents });
+    await user.click(screen.getByRole("button", { name: /refresh/i }));
+
+    expect(
+      await screen.findByRole("heading", { name: "cache" }),
+    ).toBeInTheDocument();
+
+    // The older request fails and must not display an error.
+    await act(async () => {
+      rejectStale(new Error("stale network error"));
+    });
+
+    expect(screen.getByRole("heading", { name: "cache" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    consoleErrorSpy.mockRestore();
   });
 });
