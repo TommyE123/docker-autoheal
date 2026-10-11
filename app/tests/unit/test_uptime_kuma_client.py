@@ -15,6 +15,8 @@ name-first layout.
 
 import pytest
 
+from app.config.config_manager import UptimeKumaMapping, config_manager
+from app.monitor.uptime_kuma_monitor import UptimeKumaMonitor
 from app.uptime_kuma.uptime_kuma_client import UptimeKumaClient
 
 METRICS_TEXT = (
@@ -301,6 +303,25 @@ class TestParseMonitorsFromMetrics:
         assert monitors[0]["friendly_name"] == "Tagged"
         assert monitors[0]["status"] == 1
 
+    def test_escaped_quote_in_monitor_name_is_unescaped(self):
+        client = UptimeKumaClient("http://kuma.example", "token")
+        text = (
+            r'monitor_status{monitor_id="5",env="prod",monitor_name="My \"prod\" DB",'
+            'monitor_type="http"} 0\n'
+        )
+
+        monitors = client._parse_monitors_from_metrics(text)
+
+        assert [(m["friendly_name"], m["status"]) for m in monitors] == [('My "prod" DB', 0)]
+
+    def test_escaped_backslash_and_newline_in_monitor_name_are_unescaped(self):
+        client = UptimeKumaClient("http://kuma.example", "token")
+        text = r'monitor_status{monitor_name="C:\\prod\nDB"} 1' + "\n"
+
+        monitors = client._parse_monitors_from_metrics(text)
+
+        assert [m["friendly_name"] for m in monitors] == ["C:\\prod\nDB"]
+
     def test_custom_tag_whose_name_ends_in_monitor_name_is_not_a_phantom_monitor(self):
         """A custom tag like custom_monitor_name must not be matched as monitor_name
         just because it contains that substring."""
@@ -310,6 +331,30 @@ class TestParseMonitorsFromMetrics:
         monitors = client._parse_monitors_from_metrics(text)
 
         assert monitors == []
+
+
+@pytest.mark.asyncio
+class TestEscapedMonitorNameStatus:
+    async def test_update_status_cache_matches_monitor_name_with_escaped_quotes(self, monkeypatch):
+        text = (
+            r'monitor_status{monitor_id="5",env="prod",monitor_name="My \"prod\" DB",'
+            'monitor_type="http"} 0\n'
+        )
+        _patch_session(monkeypatch, response=_FakeResponse(200, text))
+        config = config_manager.get_config()
+        config.uptime_kuma_mappings.append(
+            UptimeKumaMapping(
+                container_id="database",
+                monitor_friendly_name='My "prod" DB',
+            )
+        )
+        config_manager.update_config(config)
+        monitor = UptimeKumaMonitor()
+        monitor.client = UptimeKumaClient("http://kuma.example", "token")
+
+        await monitor._update_status_cache()
+
+        assert monitor._container_status_cache == {"database": 0}
 
 
 @pytest.mark.asyncio
