@@ -16,7 +16,7 @@ from app.config.config_manager import (
     HealthCheckConfig,
     config_manager,
 )
-from app.docker_client.docker_client_wrapper import DockerClientWrapper
+from app.docker_client.docker_client_wrapper import DockerClientWrapper, recovery_identifier
 from app.notifications.notification_manager import notification_manager
 
 logger = logging.getLogger(__name__)
@@ -79,6 +79,23 @@ class MonitoringEngine:
 
         # Priority 3: Container name (fallback)
         return info.get("name")
+
+    def get_recovery_identifier(self, info: dict) -> str:
+        """
+        Get the key for a container's restart count, cooldown, backoff and quarantine.
+
+        Every Compose container is keyed by its project, service and container
+        number (see ``recovery_identifier``), so replicas of a scaled service recover
+        independently, including ``#1`` for an unscaled service. Configuration (selection, health
+        checks, Uptime Kuma mappings) stays keyed by ``get_stable_identifier``.
+
+        Args:
+            info: Container information dict
+
+        Returns:
+            Recovery identifier string
+        """
+        return recovery_identifier(self.get_stable_identifier(info), info.get("labels", {}))
 
     @staticmethod
     def _auto_monitor_stable_id(labels: dict, container_name: str) -> str:
@@ -215,17 +232,15 @@ class MonitoringEngine:
         container_id = info.get("full_id")
         container_name = info.get("name")
 
-        # Get stable identifier (handles auto-generated names, compose services, explicit IDs)
-        stable_id = self.get_stable_identifier(info)
-
         # Check if container should be monitored
         if not self.should_monitor_container(container, info):
             return
 
-        # Check if container is quarantined (by stable ID, name, or ID for backwards compatibility)
+        # Check if container is quarantined (by recovery ID, name, or ID for backwards compatibility)
+        recovery_id = self.get_recovery_identifier(info)
         quarantine_id = None
-        if config_manager.is_quarantined(stable_id):
-            quarantine_id = stable_id
+        if config_manager.is_quarantined(recovery_id):
+            quarantine_id = recovery_id
         elif config_manager.is_quarantined(container_name):
             quarantine_id = container_name
         elif config_manager.is_quarantined(container_id):
@@ -242,13 +257,15 @@ class MonitoringEngine:
                 needs_restart, reason = await self._evaluate_container_health(container, info)
                 if not needs_restart:
                     # Container is healthy, auto-remove from quarantine
-                    await self._auto_unquarantine_container(quarantine_id, stable_id, container_name, container_id)
+                    await self._auto_unquarantine_container(
+                        quarantine_id, recovery_id, container_name, container_id
+                    )
                     return
 
             logger.debug(
-                "Container %s (stable_id: %s) is quarantined and still unhealthy, skipping",
+                "Container %s (recovery_id: %s) is quarantined and still unhealthy, skipping",
                 container_name,
-                stable_id,
+                recovery_id,
             )
             return
 
@@ -468,13 +485,13 @@ class MonitoringEngine:
             logger.error("Error performing health check: %s", e)
             return False
 
-    async def _auto_unquarantine_container(self, quarantine_id: str, stable_id: str,
+    async def _auto_unquarantine_container(self, quarantine_id: str, recovery_id: str,
                                             container_name: str, container_id: str) -> None:
         """
         Automatically remove a container from quarantine because it has auto-healed
         Args:
             quarantine_id: The ID used in the quarantine list
-            stable_id: Stable identifier for the container
+            recovery_id: Recovery identifier for the container
             container_name: Container name
             container_id: Container ID
         """
@@ -483,17 +500,17 @@ class MonitoringEngine:
             config_manager.unquarantine_container(quarantine_id)
 
             # Also clear the restart count so it starts fresh
-            config_manager.clear_restart_history(stable_id)
+            config_manager.clear_restart_history(recovery_id)
 
             # Reset backoff delays
-            if stable_id in self._backoff_delays:
+            if recovery_id in self._backoff_delays:
                 config = config_manager.get_config()
-                self._backoff_delays[stable_id] = config.restart.backoff.initial_seconds
+                self._backoff_delays[recovery_id] = config.restart.backoff.initial_seconds
 
             # Log the event
             event = AutoHealEvent(
                 timestamp=datetime.now(UTC),
-                container_name=f"{container_name} ({stable_id})",
+                container_name=f"{container_name} ({recovery_id})",
                 container_id=container_id,
                 event_type="auto_unquarantine",
                 restart_count=0,
@@ -506,9 +523,9 @@ class MonitoringEngine:
             await notification_manager.send_event_notification(event)
 
             logger.info(
-                "Container %s (stable_id: %s) automatically removed from quarantine - container auto-healed",
+                "Container %s (recovery_id: %s) automatically removed from quarantine - container auto-healed",
                 container_name,
-                stable_id,
+                recovery_id,
             )
 
         except Exception as e:
@@ -526,8 +543,9 @@ class MonitoringEngine:
         container_id = info.get("full_id")
         container_name = info.get("name")
 
-        # Get stable identifier (handles auto-generated names, compose services, explicit IDs)
-        stable_id = self.get_stable_identifier(info)
+        # Get recovery identifier: the stable identifier (handles auto-generated names,
+        # compose services, explicit IDs), made per replica for scaled Compose services
+        recovery_id = self.get_recovery_identifier(info)
         labels = info.get("labels", {})
 
         # Use STABLE IDENTIFIER as primary (persists across container recreations)
@@ -536,34 +554,34 @@ class MonitoringEngine:
         # 2. Auto-generated names (uses compose service name)
         # 3. Name conflicts (uses compose project + service)
 
-        logger.debug("Using stable_id '%s' for container %s", stable_id, container_name)
+        logger.debug("Using recovery_id '%s' for container %s", recovery_id, container_name)
 
-        # Check cooldown (using stable_id)
-        last_restart = self._last_restart_times.get(stable_id)
+        # Check cooldown (using recovery_id)
+        last_restart = self._last_restart_times.get(recovery_id)
         if last_restart:
             elapsed = (datetime.now(UTC) - last_restart).total_seconds()
             if elapsed < config.restart.cooldown_seconds:
                 logger.debug(
-                    "Container %s (stable_id: %s) in cooldown period (%.1fs)",
+                    "Container %s (recovery_id: %s) in cooldown period (%.1fs)",
                     container_name,
-                    stable_id,
+                    recovery_id,
                     elapsed,
                 )
                 return
 
-        # Check restart threshold (using stable_id for persistence)
+        # Check restart threshold (using recovery_id for persistence)
         restart_count = config_manager.get_restart_count(
-            stable_id,
+            recovery_id,
             config.restart.max_restarts_window_seconds
         )
 
         if restart_count >= config.restart.max_restarts:
-            # Quarantine container (by stable_id)
-            config_manager.quarantine_container(stable_id)
+            # Quarantine container (by recovery_id)
+            config_manager.quarantine_container(recovery_id)
 
             event = AutoHealEvent(
                 timestamp=datetime.now(UTC),
-                container_name=f"{container_name} ({stable_id})",
+                container_name=f"{container_name} ({recovery_id})",
                 container_id=container_id,  # Store current ID for reference
                 event_type="quarantine",
                 restart_count=restart_count,
@@ -577,9 +595,9 @@ class MonitoringEngine:
             await notification_manager.send_event_notification(event)
 
             logger.warning(
-                "Container %s (stable_id: %s) quarantined after %s restarts",
+                "Container %s (recovery_id: %s) quarantined after %s restarts",
                 container_name,
-                stable_id,
+                recovery_id,
                 restart_count,
             )
 
@@ -589,35 +607,40 @@ class MonitoringEngine:
 
             return
 
-        # Apply backoff if enabled (using stable_id)
+        # Apply backoff if enabled (using recovery_id)
         if config.restart.backoff.enabled:
-            backoff_delay = self._backoff_delays.get(stable_id, config.restart.backoff.initial_seconds)
+            backoff_delay = self._backoff_delays.get(
+                recovery_id, config.restart.backoff.initial_seconds
+            )
             logger.debug(
-                "Applying backoff delay of %ss for %s (stable_id: %s)",
+                "Applying backoff delay of %ss for %s (recovery_id: %s)",
                 backoff_delay,
                 container_name,
-                stable_id,
+                recovery_id,
             )
             await asyncio.sleep(backoff_delay)
 
             # Update backoff for next time
             next_backoff = int(backoff_delay * config.restart.backoff.multiplier)
-            self._backoff_delays[stable_id] = next_backoff
+            self._backoff_delays[recovery_id] = next_backoff
 
         # Perform restart
         logger.info(
-            "Restarting container %s (stable_id: %s, reason: %s)", container_name, stable_id, reason
+            "Restarting container %s (recovery_id: %s, reason: %s)",
+            container_name,
+            recovery_id,
+            reason,
         )
         success = await asyncio.to_thread(self.docker_client.restart_container, container)
 
-        # Record restart (using stable_id - persists across ID changes and handles all edge cases)
-        config_manager.record_restart(stable_id)
-        self._last_restart_times[stable_id] = datetime.now(UTC)
+        # Record restart (using recovery_id - persists across ID changes and handles all edge cases)
+        config_manager.record_restart(recovery_id)
+        self._last_restart_times[recovery_id] = datetime.now(UTC)
 
         # Log event
         event = AutoHealEvent(
             timestamp=datetime.now(UTC),
-            container_name=f"{container_name} ({stable_id})",
+            container_name=f"{container_name} ({recovery_id})",
             container_id=container_id,
             event_type="restart",
             restart_count=restart_count + 1,
@@ -631,13 +654,13 @@ class MonitoringEngine:
 
         if success:
             logger.info(
-                "Successfully restarted container %s (stable_id: %s)", container_name, stable_id
+                "Successfully restarted container %s (recovery_id: %s)", container_name, recovery_id
             )
             # Reset backoff on successful restart
-            self._backoff_delays[stable_id] = config.restart.backoff.initial_seconds
+            self._backoff_delays[recovery_id] = config.restart.backoff.initial_seconds
         else:
             logger.error(
-                "Failed to restart container %s (stable_id: %s)", container_name, stable_id
+                "Failed to restart container %s (recovery_id: %s)", container_name, recovery_id
             )
 
     async def _send_alert(self, event: AutoHealEvent) -> None:

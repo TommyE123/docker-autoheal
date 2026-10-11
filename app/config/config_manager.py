@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from app.config.init_defaults import initialize_defaults
 
@@ -100,6 +100,10 @@ class UptimeKumaMapping(BaseModel):
 
 class NotificationService(BaseModel):
     """Notification service configuration"""
+    # Rejected values can be credentials (passwords, tokens); keep them out of the
+    # ValidationError text that the API logs and returns.
+    model_config = ConfigDict(hide_input_in_errors=True)
+
     name: str = Field(description="Service name (for identification)")
     type: str = Field(description="Service type: webhook, discord, slack, telegram, ntfy, gotify, pushover")
     enabled: bool = Field(default=True, description="Enable this notification service")
@@ -117,6 +121,7 @@ class NotificationService(BaseModel):
     # Ntfy
     topic: str | None = Field(default=None, description="Ntfy topic")
     server_url: str | None = Field(default=None, description="Ntfy server URL (default: https://ntfy.sh)")
+    access_token: str | None = Field(default=None, description="Ntfy access token (takes precedence over username/password)")
 
     # Gotify
     app_token: str | None = Field(default=None, description="Gotify app token")
@@ -128,6 +133,8 @@ class NotificationService(BaseModel):
 
 class NotificationsConfig(BaseModel):
     """Notifications configuration"""
+    model_config = ConfigDict(hide_input_in_errors=True)
+
     enabled: bool = Field(default=False, description="Enable notification system")
     services: list[NotificationService] = Field(default_factory=list, description="List of notification services")
     event_filters: list[str] = Field(

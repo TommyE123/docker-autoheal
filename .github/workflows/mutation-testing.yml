@@ -171,7 +171,13 @@ jobs:
           marker="<!-- mutation-score-comment -->"
           score=$(printf '%.1f' "$SCORE")
           if [ -n "$BASELINE" ]; then
-            change=$(awk -v n="$score" -v o="$BASELINE" 'BEGIN { d = sprintf("%.1f", n - o); v = d + 0; if (v > 0) print "🔺 +" d; else if (v < 0) print "🔻 " d; else print "➖ no change" }')
+            change=$(awk -v n="$score" -v o="$BASELINE" 'BEGIN {
+              d = sprintf("%.1f", n - o)
+              v = d + 0
+              if (v > 0) print "🟢 +" d
+              else if (v < 0) print "🔴 " d
+              else print "➖ no change"
+            }')
             base="$BASELINE%"
           else
             change="n/a"

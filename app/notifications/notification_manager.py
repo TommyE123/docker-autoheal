@@ -438,8 +438,10 @@ class NotificationManager:
             "Tags": "whale,docker"
         }
 
-        # Add authentication if configured
-        if service.username and service.password:
+        # Add authentication if configured (access token takes precedence)
+        if service.access_token:
+            headers["Authorization"] = f"Bearer {service.access_token}"
+        elif service.username and service.password:
             import base64
             credentials = f"{service.username}:{service.password}"
             encoded = base64.b64encode(credentials.encode()).decode()

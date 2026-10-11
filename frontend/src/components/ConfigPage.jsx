@@ -320,7 +320,7 @@ function ConfigPage() {
           variant={alert.variant}
           dismissible
           onClose={clearAlert}
-          className="mb-4 d-flex align-items-center"
+          className="alert-floating mb-4 d-flex align-items-center"
           style={{ fontSize: '1.1rem', fontWeight: '500' }}
         >
           {alert.variant === 'success' && <i className="bi bi-check-circle-fill me-2 fs-4"></i>}

@@ -17,11 +17,16 @@ import { defineConfig, devices } from "@playwright/test";
 const tag = process.env.UI_E2E_TAG;
 const grep = tag ? new RegExp(tag) : undefined;
 
+// Set by run.sh for UI mode only; see the `all` project below.
+const uiMode = process.env.UI_E2E_UI_MODE === "1";
+
 export default defineConfig({
   testDir: "./e2e-ui",
   outputDir: "./test-results-ui",
   globalSetup: "./e2e-ui/globalSetup.js",
   globalTeardown: "./e2e-ui/globalTeardown.js",
+  // UI mode runs one project with every spec, so keep the tests from overlapping.
+  workers: uiMode ? 1 : undefined,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI
@@ -35,26 +40,40 @@ export default defineConfig({
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
   },
-  projects: [
-    {
-      // Tests that only touch their own containers or only read shared state.
-      name: "parallel",
-      testMatch: "parallel/**/*.spec.js",
-      grep,
-      fullyParallel: true,
-      use: { ...devices["Desktop Chrome"] },
-    },
-    {
-      // Tests that change state shared by the whole app (/data: configuration,
-      // notification services, the event log). One worker at a time, and only after
-      // the parallel project, so nothing else is reading that state meanwhile.
-      // `--no-deps` runs it alone.
-      name: "exclusive",
-      testMatch: "exclusive/**/*.spec.js",
-      grep,
-      workers: 1,
-      dependencies: ["parallel"],
-      use: { ...devices["Desktop Chrome"] },
-    },
-  ],
+  projects: uiMode
+    ? [
+        {
+          // Playwright's UI mode ticks only the first project by default and offers no
+          // way to preselect others, so with the two projects below, scopes whose tests
+          // live in `exclusive` (notifications, events, configuration) showed "No
+          // tests". run.sh therefore starts UI mode with this single project, which
+          // holds every spec; `workers: 1` above keeps them from overlapping.
+          name: "all",
+          testMatch: "**/*.spec.js",
+          grep,
+          use: { ...devices["Desktop Chrome"] },
+        },
+      ]
+    : [
+        {
+          // Tests that only touch their own containers or only read shared state.
+          name: "parallel",
+          testMatch: "parallel/**/*.spec.js",
+          grep,
+          fullyParallel: true,
+          use: { ...devices["Desktop Chrome"] },
+        },
+        {
+          // Tests that change state shared by the whole app (/data: configuration,
+          // notification services, the event log). One worker at a time, and only after
+          // the parallel project, so nothing else is reading that state meanwhile.
+          // `--no-deps` runs it alone.
+          name: "exclusive",
+          testMatch: "exclusive/**/*.spec.js",
+          grep,
+          workers: 1,
+          dependencies: ["parallel"],
+          use: { ...devices["Desktop Chrome"] },
+        },
+      ],
 });

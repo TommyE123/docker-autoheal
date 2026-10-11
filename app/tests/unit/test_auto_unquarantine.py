@@ -98,7 +98,7 @@ class TestAutoUnquarantine:
             # Call auto_unquarantine
             await engine._auto_unquarantine_container(
                 quarantine_id="test_stable_id",
-                stable_id="test_stable_id",
+                recovery_id="test_stable_id",
                 container_name="test-container",
                 container_id="test123abc"
             )

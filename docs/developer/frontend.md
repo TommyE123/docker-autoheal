@@ -64,6 +64,7 @@ frontend/
 ├── src/
 │   ├── components/          # Page components (Dashboard, ContainersPage, EventsPage,
 │   │                         #  ConfigPage, NotificationsPage, ...) and config/ subforms
+│   ├── constants/            # Shared constants (EVENT_TYPES)
 │   ├── hooks/                # Shared React hooks (useAlert, useConfigValidation)
 │   ├── services/api.js       # Axios client — one function per backend endpoint
 │   ├── styles/App.css

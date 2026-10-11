@@ -3,7 +3,7 @@
 # After editing, run: mise lock --platform linux-x64,linux-arm64
 [tools]
 # Installer for the pypi: tools below.
-uv = "0.12.23"
+uv = "0.13.0"
 "aqua:rhysd/actionlint" = "1.7.12"
 "aqua:hadolint/hadolint" = "2.15.1"
 "aqua:google/osv-scanner" = "2.6.0"

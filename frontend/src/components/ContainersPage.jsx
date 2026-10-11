@@ -219,7 +219,7 @@ function ContainersPage() {
   return (
     <>
       {alert && (
-        <Alert variant={alert.variant} dismissible onClose={() => setAlert(null)}>
+        <Alert variant={alert.variant} dismissible className="alert-floating" onClose={() => setAlert(null)}>
           {alert.message}
         </Alert>
       )}

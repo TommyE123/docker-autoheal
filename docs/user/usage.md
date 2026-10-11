@@ -26,7 +26,10 @@ The landing page shows:
 A running log of every decision Auto-Heal made: restarts (success or failure),
 quarantines, auto-unquarantines, and containers auto-added to monitoring because they
 started with the `autoheal=true` label. The UI shows the most recent entries (up to
-`ui.max_log_entries`, 50 by default); fetch more via the API:
+`ui.max_log_entries`, 50 by default). Use the **Event Type**, **Container** and
+**Limit** (25, 50 or 100) dropdowns above the list to narrow it; they are applied by
+the API and kept across Refresh and the automatic 5-second refresh. **Clear Filters**
+resets Event Type and Container but keeps Limit. Fetch more via the API:
 
 ```bash
 curl "http://localhost:3131/api/events?limit=200"

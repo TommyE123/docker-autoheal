@@ -136,10 +136,7 @@ test(
   },
 );
 
-// Blocked by https://github.com/TommyE123/docker-autoheal/issues/455: `.alert` is
-// position: fixed with z-index 9999 for every alert, so the empty-state alert paints
-// over the modal. Enable this test, unchanged, when that fix merges.
-test.fixme(
+test(
   "the empty-state alert stays behind the Add Service modal (#455)",
   { tag: ["@notifications", "@regression"] },
   async ({ page }) => {
@@ -168,5 +165,149 @@ test.fixme(
     await name.click();
     await name.fill("E2E Overlap");
     await expect(name).toHaveValue("E2E Overlap");
+  },
+);
+
+// ntfy access-token authentication (#442). The token is optional, masked while typing,
+// and stored with the service; the request header it produces is covered by the unit
+// tests, because the e2e suite has no endpoint the app under test can reach.
+const tokenField = (dialog) => dialog.getByPlaceholder("tk_...");
+
+const storedService = async (request, name) => {
+  const config = await (await request.get("/api/notifications/config")).json();
+  return config.services.find((service) => service.name === name);
+};
+
+test(
+  "adds an ntfy service with an access token, masked in the form and stored with it",
+  { tag: ["@notifications", "@regression"] },
+  async ({ page, request }) => {
+    await page.goto("/notifications");
+    await addServiceButton(page).click();
+
+    const dialog = dialogTitled(page, "Add Notification Service");
+    const save = dialog.getByRole("button", { name: "Add Service" });
+    await dialog.getByPlaceholder("My Discord Server").fill("E2E Ntfy Token");
+    await dialog.getByRole("combobox").selectOption("ntfy");
+
+    // The token is optional: the topic alone is enough to save.
+    await dialog.getByPlaceholder("docker-autoheal").fill("e2e-alerts");
+    await expect(save).toBeEnabled();
+
+    const token = tokenField(dialog);
+    await expect(token).toHaveAttribute("type", "password");
+    await token.fill("tk_e2e_secret");
+    await save.click();
+
+    await expect(
+      alertWith(page, "Notification service added successfully"),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("row", { name: /E2E Ntfy Token/ }),
+    ).toContainText("Ntfy");
+    // The token is not shown anywhere on the page.
+    await expect(page.getByText("tk_e2e_secret")).toHaveCount(0);
+
+    const service = await storedService(request, "E2E Ntfy Token");
+    expect(service).toMatchObject({
+      type: "ntfy",
+      topic: "e2e-alerts",
+      access_token: "tk_e2e_secret",
+    });
+  },
+);
+
+test(
+  "an ntfy service without a token is stored without one",
+  { tag: "@notifications" },
+  async ({ page, request }) => {
+    await page.goto("/notifications");
+    await addServiceButton(page).click();
+
+    const dialog = dialogTitled(page, "Add Notification Service");
+    await dialog.getByPlaceholder("My Discord Server").fill("E2E Ntfy Open");
+    await dialog.getByRole("combobox").selectOption("ntfy");
+    await dialog.getByPlaceholder("docker-autoheal").fill("e2e-open");
+    await dialog.getByRole("button", { name: "Add Service" }).click();
+
+    await expect(
+      alertWith(page, "Notification service added successfully"),
+    ).toBeVisible();
+    const service = await storedService(request, "E2E Ntfy Open");
+    expect(service.access_token ?? null).toBeNull();
+  },
+);
+
+test(
+  "editing an ntfy service keeps its token, and clearing the field removes it",
+  { tag: ["@notifications", "@regression"] },
+  async ({ page, request }) => {
+    const created = await request.post("/api/notifications/services", {
+      data: {
+        name: "E2E Ntfy Edit",
+        type: "ntfy",
+        enabled: true,
+        topic: "e2e-edit",
+        access_token: "tk_e2e_edit",
+      },
+    });
+    expect(created.ok()).toBeTruthy();
+    await page.goto("/notifications");
+
+    const row = page.getByRole("row", { name: /E2E Ntfy Edit/ });
+    await row.getByRole("button", { name: "Edit" }).click();
+    const dialog = dialogTitled(page, "Edit Notification Service");
+    await expect(tokenField(dialog)).toHaveValue("tk_e2e_edit");
+
+    // Saving without touching the token leaves it in place.
+    await dialog.getByPlaceholder("docker-autoheal").fill("e2e-edit-2");
+    await dialog.getByRole("button", { name: "Update Service" }).click();
+    await expect(
+      alertWith(page, "Notification service updated successfully"),
+    ).toBeVisible();
+    expect(await storedService(request, "E2E Ntfy Edit")).toMatchObject({
+      topic: "e2e-edit-2",
+      access_token: "tk_e2e_edit",
+    });
+
+    // Emptying the field removes the token.
+    await row.getByRole("button", { name: "Edit" }).click();
+    await tokenField(dialog).fill("");
+    await dialog.getByRole("button", { name: "Update Service" }).click();
+    await expect(
+      alertWith(page, "Notification service updated successfully").last(),
+    ).toBeVisible();
+    const service = await storedService(request, "E2E Ntfy Edit");
+    expect(service.access_token ?? null).toBeNull();
+  },
+);
+
+test(
+  "a failing ntfy delivery does not reveal the token",
+  { tag: ["@notifications", "@errors"] },
+  async ({ page, request }) => {
+    // Nothing listens on port 9 inside the app container, so the delivery fails.
+    const created = await request.post("/api/notifications/services", {
+      data: {
+        name: "E2E Ntfy Unreachable",
+        type: "ntfy",
+        enabled: true,
+        topic: "e2e-unreachable",
+        server_url: "http://127.0.0.1:9",
+        access_token: "tk_e2e_leak_check",
+      },
+    });
+    expect(created.ok()).toBeTruthy();
+
+    const response = await request.post(
+      "/api/notifications/test/E2E Ntfy Unreachable",
+    );
+    expect(await response.text()).not.toContain("tk_e2e_leak_check");
+
+    await page.goto("/notifications");
+    const row = page.getByRole("row", { name: /E2E Ntfy Unreachable/ });
+    await row.getByRole("button", { name: "Test" }).click();
+    await expect(page.getByRole("alert").first()).toBeVisible();
+    await expect(page.getByText("tk_e2e_leak_check")).toHaveCount(0);
   },
 );
