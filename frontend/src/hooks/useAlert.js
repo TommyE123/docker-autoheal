@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from "react";
 
 /**
  * Custom hook for managing alerts with auto-dismiss functionality
@@ -26,7 +26,7 @@ export function useAlert() {
     setAlert({ variant, message });
 
     // Success alerts stay longer (7 seconds), errors stay for 5 seconds
-    const timeout = variant === 'success' ? 7000 : 5000;
+    const timeout = variant === "success" ? 7000 : 5000;
     alertTimeoutRef.current = setTimeout(() => {
       setAlert(null);
       alertTimeoutRef.current = null;
@@ -43,4 +43,3 @@ export function useAlert() {
 
   return { alert, showAlert, clearAlert };
 }
-

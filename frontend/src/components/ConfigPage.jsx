@@ -1,26 +1,26 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Row, Col, Alert, Spinner } from 'react-bootstrap';
+import { useState, useEffect, useCallback } from "react";
+import { Row, Col, Alert, Spinner } from "react-bootstrap";
 import {
   getConfig,
   updateMonitorConfig,
   updateRestartConfig,
   updateObservabilityConfig,
   exportConfig,
-  importConfig
-} from '../services/api';
-import api from '../services/api';
-import { useAlert } from '../hooks/useAlert';
-import { useConfigValidation } from '../hooks/useConfigValidation';
+  importConfig,
+} from "../services/api";
+import api from "../services/api";
+import { useAlert } from "../hooks/useAlert";
+import { useConfigValidation } from "../hooks/useConfigValidation";
 
 // Component imports
-import MonitorSettings from './config/MonitorSettings';
-import RestartPolicySettings from './config/RestartPolicySettings';
-import ObservabilitySettings from './config/ObservabilitySettings';
-import ConfigImportExport from './config/ConfigImportExport';
-import UptimeKumaIntegration from './config/UptimeKumaIntegration';
-import ValidationModal from './config/ValidationModal';
-import DisableUptimeKumaModal from './config/DisableUptimeKumaModal';
-import DeleteMappingModal from './config/DeleteMappingModal';
+import MonitorSettings from "./config/MonitorSettings";
+import RestartPolicySettings from "./config/RestartPolicySettings";
+import ObservabilitySettings from "./config/ObservabilitySettings";
+import ConfigImportExport from "./config/ConfigImportExport";
+import UptimeKumaIntegration from "./config/UptimeKumaIntegration";
+import ValidationModal from "./config/ValidationModal";
+import DisableUptimeKumaModal from "./config/DisableUptimeKumaModal";
+import DeleteMappingModal from "./config/DeleteMappingModal";
 
 /**
  * ConfigPage Component
@@ -37,16 +37,16 @@ function ConfigPage() {
   const [loading, setLoading] = useState(true);
   const [validationModal, setValidationModal] = useState({
     show: false,
-    title: '',
-    message: '',
+    title: "",
+    message: "",
     errors: [],
-    suggestions: []
+    suggestions: [],
   });
   const [showDisableConfirmModal, setShowDisableConfirmModal] = useState(false);
   const [deleteMappingModal, setDeleteMappingModal] = useState({
     show: false,
     containerId: null,
-    containerName: ''
+    containerName: "",
   });
 
   // Uptime Kuma states
@@ -61,16 +61,16 @@ function ConfigPage() {
   const loadUptimeKumaData = useCallback(async () => {
     try {
       const [monitorsRes, mappingsRes, containersRes] = await Promise.all([
-        api.get('/uptime-kuma/monitors'),
-        api.get('/uptime-kuma/mappings'),
-        api.get('/containers')
+        api.get("/uptime-kuma/monitors"),
+        api.get("/uptime-kuma/mappings"),
+        api.get("/containers"),
       ]);
 
       setMonitors(monitorsRes.data.monitors || []);
       setMappings(mappingsRes.data.mappings || []);
       setContainers(containersRes.data || []);
     } catch (error) {
-      console.error('Failed to load Uptime Kuma data:', error);
+      console.error("Failed to load Uptime Kuma data:", error);
     }
   }, []);
 
@@ -84,7 +84,7 @@ function ConfigPage() {
         loadUptimeKumaData();
       }
     } catch {
-      showAlert('danger', 'Failed to load configuration');
+      showAlert("danger", "Failed to load configuration");
     } finally {
       setLoading(false);
     }
@@ -105,20 +105,21 @@ function ConfigPage() {
     if (!validation.isValid) {
       setValidationModal({
         show: true,
-        title: 'Invalid Monitor Settings Configuration',
-        message: 'The monitoring interval conflicts with your restart policy settings:',
+        title: "Invalid Monitor Settings Configuration",
+        message:
+          "The monitoring interval conflicts with your restart policy settings:",
         errors: validation.errors,
-        suggestions: validation.suggestions
+        suggestions: validation.suggestions,
       });
       return;
     }
 
     try {
       await updateMonitorConfig(config.monitor);
-      showAlert('success', 'Monitor configuration updated');
+      showAlert("success", "Monitor configuration updated");
       fetchConfig();
     } catch {
-      showAlert('danger', 'Failed to update monitor configuration');
+      showAlert("danger", "Failed to update monitor configuration");
     }
   };
 
@@ -132,20 +133,21 @@ function ConfigPage() {
     if (!validation.isValid) {
       setValidationModal({
         show: true,
-        title: 'Invalid Restart Policy Configuration',
-        message: 'The restart policy settings conflict with your monitoring configuration:',
+        title: "Invalid Restart Policy Configuration",
+        message:
+          "The restart policy settings conflict with your monitoring configuration:",
         errors: validation.errors,
-        suggestions: validation.suggestions
+        suggestions: validation.suggestions,
       });
       return;
     }
 
     try {
       await updateRestartConfig(config.restart);
-      showAlert('success', 'Restart policy updated');
+      showAlert("success", "Restart policy updated");
       fetchConfig();
     } catch {
-      showAlert('danger', 'Failed to update restart policy');
+      showAlert("danger", "Failed to update restart policy");
     }
   };
 
@@ -157,10 +159,16 @@ function ConfigPage() {
   const handleObservabilityConfigSubmit = async () => {
     try {
       await updateObservabilityConfig(config.observability);
-      showAlert('success', `Settings Saved Successfully! Log level changed to ${config.observability.log_level}. Changes are now active.`);
+      showAlert(
+        "success",
+        `Settings Saved Successfully! Log level changed to ${config.observability.log_level}. Changes are now active.`,
+      );
       fetchConfig();
     } catch {
-      showAlert('danger', 'Failed to update observability settings. Please try again.');
+      showAlert(
+        "danger",
+        "Failed to update observability settings. Please try again.",
+      );
     }
   };
 
@@ -168,18 +176,20 @@ function ConfigPage() {
   const handleExportConfig = async () => {
     try {
       const response = await exportConfig();
-      const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(response.data, null, 2)], {
+        type: "application/json",
+      });
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = `autoheal-config-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `autoheal-config-${new Date().toISOString().split("T")[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
-      showAlert('success', 'Configuration exported successfully');
+      showAlert("success", "Configuration exported successfully");
     } catch {
-      showAlert('danger', 'Failed to export configuration');
+      showAlert("danger", "Failed to export configuration");
     }
   };
 
@@ -189,11 +199,11 @@ function ConfigPage() {
 
     try {
       await importConfig(file);
-      showAlert('success', 'Configuration imported successfully');
+      showAlert("success", "Configuration imported successfully");
       fetchConfig();
-      e.target.value = '';
+      e.target.value = "";
     } catch {
-      showAlert('danger', 'Failed to import configuration');
+      showAlert("danger", "Failed to import configuration");
     }
   };
 
@@ -204,44 +214,50 @@ function ConfigPage() {
 
   const handleTestUptimeKumaConnection = async () => {
     try {
-      const response = await api.post('/uptime-kuma/test-connection', {
+      const response = await api.post("/uptime-kuma/test-connection", {
         server_url: config.uptime_kuma.server_url,
         api_token: config.uptime_kuma.api_token,
-        username: config.uptime_kuma.username || ''
+        username: config.uptime_kuma.username || "",
       });
 
       if (response.data.success) {
-        showAlert('success', `Connection successful! Found ${response.data.monitor_count} monitors.`);
+        showAlert(
+          "success",
+          `Connection successful! Found ${response.data.monitor_count} monitors.`,
+        );
         return true;
       } else {
-        showAlert('danger', `${response.data.message}`);
+        showAlert("danger", `${response.data.message}`);
         return false;
       }
     } catch (error) {
-      showAlert('danger', `Connection failed: ${error.message}`);
+      showAlert("danger", `Connection failed: ${error.message}`);
       return false;
     }
   };
 
   const handleEnableUptimeKuma = async () => {
     try {
-      const response = await api.post('/uptime-kuma/enable', {
+      const response = await api.post("/uptime-kuma/enable", {
         server_url: config.uptime_kuma.server_url,
         api_token: config.uptime_kuma.api_token,
-        username: config.uptime_kuma.username || '',
-        auto_restart_on_down: config.uptime_kuma.auto_restart_on_down
+        username: config.uptime_kuma.username || "",
+        auto_restart_on_down: config.uptime_kuma.auto_restart_on_down,
       });
 
       if (response.data.success) {
         setMonitors(response.data.monitors);
         setMappings(response.data.auto_mappings);
-        showAlert('success', `Integration enabled! ${response.data.auto_mappings.length} auto-mappings created.`);
+        showAlert(
+          "success",
+          `Integration enabled! ${response.data.auto_mappings.length} auto-mappings created.`,
+        );
         fetchConfig();
       } else {
-        showAlert('danger', `${response.data.message}`);
+        showAlert("danger", `${response.data.message}`);
       }
     } catch (error) {
-      showAlert('danger', `Failed to enable integration: ${error.message}`);
+      showAlert("danger", `Failed to enable integration: ${error.message}`);
     }
   };
 
@@ -253,47 +269,53 @@ function ConfigPage() {
     setShowDisableConfirmModal(false);
 
     try {
-      await api.post('/uptime-kuma/disable');
+      await api.post("/uptime-kuma/disable");
       setMonitors([]);
       setMappings([]);
-      showAlert('success', 'Integration disabled successfully');
+      showAlert("success", "Integration disabled successfully");
       fetchConfig();
     } catch (error) {
-      showAlert('danger', `Failed to disable integration: ${error.message}`);
+      showAlert("danger", `Failed to disable integration: ${error.message}`);
     }
   };
 
   const handleAddMapping = async (mapping) => {
     if (!mapping.container_id || !mapping.monitor_friendly_name) {
-      showAlert('danger', 'Please select both container and monitor');
+      showAlert("danger", "Please select both container and monitor");
       return;
     }
 
     try {
-      await api.post('/uptime-kuma/mappings', mapping);
+      await api.post("/uptime-kuma/mappings", mapping);
       loadUptimeKumaData();
-      showAlert('success', 'Mapping added successfully!');
+      showAlert("success", "Mapping added successfully!");
     } catch (error) {
-      showAlert('danger', `Failed to add mapping: ${error.message}`);
+      showAlert("danger", `Failed to add mapping: ${error.message}`);
     }
   };
 
   const handleDeleteMapping = (containerId) => {
-    const container = containers.find(c => c.id === containerId || c.id.startsWith(containerId));
+    const container = containers.find(
+      (c) => c.id === containerId || c.id.startsWith(containerId),
+    );
     const containerName = container ? container.name : containerId;
     setDeleteMappingModal({ show: true, containerId, containerName });
   };
 
   const confirmDeleteMapping = async () => {
     const { containerId } = deleteMappingModal;
-    setDeleteMappingModal({ show: false, containerId: null, containerName: '' });
+    setDeleteMappingModal({
+      show: false,
+      containerId: null,
+      containerName: "",
+    });
 
     try {
       await api.delete(`/uptime-kuma/mappings/${containerId}`);
       loadUptimeKumaData();
-      showAlert('success', 'Mapping deleted!');
+      showAlert("success", "Mapping deleted!");
     } catch (error) {
-      showAlert('danger', `Failed to delete mapping: ${error.message}`);
+      showAlert("danger", `Failed to delete mapping: ${error.message}`);
     }
   };
 
@@ -321,10 +343,14 @@ function ConfigPage() {
           dismissible
           onClose={clearAlert}
           className="alert-floating mb-4 d-flex align-items-center"
-          style={{ fontSize: '1.1rem', fontWeight: '500' }}
+          style={{ fontSize: "1.1rem", fontWeight: "500" }}
         >
-          {alert.variant === 'success' && <i className="bi bi-check-circle-fill me-2 fs-4"></i>}
-          {alert.variant === 'danger' && <i className="bi bi-exclamation-circle-fill me-2 fs-4"></i>}
+          {alert.variant === "success" && (
+            <i className="bi bi-check-circle-fill me-2 fs-4"></i>
+          )}
+          {alert.variant === "danger" && (
+            <i className="bi bi-exclamation-circle-fill me-2 fs-4"></i>
+          )}
           <span>{alert.message}</span>
         </Alert>
       )}
@@ -391,7 +417,15 @@ function ConfigPage() {
         errors={validationModal.errors}
         suggestions={validationModal.suggestions}
         config={config}
-        onHide={() => setValidationModal({ show: false, title: '', message: '', errors: [], suggestions: [] })}
+        onHide={() =>
+          setValidationModal({
+            show: false,
+            title: "",
+            message: "",
+            errors: [],
+            suggestions: [],
+          })
+        }
       />
 
       <DisableUptimeKumaModal
@@ -403,7 +437,13 @@ function ConfigPage() {
       <DeleteMappingModal
         show={deleteMappingModal.show}
         containerName={deleteMappingModal.containerName}
-        onHide={() => setDeleteMappingModal({ show: false, containerId: null, containerName: '' })}
+        onHide={() =>
+          setDeleteMappingModal({
+            show: false,
+            containerId: null,
+            containerName: "",
+          })
+        }
         onConfirm={confirmDeleteMapping}
       />
     </>
@@ -411,4 +451,3 @@ function ConfigPage() {
 }
 
 export default ConfigPage;
-

@@ -57,7 +57,11 @@ describe("UptimeKumaIntegration", () => {
   });
 
   const baseProps = () => ({
-    config: { enabled: false, server_url: "http://kuma.local", api_token: "tok" },
+    config: {
+      enabled: false,
+      server_url: "http://kuma.local",
+      api_token: "tok",
+    },
     monitors: [],
     containers: [],
     mappings: [],
@@ -78,7 +82,9 @@ describe("UptimeKumaIntegration", () => {
       expect(
         screen.queryByRole("button", { name: /disable integration/i }),
       ).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /test connection/i })).toBeDisabled();
+      expect(
+        screen.getByRole("button", { name: /test connection/i }),
+      ).toBeDisabled();
     });
 
     it("forwards edits in the connection form to onConfigChange", async () => {
@@ -86,19 +92,29 @@ describe("UptimeKumaIntegration", () => {
       const props = baseProps();
       render(<UptimeKumaIntegration {...props} config={{ enabled: false }} />);
 
-      await user.type(screen.getByPlaceholderText("http://localhost:3001"), "h");
+      await user.type(
+        screen.getByPlaceholderText("http://localhost:3001"),
+        "h",
+      );
 
-      expect(props.onConfigChange).toHaveBeenCalledWith({ enabled: false, server_url: "h" });
+      expect(props.onConfigChange).toHaveBeenCalledWith({
+        enabled: false,
+        server_url: "h",
+      });
     });
 
     it("shows a Testing state while the connection test is pending", async () => {
       const user = userEvent.setup();
       let resolveTest;
       const props = baseProps();
-      props.onTestConnection.mockReturnValue(new Promise((r) => (resolveTest = r)));
+      props.onTestConnection.mockReturnValue(
+        new Promise((r) => (resolveTest = r)),
+      );
       render(<UptimeKumaIntegration {...props} />);
 
-      await user.click(screen.getByRole("button", { name: /test connection/i }));
+      await user.click(
+        screen.getByRole("button", { name: /test connection/i }),
+      );
 
       expect(await screen.findByText(/testing\.\.\./i)).toBeInTheDocument();
       expect(props.onTestConnection).toHaveBeenCalledTimes(1);
@@ -115,10 +131,14 @@ describe("UptimeKumaIntegration", () => {
       props.onTestConnection.mockResolvedValue(false);
       render(<UptimeKumaIntegration {...props} />);
 
-      await user.click(screen.getByRole("button", { name: /test connection/i }));
+      await user.click(
+        screen.getByRole("button", { name: /test connection/i }),
+      );
 
       await waitFor(() => expect(props.onTestConnection).toHaveBeenCalled());
-      expect(screen.getByRole("button", { name: /test connection/i })).toBeEnabled();
+      expect(
+        screen.getByRole("button", { name: /test connection/i }),
+      ).toBeEnabled();
       expect(
         screen.queryByRole("button", { name: /enable integration/i }),
       ).not.toBeInTheDocument();
@@ -130,7 +150,9 @@ describe("UptimeKumaIntegration", () => {
       props.onTestConnection.mockResolvedValue(true);
       render(<UptimeKumaIntegration {...props} />);
 
-      await user.click(screen.getByRole("button", { name: /test connection/i }));
+      await user.click(
+        screen.getByRole("button", { name: /test connection/i }),
+      );
 
       expect(
         await screen.findByRole("button", { name: /enable integration/i }),
@@ -145,11 +167,17 @@ describe("UptimeKumaIntegration", () => {
       let resolveEnable;
       const props = baseProps();
       props.onTestConnection.mockResolvedValue(true);
-      props.onEnableIntegration.mockReturnValue(new Promise((r) => (resolveEnable = r)));
+      props.onEnableIntegration.mockReturnValue(
+        new Promise((r) => (resolveEnable = r)),
+      );
       render(<UptimeKumaIntegration {...props} />);
 
-      await user.click(screen.getByRole("button", { name: /test connection/i }));
-      await user.click(await screen.findByRole("button", { name: /enable integration/i }));
+      await user.click(
+        screen.getByRole("button", { name: /test connection/i }),
+      );
+      await user.click(
+        await screen.findByRole("button", { name: /enable integration/i }),
+      );
 
       expect(await screen.findByText(/enabling\.\.\./i)).toBeInTheDocument();
       expect(props.onEnableIntegration).toHaveBeenCalledTimes(1);
@@ -171,7 +199,11 @@ describe("UptimeKumaIntegration", () => {
       ],
       containers: [{ id: "abc123", name: "web-app", status: "running" }],
       mappings: [
-        { container_id: "abc123", monitor_friendly_name: "web-monitor", auto_mapped: false },
+        {
+          container_id: "abc123",
+          monitor_friendly_name: "web-monitor",
+          auto_mapped: false,
+        },
       ],
     });
 
@@ -188,18 +220,25 @@ describe("UptimeKumaIntegration", () => {
       expect(
         screen.queryByRole("button", { name: /test connection/i }),
       ).not.toBeInTheDocument();
-      expect(screen.getByText("Container-Monitor Mappings")).toBeInTheDocument();
+      expect(
+        screen.getByText("Container-Monitor Mappings"),
+      ).toBeInTheDocument();
     });
 
     it("shows the monitors list only when monitors exist", () => {
       const { unmount } = render(<UptimeKumaIntegration {...enabledProps()} />);
-      expect(screen.getByText("Available Uptime-Kuma Monitors")).toBeInTheDocument();
+      expect(
+        screen.getByText("Available Uptime-Kuma Monitors"),
+      ).toBeInTheDocument();
       unmount();
 
       render(<UptimeKumaIntegration {...enabledProps()} monitors={[]} />);
-      expect(screen.queryByText("Available Uptime-Kuma Monitors")).not.toBeInTheDocument();
-      expect(screen.getByText("Container-Monitor Mappings")).toBeInTheDocument();
+      expect(
+        screen.queryByText("Available Uptime-Kuma Monitors"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByText("Container-Monitor Mappings"),
+      ).toBeInTheDocument();
     });
   });
 });
-
