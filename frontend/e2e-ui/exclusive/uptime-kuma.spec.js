@@ -68,17 +68,22 @@ const mappingsTable = (page) =>
     has: page.getByRole("columnheader", { name: "Type" }),
   });
 
-test.afterEach(async ({ request }) => {
-  // Stops the app's Uptime-Kuma monitor; restoring the configuration alone would not.
-  await request.post("/api/uptime-kuma/disable");
-});
-
 test(
   "re-enabling Uptime-Kuma keeps a manual mapping and refreshes the auto mappings",
   { tag: ["@configuration", "@regression"] },
   async ({ page, request, baseURL, createContainer }) => {
     // Two full enable cycles through the UI, with modals and alerts in between.
     test.setTimeout(90000);
+    const current = await request.get("/api/config");
+    expect(current.ok()).toBeTruthy();
+    const config = await current.json();
+    // The test disables the integration at the end, which stops the app's monitor and
+    // is not undone by restoring the configuration, so leave an instance that already
+    // uses Uptime-Kuma alone.
+    test.skip(
+      config.uptime_kuma.enabled,
+      "Uptime-Kuma is already enabled on this instance",
+    );
     const manualContainer = await createContainer({ suffix: "kuma-manual" });
     const autoContainer = await createContainer({ suffix: "kuma-auto" });
     // Auto-mapping matches a container to the monitor with its name. The manual
@@ -95,10 +100,6 @@ test(
 
     try {
       // Start from a disabled integration with no mappings.
-      const current = await request.get("/api/config");
-      expect(current.ok()).toBeTruthy();
-      const config = await current.json();
-      config.uptime_kuma = { ...config.uptime_kuma, enabled: false };
       config.uptime_kuma_mappings = [];
       expect((await request.put("/api/config", { data: config })).ok()).toBe(
         true,
@@ -186,6 +187,7 @@ test(
         },
       ]);
     } finally {
+      await request.post("/api/uptime-kuma/disable");
       await removeNamed([fakeName]);
     }
   },
