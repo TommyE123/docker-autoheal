@@ -138,6 +138,11 @@ a container to more than one monitor, it is left unmapped and the reason is logg
 it manually instead. The same applies to a scaled Compose service, whose replicas all share
 one stable identifier: if they match different monitors, none of them is mapped.
 
+A mapping identifies its monitor by name only, so give every mapped monitor a unique name
+in Uptime Kuma. If several monitors share the mapped name, Docker Auto-Heal cannot tell
+which one belongs to the container: until the name is unique again it ignores their status,
+so Uptime Kuma cannot trigger a restart for that container, and logs a warning.
+
 Review the auto-mappings after enabling the integration. A short, generic Compose service
 name such as `web` or `db` can coincidentally match a monitor for an entirely unrelated
 target, and `auto_restart_on_down` is on by default — so an unrelated monitor going DOWN
