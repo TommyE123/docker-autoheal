@@ -1,4 +1,4 @@
-import { Card, Form, Button } from 'react-bootstrap';
+import { Card, Form, Button } from "react-bootstrap";
 
 /**
  * MonitorSettings Component
@@ -13,7 +13,7 @@ function MonitorSettings({ config, onConfigChange, onSubmit }) {
   const handleChange = (field, value) => {
     onConfigChange({
       ...config,
-      [field]: value
+      [field]: value,
     });
   };
 
@@ -38,7 +38,9 @@ function MonitorSettings({ config, onConfigChange, onSubmit }) {
               type="number"
               min="1"
               value={config.interval_seconds}
-              onChange={(e) => handleChange('interval_seconds', parseInt(e.target.value))}
+              onChange={(e) =>
+                handleChange("interval_seconds", parseInt(e.target.value))
+              }
             />
             <Form.Text>How often to check containers</Form.Text>
           </Form.Group>
@@ -48,7 +50,7 @@ function MonitorSettings({ config, onConfigChange, onSubmit }) {
             <Form.Control
               type="text"
               value={config.label_key}
-              onChange={(e) => handleChange('label_key', e.target.value)}
+              onChange={(e) => handleChange("label_key", e.target.value)}
             />
           </Form.Group>
 
@@ -57,7 +59,7 @@ function MonitorSettings({ config, onConfigChange, onSubmit }) {
             <Form.Control
               type="text"
               value={config.label_value}
-              onChange={(e) => handleChange('label_value', e.target.value)}
+              onChange={(e) => handleChange("label_value", e.target.value)}
             />
           </Form.Group>
 
@@ -66,7 +68,7 @@ function MonitorSettings({ config, onConfigChange, onSubmit }) {
               type="checkbox"
               label="Monitor All Containers (ignore label filter)"
               checked={config.include_all}
-              onChange={(e) => handleChange('include_all', e.target.checked)}
+              onChange={(e) => handleChange("include_all", e.target.checked)}
             />
           </Form.Group>
 
@@ -81,4 +83,3 @@ function MonitorSettings({ config, onConfigChange, onSubmit }) {
 }
 
 export default MonitorSettings;
-

@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { Card, Button, Badge } from 'react-bootstrap';
-import UptimeKumaConnectionForm from './UptimeKumaConnectionForm';
-import UptimeKumaMonitorsList from './UptimeKumaMonitorsList';
-import UptimeKumaMappings from './UptimeKumaMappings';
+import { useState } from "react";
+import { Card, Button, Badge } from "react-bootstrap";
+import UptimeKumaConnectionForm from "./UptimeKumaConnectionForm";
+import UptimeKumaMonitorsList from "./UptimeKumaMonitorsList";
+import UptimeKumaMappings from "./UptimeKumaMappings";
 
 /**
  * UptimeKumaIntegration Component
@@ -30,7 +30,7 @@ function UptimeKumaIntegration({
   onEnableIntegration,
   onAddMapping,
   onDeleteMapping,
-  onShowDisableModal
+  onShowDisableModal,
 }) {
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionTested, setConnectionTested] = useState(false);
@@ -58,17 +58,17 @@ function UptimeKumaIntegration({
           <i className="bi bi-link-45deg me-2"></i>
           Uptime-Kuma Integration
           {isEnabled ? (
-            <Badge bg="success" className="ms-2">Active</Badge>
+            <Badge bg="success" className="ms-2">
+              Active
+            </Badge>
           ) : (
-            <Badge bg="secondary" className="ms-2">Disabled</Badge>
+            <Badge bg="secondary" className="ms-2">
+              Disabled
+            </Badge>
           )}
         </h5>
         {isEnabled && (
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={onShowDisableModal}
-          >
+          <Button variant="danger" size="sm" onClick={onShowDisableModal}>
             <i className="bi bi-toggle-off me-1"></i>
             Disable Integration
           </Button>
@@ -89,8 +89,13 @@ function UptimeKumaIntegration({
           <>
             <div className="mb-3 p-3 bg-light rounded">
               <div className="mt-2 small text-muted">
-                <div><strong>Server:</strong> {config.server_url}</div>
-                <div><strong>Monitors:</strong> {monitors.length} | <strong>Mappings:</strong> {mappings.length}</div>
+                <div>
+                  <strong>Server:</strong> {config.server_url}
+                </div>
+                <div>
+                  <strong>Monitors:</strong> {monitors.length} |{" "}
+                  <strong>Mappings:</strong> {mappings.length}
+                </div>
               </div>
             </div>
 
@@ -117,4 +122,3 @@ function UptimeKumaIntegration({
 }
 
 export default UptimeKumaIntegration;
-

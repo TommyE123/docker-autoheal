@@ -1,22 +1,30 @@
-import { useState, useEffect, useRef } from 'react';
-import { Card, Button, Spinner, Badge, Alert, Modal, Form } from 'react-bootstrap';
-import { getEvents, clearEvents, getContainers } from '../services/api';
-import { EVENT_TYPES } from '../constants/eventTypes';
-import { format } from 'date-fns';
+import { useState, useEffect, useRef } from "react";
+import {
+  Card,
+  Button,
+  Spinner,
+  Badge,
+  Alert,
+  Modal,
+  Form,
+} from "react-bootstrap";
+import { getEvents, clearEvents, getContainers } from "../services/api";
+import { EVENT_TYPES } from "../constants/eventTypes";
+import { format } from "date-fns";
 
 function EventsPage() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [alert, setAlert] = useState(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [eventType, setEventType] = useState('');
-  const [container, setContainer] = useState('');
+  const [eventType, setEventType] = useState("");
+  const [container, setContainer] = useState("");
   const [limit, setLimit] = useState(50);
   const [containers, setContainers] = useState([]);
 
   const latestRequestId = useRef(0);
 
-  const filtersActive = eventType !== '' || container !== '';
+  const filtersActive = eventType !== "" || container !== "";
 
   const fetchEvents = async () => {
     // Only the most recently issued request may update state, so a slow
@@ -28,7 +36,7 @@ function EventsPage() {
         setEvents(response.data);
       }
     } catch (error) {
-      console.error('Failed to load events:', error);
+      console.error("Failed to load events:", error);
     } finally {
       if (requestId === latestRequestId.current) {
         setLoading(false);
@@ -50,11 +58,17 @@ function EventsPage() {
     try {
       await clearEvents();
       setEvents([]);
-      setAlert({ type: 'success', message: 'All events cleared successfully!' });
+      setAlert({
+        type: "success",
+        message: "All events cleared successfully!",
+      });
       setTimeout(() => setAlert(null), 3000);
     } catch (error) {
-      console.error('Failed to clear events:', error);
-      setAlert({ type: 'danger', message: 'Failed to clear events. Please try again.' });
+      console.error("Failed to clear events:", error);
+      setAlert({
+        type: "danger",
+        message: "Failed to clear events. Please try again.",
+      });
       setTimeout(() => setAlert(null), 5000);
     }
   };
@@ -65,15 +79,15 @@ function EventsPage() {
         const response = await getContainers(true);
         setContainers(response.data);
       } catch (error) {
-        console.error('Failed to load containers:', error);
+        console.error("Failed to load containers:", error);
       }
     };
     loadContainers();
   }, []);
 
   const handleClearFilters = () => {
-    setEventType('');
-    setContainer('');
+    setEventType("");
+    setContainer("");
   };
 
   useEffect(() => {
@@ -89,31 +103,31 @@ function EventsPage() {
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventType, container, limit]);
 
   const getEventVariant = (status) => {
     const variants = {
-      success: 'success',
-      failure: 'danger',
-      quarantined: 'warning'
+      success: "success",
+      failure: "danger",
+      quarantined: "warning",
     };
-    return variants[status] || 'secondary';
+    return variants[status] || "secondary";
   };
 
   const getEventIcon = (eventType) => {
     const icons = {
-      restart: 'bi-arrow-clockwise',
-      quarantine: 'bi-lock',
-      health_check_failed: 'bi-exclamation-triangle'
+      restart: "bi-arrow-clockwise",
+      quarantine: "bi-lock",
+      health_check_failed: "bi-exclamation-triangle",
     };
-    return icons[eventType] || 'bi-info-circle';
+    return icons[eventType] || "bi-info-circle";
   };
 
   if (loading) {
@@ -136,31 +150,35 @@ function EventsPage() {
           <Form.Select
             size="sm"
             aria-label="Event Type"
-            style={{ width: 'auto' }}
+            style={{ width: "auto" }}
             value={eventType}
             onChange={(e) => setEventType(e.target.value)}
           >
             <option value="">All event types</option>
             {EVENT_TYPES.map((type) => (
-              <option key={type.value} value={type.value}>{type.label}</option>
+              <option key={type.value} value={type.value}>
+                {type.label}
+              </option>
             ))}
           </Form.Select>
           <Form.Select
             size="sm"
             aria-label="Container"
-            style={{ width: 'auto' }}
+            style={{ width: "auto" }}
             value={container}
             onChange={(e) => setContainer(e.target.value)}
           >
             <option value="">All containers</option>
             {containers.map((c) => (
-              <option key={c.id} value={c.name}>{c.name}</option>
+              <option key={c.id} value={c.name}>
+                {c.name}
+              </option>
             ))}
           </Form.Select>
           <Form.Select
             size="sm"
             aria-label="Limit"
-            style={{ width: 'auto' }}
+            style={{ width: "auto" }}
             value={limit}
             onChange={(e) => setLimit(Number(e.target.value))}
           >
@@ -173,7 +191,11 @@ function EventsPage() {
             Refresh
           </Button>
           {filtersActive && (
-            <Button variant="outline-secondary" size="sm" onClick={handleClearFilters}>
+            <Button
+              variant="outline-secondary"
+              size="sm"
+              onClick={handleClearFilters}
+            >
               <i className="bi bi-funnel me-1"></i>
               Clear Filters
             </Button>
@@ -190,9 +212,14 @@ function EventsPage() {
         </div>
       </Card.Header>
 
-      <Card.Body style={{ maxHeight: '600px', overflowY: 'auto' }}>
+      <Card.Body style={{ maxHeight: "600px", overflowY: "auto" }}>
         {alert && (
-          <Alert variant={alert.type} dismissible onClose={() => setAlert(null)} className="alert-floating mb-3">
+          <Alert
+            variant={alert.type}
+            dismissible
+            onClose={() => setAlert(null)}
+            className="alert-floating mb-3"
+          >
             {alert.message}
           </Alert>
         )}
@@ -210,18 +237,26 @@ function EventsPage() {
                 <div className="d-flex justify-content-between align-items-start mb-2">
                   <div>
                     <h6 className="mb-1">
-                      <i className={`bi ${getEventIcon(event.event_type)} me-2`}></i>
+                      <i
+                        className={`bi ${getEventIcon(event.event_type)} me-2`}
+                      ></i>
                       {event.container_name}
                     </h6>
                     <small className="text-muted">
-                      {format(new Date(event.timestamp), 'PPpp')}
+                      {format(new Date(event.timestamp), "PPpp")}
                     </small>
                   </div>
                   <div className="text-end">
-                    <Badge bg="secondary" className="me-1">{event.event_type}</Badge>
-                    <Badge bg={getEventVariant(event.status)}>{event.status}</Badge>
+                    <Badge bg="secondary" className="me-1">
+                      {event.event_type}
+                    </Badge>
+                    <Badge bg={getEventVariant(event.status)}>
+                      {event.status}
+                    </Badge>
                     <div className="mt-1">
-                      <Badge bg="primary">Restarts: {event.restart_count}</Badge>
+                      <Badge bg="primary">
+                        Restarts: {event.restart_count}
+                      </Badge>
                     </div>
                   </div>
                 </div>
@@ -229,7 +264,8 @@ function EventsPage() {
                   <strong>Message:</strong> {event.message}
                 </div>
                 <div className="mt-1 small text-muted">
-                  <strong>Container ID:</strong> <code>{event.container_id}</code>
+                  <strong>Container ID:</strong>{" "}
+                  <code>{event.container_id}</code>
                 </div>
               </div>
             ))}
@@ -247,11 +283,13 @@ function EventsPage() {
         </Modal.Header>
         <Modal.Body>
           <p className="mb-0">
-            Are you sure you want to clear all events? This action cannot be undone.
+            Are you sure you want to clear all events? This action cannot be
+            undone.
           </p>
           <p className="text-muted small mt-2 mb-0">
             <i className="bi bi-info-circle me-1"></i>
-            {events.length} event{events.length !== 1 ? 's' : ''} will be permanently deleted.
+            {events.length} event{events.length !== 1 ? "s" : ""} will be
+            permanently deleted.
           </p>
         </Modal.Body>
         <Modal.Footer>
@@ -270,4 +308,3 @@ function EventsPage() {
 }
 
 export default EventsPage;
-

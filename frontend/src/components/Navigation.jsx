@@ -1,5 +1,5 @@
-import { Navbar, Nav, Container, Badge } from 'react-bootstrap';
-import { Link, useLocation } from 'react-router-dom';
+import { Navbar, Nav, Container, Badge } from "react-bootstrap";
+import { Link, useLocation } from "react-router-dom";
 
 function Navigation({ systemStatus }) {
   const location = useLocation();
@@ -21,7 +21,7 @@ function Navigation({ systemStatus }) {
             <Nav.Link
               as={Link}
               to="/containers"
-              className={isActive('/containers') ? 'active' : ''}
+              className={isActive("/containers") ? "active" : ""}
             >
               <i className="bi bi-box me-1"></i>
               Containers
@@ -30,7 +30,7 @@ function Navigation({ systemStatus }) {
             <Nav.Link
               as={Link}
               to="/events"
-              className={isActive('/events') ? 'active' : ''}
+              className={isActive("/events") ? "active" : ""}
             >
               <i className="bi bi-clock-history me-1"></i>
               Events
@@ -39,7 +39,7 @@ function Navigation({ systemStatus }) {
             <Nav.Link
               as={Link}
               to="/notifications"
-              className={isActive('/notifications') ? 'active' : ''}
+              className={isActive("/notifications") ? "active" : ""}
             >
               <i className="bi bi-bell me-1"></i>
               Notifications
@@ -48,7 +48,7 @@ function Navigation({ systemStatus }) {
             <Nav.Link
               as={Link}
               to="/config"
-              className={isActive('/config') ? 'active' : ''}
+              className={isActive("/config") ? "active" : ""}
             >
               <i className="bi bi-gear me-1"></i>
               Configuration
@@ -64,14 +64,22 @@ function Navigation({ systemStatus }) {
             {systemStatus && (
               <Nav.Item className="d-flex align-items-center text-light">
                 <Badge
-                  bg={systemStatus.monitoring_active && systemStatus.docker_connected ? 'success' : 'danger'}
+                  bg={
+                    systemStatus.monitoring_active &&
+                    systemStatus.docker_connected
+                      ? "success"
+                      : "danger"
+                  }
                   className="me-2"
                 >
-                  <i className={`bi ${systemStatus.monitoring_active ? 'bi-check-circle' : 'bi-x-circle'} me-1`}></i>
-                  {systemStatus.monitoring_active ? 'Active' : 'Inactive'}
+                  <i
+                    className={`bi ${systemStatus.monitoring_active ? "bi-check-circle" : "bi-x-circle"} me-1`}
+                  ></i>
+                  {systemStatus.monitoring_active ? "Active" : "Inactive"}
                 </Badge>
                 <span className="small">
-                  {systemStatus.monitored_containers}/{systemStatus.total_containers} monitored
+                  {systemStatus.monitored_containers}/
+                  {systemStatus.total_containers} monitored
                 </span>
               </Nav.Item>
             )}
@@ -83,4 +91,3 @@ function Navigation({ systemStatus }) {
 }
 
 export default Navigation;
-

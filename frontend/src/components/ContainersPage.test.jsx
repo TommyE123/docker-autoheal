@@ -89,7 +89,9 @@ describe("ContainersPage", () => {
 
       render(<ContainersPage />);
 
-      expect(await screen.findByText(/failed to load containers/i)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/failed to load containers/i),
+      ).toBeInTheDocument();
     });
 
     it("refetches containers when Refresh is clicked", async () => {
@@ -155,13 +157,18 @@ describe("ContainersPage", () => {
       ["paused", "warning"],
       ["restarting", "info"],
       ["created", "secondary"],
-    ])("renders a %s status badge with the %s variant", async (status, variant) => {
-      getContainers.mockResolvedValue({ data: [{ ...containers[0], status }] });
+    ])(
+      "renders a %s status badge with the %s variant",
+      async (status, variant) => {
+        getContainers.mockResolvedValue({
+          data: [{ ...containers[0], status }],
+        });
 
-      render(<ContainersPage />);
+        render(<ContainersPage />);
 
-      expect(await screen.findByText(status)).toHaveClass(`bg-${variant}`);
-    });
+        expect(await screen.findByText(status)).toHaveClass(`bg-${variant}`);
+      },
+    );
 
     it.each([
       ["healthy", "success"],
@@ -195,7 +202,13 @@ describe("ContainersPage", () => {
       [99, "Unknown"],
     ])("maps Uptime Kuma status %s to %s", async (code, text) => {
       getContainers.mockResolvedValue({
-        data: [{ ...containers[0], uptime_kuma_status: code, uptime_kuma_monitor_name: "mon" }],
+        data: [
+          {
+            ...containers[0],
+            uptime_kuma_status: code,
+            uptime_kuma_monitor_name: "mon",
+          },
+        ],
       });
 
       render(<ContainersPage />);
@@ -213,19 +226,33 @@ describe("ContainersPage", () => {
 
     it("shows Unknown when a monitor is mapped but its status is unavailable", async () => {
       getContainers.mockResolvedValue({
-        data: [{ ...containers[0], uptime_kuma_status: null, uptime_kuma_monitor_name: "mon" }],
+        data: [
+          {
+            ...containers[0],
+            uptime_kuma_status: null,
+            uptime_kuma_monitor_name: "mon",
+          },
+        ],
       });
 
       render(<ContainersPage />);
 
-      expect(await screen.findByText("Unknown")).toHaveAttribute("title", "mon");
+      expect(await screen.findByText("Unknown")).toHaveAttribute(
+        "title",
+        "mon",
+      );
     });
 
     it("shows the Quarantined badge only for quarantined containers", async () => {
       getContainers.mockResolvedValue({
         data: [
           containers[0],
-          { ...containers[0], id: "q1", name: "quarantined-app", quarantined: true },
+          {
+            ...containers[0],
+            id: "q1",
+            name: "quarantined-app",
+            quarantined: true,
+          },
         ],
       });
 
@@ -237,10 +264,7 @@ describe("ContainersPage", () => {
   });
 
   describe("selection and auto-heal", () => {
-    const two = [
-      containers[0],
-      { ...containers[0], id: "def456", name: "db" },
-    ];
+    const two = [containers[0], { ...containers[0], id: "def456", name: "db" }];
 
     it("disables the auto-heal buttons until a container is selected", async () => {
       const user = userEvent.setup();
@@ -250,7 +274,9 @@ describe("ContainersPage", () => {
       await screen.findByText("web-app");
 
       const enable = screen.getByRole("button", { name: /enable auto-heal/i });
-      const disable = screen.getByRole("button", { name: /disable auto-heal/i });
+      const disable = screen.getByRole("button", {
+        name: /disable auto-heal/i,
+      });
       expect(enable).toBeDisabled();
       expect(disable).toBeDisabled();
 
@@ -288,12 +314,19 @@ describe("ContainersPage", () => {
       await screen.findByText("web-app");
 
       await user.click(screen.getAllByRole("checkbox")[0]);
-      await user.click(screen.getByRole("button", { name: /enable auto-heal/i }));
+      await user.click(
+        screen.getByRole("button", { name: /enable auto-heal/i }),
+      );
 
       await waitFor(() =>
-        expect(updateContainerSelection).toHaveBeenCalledWith(["abc123", "def456"], true),
+        expect(updateContainerSelection).toHaveBeenCalledWith(
+          ["abc123", "def456"],
+          true,
+        ),
       );
-      expect(await screen.findByText(/enabled auto-heal for 2 container/i)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/enabled auto-heal for 2 container/i),
+      ).toBeInTheDocument();
       expect(screen.getAllByRole("checkbox")[0]).not.toBeChecked();
     });
 
@@ -306,31 +339,41 @@ describe("ContainersPage", () => {
       await screen.findByText("web-app");
 
       await user.click(screen.getAllByRole("checkbox")[1]);
-      await user.click(screen.getByRole("button", { name: /disable auto-heal/i }));
+      await user.click(
+        screen.getByRole("button", { name: /disable auto-heal/i }),
+      );
 
       await waitFor(() =>
-        expect(updateContainerSelection).toHaveBeenCalledWith(["abc123"], false),
+        expect(updateContainerSelection).toHaveBeenCalledWith(
+          ["abc123"],
+          false,
+        ),
       );
-      expect(await screen.findByText(/disabled auto-heal for 1 container/i)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/disabled auto-heal for 1 container/i),
+      ).toBeInTheDocument();
     });
 
     it.each([
       ["enable", /enable auto-heal/i, /failed to enable auto-heal/i],
       ["disable", /disable auto-heal/i, /failed to disable auto-heal/i],
-    ])("shows an error and keeps the selection when %s fails", async (_, button, message) => {
-      const user = userEvent.setup();
-      getContainers.mockResolvedValue({ data: two });
-      updateContainerSelection.mockRejectedValue(new Error("nope"));
+    ])(
+      "shows an error and keeps the selection when %s fails",
+      async (_, button, message) => {
+        const user = userEvent.setup();
+        getContainers.mockResolvedValue({ data: two });
+        updateContainerSelection.mockRejectedValue(new Error("nope"));
 
-      render(<ContainersPage />);
-      await screen.findByText("web-app");
+        render(<ContainersPage />);
+        await screen.findByText("web-app");
 
-      await user.click(screen.getAllByRole("checkbox")[1]);
-      await user.click(screen.getByRole("button", { name: button }));
+        await user.click(screen.getAllByRole("checkbox")[1]);
+        await user.click(screen.getByRole("button", { name: button }));
 
-      expect(await screen.findByText(message)).toBeInTheDocument();
-      expect(screen.getAllByRole("checkbox")[1]).toBeChecked();
-    });
+        expect(await screen.findByText(message)).toBeInTheDocument();
+        expect(screen.getAllByRole("checkbox")[1]).toBeChecked();
+      },
+    );
   });
 
   describe("restart and unquarantine", () => {
@@ -344,12 +387,16 @@ describe("ContainersPage", () => {
       await screen.findByText("web-app");
 
       await user.click(screen.getByTitle("Restart"));
-      expect(screen.getByText(/restart container "web-app"/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/restart container "web-app"/i),
+      ).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: /^cancel$/i }));
 
       expect(restartContainer).not.toHaveBeenCalled();
       await waitFor(() =>
-        expect(screen.queryByRole("button", { name: /^confirm$/i })).not.toBeInTheDocument(),
+        expect(
+          screen.queryByRole("button", { name: /^confirm$/i }),
+        ).not.toBeInTheDocument(),
       );
     });
 
@@ -364,7 +411,9 @@ describe("ContainersPage", () => {
       await user.click(screen.getByTitle("Restart"));
       await user.click(screen.getByRole("button", { name: /^confirm$/i }));
 
-      expect(await screen.findByText(/container "web-app" restarted/i)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/container "web-app" restarted/i),
+      ).toBeInTheDocument();
     });
 
     it("shows an error alert when a restart fails", async () => {
@@ -378,7 +427,9 @@ describe("ContainersPage", () => {
       await user.click(screen.getByTitle("Restart"));
       await user.click(screen.getByRole("button", { name: /^confirm$/i }));
 
-      expect(await screen.findByText(/failed to restart container/i)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/failed to restart container/i),
+      ).toBeInTheDocument();
     });
 
     it("only offers Unquarantine for quarantined containers", async () => {
@@ -401,8 +452,12 @@ describe("ContainersPage", () => {
       await user.click(screen.getByTitle("Unquarantine"));
       await user.click(screen.getByRole("button", { name: /^confirm$/i }));
 
-      await waitFor(() => expect(unquarantineContainer).toHaveBeenCalledWith("abc123"));
-      expect(await screen.findByText(/removed from quarantine/i)).toBeInTheDocument();
+      await waitFor(() =>
+        expect(unquarantineContainer).toHaveBeenCalledWith("abc123"),
+      );
+      expect(
+        await screen.findByText(/removed from quarantine/i),
+      ).toBeInTheDocument();
     });
 
     it("shows an error alert when unquarantining fails", async () => {
@@ -416,7 +471,9 @@ describe("ContainersPage", () => {
       await user.click(screen.getByTitle("Unquarantine"));
       await user.click(screen.getByRole("button", { name: /^confirm$/i }));
 
-      expect(await screen.findByText(/failed to unquarantine container/i)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/failed to unquarantine container/i),
+      ).toBeInTheDocument();
     });
 
     it("does not open the details modal when action buttons are clicked", async () => {
@@ -456,27 +513,41 @@ describe("ContainersPage", () => {
       render(<ContainersPage />);
       await user.click(await screen.findByText("web-app"));
 
-      await waitFor(() => expect(getContainerDetails).toHaveBeenCalledWith("abc123"));
+      await waitFor(() =>
+        expect(getContainerDetails).toHaveBeenCalledWith("abc123"),
+      );
       const dialog = await screen.findByRole("dialog");
       expect(within(dialog).getByText("Container Details")).toBeInTheDocument();
       expect(within(dialog).getByText("abc123full")).toBeInTheDocument();
       expect(within(dialog).getByText("Health Status")).toBeInTheDocument();
-      expect(within(dialog).getByText(/"autoheal": "true"/)).toBeInTheDocument();
-      expect(within(dialog).getByText("Exit Code:").nextSibling).toHaveTextContent("137");
+      expect(
+        within(dialog).getByText(/"autoheal": "true"/),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).getByText("Exit Code:").nextSibling,
+      ).toHaveTextContent("137");
     });
 
     it("omits the health section when the container has no health data", async () => {
       const user = userEvent.setup();
       getContainers.mockResolvedValue({ data: containers });
-      getContainerDetails.mockResolvedValue({ data: { ...details, health: null, monitored: false, quarantined: true } });
+      getContainerDetails.mockResolvedValue({
+        data: { ...details, health: null, monitored: false, quarantined: true },
+      });
 
       render(<ContainersPage />);
       await user.click(await screen.findByText("web-app"));
 
       const dialog = await screen.findByRole("dialog");
-      expect(within(dialog).queryByText("Health Status")).not.toBeInTheDocument();
-      expect(within(dialog).getByText("Monitored:").nextSibling).toHaveTextContent("No");
-      expect(within(dialog).getByText("Quarantined:").nextSibling).toHaveTextContent("Yes");
+      expect(
+        within(dialog).queryByText("Health Status"),
+      ).not.toBeInTheDocument();
+      expect(
+        within(dialog).getByText("Monitored:").nextSibling,
+      ).toHaveTextContent("No");
+      expect(
+        within(dialog).getByText("Quarantined:").nextSibling,
+      ).toHaveTextContent("Yes");
     });
 
     it("shows an error alert when details fail to load", async () => {
@@ -487,7 +558,9 @@ describe("ContainersPage", () => {
       render(<ContainersPage />);
       await user.click(await screen.findByText("web-app"));
 
-      expect(await screen.findByText(/failed to load container details/i)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/failed to load container details/i),
+      ).toBeInTheDocument();
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
 
@@ -502,7 +575,9 @@ describe("ContainersPage", () => {
 
       await user.click(within(dialog).getByRole("button", { name: /close/i }));
 
-      await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      );
     });
   });
 });

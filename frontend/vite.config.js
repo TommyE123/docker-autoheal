@@ -1,5 +1,9 @@
-import { defineConfig, configDefaults, coverageConfigDefaults } from 'vitest/config'
-import react from '@vitejs/plugin-react'
+import {
+  defineConfig,
+  configDefaults,
+  coverageConfigDefaults,
+} from "vitest/config";
+import react from "@vitejs/plugin-react";
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -7,30 +11,30 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/api': {
-        target: 'http://localhost:3131',
+      "/api": {
+        target: "http://localhost:3131",
         changeOrigin: true,
       },
-      '/health': {
-        target: 'http://localhost:3131',
+      "/health": {
+        target: "http://localhost:3131",
         changeOrigin: true,
-      }
-    }
+      },
+    },
   },
   build: {
-    outDir: '../static',
+    outDir: "../static",
     emptyOutDir: true,
   },
   test: {
-    environment: 'jsdom',
+    environment: "jsdom",
     // Playwright UI E2E specs run via `npm run test:ui-e2e`, not Vitest.
-    exclude: [...configDefaults.exclude, 'e2e-ui/**'],
-    setupFiles: ['./src/test/setup.js'],
-    globalSetup: ['./src/test/globalSetup.js'],
+    exclude: [...configDefaults.exclude, "e2e-ui/**"],
+    setupFiles: ["./src/test/setup.js"],
+    globalSetup: ["./src/test/globalSetup.js"],
     coverage: {
-      provider: 'v8',
-      reporter: ['text', 'lcov'],
-      reportsDirectory: './coverage',
+      provider: "v8",
+      reporter: ["text", "lcov"],
+      reportsDirectory: "./coverage",
       // globalSetup runs in the main process before worker pools start, so
       // v8 coverage instrumentation never sees it execute; excluding it
       // keeps coverage % from being diluted by a file that can never show
@@ -39,11 +43,10 @@ export default defineConfig({
       // not under Vitest, so they can never show as covered here either.
       exclude: [
         ...coverageConfigDefaults.exclude,
-        'src/test/globalSetup.js',
-        'playwright.ui.config.js',
-        'e2e-ui/**',
+        "src/test/globalSetup.js",
+        "playwright.ui.config.js",
+        "e2e-ui/**",
       ],
     },
   },
-})
-
+});

@@ -1,4 +1,4 @@
-import { Card, Form, Button } from 'react-bootstrap';
+import { Card, Form, Button } from "react-bootstrap";
 
 /**
  * RestartPolicySettings Component
@@ -13,7 +13,7 @@ function RestartPolicySettings({ config, onConfigChange, onSubmit }) {
   const handleChange = (field, value) => {
     onConfigChange({
       ...config,
-      [field]: value
+      [field]: value,
     });
   };
 
@@ -36,7 +36,7 @@ function RestartPolicySettings({ config, onConfigChange, onSubmit }) {
             <Form.Label>Restart Mode</Form.Label>
             <Form.Select
               value={config.mode}
-              onChange={(e) => handleChange('mode', e.target.value)}
+              onChange={(e) => handleChange("mode", e.target.value)}
             >
               <option value="on-failure">On Failure (exit code != 0)</option>
               <option value="health">Health Check</option>
@@ -50,7 +50,9 @@ function RestartPolicySettings({ config, onConfigChange, onSubmit }) {
               type="number"
               min="0"
               value={config.cooldown_seconds}
-              onChange={(e) => handleChange('cooldown_seconds', parseInt(e.target.value))}
+              onChange={(e) =>
+                handleChange("cooldown_seconds", parseInt(e.target.value))
+              }
             />
             <Form.Text>Wait time between restart attempts</Form.Text>
           </Form.Group>
@@ -61,7 +63,9 @@ function RestartPolicySettings({ config, onConfigChange, onSubmit }) {
               type="number"
               min="1"
               value={config.max_restarts}
-              onChange={(e) => handleChange('max_restarts', parseInt(e.target.value))}
+              onChange={(e) =>
+                handleChange("max_restarts", parseInt(e.target.value))
+              }
             />
             <Form.Text>Maximum restarts before quarantine</Form.Text>
           </Form.Group>
@@ -72,7 +76,12 @@ function RestartPolicySettings({ config, onConfigChange, onSubmit }) {
               type="number"
               min="1"
               value={config.max_restarts_window_seconds}
-              onChange={(e) => handleChange('max_restarts_window_seconds', parseInt(e.target.value))}
+              onChange={(e) =>
+                handleChange(
+                  "max_restarts_window_seconds",
+                  parseInt(e.target.value),
+                )
+              }
             />
             <Form.Text>Time window for counting restarts</Form.Text>
           </Form.Group>
@@ -82,7 +91,9 @@ function RestartPolicySettings({ config, onConfigChange, onSubmit }) {
               type="checkbox"
               label="Respect Manual Stop"
               checked={config.respect_manual_stop}
-              onChange={(e) => handleChange('respect_manual_stop', e.target.checked)}
+              onChange={(e) =>
+                handleChange("respect_manual_stop", e.target.checked)
+              }
             />
           </Form.Group>
 
@@ -97,4 +108,3 @@ function RestartPolicySettings({ config, onConfigChange, onSubmit }) {
 }
 
 export default RestartPolicySettings;
-

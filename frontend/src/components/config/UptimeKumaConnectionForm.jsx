@@ -1,5 +1,5 @@
-import { Form, Button, Spinner, InputGroup } from 'react-bootstrap';
-import { useState } from 'react';
+import { Form, Button, Spinner, InputGroup } from "react-bootstrap";
+import { useState } from "react";
 /**
  * UptimeKumaConnectionForm Component
  * Form for configuring and testing Uptime Kuma connection
@@ -20,12 +20,12 @@ function UptimeKumaConnectionForm({
   onEnableIntegration,
   testingConnection,
   connectionTested,
-  enablingIntegration
+  enablingIntegration,
 }) {
   const handleChange = (field, value) => {
     onConfigChange({
       ...config,
-      [field]: value
+      [field]: value,
     });
   };
 
@@ -35,7 +35,8 @@ function UptimeKumaConnectionForm({
   return (
     <>
       <p className="text-muted mb-3">
-        Configure your Uptime-Kuma server connection. You can use either API Key authentication (recommended) or basic username/password authentication.
+        Configure your Uptime-Kuma server connection. You can use either API Key
+        authentication (recommended) or basic username/password authentication.
       </p>
 
       <Form>
@@ -44,8 +45,8 @@ function UptimeKumaConnectionForm({
           <Form.Control
             type="text"
             placeholder="http://localhost:3001"
-            value={config?.server_url || ''}
-            onChange={(e) => handleChange('server_url', e.target.value)}
+            value={config?.server_url || ""}
+            onChange={(e) => handleChange("server_url", e.target.value)}
           />
           <Form.Text>Enter the base URL of your Uptime-Kuma instance</Form.Text>
         </Form.Group>
@@ -56,19 +57,20 @@ function UptimeKumaConnectionForm({
             <Form.Control
               type={showApiToken ? "text" : "password"}
               placeholder="Enter your API key (e.g., uk3_xxxxx) or password"
-              value={config?.api_token || ''}
-              onChange={(e) => handleChange('api_token', e.target.value)}
+              value={config?.api_token || ""}
+              onChange={(e) => handleChange("api_token", e.target.value)}
             />
             <Button
               variant="outline-secondary"
               onClick={() => setShowApiToken(!showApiToken)}
               aria-label={showApiToken ? "Hide API key" : "Show API key"}
             >
-              <i className={`bi bi-eye${showApiToken ? '-slash' : ''}`}></i>
+              <i className={`bi bi-eye${showApiToken ? "-slash" : ""}`}></i>
             </Button>
           </InputGroup>
           <Form.Text className="text-muted">
-            <strong>API Key Auth:</strong> Enter API key here (Settings → Security → API Keys)
+            <strong>API Key Auth:</strong> Enter API key here (Settings →
+            Security → API Keys)
           </Form.Text>
         </Form.Group>
 
@@ -77,7 +79,9 @@ function UptimeKumaConnectionForm({
             type="checkbox"
             label="Auto-restart containers when monitors are DOWN"
             checked={config?.auto_restart_on_down ?? true}
-            onChange={(e) => handleChange('auto_restart_on_down', e.target.checked)}
+            onChange={(e) =>
+              handleChange("auto_restart_on_down", e.target.checked)
+            }
           />
         </Form.Group>
 
@@ -131,4 +135,3 @@ function UptimeKumaConnectionForm({
 }
 
 export default UptimeKumaConnectionForm;
-

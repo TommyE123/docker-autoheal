@@ -1,4 +1,4 @@
-import { Modal, Button } from 'react-bootstrap';
+import { Modal, Button } from "react-bootstrap";
 
 /**
  * DisableUptimeKumaModal Component
@@ -29,15 +29,20 @@ function DisableUptimeKumaModal({ show, onHide, onConfirm }) {
           Are you sure you want to disable the Uptime-Kuma integration?
         </p>
         <div className="alert alert-warning mb-0">
-          <strong><i className="bi bi-info-circle me-2"></i>This will:</strong>
+          <strong>
+            <i className="bi bi-info-circle me-2"></i>This will:
+          </strong>
           <ul className="mb-0 mt-2">
             <li>Stop monitoring all Uptime-Kuma monitors</li>
             <li>Remove all container-monitor mappings</li>
-            <li>Disable automatic container restarts based on monitor status</li>
+            <li>
+              Disable automatic container restarts based on monitor status
+            </li>
           </ul>
         </div>
         <p className="text-muted small mt-3 mb-0">
-          You can re-enable the integration at any time by configuring and enabling it again.
+          You can re-enable the integration at any time by configuring and
+          enabling it again.
         </p>
       </Modal.Body>
       <Modal.Footer>
@@ -55,4 +60,3 @@ function DisableUptimeKumaModal({ show, onHide, onConfirm }) {
 }
 
 export default DisableUptimeKumaModal;
-
