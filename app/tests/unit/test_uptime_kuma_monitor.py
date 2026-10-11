@@ -313,6 +313,28 @@ class TestUpdateStatusCache:
             assert ambiguity_warnings() == 2
             assert monitor._container_status_cache == {}
 
+    async def test_duplicate_mapping_entries_warn_once_and_get_no_status(self, caplog):
+        """Identical mapping entries for one container must not warn once per entry."""
+        _add_mapping("db", "Database")
+        _add_mapping("db", "Database")
+        monitor = UptimeKumaMonitor()
+        _install_client(
+            monitor,
+            FakeUptimeKumaClient(
+                monitors=[
+                    {"friendly_name": "Database", "status": 1},
+                    {"friendly_name": "Database", "status": 0},
+                ]
+            ),
+        )
+
+        with caplog.at_level(logging.WARNING):
+            await monitor._update_status_cache()
+
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) == 1
+        assert monitor._container_status_cache == {}
+
     async def test_each_newly_ambiguous_mapping_is_warned_about(self, caplog):
         _add_mapping("db", "Database")
         _add_mapping("web", "Web Monitor")

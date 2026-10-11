@@ -159,10 +159,12 @@ class UptimeKumaMonitor:
             mapping_key = (mapping.container_id, mapping.monitor_friendly_name)
             monitor_count = monitor_count_by_name[mapping.monitor_friendly_name]
             if monitor_count > 1:
+                # Identical mapping entries share a key, so warn at most once per refresh.
+                already_seen = mapping_key in ambiguous_mappings
                 ambiguous_mappings.add(mapping_key)
                 # The status is refreshed once per mapped container check, so warn
                 # once per mapping until the name is unique again, not on every refresh.
-                if mapping_key not in self._ambiguous_mappings:
+                if not already_seen and mapping_key not in self._ambiguous_mappings:
                     logger.warning(
                         "Uptime-Kuma monitor name '%s' mapped to %s matches %d monitors - "
                         "ignoring its status because the name is ambiguous, so it will not "
