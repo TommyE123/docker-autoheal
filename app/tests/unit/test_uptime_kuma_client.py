@@ -306,7 +306,7 @@ class TestParseMonitorsFromMetrics:
     @pytest.mark.parametrize(
         ("friendly_name", "escaped_name"),
         [
-            ('My "prod" DB', r'My \"prod\" DB'),
+            ('My "prod" DB', r"My \"prod\" DB"),
             (r"C:\prod", r"C:\\prod"),
             ("line\nbreak", r"line\nbreak"),
         ],
@@ -397,7 +397,7 @@ class TestGetMonitorStatusByName:
     @pytest.mark.parametrize(
         ("monitor_name", "escaped_name"),
         [
-            ('My "prod" DB', r'My \"prod\" DB'),
+            ('My "prod" DB', r"My \"prod\" DB"),
             (r"C:\prod", r"C:\\prod"),
             ("line\nbreak", r"line\nbreak"),
         ],
