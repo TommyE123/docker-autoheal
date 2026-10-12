@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 # A genuine Uptime-Kuma sample: monitor_status or app_version at the start of a line,
 # followed by its label set. app_version is present even when no monitors exist.
-_METRICS_SAMPLE_PATTERN = re.compile(r"^(?:monitor_status|app_version)\\{", re.MULTILINE)
+_METRICS_SAMPLE_PATTERN = re.compile(r"^(?:monitor_status|app_version)\{", re.MULTILINE)
 
 
 class UptimeKumaClient:
