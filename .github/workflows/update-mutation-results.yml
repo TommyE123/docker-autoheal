@@ -9,7 +9,8 @@ name: Update Mutation Results
 # and on workflow_dispatch, from the Actions tab or an external scheduler
 # (cron-job.org) calling the API on main. There is deliberately no GitHub schedule.
 # paths-ignore stops this workflow's own badge-only merge from re-triggering it
-# (a loop); a push that also changes any other file still runs.
+# (a loop); a push that also changes any other file still runs. Release Please
+# release merges (chore(main): release ...) are skipped; workflow_dispatch always runs.
 on:
   push:
     branches:
@@ -21,18 +22,20 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: update-mutation-results
-  cancel-in-progress: false
-
 env:
   BADGE_FILE: .github/badges/mutation.json
 
 jobs:
   update:
     name: Update mutation results
+    if: "${{ github.event_name == 'workflow_dispatch' || !startsWith(github.event.head_commit.message, 'chore(main): release') }}"
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # On the job, so a run skipped by the `if` above never takes the group and
+    # cannot replace a queued real run.
+    concurrency:
+      group: update-mutation-results
+      cancel-in-progress: false
 
     steps:
       # Only valid when dispatched on main: any other ref fails loudly, so a
@@ -75,23 +78,20 @@ jobs:
           UPDATE_MUTATION_BADGE: "1"
         run: ./mutation.sh
 
-      # Old score from the tracked file, new from the file just generated.
+      # Old score from the tracked file, new from the file just generated; only the
+      # warning is computed here.
       - name: Compare scores
         id: score
         run: |
           old=$(git show "HEAD:$BADGE_FILE" | jq -r '.message // empty')
           new=$(jq -r '.message // empty' "$BADGE_FILE")
-          title="mutation: update mutation score badge"
           warning=""
           if [[ $old =~ ^[0-9.]+%$ && $new =~ ^[0-9.]+%$ && $old != "$new" ]]; then
             if awk -v o="${old%\%}" -v n="${new%\%}" 'BEGIN { exit !(n < o) }'; then
               warning="> ⚠️ Mutation score dropped from $old to $new."
             fi
           fi
-          {
-            echo "title=$title"
-            echo "warning=$warning"
-          } >> "$GITHUB_OUTPUT"
+          echo "warning=$warning" >> "$GITHUB_OUTPUT"
 
       # The run takes a while: if main moved on, the result is stale, so publish and
       # close nothing and leave it to the next run.
@@ -120,8 +120,8 @@ jobs:
           branch: chore/update-mutation-results
           delete-branch: true
           add-paths: .github/badges/mutation.json
-          commit-message: ${{ steps.score.outputs.title }}
-          title: ${{ steps.score.outputs.title }}
+          commit-message: "mutation: update mutation score badge"
+          title: "mutation: update mutation score badge"
           body: |
             ${{ steps.score.outputs.warning }}
 
