@@ -96,52 +96,16 @@ def test_diverged_history_is_not_skipped(repo):
     assert not skips(repo, old_tip)
 
 
-TESTED_SCRIPT = REPO_ROOT / ".github" / "scripts" / "mutation-tested-push.sh"
+WORKFLOW = (REPO_ROOT / ".github" / "workflows" / "update-mutation-results.yml").read_text()
 
 
-def mutation_tested(repo, tmp_path, heads, runs, before="0" * 40):
-    """Run mutation-tested-push.sh with a stub `gh`.
-
-    ``heads`` maps a main commit SHA to its merged PR head SHA, ``runs`` maps a
-    PR head SHA to its successful Mutation Testing run count.
-    """
-    stub = tmp_path / "bin"
-    stub.mkdir(parents=True)
-    cases = "".join(f"  *commits/{sha}/pulls) echo '{head}' ;;\n" for sha, head in heads.items())
-    cases += "".join(f"  *\"head_sha={head}&\"*) echo '{n}' ;;\n" for head, n in runs.items())
-    (stub / "gh").write_text(f'#!/usr/bin/env bash\ncase "$2" in\n{cases}  *) ;;\nesac\n')
-    (stub / "gh").chmod(0o755)
-    after = git(repo, "rev-parse", "HEAD")
-    env = {"PATH": f"{stub}:/usr/bin:/bin", "GITHUB_REPOSITORY": "o/r", "GH_TOKEN": "x"}
-    cmd = ["bash", str(TESTED_SCRIPT), before, after]
-    return subprocess.run(cmd, cwd=repo, env=env, check=False).returncode == 0  # noqa: S603
-
-
-def test_runs_when_merged_pr_has_successful_mutation_run(repo, tmp_path):
-    # Squash merge: the PR head SHA differs from the commit on main; the head is used.
-    tip = git(repo, "rev-parse", "HEAD")
-    assert mutation_tested(repo, tmp_path / "a", {tip: "headsha"}, {"headsha": 1})
-
-
-def test_not_run_without_pr_or_successful_mutation_run(repo, tmp_path):
-    tip = git(repo, "rev-parse", "HEAD")
-    assert not mutation_tested(repo, tmp_path / "b", {}, {"headsha": 1})  # no merged PR
-    assert not mutation_tested(repo, tmp_path / "c", {tip: "headsha"}, {"headsha": 0})  # no run
-
-
-def test_tested_commit_followed_by_untested_commit_is_not_run(repo, tmp_path):
-    base = git(repo, "rev-parse", "HEAD")
-    tested = commit(repo, {"a.py": "1"}, "fix: tested change (#1)")
-    commit(repo, {"a.py": "2"}, "feat: untested change (#2)")
-    heads, runs = {tested: "head1"}, {"head1": 1}
-    assert not mutation_tested(repo, tmp_path / "d", heads, runs, before=base)
-
-
-def test_all_commits_tested_is_run_and_badge_commits_are_exempt(repo, tmp_path):
-    base = git(repo, "rev-parse", "HEAD")
-    first = commit(repo, {"a.py": "1"}, "fix: one (#1)")
-    commit(repo, {BADGE: "1"}, f"{SUBJECT} (#2)")
-    second = commit(repo, {"a.py": "2"}, "fix: two (#3)")
-    heads = {first: "h1", second: "h3"}
-    assert mutation_tested(repo, tmp_path / "e", heads, {"h1": 1, "h3": 1}, before=base)
-    assert not mutation_tested(repo, tmp_path / "f", heads, {"h1": 1}, before=base)
+def test_workflow_publishes_only_fresh_badge_results_and_skips_badge_only_pushes():
+    # Stale-result protection: publishing is gated on main not having moved.
+    assert "steps.fresh.outputs.current == 'true'" in WORKFLOW
+    # Only the badge file is published and auto-merged.
+    assert "add-paths: .github/badges/mutation.json" in WORKFLOW
+    assert '[ "$files" = "$BADGE_FILE" ]' in WORKFLOW
+    # The mutation job runs only when the loop guard allows it.
+    assert "needs.guard.outputs.run == 'true'" in WORKFLOW
+    assert "mutation-badge-only-push.sh" in WORKFLOW
+    assert "mutation-tested-push" not in WORKFLOW

@@ -5,14 +5,10 @@ name: Update Mutation Results
 # Pull request mutation runs (mutation-testing.yml) never touch that file.
 #
 # Informational only: a lower score is flagged in the PR but never fails this
-# workflow, blocks the merge or delays Release Please. On a push to main it runs
-# only when the push came from a merged pull request whose head commit already
-# has a successful Mutation Testing run (mutation-testing.yml), and never for a
-# push that holds only this workflow's own badge-update commit (that would
-# loop). Other pushes (docs-only, Release Please, direct pushes, no or failed
-# mutation run) are skipped. workflow_dispatch always runs, from the Actions tab
-# or an external scheduler (cron-job.org) calling the API on main. There is
-# deliberately no GitHub schedule.
+# workflow, blocks the merge or delays Release Please. Runs on every push to main
+# (except a push holding only this workflow's own badge-update commit, which would
+# loop) and on workflow_dispatch, from the Actions tab or an external scheduler
+# (cron-job.org) calling the API on main. There is deliberately no GitHub schedule.
 on:
   push:
     branches:
@@ -30,19 +26,12 @@ env:
   BADGE_FILE: .github/badges/mutation.json
 
 jobs:
-  # Skips the suite when the push holds nothing but automated badge-update commits
-  # (from the push's before/after SHAs, commit subjects and changed files), or when
-  # no merged pull request in the push has a successful pull request mutation run.
-  # The pull request is found from the commit, and its head SHA (not the squash
-  # commit SHA on main) is used to find the run.
+  # Skips the suite only when the push holds nothing but automated badge-update
+  # commits (from the push's before/after SHAs, commit subjects and changed files).
   guard:
     name: Check push
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions:
-      contents: read
-      actions: read # list Mutation Testing runs
-      pull-requests: read # find the pull request of a commit
     outputs:
       run: ${{ steps.check.outputs.run }}
     steps:
@@ -58,18 +47,12 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           BEFORE: ${{ github.event.before }}
           AFTER: ${{ github.sha }}
-          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "$EVENT_NAME" != "push" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          elif .github/scripts/mutation-badge-only-push.sh "$BEFORE" "$AFTER"; then
+          if [ "$EVENT_NAME" = "push" ] && .github/scripts/mutation-badge-only-push.sh "$BEFORE" "$AFTER"; then
             echo "Push holds only the automated badge update; skipping the mutation run."
             echo "run=false" >> "$GITHUB_OUTPUT"
-          elif .github/scripts/mutation-tested-push.sh "$BEFORE" "$AFTER"; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
           else
-            echo "No merged pull request in this push has a successful Mutation Testing run; skipping."
-            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "run=true" >> "$GITHUB_OUTPUT"
           fi
 
   update:

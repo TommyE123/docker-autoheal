@@ -98,13 +98,11 @@ modify it, and the badge keeps showing the last committed score between refreshe
 The `Update Mutation Results` workflow (`.github/workflows/update-mutation-results.yml`)
 refreshes it:
 
-- It runs on `workflow_dispatch` (always) and on a push to `main` only when the push came
-  from a merged pull request whose head commit already has a successful `Mutation Testing`
-  run (`.github/scripts/mutation-tested-push.sh`; the pull request is looked up from the
-  commit, so squash merge SHAs are fine). Pushes without such a run (docs-only, Release
-  Please, direct pushes) are skipped. It has no GitHub `schedule`. A dispatch can come from the Actions tab or an external
-  scheduler (cron-job.org); the caller's token is configured outside the repository. It always checks
-  out and tests `main`; a dispatch against any other ref fails immediately with an error.
+- It runs on every push to `main` and on `workflow_dispatch`, with no GitHub `schedule`. A
+  dispatch can come from the Actions tab or an external scheduler (cron-job.org); the
+  caller's token is configured outside the repository. It always checks out and tests
+  `main`; a dispatch against any other ref fails immediately with an error. The score is
+  computed from the current `main` commit, independent of any pull request mutation run.
 - To avoid a loop, a `guard` job skips the run when a push holds only the automated
   badge-update commit(s). `.github/scripts/mutation-badge-only-push.sh` compares the
   push's `before`/`after` SHAs: every commit must have the subject
