@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useId } from "react";
 import {
   Card,
   Button,
@@ -13,6 +13,7 @@ import { EVENT_TYPES } from "../constants/eventTypes";
 import { format } from "date-fns";
 
 function EventsPage() {
+  const confirmationTitleId = `${useId()}-confirm-clear-events-title`;
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [alert, setAlert] = useState(null);
@@ -289,9 +290,14 @@ function EventsPage() {
       </Card.Body>
 
       {/* Confirmation Modal */}
-      <Modal show={showConfirmModal} onHide={handleCancelClear} centered>
+      <Modal
+        show={showConfirmModal}
+        onHide={handleCancelClear}
+        centered
+        aria-labelledby={confirmationTitleId}
+      >
         <Modal.Header closeButton>
-          <Modal.Title>
+          <Modal.Title id={confirmationTitleId}>
             <i className="bi bi-exclamation-triangle text-warning me-2"></i>
             Confirm Clear Events
           </Modal.Title>

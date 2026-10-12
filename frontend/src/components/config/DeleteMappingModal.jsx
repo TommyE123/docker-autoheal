@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Modal, Button } from "react-bootstrap";
 
 /**
@@ -11,6 +12,8 @@ import { Modal, Button } from "react-bootstrap";
  * @param {Function} props.onConfirm - Callback when confirmed
  */
 function DeleteMappingModal({ show, containerName, onHide, onConfirm }) {
+  const titleId = `${useId()}-delete-mapping-title`;
+
   return (
     <Modal
       show={show}
@@ -18,9 +21,10 @@ function DeleteMappingModal({ show, containerName, onHide, onConfirm }) {
       centered
       backdrop="static"
       keyboard={true}
+      aria-labelledby={titleId}
     >
       <Modal.Header closeButton className="bg-danger text-white">
-        <Modal.Title>
+        <Modal.Title id={titleId}>
           <i className="bi bi-trash-fill me-2"></i>
           Delete Mapping?
         </Modal.Title>

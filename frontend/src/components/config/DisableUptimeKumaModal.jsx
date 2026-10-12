@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Modal, Button } from "react-bootstrap";
 
 /**
@@ -10,6 +11,8 @@ import { Modal, Button } from "react-bootstrap";
  * @param {Function} props.onConfirm - Callback when confirmed
  */
 function DisableUptimeKumaModal({ show, onHide, onConfirm }) {
+  const titleId = `${useId()}-disable-uptime-kuma-title`;
+
   return (
     <Modal
       show={show}
@@ -17,9 +20,10 @@ function DisableUptimeKumaModal({ show, onHide, onConfirm }) {
       centered
       backdrop="static"
       keyboard={true}
+      aria-labelledby={titleId}
     >
       <Modal.Header closeButton className="bg-warning text-dark">
-        <Modal.Title>
+        <Modal.Title id={titleId}>
           <i className="bi bi-exclamation-triangle-fill me-2"></i>
           Disable Uptime-Kuma Integration?
         </Modal.Title>

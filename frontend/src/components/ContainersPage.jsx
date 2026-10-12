@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useId } from "react";
 import {
   Card,
   Table,
@@ -18,6 +18,9 @@ import {
 } from "../services/api";
 
 function ContainersPage() {
+  const id = useId();
+  const containerDetailsTitleId = `${id}-container-details-title`;
+  const confirmationTitleId = `${id}-confirmation-title`;
   const [containers, setContainers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedContainers, setSelectedContainers] = useState(new Set());
@@ -372,6 +375,7 @@ function ContainersPage() {
                         }
                         className="me-1"
                         title="Restart"
+                        aria-label="Restart"
                       >
                         <i className="bi bi-arrow-clockwise"></i>
                       </Button>
@@ -383,6 +387,7 @@ function ContainersPage() {
                             handleUnquarantine(container.id, container.name)
                           }
                           title="Unquarantine"
+                          aria-label="Unquarantine"
                         >
                           <i className="bi bi-unlock"></i>
                         </Button>
@@ -397,9 +402,16 @@ function ContainersPage() {
       </Card>
 
       {/* Container Details Modal */}
-      <Modal show={showModal} onHide={() => setShowModal(false)} size="lg">
+      <Modal
+        show={showModal}
+        onHide={() => setShowModal(false)}
+        size="lg"
+        aria-labelledby={containerDetailsTitleId}
+      >
         <Modal.Header closeButton>
-          <Modal.Title>Container Details</Modal.Title>
+          <Modal.Title id={containerDetailsTitleId}>
+            Container Details
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {modalContainer && (
@@ -473,9 +485,16 @@ function ContainersPage() {
       </Modal>
 
       {/* Confirmation Modal */}
-      <Modal show={confirmModal.show} onHide={handleCancelConfirm} centered>
+      <Modal
+        show={confirmModal.show}
+        onHide={handleCancelConfirm}
+        centered
+        aria-labelledby={confirmationTitleId}
+      >
         <Modal.Header closeButton>
-          <Modal.Title>{confirmModal.title}</Modal.Title>
+          <Modal.Title id={confirmationTitleId}>
+            {confirmModal.title}
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body>{confirmModal.message}</Modal.Body>
         <Modal.Footer>
