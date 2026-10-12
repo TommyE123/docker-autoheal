@@ -302,10 +302,7 @@ function NotificationsPage() {
       case "webhook":
         return (
           <>
-            <Form.Group
-              controlId={controlId("webhook-url")}
-              className="mb-3"
-            >
+            <Form.Group controlId={controlId("webhook-url")} className="mb-3">
               <Form.Label>Webhook URL *</Form.Label>
               <Form.Control
                 type="url"
@@ -439,10 +436,7 @@ function NotificationsPage() {
                 placeholder="https://ntfy.sh (default)"
               />
             </Form.Group>
-            <Form.Group
-              controlId={controlId("ntfy-username")}
-              className="mb-3"
-            >
+            <Form.Group controlId={controlId("ntfy-username")} className="mb-3">
               <Form.Label>Username (optional)</Form.Label>
               <Form.Control
                 type="text"
@@ -452,10 +446,7 @@ function NotificationsPage() {
                 }
               />
             </Form.Group>
-            <Form.Group
-              controlId={controlId("ntfy-password")}
-              className="mb-3"
-            >
+            <Form.Group controlId={controlId("ntfy-password")} className="mb-3">
               <Form.Label>Password (optional)</Form.Label>
               <Form.Control
                 type="password"
@@ -779,10 +770,7 @@ function NotificationsPage() {
         </Modal.Header>
         <Modal.Body>
           <Form>
-            <Form.Group
-              controlId={controlId("service-name")}
-              className="mb-3"
-            >
+            <Form.Group controlId={controlId("service-name")} className="mb-3">
               <Form.Label>Service Name *</Form.Label>
               <Form.Control
                 type="text"
@@ -799,10 +787,7 @@ function NotificationsPage() {
               </Form.Text>
             </Form.Group>
 
-            <Form.Group
-              controlId={controlId("service-type")}
-              className="mb-3"
-            >
+            <Form.Group controlId={controlId("service-type")} className="mb-3">
               <Form.Label>Service Type *</Form.Label>
               <Form.Select
                 value={formData.type}

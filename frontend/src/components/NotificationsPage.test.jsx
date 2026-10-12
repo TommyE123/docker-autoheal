@@ -232,10 +232,7 @@ describe("NotificationsPage", () => {
 
     await user.click(screen.getByRole("button", { name: /add service/i }));
 
-    await user.type(
-      screen.getByLabelText("Service Name *"),
-      "New Webhook",
-    );
+    await user.type(screen.getByLabelText("Service Name *"), "New Webhook");
     await user.type(
       screen.getByLabelText("Webhook URL *"),
       "https://example.com/hook",
@@ -347,10 +344,7 @@ describe("NotificationsPage", () => {
     await screen.findByText(/notifications are disabled/i);
 
     await user.click(screen.getByRole("button", { name: /add service/i }));
-    await user.type(
-      screen.getByLabelText("Service Name *"),
-      "Name Only",
-    );
+    await user.type(screen.getByLabelText("Service Name *"), "Name Only");
 
     const typeSelect = screen.getByLabelText("Service Type *");
     const serviceTypes = Array.from(
@@ -859,7 +853,10 @@ describe("NotificationsPage", () => {
     it("sends the access token for an ntfy service", async () => {
       const user = await openAddModal("ntfy", "Ntfy");
       await user.type(screen.getByLabelText("Topic *"), "alerts");
-      await user.type(screen.getByLabelText("Access token (optional)"), "tk_secret");
+      await user.type(
+        screen.getByLabelText("Access token (optional)"),
+        "tk_secret",
+      );
 
       expect(await submitAndGetPayload(user)).toEqual({
         name: "Ntfy",
@@ -917,14 +914,8 @@ describe("NotificationsPage", () => {
 
     it("sends the user key and api token for a pushover service", async () => {
       const user = await openAddModal("pushover", "Pushover");
-      await user.type(
-        screen.getByLabelText("User Key *"),
-        "ukey",
-      );
-      await user.type(
-        screen.getByLabelText("API Token *"),
-        "atok",
-      );
+      await user.type(screen.getByLabelText("User Key *"), "ukey");
+      await user.type(screen.getByLabelText("API Token *"), "atok");
 
       expect(await submitAndGetPayload(user)).toEqual({
         name: "Pushover",

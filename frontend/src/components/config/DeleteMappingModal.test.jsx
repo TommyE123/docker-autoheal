@@ -18,7 +18,9 @@ describe("DeleteMappingModal", () => {
       />,
     );
 
-    expect(screen.getByRole("dialog", { name: "Delete Mapping?" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "Delete Mapping?" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("web-app")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /delete mapping/i }));

@@ -73,10 +73,7 @@ function RestartPolicySettings({ config, onConfigChange, onSubmit }) {
             <Form.Text>Maximum restarts before quarantine</Form.Text>
           </Form.Group>
 
-          <Form.Group
-            controlId={`${id}-max-restarts-window`}
-            className="mb-3"
-          >
+          <Form.Group controlId={`${id}-max-restarts-window`} className="mb-3">
             <Form.Label>Max Restarts Window (seconds)</Form.Label>
             <Form.Control
               type="number"
