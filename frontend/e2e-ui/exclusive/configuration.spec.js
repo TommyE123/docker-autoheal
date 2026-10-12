@@ -1,8 +1,6 @@
 import { exclusiveTest as test, expect, dialogTitled } from "../fixtures.js";
 
-// The labels in the settings forms are not associated with their inputs (no
-// controlId), so the fields are found by role inside the form that owns the
-// "Save Monitor Settings" button. Switch to getByLabel once the labels are linked.
+// Keep role queries scoped to the settings form that owns the save button.
 const monitorForm = (page) =>
   page.locator("form").filter({
     has: page.getByRole("button", { name: "Save Monitor Settings" }),

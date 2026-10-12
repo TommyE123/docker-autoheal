@@ -59,7 +59,9 @@ test(
     await expect(page.getByText(emptyStateText)).toBeHidden();
 
     page.once("dialog", (confirm) => confirm.accept());
-    await row.getByRole("button", { name: "Delete" }).click();
+    await row
+      .getByRole("button", { name: "Delete E2E Webhook", exact: true })
+      .click();
     await expect(
       alertWith(page, "Notification service deleted successfully"),
     ).toBeVisible();
@@ -125,10 +127,16 @@ test(
   async ({ page, request }) => {
     await page.goto("/notifications");
 
-    // The master switch is the page's only checkbox (its label is not linked to it).
-    await page.getByRole("checkbox").click();
+    const notificationSwitch = page.getByRole("checkbox", {
+      name: "Notification System",
+      exact: true,
+    });
+    await expect(notificationSwitch).toBeVisible();
+    await expect(page.getByText("Disabled", { exact: true })).toBeVisible();
+    await notificationSwitch.click();
     await expect(alertWith(page, "Notifications enabled")).toBeVisible();
     await expect(page.getByText("Notifications are enabled")).toBeVisible();
+    await expect(page.getByText("Enabled", { exact: true })).toBeVisible();
     const config = await (
       await request.get("/api/notifications/config")
     ).json();
@@ -255,7 +263,9 @@ test(
     await page.goto("/notifications");
 
     const row = page.getByRole("row", { name: /E2E Ntfy Edit/ });
-    await row.getByRole("button", { name: "Edit" }).click();
+    await row
+      .getByRole("button", { name: "Edit E2E Ntfy Edit", exact: true })
+      .click();
     const dialog = dialogTitled(page, "Edit Notification Service");
     await expect(tokenField(dialog)).toHaveValue("tk_e2e_edit");
 
@@ -271,7 +281,9 @@ test(
     });
 
     // Emptying the field removes the token.
-    await row.getByRole("button", { name: "Edit" }).click();
+    await row
+      .getByRole("button", { name: "Edit E2E Ntfy Edit", exact: true })
+      .click();
     await tokenField(dialog).fill("");
     await dialog.getByRole("button", { name: "Update Service" }).click();
     await expect(
@@ -306,7 +318,12 @@ test(
 
     await page.goto("/notifications");
     const row = page.getByRole("row", { name: /E2E Ntfy Unreachable/ });
-    await row.getByRole("button", { name: "Test" }).click();
+    await row
+      .getByRole("button", {
+        name: "Test E2E Ntfy Unreachable",
+        exact: true,
+      })
+      .click();
     await expect(page.getByRole("alert").first()).toBeVisible();
     await expect(page.getByText("tk_e2e_leak_check")).toHaveCount(0);
   },

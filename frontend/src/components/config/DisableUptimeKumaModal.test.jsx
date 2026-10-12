@@ -12,6 +12,11 @@ describe("DisableUptimeKumaModal", () => {
       <DisableUptimeKumaModal show onHide={vi.fn()} onConfirm={onConfirm} />,
     );
 
+    expect(
+      screen.getByRole("dialog", {
+        name: "Disable Uptime-Kuma Integration?",
+      }),
+    ).toBeInTheDocument();
     await user.click(
       screen.getByRole("button", { name: /disable integration/i }),
     );

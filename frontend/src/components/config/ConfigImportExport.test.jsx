@@ -20,14 +20,12 @@ describe("ConfigImportExport", () => {
   it("calls onImport with the selected file", async () => {
     const user = userEvent.setup();
     const onImport = vi.fn();
-    const { container } = render(
-      <ConfigImportExport onExport={vi.fn()} onImport={onImport} />,
-    );
+    render(<ConfigImportExport onExport={vi.fn()} onImport={onImport} />);
 
     const file = new File(['{"a":1}'], "config.json", {
       type: "application/json",
     });
-    const input = container.querySelector("#importFile");
+    const input = screen.getByLabelText("Import configuration file");
 
     await user.upload(input, file);
 

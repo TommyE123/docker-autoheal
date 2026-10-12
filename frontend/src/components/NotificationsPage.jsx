@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useId } from "react";
 import {
   Container,
   Row,
@@ -41,6 +41,11 @@ function isServiceFormValid(formData) {
 }
 
 function NotificationsPage() {
+  const id = useId();
+  const notificationSystemSwitchId = `${id}-notification-system`;
+  const notificationSystemLabelId = `${id}-notification-system-label`;
+  const modalTitleId = `${id}-notification-modal-title`;
+  const controlId = (name) => `${id}-${name}`;
   const [config, setConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -298,7 +303,7 @@ function NotificationsPage() {
       case "webhook":
         return (
           <>
-            <Form.Group className="mb-3">
+            <Form.Group controlId={controlId("webhook-url")} className="mb-3">
               <Form.Label>Webhook URL *</Form.Label>
               <Form.Control
                 type="url"
@@ -316,7 +321,10 @@ function NotificationsPage() {
       case "discord":
         return (
           <>
-            <Form.Group className="mb-3">
+            <Form.Group
+              controlId={controlId("discord-webhook-url")}
+              className="mb-3"
+            >
               <Form.Label>Discord Webhook URL *</Form.Label>
               <Form.Control
                 type="url"
@@ -328,7 +336,10 @@ function NotificationsPage() {
                 required
               />
             </Form.Group>
-            <Form.Group className="mb-3">
+            <Form.Group
+              controlId={controlId("discord-username")}
+              className="mb-3"
+            >
               <Form.Label>Username (optional)</Form.Label>
               <Form.Control
                 type="text"
@@ -344,7 +355,10 @@ function NotificationsPage() {
 
       case "slack":
         return (
-          <Form.Group className="mb-3">
+          <Form.Group
+            controlId={controlId("slack-webhook-url")}
+            className="mb-3"
+          >
             <Form.Label>Slack Webhook URL *</Form.Label>
             <Form.Control
               type="url"
@@ -361,7 +375,10 @@ function NotificationsPage() {
       case "telegram":
         return (
           <>
-            <Form.Group className="mb-3">
+            <Form.Group
+              controlId={controlId("telegram-bot-token")}
+              className="mb-3"
+            >
               <Form.Label>Bot Token *</Form.Label>
               <Form.Control
                 type="text"
@@ -373,7 +390,10 @@ function NotificationsPage() {
                 required
               />
             </Form.Group>
-            <Form.Group className="mb-3">
+            <Form.Group
+              controlId={controlId("telegram-chat-id")}
+              className="mb-3"
+            >
               <Form.Label>Chat ID *</Form.Label>
               <Form.Control
                 type="text"
@@ -391,7 +411,7 @@ function NotificationsPage() {
       case "ntfy":
         return (
           <>
-            <Form.Group className="mb-3">
+            <Form.Group controlId={controlId("ntfy-topic")} className="mb-3">
               <Form.Label>Topic *</Form.Label>
               <Form.Control
                 type="text"
@@ -403,7 +423,10 @@ function NotificationsPage() {
                 required
               />
             </Form.Group>
-            <Form.Group className="mb-3">
+            <Form.Group
+              controlId={controlId("ntfy-server-url")}
+              className="mb-3"
+            >
               <Form.Label>Server URL (optional)</Form.Label>
               <Form.Control
                 type="url"
@@ -414,7 +437,7 @@ function NotificationsPage() {
                 placeholder="https://ntfy.sh (default)"
               />
             </Form.Group>
-            <Form.Group className="mb-3">
+            <Form.Group controlId={controlId("ntfy-username")} className="mb-3">
               <Form.Label>Username (optional)</Form.Label>
               <Form.Control
                 type="text"
@@ -424,7 +447,7 @@ function NotificationsPage() {
                 }
               />
             </Form.Group>
-            <Form.Group className="mb-3">
+            <Form.Group controlId={controlId("ntfy-password")} className="mb-3">
               <Form.Label>Password (optional)</Form.Label>
               <Form.Control
                 type="password"
@@ -434,7 +457,10 @@ function NotificationsPage() {
                 }
               />
             </Form.Group>
-            <Form.Group className="mb-3">
+            <Form.Group
+              controlId={controlId("ntfy-access-token")}
+              className="mb-3"
+            >
               <Form.Label>Access token (optional)</Form.Label>
               <Form.Control
                 type="password"
@@ -454,7 +480,10 @@ function NotificationsPage() {
       case "gotify":
         return (
           <>
-            <Form.Group className="mb-3">
+            <Form.Group
+              controlId={controlId("gotify-server-url")}
+              className="mb-3"
+            >
               <Form.Label>Server URL *</Form.Label>
               <Form.Control
                 type="url"
@@ -466,7 +495,10 @@ function NotificationsPage() {
                 required
               />
             </Form.Group>
-            <Form.Group className="mb-3">
+            <Form.Group
+              controlId={controlId("gotify-app-token")}
+              className="mb-3"
+            >
               <Form.Label>App Token *</Form.Label>
               <Form.Control
                 type="text"
@@ -484,7 +516,10 @@ function NotificationsPage() {
       case "pushover":
         return (
           <>
-            <Form.Group className="mb-3">
+            <Form.Group
+              controlId={controlId("pushover-user-key")}
+              className="mb-3"
+            >
               <Form.Label>User Key *</Form.Label>
               <Form.Control
                 type="text"
@@ -496,7 +531,10 @@ function NotificationsPage() {
                 required
               />
             </Form.Group>
-            <Form.Group className="mb-3">
+            <Form.Group
+              controlId={controlId("pushover-api-token")}
+              className="mb-3"
+            >
               <Form.Label>API Token *</Form.Label>
               <Form.Control
                 type="text"
@@ -554,20 +592,39 @@ function NotificationsPage() {
             <Card.Body>
               <div className="d-flex justify-content-between align-items-center">
                 <div>
-                  <h5>Notification System</h5>
+                  <h5>
+                    <Form.Label
+                      htmlFor={notificationSystemSwitchId}
+                      id={notificationSystemLabelId}
+                      className="mb-0"
+                    >
+                      Notification System
+                    </Form.Label>
+                  </h5>
                   <p className="text-muted mb-0">
                     {config?.enabled
                       ? "Notifications are enabled"
                       : "Notifications are disabled"}
                   </p>
                 </div>
-                <Form.Check
-                  type="switch"
-                  checked={config?.enabled || false}
-                  onChange={(e) => handleToggleNotifications(e.target.checked)}
-                  disabled={saving}
-                  label={config?.enabled ? "Enabled" : "Disabled"}
-                />
+                <div className="d-flex align-items-center">
+                  <Form.Check
+                    id={notificationSystemSwitchId}
+                    aria-labelledby={notificationSystemLabelId}
+                    type="switch"
+                    checked={config?.enabled || false}
+                    onChange={(e) =>
+                      handleToggleNotifications(e.target.checked)
+                    }
+                    disabled={saving}
+                  />
+                  <Form.Label
+                    htmlFor={notificationSystemSwitchId}
+                    className="ms-2 mb-0"
+                  >
+                    {config?.enabled ? "Enabled" : "Disabled"}
+                  </Form.Label>
+                </div>
               </div>
             </Card.Body>
           </Card>
@@ -670,6 +727,7 @@ function NotificationsPage() {
                               testingService === service.name ||
                               !service.enabled
                             }
+                            aria-label={`${testingService === service.name ? "Testing" : "Test"} ${service.name}`}
                           >
                             {testingService === service.name ? (
                               <>
@@ -689,6 +747,7 @@ function NotificationsPage() {
                             size="sm"
                             className="me-2"
                             onClick={() => handleOpenModal(service)}
+                            aria-label={`Edit ${service.name}`}
                           >
                             Edit
                           </Button>
@@ -697,6 +756,7 @@ function NotificationsPage() {
                             size="sm"
                             onClick={() => handleDeleteService(service.name)}
                             disabled={saving}
+                            aria-label={`Delete ${service.name}`}
                           >
                             Delete
                           </Button>
@@ -711,9 +771,14 @@ function NotificationsPage() {
         </Col>
       </Row>
 
-      <Modal show={showModal} onHide={handleCloseModal} size="lg">
+      <Modal
+        show={showModal}
+        onHide={handleCloseModal}
+        size="lg"
+        aria-labelledby={modalTitleId}
+      >
         <Modal.Header closeButton>
-          <Modal.Title>
+          <Modal.Title id={modalTitleId}>
             {editingService
               ? "Edit Notification Service"
               : "Add Notification Service"}
@@ -721,7 +786,7 @@ function NotificationsPage() {
         </Modal.Header>
         <Modal.Body>
           <Form>
-            <Form.Group className="mb-3">
+            <Form.Group controlId={controlId("service-name")} className="mb-3">
               <Form.Label>Service Name *</Form.Label>
               <Form.Control
                 type="text"
@@ -738,7 +803,7 @@ function NotificationsPage() {
               </Form.Text>
             </Form.Group>
 
-            <Form.Group className="mb-3">
+            <Form.Group controlId={controlId("service-type")} className="mb-3">
               <Form.Label>Service Type *</Form.Label>
               <Form.Select
                 value={formData.type}
@@ -755,7 +820,10 @@ function NotificationsPage() {
               </Form.Select>
             </Form.Group>
 
-            <Form.Group className="mb-3">
+            <Form.Group
+              controlId={controlId("service-enabled")}
+              className="mb-3"
+            >
               <Form.Check
                 type="switch"
                 label="Enabled"

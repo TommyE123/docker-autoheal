@@ -1,5 +1,5 @@
 import { Form, Button, Spinner, InputGroup } from "react-bootstrap";
-import { useState } from "react";
+import { useId, useState } from "react";
 /**
  * UptimeKumaConnectionForm Component
  * Form for configuring and testing Uptime Kuma connection
@@ -22,6 +22,7 @@ function UptimeKumaConnectionForm({
   connectionTested,
   enablingIntegration,
 }) {
+  const id = useId();
   const handleChange = (field, value) => {
     onConfigChange({
       ...config,
@@ -40,7 +41,7 @@ function UptimeKumaConnectionForm({
       </p>
 
       <Form>
-        <Form.Group className="mb-3">
+        <Form.Group controlId={`${id}-server-url`} className="mb-3">
           <Form.Label>Uptime-Kuma Server URL</Form.Label>
           <Form.Control
             type="text"
@@ -51,7 +52,7 @@ function UptimeKumaConnectionForm({
           <Form.Text>Enter the base URL of your Uptime-Kuma instance</Form.Text>
         </Form.Group>
 
-        <Form.Group className="mb-3">
+        <Form.Group controlId={`${id}-api-key`} className="mb-3">
           <Form.Label>API Key</Form.Label>
           <InputGroup>
             <Form.Control
@@ -74,7 +75,7 @@ function UptimeKumaConnectionForm({
           </Form.Text>
         </Form.Group>
 
-        <Form.Group className="mb-3">
+        <Form.Group controlId={`${id}-auto-restart`} className="mb-3">
           <Form.Check
             type="checkbox"
             label="Auto-restart containers when monitors are DOWN"

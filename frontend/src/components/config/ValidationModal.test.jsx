@@ -26,6 +26,9 @@ describe("ValidationModal", () => {
       />,
     );
 
+    expect(
+      screen.getByRole("dialog", { name: "Invalid Configuration" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Window too small")).toBeInTheDocument();
     expect(screen.getByText("Interval too short")).toBeInTheDocument();
     expect(screen.getByText("Increase the window")).toBeInTheDocument();

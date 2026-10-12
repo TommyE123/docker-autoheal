@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Modal, Button } from "react-bootstrap";
 
 /**
@@ -22,6 +23,9 @@ function ValidationModal({
   config,
   onHide,
 }) {
+  const id = useId();
+  const titleId = `${id}-validation-modal-title`;
+
   return (
     <Modal
       show={show}
@@ -30,9 +34,10 @@ function ValidationModal({
       centered
       backdrop="static"
       keyboard={true}
+      aria-labelledby={titleId}
     >
       <Modal.Header closeButton className="bg-warning text-dark">
-        <Modal.Title>
+        <Modal.Title id={titleId}>
           <i className="bi bi-exclamation-triangle-fill me-2"></i>
           {title}
         </Modal.Title>

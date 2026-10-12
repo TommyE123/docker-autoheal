@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Card, Table, Badge, Button, Row, Col, Form } from "react-bootstrap";
 
 /**
@@ -19,6 +19,7 @@ function UptimeKumaMappings({
   onAddMapping,
   onDeleteMapping,
 }) {
+  const id = useId();
   const [newMapping, setNewMapping] = useState({
     container_id: "",
     monitor_friendly_name: "",
@@ -100,7 +101,7 @@ function UptimeKumaMappings({
         <h6 className="mt-3">Add New Mapping</h6>
         <Row className="align-items-end">
           <Col md={5}>
-            <Form.Group>
+            <Form.Group controlId={`${id}-container`}>
               <Form.Label>Container</Form.Label>
               <Form.Select
                 value={newMapping.container_id}
@@ -118,7 +119,7 @@ function UptimeKumaMappings({
             </Form.Group>
           </Col>
           <Col md={5}>
-            <Form.Group>
+            <Form.Group controlId={`${id}-monitor`}>
               <Form.Label>Monitor</Form.Label>
               <Form.Select
                 value={newMapping.monitor_friendly_name}

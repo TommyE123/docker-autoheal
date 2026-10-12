@@ -17,6 +17,9 @@ describe("MaintenanceModal", () => {
 
     render(<MaintenanceModal show startTime={startTime} onDismiss={vi.fn()} />);
 
+    expect(
+      screen.getByRole("dialog", { name: "Maintenance Mode Active" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("00:00:05")).toBeInTheDocument();
 
     act(() => {

@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Card, Form, Button } from "react-bootstrap";
 
 /**
@@ -10,6 +11,8 @@ import { Card, Form, Button } from "react-bootstrap";
  * @param {Function} props.onSubmit - Callback when form is submitted
  */
 function RestartPolicySettings({ config, onConfigChange, onSubmit }) {
+  const id = useId();
+
   const handleChange = (field, value) => {
     onConfigChange({
       ...config,
@@ -32,7 +35,7 @@ function RestartPolicySettings({ config, onConfigChange, onSubmit }) {
       </Card.Header>
       <Card.Body>
         <Form onSubmit={handleFormSubmit}>
-          <Form.Group className="mb-3">
+          <Form.Group controlId={`${id}-restart-mode`} className="mb-3">
             <Form.Label>Restart Mode</Form.Label>
             <Form.Select
               value={config.mode}
@@ -44,7 +47,7 @@ function RestartPolicySettings({ config, onConfigChange, onSubmit }) {
             </Form.Select>
           </Form.Group>
 
-          <Form.Group className="mb-3">
+          <Form.Group controlId={`${id}-cooldown-seconds`} className="mb-3">
             <Form.Label>Cooldown (seconds)</Form.Label>
             <Form.Control
               type="number"
@@ -57,7 +60,7 @@ function RestartPolicySettings({ config, onConfigChange, onSubmit }) {
             <Form.Text>Wait time between restart attempts</Form.Text>
           </Form.Group>
 
-          <Form.Group className="mb-3">
+          <Form.Group controlId={`${id}-max-restarts`} className="mb-3">
             <Form.Label>Max Restarts</Form.Label>
             <Form.Control
               type="number"
@@ -70,7 +73,7 @@ function RestartPolicySettings({ config, onConfigChange, onSubmit }) {
             <Form.Text>Maximum restarts before quarantine</Form.Text>
           </Form.Group>
 
-          <Form.Group className="mb-3">
+          <Form.Group controlId={`${id}-max-restarts-window`} className="mb-3">
             <Form.Label>Max Restarts Window (seconds)</Form.Label>
             <Form.Control
               type="number"
@@ -86,7 +89,7 @@ function RestartPolicySettings({ config, onConfigChange, onSubmit }) {
             <Form.Text>Time window for counting restarts</Form.Text>
           </Form.Group>
 
-          <Form.Group className="mb-3">
+          <Form.Group controlId={`${id}-respect-manual-stop`} className="mb-3">
             <Form.Check
               type="checkbox"
               label="Respect Manual Stop"

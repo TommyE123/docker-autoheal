@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Card, Form, Button } from "react-bootstrap";
 
 /**
@@ -10,6 +11,8 @@ import { Card, Form, Button } from "react-bootstrap";
  * @param {Function} props.onSubmit - Callback when form is submitted
  */
 function MonitorSettings({ config, onConfigChange, onSubmit }) {
+  const id = useId();
+
   const handleChange = (field, value) => {
     onConfigChange({
       ...config,
@@ -32,7 +35,7 @@ function MonitorSettings({ config, onConfigChange, onSubmit }) {
       </Card.Header>
       <Card.Body>
         <Form onSubmit={handleFormSubmit}>
-          <Form.Group className="mb-3">
+          <Form.Group controlId={`${id}-monitoring-interval`} className="mb-3">
             <Form.Label>Monitoring Interval (seconds)</Form.Label>
             <Form.Control
               type="number"
@@ -45,7 +48,7 @@ function MonitorSettings({ config, onConfigChange, onSubmit }) {
             <Form.Text>How often to check containers</Form.Text>
           </Form.Group>
 
-          <Form.Group className="mb-3">
+          <Form.Group controlId={`${id}-label-key`} className="mb-3">
             <Form.Label>Label Key</Form.Label>
             <Form.Control
               type="text"
@@ -54,7 +57,7 @@ function MonitorSettings({ config, onConfigChange, onSubmit }) {
             />
           </Form.Group>
 
-          <Form.Group className="mb-3">
+          <Form.Group controlId={`${id}-label-value`} className="mb-3">
             <Form.Label>Label Value</Form.Label>
             <Form.Control
               type="text"
@@ -63,7 +66,7 @@ function MonitorSettings({ config, onConfigChange, onSubmit }) {
             />
           </Form.Group>
 
-          <Form.Group className="mb-3">
+          <Form.Group controlId={`${id}-monitor-all`} className="mb-3">
             <Form.Check
               type="checkbox"
               label="Monitor All Containers (ignore label filter)"

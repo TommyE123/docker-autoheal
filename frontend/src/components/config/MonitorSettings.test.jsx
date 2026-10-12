@@ -37,7 +37,14 @@ describe("MonitorSettings", () => {
       />,
     );
 
-    const intervalInput = screen.getByRole("spinbutton");
+    const intervalInput = screen.getByLabelText(
+      "Monitoring Interval (seconds)",
+    );
+    expect(screen.getByLabelText("Label Key")).toBeInTheDocument();
+    expect(screen.getByLabelText("Label Value")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Monitor All Containers (ignore label filter)"),
+    ).toBeInTheDocument();
     await user.clear(intervalInput);
     await user.type(intervalInput, "60");
 

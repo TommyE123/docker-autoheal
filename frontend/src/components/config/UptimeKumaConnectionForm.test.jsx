@@ -22,9 +22,13 @@ describe("UptimeKumaConnectionForm", () => {
 
     const testButton = screen.getByRole("button", { name: /test connection/i });
     expect(testButton).toBeDisabled();
+    expect(screen.getByLabelText("API Key")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Auto-restart containers when monitors are DOWN"),
+    ).toBeInTheDocument();
 
     await user.type(
-      screen.getByPlaceholderText("http://localhost:3001"),
+      screen.getByLabelText("Uptime-Kuma Server URL"),
       "http://kuma.local",
     );
     expect(onConfigChange).toHaveBeenCalled();

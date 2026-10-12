@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Modal, Button } from "react-bootstrap";
 
 function MaintenanceModal({ show, startTime, onDismiss }) {
+  const id = useId();
+  const titleId = `${id}-maintenance-title`;
   const [elapsedTime, setElapsedTime] = useState("00:00:00");
 
   useEffect(() => {
@@ -35,9 +37,10 @@ function MaintenanceModal({ show, startTime, onDismiss }) {
       keyboard={false}
       centered
       className="maintenance-modal"
+      aria-labelledby={titleId}
     >
       <Modal.Header className="bg-warning text-dark border-0">
-        <Modal.Title className="w-100 text-center">
+        <Modal.Title id={titleId} className="w-100 text-center">
           <i className="bi bi-tools me-2"></i>
           Maintenance Mode Active
         </Modal.Title>

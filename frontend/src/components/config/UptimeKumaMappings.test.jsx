@@ -24,7 +24,8 @@ describe("UptimeKumaMappings", () => {
     const addButton = screen.getByRole("button", { name: /^add$/i });
     expect(addButton).toBeDisabled();
 
-    const [containerSelect, monitorSelect] = screen.getAllByRole("combobox");
+    const containerSelect = screen.getByLabelText("Container");
+    const monitorSelect = screen.getByLabelText("Monitor");
     await user.selectOptions(containerSelect, "abc123");
     await user.selectOptions(monitorSelect, "web-monitor");
 

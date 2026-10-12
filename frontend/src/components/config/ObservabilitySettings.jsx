@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Card, Form, Button } from "react-bootstrap";
 
 /**
@@ -10,6 +11,8 @@ import { Card, Form, Button } from "react-bootstrap";
  * @param {Function} props.onSubmit - Callback when form is submitted
  */
 function ObservabilitySettings({ config, onConfigChange, onSubmit }) {
+  const id = useId();
+
   const handleChange = (field, value) => {
     onConfigChange({
       ...config,
@@ -32,7 +35,7 @@ function ObservabilitySettings({ config, onConfigChange, onSubmit }) {
       </Card.Header>
       <Card.Body>
         <Form onSubmit={handleFormSubmit}>
-          <Form.Group className="mb-3">
+          <Form.Group controlId={`${id}-log-level`} className="mb-3">
             <Form.Label>Log Level</Form.Label>
             <Form.Select
               value={config.log_level}
@@ -50,7 +53,7 @@ function ObservabilitySettings({ config, onConfigChange, onSubmit }) {
             </Form.Text>
           </Form.Group>
 
-          <Form.Group className="mb-3">
+          <Form.Group controlId={`${id}-prometheus-metrics`} className="mb-3">
             <Form.Check
               type="checkbox"
               label="Enable Prometheus Metrics"
