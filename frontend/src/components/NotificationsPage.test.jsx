@@ -378,7 +378,9 @@ describe("NotificationsPage", () => {
 
     await screen.findByText("Legacy Webhook");
 
-    await user.click(screen.getByRole("button", { name: /^edit$/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Edit Legacy Webhook" }),
+    );
 
     const updateButton = screen.getByRole("button", {
       name: /update service/i,
@@ -408,7 +410,9 @@ describe("NotificationsPage", () => {
 
     await screen.findByText("Future Service");
 
-    await user.click(screen.getByRole("button", { name: /^edit$/i }));
+    await user.click(
+      screen.getByRole("button", { name: "Edit Future Service" }),
+    );
 
     expect(
       screen.getByRole("button", { name: /update service/i }),
@@ -434,7 +438,7 @@ describe("NotificationsPage", () => {
 
     await screen.findByText("My Webhook");
 
-    await user.click(screen.getAllByRole("button", { name: /^edit$/i })[0]);
+    await user.click(screen.getByRole("button", { name: "Edit My Webhook" }));
 
     const urlInput = screen.getByDisplayValue("https://example.com/webhook");
     await user.clear(urlInput);
@@ -455,7 +459,7 @@ describe("NotificationsPage", () => {
     // The service list only shows name/type/status, so reopen the edit
     // modal to prove the refetched config actually carries the new URL
     // rather than the save handler having silently no-opped.
-    await user.click(screen.getAllByRole("button", { name: /^edit$/i })[0]);
+    await user.click(screen.getByRole("button", { name: "Edit My Webhook" }));
     expect(
       await screen.findByDisplayValue("https://example.com/updated"),
     ).toBeInTheDocument();
@@ -472,7 +476,7 @@ describe("NotificationsPage", () => {
 
     await screen.findByText("My Webhook");
 
-    await user.click(screen.getAllByRole("button", { name: /^edit$/i })[0]);
+    await user.click(screen.getByRole("button", { name: "Edit My Webhook" }));
     await user.click(screen.getByRole("button", { name: /update service/i }));
 
     expect(
@@ -499,7 +503,9 @@ describe("NotificationsPage", () => {
 
     await screen.findByText("Disabled Slack");
 
-    await user.click(screen.getAllByRole("button", { name: /^edit$/i })[1]);
+    await user.click(
+      screen.getByRole("button", { name: "Edit Disabled Slack" }),
+    );
 
     const modal = screen.getByRole("dialog", {
       name: "Edit Notification Service",
@@ -539,7 +545,7 @@ describe("NotificationsPage", () => {
 
     await screen.findByText("My Webhook");
 
-    await user.click(screen.getAllByRole("button", { name: /^edit$/i })[0]);
+    await user.click(screen.getByRole("button", { name: "Edit My Webhook" }));
 
     const modal = screen.getByRole("dialog", {
       name: "Edit Notification Service",
@@ -581,7 +587,7 @@ describe("NotificationsPage", () => {
 
     await screen.findByText("My Webhook");
 
-    await user.click(screen.getAllByRole("button", { name: /^delete$/i })[0]);
+    await user.click(screen.getByRole("button", { name: "Delete My Webhook" }));
 
     await waitFor(() =>
       expect(deleteNotificationService).toHaveBeenCalledWith("My Webhook"),
@@ -606,7 +612,7 @@ describe("NotificationsPage", () => {
 
     await screen.findByText("My Webhook");
 
-    await user.click(screen.getAllByRole("button", { name: /^delete$/i })[0]);
+    await user.click(screen.getByRole("button", { name: "Delete My Webhook" }));
 
     expect(deleteNotificationService).not.toHaveBeenCalled();
 
@@ -623,7 +629,7 @@ describe("NotificationsPage", () => {
 
     await screen.findByText("My Webhook");
 
-    await user.click(screen.getAllByRole("button", { name: /^delete$/i })[0]);
+    await user.click(screen.getByRole("button", { name: "Delete My Webhook" }));
 
     expect(
       await screen.findByText(/failed to delete notification service/i),
@@ -641,7 +647,7 @@ describe("NotificationsPage", () => {
 
     await screen.findByText("My Webhook");
 
-    await user.click(screen.getAllByRole("button", { name: /^test$/i })[0]);
+    await user.click(screen.getByRole("button", { name: "Test My Webhook" }));
 
     await waitFor(() =>
       expect(testNotificationService).toHaveBeenCalledWith("My Webhook"),
@@ -662,7 +668,7 @@ describe("NotificationsPage", () => {
 
     await screen.findByText("My Webhook");
 
-    await user.click(screen.getAllByRole("button", { name: /^test$/i })[0]);
+    await user.click(screen.getByRole("button", { name: "Test My Webhook" }));
 
     expect(await screen.findByText(/test send failed/i)).toBeInTheDocument();
   });

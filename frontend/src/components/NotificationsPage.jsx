@@ -714,6 +714,7 @@ function NotificationsPage() {
                               testingService === service.name ||
                               !service.enabled
                             }
+                            aria-label={`Test ${service.name}`}
                           >
                             {testingService === service.name ? (
                               <>
@@ -733,6 +734,7 @@ function NotificationsPage() {
                             size="sm"
                             className="me-2"
                             onClick={() => handleOpenModal(service)}
+                            aria-label={`Edit ${service.name}`}
                           >
                             Edit
                           </Button>
@@ -741,6 +743,7 @@ function NotificationsPage() {
                             size="sm"
                             onClick={() => handleDeleteService(service.name)}
                             disabled={saving}
+                            aria-label={`Delete ${service.name}`}
                           >
                             Delete
                           </Button>

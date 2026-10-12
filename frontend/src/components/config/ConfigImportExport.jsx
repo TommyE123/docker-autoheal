@@ -35,6 +35,7 @@ function ConfigImportExport({ onExport, onImport }) {
             accept=".json"
             onChange={onImport}
             id="importFile"
+            aria-label="Import configuration file"
           />
           <Form.Text className="d-block mt-2">
             Upload configuration JSON file to restore all settings

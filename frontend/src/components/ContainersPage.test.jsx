@@ -266,6 +266,23 @@ describe("ContainersPage", () => {
   describe("selection and auto-heal", () => {
     const two = [containers[0], { ...containers[0], id: "def456", name: "db" }];
 
+    it("names the select-all and container selection checkboxes", async () => {
+      getContainers.mockResolvedValue({ data: two });
+
+      render(<ContainersPage />);
+      await screen.findByText("web-app");
+
+      expect(
+        screen.getByRole("checkbox", { name: "Select all containers" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("checkbox", { name: "Select web-app" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("checkbox", { name: "Select db" }),
+      ).toBeInTheDocument();
+    });
+
     it("disables the auto-heal buttons until a container is selected", async () => {
       const user = userEvent.setup();
       getContainers.mockResolvedValue({ data: two });
@@ -386,7 +403,7 @@ describe("ContainersPage", () => {
       render(<ContainersPage />);
       await screen.findByText("web-app");
 
-      await user.click(screen.getByRole("button", { name: "Restart" }));
+      await user.click(screen.getByRole("button", { name: "Restart web-app" }));
       expect(
         screen.getByRole("dialog", { name: "Restart Container" }),
       ).toBeInTheDocument();
@@ -411,7 +428,7 @@ describe("ContainersPage", () => {
       render(<ContainersPage />);
       await screen.findByText("web-app");
 
-      await user.click(screen.getByRole("button", { name: "Restart" }));
+      await user.click(screen.getByRole("button", { name: "Restart web-app" }));
       expect(
         screen.getByRole("dialog", { name: "Restart Container" }),
       ).toBeInTheDocument();
@@ -430,7 +447,7 @@ describe("ContainersPage", () => {
       render(<ContainersPage />);
       await screen.findByText("web-app");
 
-      await user.click(screen.getByRole("button", { name: "Restart" }));
+      await user.click(screen.getByRole("button", { name: "Restart web-app" }));
       await user.click(screen.getByRole("button", { name: /^confirm$/i }));
 
       expect(
@@ -445,7 +462,7 @@ describe("ContainersPage", () => {
       await screen.findByText("web-app");
 
       expect(
-        screen.queryByRole("button", { name: "Unquarantine" }),
+        screen.queryByRole("button", { name: "Unquarantine web-app" }),
       ).not.toBeInTheDocument();
     });
 
@@ -457,7 +474,9 @@ describe("ContainersPage", () => {
       render(<ContainersPage />);
       await screen.findByText("web-app");
 
-      await user.click(screen.getByRole("button", { name: "Unquarantine" }));
+      await user.click(
+        screen.getByRole("button", { name: "Unquarantine web-app" }),
+      );
       expect(
         screen.getByRole("dialog", { name: "Remove from Quarantine" }),
       ).toBeInTheDocument();
@@ -479,7 +498,9 @@ describe("ContainersPage", () => {
       render(<ContainersPage />);
       await screen.findByText("web-app");
 
-      await user.click(screen.getByRole("button", { name: "Unquarantine" }));
+      await user.click(
+        screen.getByRole("button", { name: "Unquarantine web-app" }),
+      );
       await user.click(screen.getByRole("button", { name: /^confirm$/i }));
 
       expect(
@@ -494,7 +515,7 @@ describe("ContainersPage", () => {
       render(<ContainersPage />);
       await screen.findByText("web-app");
 
-      await user.click(screen.getByRole("button", { name: "Restart" }));
+      await user.click(screen.getByRole("button", { name: "Restart web-app" }));
       await user.click(screen.getAllByRole("checkbox")[1]);
 
       expect(getContainerDetails).not.toHaveBeenCalled();

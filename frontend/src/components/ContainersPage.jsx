@@ -308,6 +308,7 @@ function ContainersPage() {
                 <th style={{ width: "40px" }}>
                   <Form.Check
                     type="checkbox"
+                    aria-label="Select all containers"
                     checked={
                       selectedContainers.size === containers.length &&
                       containers.length > 0
@@ -343,6 +344,7 @@ function ContainersPage() {
                     <td onClick={(e) => e.stopPropagation()}>
                       <Form.Check
                         type="checkbox"
+                        aria-label={`Select ${container.name}`}
                         checked={selectedContainers.has(container.id)}
                         onChange={() => toggleSelection(container.id)}
                       />
@@ -375,7 +377,7 @@ function ContainersPage() {
                         }
                         className="me-1"
                         title="Restart"
-                        aria-label="Restart"
+                        aria-label={`Restart ${container.name}`}
                       >
                         <i className="bi bi-arrow-clockwise"></i>
                       </Button>
@@ -387,7 +389,7 @@ function ContainersPage() {
                             handleUnquarantine(container.id, container.name)
                           }
                           title="Unquarantine"
-                          aria-label="Unquarantine"
+                          aria-label={`Unquarantine ${container.name}`}
                         >
                           <i className="bi bi-unlock"></i>
                         </Button>
