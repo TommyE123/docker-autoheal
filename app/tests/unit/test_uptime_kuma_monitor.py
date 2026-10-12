@@ -290,9 +290,7 @@ class TestUpdateStatusCache:
         # The real client returns None (not []) when the request fails.
         _add_mapping("web", "Web Monitor")
         monitor = UptimeKumaMonitor()
-        fake_client = FakeUptimeKumaClient(
-            monitors=[{"friendly_name": "Web Monitor", "status": 0}]
-        )
+        fake_client = FakeUptimeKumaClient(monitors=[{"friendly_name": "Web Monitor", "status": 0}])
         _install_client(monitor, fake_client)
 
         await monitor._update_status_cache()
@@ -514,15 +512,17 @@ class TestUpdateStatusCache:
     async def test_error_fetching_metrics_is_logged_and_leaves_cache_unchanged(self, caplog):
         _add_mapping("web", "Web Monitor")
         monitor = UptimeKumaMonitor()
-        monitor._container_status_cache["web"] = 1
-        fake_client = FakeUptimeKumaClient(get_all_monitors_error=RuntimeError("upstream error"))
+        fake_client = FakeUptimeKumaClient(monitors=[{"friendly_name": "Web Monitor", "status": 1}])
         _install_client(monitor, fake_client)
+
+        await monitor._update_status_cache()
+        fake_client.get_all_monitors_error = RuntimeError("upstream error")
 
         with caplog.at_level(logging.ERROR):
             await monitor._update_status_cache()
 
         assert monitor._container_status_cache == {"web": 1}
-        assert fake_client.get_all_monitors_calls == 1
+        assert fake_client.get_all_monitors_calls == 2
         assert any(
             record.levelno == logging.ERROR and "upstream error" in record.getMessage()
             for record in caplog.records
@@ -596,13 +596,13 @@ class TestShouldRestartFromUptimeKuma:
 
         assert await monitor.should_restart_from_uptime_kuma("web") is True
 
-    async def test_remapped_container_does_not_restart_from_stale_down_status_during_outage(self):
+    async def test_remapped_container_does_not_restart_from_stale_down_status_during_outage(
+        self,
+    ):
         _enable_uptime_kuma(auto_restart_on_down=True)
         _add_mapping("web", "Old Monitor")
         monitor = UptimeKumaMonitor()
-        fake_client = FakeUptimeKumaClient(
-            monitors=[{"friendly_name": "Old Monitor", "status": 0}]
-        )
+        fake_client = FakeUptimeKumaClient(monitors=[{"friendly_name": "Old Monitor", "status": 0}])
         _install_client(monitor, fake_client)
 
         assert await monitor.should_restart_from_uptime_kuma("web") is True

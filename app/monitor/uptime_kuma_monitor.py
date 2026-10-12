@@ -162,7 +162,10 @@ class UptimeKumaMonitor:
             }
             for container_id in list(self._container_status_cache):
                 source_mapping = self._container_status_mapping_cache.get(container_id)
-                if source_mapping is None or (container_id, source_mapping) not in configured_mappings:
+                if (
+                    source_mapping is None
+                    or (container_id, source_mapping) not in configured_mappings
+                ):
                     self._container_status_cache.pop(container_id, None)
                     self._container_status_mapping_cache.pop(container_id, None)
             return
@@ -222,7 +225,9 @@ class UptimeKumaMonitor:
             # Cache the status (0=down, 1=up, 2=pending, 3=maintenance)
             # mapping.container_id now stores stable_id
             self._container_status_cache[mapping.container_id] = status
-            self._container_status_mapping_cache[mapping.container_id] = mapping.monitor_friendly_name
+            self._container_status_mapping_cache[mapping.container_id] = (
+                mapping.monitor_friendly_name
+            )
             refreshed_ids.add(mapping.container_id)
 
             logger.debug(
