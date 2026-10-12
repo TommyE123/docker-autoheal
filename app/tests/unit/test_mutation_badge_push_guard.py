@@ -99,15 +99,17 @@ def test_diverged_history_is_not_skipped(repo):
 TESTED_SCRIPT = REPO_ROOT / ".github" / "scripts" / "mutation-tested-push.sh"
 
 
-def mutation_tested(repo, tmp_path, pulls, runs, before="0" * 40):
-    """Run mutation-tested-push.sh with a stub `gh` serving canned API output."""
+def mutation_tested(repo, tmp_path, heads, runs, before="0" * 40):
+    """Run mutation-tested-push.sh with a stub `gh`.
+
+    ``heads`` maps a main commit SHA to its merged PR head SHA, ``runs`` maps a
+    PR head SHA to its successful Mutation Testing run count.
+    """
     stub = tmp_path / "bin"
     stub.mkdir(parents=True)
-    (stub / "gh").write_text(
-        '#!/usr/bin/env bash\ncase "$2" in\n'
-        f"  */pulls) echo '{pulls}' ;;\n"
-        f"  *runs*) echo '{runs}' ;;\nesac\n"
-    )
+    cases = "".join(f"  *commits/{sha}/pulls) echo '{head}' ;;\n" for sha, head in heads.items())
+    cases += "".join(f"  *\"head_sha={head}&\"*) echo '{n}' ;;\n" for head, n in runs.items())
+    (stub / "gh").write_text(f'#!/usr/bin/env bash\ncase "$2" in\n{cases}  *) ;;\nesac\n')
     (stub / "gh").chmod(0o755)
     after = git(repo, "rev-parse", "HEAD")
     env = {"PATH": f"{stub}:/usr/bin:/bin", "GITHUB_REPOSITORY": "o/r", "GH_TOKEN": "x"}
@@ -117,9 +119,29 @@ def mutation_tested(repo, tmp_path, pulls, runs, before="0" * 40):
 
 def test_runs_when_merged_pr_has_successful_mutation_run(repo, tmp_path):
     # Squash merge: the PR head SHA differs from the commit on main; the head is used.
-    assert mutation_tested(repo, tmp_path / "a", "headsha", "1")
+    tip = git(repo, "rev-parse", "HEAD")
+    assert mutation_tested(repo, tmp_path / "a", {tip: "headsha"}, {"headsha": 1})
 
 
 def test_not_run_without_pr_or_successful_mutation_run(repo, tmp_path):
-    assert not mutation_tested(repo, tmp_path / "b", "", "1")  # no merged PR for the commit
-    assert not mutation_tested(repo, tmp_path / "c", "headsha", "0")  # no successful run
+    tip = git(repo, "rev-parse", "HEAD")
+    assert not mutation_tested(repo, tmp_path / "b", {}, {"headsha": 1})  # no merged PR
+    assert not mutation_tested(repo, tmp_path / "c", {tip: "headsha"}, {"headsha": 0})  # no run
+
+
+def test_tested_commit_followed_by_untested_commit_is_not_run(repo, tmp_path):
+    base = git(repo, "rev-parse", "HEAD")
+    tested = commit(repo, {"a.py": "1"}, "fix: tested change (#1)")
+    commit(repo, {"a.py": "2"}, "feat: untested change (#2)")
+    heads, runs = {tested: "head1"}, {"head1": 1}
+    assert not mutation_tested(repo, tmp_path / "d", heads, runs, before=base)
+
+
+def test_all_commits_tested_is_run_and_badge_commits_are_exempt(repo, tmp_path):
+    base = git(repo, "rev-parse", "HEAD")
+    first = commit(repo, {"a.py": "1"}, "fix: one (#1)")
+    commit(repo, {BADGE: "1"}, f"{SUBJECT} (#2)")
+    second = commit(repo, {"a.py": "2"}, "fix: two (#3)")
+    heads = {first: "h1", second: "h3"}
+    assert mutation_tested(repo, tmp_path / "e", heads, {"h1": 1, "h3": 1}, before=base)
+    assert not mutation_tested(repo, tmp_path / "f", heads, {"h1": 1}, before=base)
