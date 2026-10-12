@@ -149,9 +149,7 @@ class TestConnect:
             "unrelated-metrics",
         ],
     )
-    async def test_returns_false_when_response_is_not_uptime_kuma_metrics(
-        self, monkeypatch, body
-    ):
+    async def test_returns_false_when_response_is_not_uptime_kuma_metrics(self, monkeypatch, body):
         """Reject responses that mention a metric without a genuine metrics sample."""
         _patch_session(monkeypatch, response=_FakeResponse(200, body))
         client = UptimeKumaClient("http://kuma.example", "token")
