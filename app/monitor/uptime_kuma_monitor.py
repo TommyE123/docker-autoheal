@@ -33,6 +33,7 @@ class UptimeKumaMonitor:
         self._task: asyncio.Task | None = None
         self._monitor_cache: dict[str, dict] = {}  # Cache monitor IDs by friendly name
         self._container_status_cache: dict[str, int] = {}  # Cache of stable_id -> status
+        self._container_status_mapping_cache: dict[str, str] = {}
         # (stable_id, monitor name) mappings already warned about as ambiguous
         self._ambiguous_mappings: set[tuple[str, str]] = set()
 
@@ -141,6 +142,7 @@ class UptimeKumaMonitor:
 
         if not config.uptime_kuma_mappings:
             self._container_status_cache.clear()
+            self._container_status_mapping_cache.clear()
             return
 
         try:
@@ -149,12 +151,20 @@ class UptimeKumaMonitor:
             monitors = await self.client.get_all_monitors()
         except Exception as e:
             logger.error("Error fetching Uptime-Kuma monitor statuses: %s", e)
-            return
+            monitors = None
 
         if monitors is None:
             # The fetch failed (the client already logged why): keep the cached statuses
-            # instead of treating the failure as evidence that the monitors disappeared.
-            # A successful empty list is a valid refresh and falls through to the pruning.
+            # only when the mapping that produced each status is still configured.
+            configured_mappings = {
+                (mapping.container_id, mapping.monitor_friendly_name)
+                for mapping in config.uptime_kuma_mappings
+            }
+            for container_id in list(self._container_status_cache):
+                source_mapping = self._container_status_mapping_cache.get(container_id)
+                if source_mapping is None or (container_id, source_mapping) not in configured_mappings:
+                    self._container_status_cache.pop(container_id, None)
+                    self._container_status_mapping_cache.pop(container_id, None)
             return
 
         # Uptime-Kuma allows several monitors to share a friendly name, and mappings
@@ -195,6 +205,7 @@ class UptimeKumaMonitor:
                 # Drop any status cached while the name was unique, so it cannot
                 # keep driving a restart decision.
                 self._container_status_cache.pop(mapping.container_id, None)
+                self._container_status_mapping_cache.pop(mapping.container_id, None)
                 continue
             if mapping.container_id in ambiguous_containers:
                 continue
@@ -211,6 +222,7 @@ class UptimeKumaMonitor:
             # Cache the status (0=down, 1=up, 2=pending, 3=maintenance)
             # mapping.container_id now stores stable_id
             self._container_status_cache[mapping.container_id] = status
+            self._container_status_mapping_cache[mapping.container_id] = mapping.monitor_friendly_name
             refreshed_ids.add(mapping.container_id)
 
             logger.debug(
@@ -227,6 +239,7 @@ class UptimeKumaMonitor:
         for container_id in list(self._container_status_cache):
             if container_id not in refreshed_ids:
                 del self._container_status_cache[container_id]
+                self._container_status_mapping_cache.pop(container_id, None)
 
         self._ambiguous_mappings = ambiguous_mappings
 
