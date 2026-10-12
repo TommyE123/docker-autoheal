@@ -255,7 +255,7 @@ test(
     await page.goto("/notifications");
 
     const row = page.getByRole("row", { name: /E2E Ntfy Edit/ });
-    await row.getByRole("button", { name: "Edit" }).click();
+    await row.getByRole("button", { name: "Edit E2E Ntfy Edit" }).click();
     const dialog = dialogTitled(page, "Edit Notification Service");
     await expect(tokenField(dialog)).toHaveValue("tk_e2e_edit");
 
@@ -271,7 +271,7 @@ test(
     });
 
     // Emptying the field removes the token.
-    await row.getByRole("button", { name: "Edit" }).click();
+    await row.getByRole("button", { name: "Edit E2E Ntfy Edit" }).click();
     await tokenField(dialog).fill("");
     await dialog.getByRole("button", { name: "Update Service" }).click();
     await expect(
