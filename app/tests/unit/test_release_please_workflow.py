@@ -14,6 +14,9 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 WORKFLOW = (REPO_ROOT / ".github" / "workflows" / "release-please.yml").read_text(encoding="utf-8")
+MUTATION_UPDATER = (REPO_ROOT / ".github" / "workflows" / "update-mutation-results.yml").read_text(
+    encoding="utf-8"
+)
 AUTO_MERGE_WORKFLOW = (
     REPO_ROOT / ".github" / "workflows" / "release-please-auto-merge.yml"
 ).read_text(encoding="utf-8")
@@ -47,10 +50,56 @@ def test_config_bootstraps_from_the_last_real_release_commit():
     }
 
     actual_sections = {
-        section["type"]: section["section"] for section in config["changelog-sections"]
+        section["type"]: section["section"]
+        for section in config["changelog-sections"]
+        if not section.get("hidden")
     }
 
     assert actual_sections == expected_sections
+
+
+def test_mutation_commits_are_hidden_from_release_notes():
+    config = json.loads((REPO_ROOT / "release-please-config.json").read_text())
+
+    sections = {section["type"]: section for section in config["changelog-sections"]}
+    assert sections["mutation"].get("hidden") is True
+    assert not sections["feat"].get("hidden")
+    assert not sections["fix"].get("hidden")
+
+
+def test_mutation_updater_push_trigger_ignores_only_the_badge_and_keeps_dispatch():
+    # paths-ignore skips a push only when every changed file is ignored, so a
+    # badge-only push does not loop but a mixed or code push still runs.
+    expected = (
+        "  push:\n"
+        "    branches:\n"
+        "      - main\n"
+        "    paths-ignore:\n"
+        '      - ".github/badges/mutation.json"\n'
+        "  workflow_dispatch:\n"
+    )
+    assert expected in MUTATION_UPDATER
+    assert "    paths:" not in MUTATION_UPDATER
+
+
+def test_mutation_updater_skips_release_merges_but_not_dispatch():
+    assert (
+        "if: \"${{ github.event_name == 'workflow_dispatch' || "
+        "!startsWith(github.event.head_commit.message, 'chore(main): release') }}\""
+    ) in MUTATION_UPDATER
+    # Job-level, so a skipped run never takes the group from a queued real run.
+    assert "\nconcurrency:" not in MUTATION_UPDATER
+    assert "    concurrency:\n      group: update-mutation-results" in MUTATION_UPDATER
+
+
+def test_mutation_updater_keeps_stale_result_and_badge_only_safeguards():
+    assert "steps.fresh.outputs.current == 'true'" in MUTATION_UPDATER
+    # Main moving only by badge-only commits (the updater's own merge) is not stale.
+    assert "compare/$head...$current" in MUTATION_UPDATER
+    assert '.status == \\"ahead\\"' in MUTATION_UPDATER
+    assert 'all(. == \\"$BADGE_FILE\\")' in MUTATION_UPDATER
+    assert "add-paths: .github/badges/mutation.json" in MUTATION_UPDATER
+    assert '[ "$files" = "$BADGE_FILE" ]' in MUTATION_UPDATER
 
 
 def test_manifest_starts_from_the_actual_last_released_version():
