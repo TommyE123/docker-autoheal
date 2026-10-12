@@ -94,12 +94,17 @@ jobs:
           echo "warning=$warning" >> "$GITHUB_OUTPUT"
 
       # The run takes a while: if main moved on, the result is stale, so publish and
-      # close nothing and leave it to the next run.
+      # close nothing and leave it to the next run. Main moving only by badge-only
+      # commits (this workflow's own merged PR, which paths-ignore keeps from starting
+      # a new run) does not make the result stale.
       - name: Verify main has not moved
         id: fresh
         run: |
           current=$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)
-          if [ "$current" = "$(git rev-parse HEAD)" ]; then
+          head=$(git rev-parse HEAD)
+          if [ "$current" = "$head" ] ||
+            gh api "repos/$GITHUB_REPOSITORY/compare/$head...$current" \
+              --jq ".status == \"ahead\" and ([.files[].filename] | all(. == \"$BADGE_FILE\"))" | grep -qx true; then
             echo "current=true" >> "$GITHUB_OUTPUT"
           else
             echo "::warning title=Mutation results are stale::main moved during the run; nothing was published or closed. Run the workflow again."

@@ -109,7 +109,8 @@ refreshes it:
   (`chore(main): release ...`) are skipped; `workflow_dispatch` always runs.
 - It runs the same full `./mutation.sh` with `UPDATE_MUTATION_BADGE=1`, then compares the
   new score with the one tracked on `main`. The result is tied to the exact `main` commit
-  that was tested; if `main` has moved by the time the run finishes, nothing is published
+  that was tested; if `main` has moved by the time the run finishes (other than by
+  badge-only commits, such as this workflow's own merged PR), nothing is published
   or closed and the workflow must be run again.
 - It then hands the tracked file to
   [`peter-evans/create-pull-request`](https://github.com/peter-evans/create-pull-request)

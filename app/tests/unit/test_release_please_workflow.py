@@ -94,6 +94,10 @@ def test_mutation_updater_skips_release_merges_but_not_dispatch():
 
 def test_mutation_updater_keeps_stale_result_and_badge_only_safeguards():
     assert "steps.fresh.outputs.current == 'true'" in MUTATION_UPDATER
+    # Main moving only by badge-only commits (the updater's own merge) is not stale.
+    assert "compare/$head...$current" in MUTATION_UPDATER
+    assert '.status == \\"ahead\\"' in MUTATION_UPDATER
+    assert 'all(. == \\"$BADGE_FILE\\")' in MUTATION_UPDATER
     assert "add-paths: .github/badges/mutation.json" in MUTATION_UPDATER
     assert '[ "$files" = "$BADGE_FILE" ]' in MUTATION_UPDATER
 
