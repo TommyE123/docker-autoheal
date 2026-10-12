@@ -45,7 +45,7 @@ class UptimeKumaClient:
                     if response.status == 200:
                         text = await response.text()
                         # Check if we got valid metrics data
-                        has_metrics = "monitor_status" in text or "app_version" in text
+                        has_metrics = bool(_METRICS_SAMPLE_PATTERN.search(text))
                         logger.debug("Has metrics data: %s", has_metrics)
                         return has_metrics
                     logger.warning("Unexpected response status: %s", response.status)
