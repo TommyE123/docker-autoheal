@@ -39,7 +39,7 @@ for sha in $commits; do
       break
     fi
   done
-  [ "$ok" = 1 ] || continue
+  [ "$ok" = 1 ] || exit 1
   tested=1
 done
 [ "$tested" = 1 ]
