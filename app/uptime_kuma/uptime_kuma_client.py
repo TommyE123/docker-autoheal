@@ -1,5 +1,4 @@
-"""
-Uptime-Kuma API client for fetching monitor statuses
+"""Uptime-Kuma API client for fetching monitor statuses
 Uses the /metrics endpoint with Basic Authentication
 """
 
@@ -12,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 # A genuine Uptime-Kuma sample: monitor_status or app_version at the start of a line,
 # followed by its label set. app_version is present even when no monitors exist.
-_METRICS_SAMPLE_PATTERN = re.compile(r"^(?:monitor_status|app_version)\{", re.MULTILINE)
+_METRICS_SAMPLE_PATTERN = re.compile(r"^(?:monitor_status|app_version)\\{", re.MULTILINE)
 
 
 class UptimeKumaClient:
@@ -24,8 +23,8 @@ class UptimeKumaClient:
         self.password = password
         self.username = username
         # Use Basic Auth with username (empty for API key) and password/API key
-        # For API key: username="", passwordapi_key
-        # For user auth: username=username, passwordpassword
+        # For API key: username="", ******
+        # For user auth: username=username, ******
         # Keep BasicAuth's Latin-1 default for compatibility with existing credentials.
         self.auth_header = aiohttp.encode_basic_auth(
             username if username else "", password, encoding="latin1"
