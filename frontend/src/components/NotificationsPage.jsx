@@ -43,6 +43,7 @@ function isServiceFormValid(formData) {
 function NotificationsPage() {
   const id = useId();
   const notificationSystemSwitchId = `${id}-notification-system`;
+  const notificationSystemLabelId = `${id}-notification-system-label`;
   const modalTitleId = `${id}-notification-modal-title`;
   const controlId = (name) => `${id}-${name}`;
   const [config, setConfig] = useState(null);
@@ -594,6 +595,7 @@ function NotificationsPage() {
                   <h5>
                     <Form.Label
                       htmlFor={notificationSystemSwitchId}
+                      id={notificationSystemLabelId}
                       className="mb-0"
                     >
                       Notification System
@@ -608,6 +610,7 @@ function NotificationsPage() {
                 <div className="d-flex align-items-center">
                   <Form.Check
                     id={notificationSystemSwitchId}
+                    aria-labelledby={notificationSystemLabelId}
                     type="switch"
                     checked={config?.enabled || false}
                     onChange={(e) =>
@@ -615,9 +618,12 @@ function NotificationsPage() {
                     }
                     disabled={saving}
                   />
-                  <span className="ms-2" aria-hidden="true">
+                  <Form.Label
+                    htmlFor={notificationSystemSwitchId}
+                    className="ms-2 mb-0"
+                  >
                     {config?.enabled ? "Enabled" : "Disabled"}
-                  </span>
+                  </Form.Label>
                 </div>
               </div>
             </Card.Body>
@@ -721,7 +727,7 @@ function NotificationsPage() {
                               testingService === service.name ||
                               !service.enabled
                             }
-                            aria-label={`Test ${service.name}`}
+                            aria-label={`${testingService === service.name ? "Testing" : "Test"} ${service.name}`}
                           >
                             {testingService === service.name ? (
                               <>

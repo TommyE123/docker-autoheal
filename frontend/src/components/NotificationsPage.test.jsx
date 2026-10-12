@@ -72,6 +72,7 @@ describe("NotificationsPage", () => {
     expect(screen.getByText("Disabled", { exact: true })).toBeInTheDocument();
     const notificationSwitch = screen.getByRole("checkbox", {
       name: "Notification System",
+      exact: true,
     });
 
     await user.click(notificationSwitch);
@@ -81,6 +82,27 @@ describe("NotificationsPage", () => {
     );
     expect(screen.getByText("Enabled", { exact: true })).toBeInTheDocument();
     expect(notificationSwitch).toHaveAccessibleName("Notification System");
+  });
+
+  it("toggles notifications when the visible status label is clicked", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({ data: config });
+    updateNotificationsConfig.mockResolvedValue({});
+
+    render(<NotificationsPage />);
+    await screen.findByText(/notifications are disabled/i);
+
+    await user.click(screen.getByText("Disabled", { exact: true }));
+
+    expect(
+      screen.getByRole("checkbox", {
+        name: "Notification System",
+        exact: true,
+      }),
+    ).toBeChecked();
+    await waitFor(() =>
+      expect(updateNotificationsConfig).toHaveBeenCalledWith({ enabled: true }),
+    );
   });
 
   it("clears the pending alert timer when unmounted", async () => {
@@ -659,6 +681,44 @@ describe("NotificationsPage", () => {
     expect(
       await screen.findByText(/test notification sent to "my webhook"/i),
     ).toBeInTheDocument();
+  });
+
+  it("updates the Test button accessible name while the test is pending", async () => {
+    const user = userEvent.setup();
+    let resolveTest;
+    getNotificationsConfig.mockResolvedValue({ data: configWithServices });
+    testNotificationService.mockReturnValue(
+      new Promise((resolve) => {
+        resolveTest = resolve;
+      }),
+    );
+
+    render(<NotificationsPage />);
+    await screen.findByText("My Webhook");
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Test My Webhook",
+        exact: true,
+      }),
+    );
+
+    const testingButton = screen.getByRole("button", {
+      name: "Testing My Webhook",
+      exact: true,
+    });
+    expect(testingButton).toBeDisabled();
+
+    resolveTest({});
+    expect(
+      await screen.findByText(/test notification sent to "my webhook"/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Test My Webhook",
+        exact: true,
+      }),
+    ).toBeEnabled();
   });
 
   it("shows an alert when testing a notification service fails", async () => {

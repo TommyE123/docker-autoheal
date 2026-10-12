@@ -3,8 +3,8 @@ import { inspectContainer, RUN_LABEL, stopContainer } from "../docker.js";
 
 const rowFor = (page, name) => page.getByRole("row", { name });
 
-// The row action buttons are icon-only: the icon glyph becomes their accessible name, so
-// getByRole("button", { name: "Restart" }) never matches. Find them by their title.
+// Row action buttons have container-specific accessible names; title selectors below target
+// their hover tooltips while keeping each action scoped to its container row.
 
 // What the Containers page should show for each shared container. Only the first is
 // part of @smoke: the rest are the same list rendering with different data.
