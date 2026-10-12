@@ -98,22 +98,27 @@ modify it, and the badge keeps showing the last committed score between refreshe
 The `Update Mutation Results` workflow (`.github/workflows/update-mutation-results.yml`)
 refreshes it:
 
-- It has only a `workflow_dispatch` trigger and no GitHub `schedule`. Run it from the
-  Actions tab, or let an external scheduler (cron-job.org) call the `workflow_dispatch`
-  API. The caller's token is configured outside the repository. It always checks out and
-  tests `main`; a dispatch against any other ref fails immediately with an error.
+- It runs on every push to `main` and on `workflow_dispatch`, with no GitHub `schedule`. A
+  dispatch can come from the Actions tab or an external scheduler (cron-job.org); the
+  caller's token is configured outside the repository. It always checks out and tests
+  `main`; a dispatch against any other ref fails immediately with an error. The score is
+  computed from the current `main` commit, independent of any pull request mutation run.
+- To avoid a loop, the `push` trigger uses `paths-ignore: .github/badges/mutation.json`, so the
+  updater's own badge-only merge does not start another run. A push that changes any other
+  file (including a mixed push with the badge file) still runs. Release Please release merges
+  (`chore(main): release ...`) are skipped; `workflow_dispatch` always runs.
 - It runs the same full `./mutation.sh` with `UPDATE_MUTATION_BADGE=1`, then compares the
   new score with the one tracked on `main`. The result is tied to the exact `main` commit
-  that was tested; if `main` has moved by the time the run finishes, nothing is published
+  that was tested; if `main` has moved by the time the run finishes (other than by
+  badge-only commits, such as this workflow's own merged PR), nothing is published
   or closed and the workflow must be run again.
 - It then hands the tracked file to
   [`peter-evans/create-pull-request`](https://github.com/peter-evans/create-pull-request)
   (pinned by commit SHA), which owns the branch and PR lifecycle:
   - On a change it commits only `.github/badges/mutation.json` to
     `chore/update-mutation-results` and opens a pull request to `main`, or updates the one
-    already open. The title is `chore: update mutation results (65.8% → 66.7%)`; when the
-    score is unchanged or cannot be read from either file it is
-    `chore: update mutation results`. If the score dropped, the PR body starts with a
+    already open. The title (and so the squash-merge commit subject) is always
+    `mutation: update mutation score badge`. If the score dropped, the PR body starts with a
     warning. A drop never fails the workflow.
   - With no change it creates nothing, and closes (and deletes the branch of) an update PR
     left open by an earlier run, because the result has caught up.
