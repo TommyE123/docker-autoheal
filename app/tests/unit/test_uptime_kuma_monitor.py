@@ -290,12 +290,67 @@ class TestUpdateStatusCache:
         # The real client returns None (not []) when the request fails.
         _add_mapping("web", "Web Monitor")
         monitor = UptimeKumaMonitor()
-        monitor._container_status_cache["web"] = 0
-        _install_client(monitor, FakeUptimeKumaClient(get_all_monitors_fails=True))
+        fake_client = FakeUptimeKumaClient(monitors=[{"friendly_name": "Web Monitor", "status": 0}])
+        _install_client(monitor, fake_client)
+
+        await monitor._update_status_cache()
+        fake_client.get_all_monitors_fails = True
 
         await monitor._update_status_cache()
 
         assert monitor._container_status_cache == {"web": 0}
+
+    async def test_failed_fetch_drops_remapped_status_and_preserves_other_container(self):
+        _add_mapping("web", "Old Monitor")
+        _add_mapping("db", "DB Monitor")
+        monitor = UptimeKumaMonitor()
+        fake_client = FakeUptimeKumaClient(
+            monitors=[
+                {"friendly_name": "Old Monitor", "status": 0},
+                {"friendly_name": "DB Monitor", "status": 1},
+            ]
+        )
+        _install_client(monitor, fake_client)
+
+        await monitor._update_status_cache()
+        config = config_manager.get_config()
+        config.uptime_kuma_mappings = [
+            UptimeKumaMapping(container_id="web", monitor_friendly_name="New Monitor"),
+            UptimeKumaMapping(container_id="db", monitor_friendly_name="DB Monitor"),
+        ]
+        config_manager.update_config(config)
+        fake_client.get_all_monitors_fails = True
+
+        await monitor._update_status_cache()
+
+        assert monitor.get_container_status("web") is None
+        assert monitor.get_container_status("db") == 1
+
+    async def test_failed_fetch_drops_status_when_its_source_mapping_is_removed(self):
+        _add_mapping("web", "Monitor A")
+        _add_mapping("web", "Monitor B")
+        monitor = UptimeKumaMonitor()
+        fake_client = FakeUptimeKumaClient(
+            monitors=[
+                {"friendly_name": "Monitor A", "status": 1},
+                {"friendly_name": "Monitor B", "status": 0},
+            ]
+        )
+        _install_client(monitor, fake_client)
+
+        await monitor._update_status_cache()
+        assert monitor.get_container_status("web") == 0
+
+        config = config_manager.get_config()
+        config.uptime_kuma_mappings = [
+            UptimeKumaMapping(container_id="web", monitor_friendly_name="Monitor A")
+        ]
+        config_manager.update_config(config)
+        fake_client.get_all_monitors_fails = True
+
+        await monitor._update_status_cache()
+
+        assert monitor.get_container_status("web") is None
 
     async def test_status_for_unmapped_container_is_dropped(self):
         _add_mapping("web", "Web Monitor")
@@ -509,15 +564,17 @@ class TestUpdateStatusCache:
     async def test_error_fetching_metrics_is_logged_and_leaves_cache_unchanged(self, caplog):
         _add_mapping("web", "Web Monitor")
         monitor = UptimeKumaMonitor()
-        monitor._container_status_cache["web"] = 1
-        fake_client = FakeUptimeKumaClient(get_all_monitors_error=RuntimeError("upstream error"))
+        fake_client = FakeUptimeKumaClient(monitors=[{"friendly_name": "Web Monitor", "status": 1}])
         _install_client(monitor, fake_client)
+
+        await monitor._update_status_cache()
+        fake_client.get_all_monitors_error = RuntimeError("upstream error")
 
         with caplog.at_level(logging.ERROR):
             await monitor._update_status_cache()
 
         assert monitor._container_status_cache == {"web": 1}
-        assert fake_client.get_all_monitors_calls == 1
+        assert fake_client.get_all_monitors_calls == 2
         assert any(
             record.levelno == logging.ERROR and "upstream error" in record.getMessage()
             for record in caplog.records
@@ -590,6 +647,27 @@ class TestShouldRestartFromUptimeKuma:
         )
 
         assert await monitor.should_restart_from_uptime_kuma("web") is True
+
+    async def test_remapped_container_does_not_restart_from_stale_down_status_during_outage(
+        self,
+    ):
+        _enable_uptime_kuma(auto_restart_on_down=True)
+        _add_mapping("web", "Old Monitor")
+        monitor = UptimeKumaMonitor()
+        fake_client = FakeUptimeKumaClient(monitors=[{"friendly_name": "Old Monitor", "status": 0}])
+        _install_client(monitor, fake_client)
+
+        assert await monitor.should_restart_from_uptime_kuma("web") is True
+
+        config = config_manager.get_config()
+        config.uptime_kuma_mappings = [
+            UptimeKumaMapping(container_id="web", monitor_friendly_name="New Monitor")
+        ]
+        config_manager.update_config(config)
+        fake_client.get_all_monitors_fails = True
+
+        assert await monitor.should_restart_from_uptime_kuma("web") is False
+        assert monitor.get_container_status("web") is None
 
     async def test_false_when_mapped_monitor_is_up(self):
         _enable_uptime_kuma(auto_restart_on_down=True)
