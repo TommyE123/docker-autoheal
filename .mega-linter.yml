@@ -34,7 +34,6 @@ DISABLE_ERRORS_LINTERS:
   - PYTHON_PYRIGHT
   - PYTHON_RUFF
   - REPOSITORY_OSV_SCANNER
-  - REPOSITORY_TRIVY
 
 # ---------------------------------------------------------------------------
 # Global MegaLinter configuration
