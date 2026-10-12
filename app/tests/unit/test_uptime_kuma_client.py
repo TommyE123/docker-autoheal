@@ -120,7 +120,8 @@ class TestConnect:
 
     async def test_returns_true_when_monitor_status_present(self, monkeypatch):
         """Accept a successful response containing monitor status metrics."""
-        _patch_session(monkeypatch, response=_FakeResponse(200, METRICS_TEXT))
+        text = 'monitor_status{monitor_name="Web"} 1\n'
+        _patch_session(monkeypatch, response=_FakeResponse(200, text))
         client = UptimeKumaClient("http://kuma.example", "token")
 
         assert await client.connect() is True
@@ -131,8 +132,26 @@ class TestConnect:
 
         assert await client.connect() is True
 
-    async def test_returns_false_when_response_has_no_metrics_markers(self, monkeypatch):
-        _patch_session(monkeypatch, response=_FakeResponse(200, "not metrics data"))
+    @pytest.mark.parametrize(
+        "body",
+        [
+            "<html><body>monitor_status</body></html>",
+            "<html><body>app_version</body></html>",
+            "",
+            "some_other_metric 1\n",
+        ],
+        ids=[
+            "html-mentioning-monitor-status",
+            "html-mentioning-app-version",
+            "empty-body",
+            "unrelated-metrics",
+        ],
+    )
+    async def test_returns_false_when_response_is_not_uptime_kuma_metrics(
+        self, monkeypatch, body
+    ):
+        """Reject responses that mention a metric without a genuine metrics sample."""
+        _patch_session(monkeypatch, response=_FakeResponse(200, body))
         client = UptimeKumaClient("http://kuma.example", "token")
 
         assert await client.connect() is False
