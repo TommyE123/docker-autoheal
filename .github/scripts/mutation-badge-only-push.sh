@@ -15,6 +15,9 @@ subject='^mutation: update mutation score badge( \(#[0-9]+\))?$'
 git cat-file -e "$before^{commit}" 2>/dev/null || exit 1
 git cat-file -e "$after^{commit}" 2>/dev/null || exit 1
 
+# Diverged or unprovable history (e.g. a force push): do not skip.
+git merge-base --is-ancestor "$before" "$after" 2>/dev/null || exit 1
+
 commits=$(git rev-list "$before..$after")
 [ -n "$commits" ] || exit 1
 

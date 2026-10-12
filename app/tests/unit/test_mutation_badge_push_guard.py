@@ -77,3 +77,15 @@ def test_unknown_or_zero_before_is_not_skipped(repo):
     commit(repo, {BADGE: "1"}, SUBJECT)
     assert not skips(repo, "0" * 40)
     assert not skips(repo, "1" * 40)
+
+
+def test_diverged_history_is_not_skipped(repo):
+    base = git(repo, "rev-parse", "HEAD")
+    git(repo, "checkout", "-q", "-b", "other")
+    old_tip = commit(repo, {BADGE: "2"}, "fix: abandoned work")
+    git(repo, "checkout", "-q", "-")
+    git(repo, "reset", "-q", "--hard", base)
+    commit(repo, {BADGE: "1"}, SUBJECT)
+    # Both SHAs exist and only the badge differs between them (so the commit
+    # and diff checks alone would pass), but the old tip is not its ancestor (a force push), so it must not skip.
+    assert not skips(repo, old_tip)

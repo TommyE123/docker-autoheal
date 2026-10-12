@@ -61,8 +61,13 @@ def test_mutation_commits_are_hidden_from_release_notes():
     sections = {section["type"]: section for section in config["changelog-sections"]}
     assert sections["mutation"].get("hidden") is True
 
-    # Release Please bumps only for feat/fix (and breaking changes); hiding a
-    # type does not bump anything, and the releasing types stay visible.
+    # Configuration check only. It does not prove that a mutation-only commit
+    # causes no release: version bumping is computed by Release Please itself
+    # (which this repo does not re-implement), not by changelog-sections. This
+    # only pins that the releasing types stay visible and nothing here
+    # overrides the bump rules.
+    assert "bump-minor-pre-major" not in config
+    assert "bump-patch-for-minor-pre-major" not in config
     assert not sections["feat"].get("hidden")
     assert not sections["fix"].get("hidden")
     assert (
