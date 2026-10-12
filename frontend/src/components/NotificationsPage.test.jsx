@@ -69,14 +69,18 @@ describe("NotificationsPage", () => {
     render(<NotificationsPage />);
 
     await screen.findByText(/notifications are disabled/i);
+    expect(screen.getByText("Disabled", { exact: true })).toBeInTheDocument();
+    const notificationSwitch = screen.getByRole("checkbox", {
+      name: "Notification System",
+    });
 
-    await user.click(
-      screen.getByRole("checkbox", { name: "Notification System" }),
-    );
+    await user.click(notificationSwitch);
 
     await waitFor(() =>
       expect(updateNotificationsConfig).toHaveBeenCalledWith({ enabled: true }),
     );
+    expect(screen.getByText("Enabled", { exact: true })).toBeInTheDocument();
+    expect(notificationSwitch).toHaveAccessibleName("Notification System");
   });
 
   it("clears the pending alert timer when unmounted", async () => {

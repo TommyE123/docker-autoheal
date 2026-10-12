@@ -2,7 +2,8 @@ import { useEffect, useId, useState } from "react";
 import { Modal, Button } from "react-bootstrap";
 
 function MaintenanceModal({ show, startTime, onDismiss }) {
-  const titleId = `${useId()}-maintenance-title`;
+  const id = useId();
+  const titleId = `${id}-maintenance-title`;
   const [elapsedTime, setElapsedTime] = useState("00:00:00");
 
   useEffect(() => {

@@ -23,7 +23,8 @@ function ValidationModal({
   config,
   onHide,
 }) {
-  const titleId = `${useId()}-validation-modal-title`;
+  const id = useId();
+  const titleId = `${id}-validation-modal-title`;
 
   return (
     <Modal

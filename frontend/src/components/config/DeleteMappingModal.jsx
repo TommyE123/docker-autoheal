@@ -12,7 +12,8 @@ import { Modal, Button } from "react-bootstrap";
  * @param {Function} props.onConfirm - Callback when confirmed
  */
 function DeleteMappingModal({ show, containerName, onHide, onConfirm }) {
-  const titleId = `${useId()}-delete-mapping-title`;
+  const id = useId();
+  const titleId = `${id}-delete-mapping-title`;
 
   return (
     <Modal

@@ -11,7 +11,8 @@ import { Modal, Button } from "react-bootstrap";
  * @param {Function} props.onConfirm - Callback when confirmed
  */
 function DisableUptimeKumaModal({ show, onHide, onConfirm }) {
-  const titleId = `${useId()}-disable-uptime-kuma-title`;
+  const id = useId();
+  const titleId = `${id}-disable-uptime-kuma-title`;
 
   return (
     <Modal

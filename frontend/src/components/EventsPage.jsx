@@ -13,7 +13,8 @@ import { EVENT_TYPES } from "../constants/eventTypes";
 import { format } from "date-fns";
 
 function EventsPage() {
-  const confirmationTitleId = `${useId()}-confirm-clear-events-title`;
+  const id = useId();
+  const confirmationTitleId = `${id}-confirm-clear-events-title`;
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [alert, setAlert] = useState(null);

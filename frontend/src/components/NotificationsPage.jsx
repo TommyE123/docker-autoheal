@@ -605,13 +605,20 @@ function NotificationsPage() {
                       : "Notifications are disabled"}
                   </p>
                 </div>
-                <Form.Check
-                  id={notificationSystemSwitchId}
-                  type="switch"
-                  checked={config?.enabled || false}
-                  onChange={(e) => handleToggleNotifications(e.target.checked)}
-                  disabled={saving}
-                />
+                <div className="d-flex align-items-center">
+                  <Form.Check
+                    id={notificationSystemSwitchId}
+                    type="switch"
+                    checked={config?.enabled || false}
+                    onChange={(e) =>
+                      handleToggleNotifications(e.target.checked)
+                    }
+                    disabled={saving}
+                  />
+                  <span className="ms-2" aria-hidden="true">
+                    {config?.enabled ? "Enabled" : "Disabled"}
+                  </span>
+                </div>
               </div>
             </Card.Body>
           </Card>
