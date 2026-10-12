@@ -98,15 +98,18 @@ modify it, and the badge keeps showing the last committed score between refreshe
 The `Update Mutation Results` workflow (`.github/workflows/update-mutation-results.yml`)
 refreshes it:
 
-- It runs after every push to `main` and on `workflow_dispatch`, with no GitHub
-  `schedule`. A dispatch can come from the Actions tab or an external scheduler
-  (cron-job.org); the caller's token is configured outside the repository. It always checks
+- It runs on `workflow_dispatch` (always) and on a push to `main` only when the push came
+  from a merged pull request whose head commit already has a successful `Mutation Testing`
+  run (`.github/scripts/mutation-tested-push.sh`; the pull request is looked up from the
+  commit, so squash merge SHAs are fine). Pushes without such a run (docs-only, Release
+  Please, direct pushes) are skipped. It has no GitHub `schedule`. A dispatch can come from the Actions tab or an external
+  scheduler (cron-job.org); the caller's token is configured outside the repository. It always checks
   out and tests `main`; a dispatch against any other ref fails immediately with an error.
 - To avoid a loop, a `guard` job skips the run when a push holds only the automated
   badge-update commit(s). `.github/scripts/mutation-badge-only-push.sh` compares the
   push's `before`/`after` SHAs: every commit must have the subject
   `mutation: update mutation score badge` and touch only the badge file, and the whole
-  range must change only that file. Normal commits and mixed pushes still run.
+  range must change only that file. Normal commits and mixed pushes are not skipped by this check.
 - It runs the same full `./mutation.sh` with `UPDATE_MUTATION_BADGE=1`, then compares the
   new score with the one tracked on `main`. The result is tied to the exact `main` commit
   that was tested; if `main` has moved by the time the run finishes, nothing is published
@@ -204,10 +207,10 @@ of the rest are noise (log messages, string literals, cosmetic constants).
 still own test and coverage settings. Every non-default setting has a reason from the
 Phase 1 evaluation in [#333](https://github.com/TommyE123/docker-autoheal/issues/333):
 
-| Setting                              | Why                                                                                                                                                                                                            |
-|--------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `source_paths = ["app"]`             | Required: Mutmut's automatic detection fails for this repository's directory name.                                                                                                                             |
-| `do_not_mutate`                      | Without `app/tests/*` Mutmut mutates the tests themselves (about 13.6k extra mutants, including the integration suite). `.coveragerc` omits it too.                                                            |
+| Setting                              | Why                                                                                                                                                                                                                                                 |
+|--------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `source_paths = ["app"]`             | Required: Mutmut's automatic detection fails for this repository's directory name.                                                                                                                                                                  |
+| `do_not_mutate`                      | Without `app/tests/*` Mutmut mutates the tests themselves (about 13.6k extra mutants, including the integration suite). `.coveragerc` omits it too.                                                                                                 |
 | `pytest_add_cli_args_test_selection` | `test_release_please_workflow.py`, `test_dev_stack_files.py` and `test_mutation_badge_push_guard.py` read `.github/`, `.vscode/` and Compose files that do not exist inside `mutants/` and abort stats collection. They import nothing from `app/`. |
 
 Deliberately left at Mutmut's defaults:

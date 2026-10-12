@@ -70,9 +70,7 @@ def test_mutation_commits_are_hidden_from_release_notes():
     assert "bump-patch-for-minor-pre-major" not in config
     assert not sections["feat"].get("hidden")
     assert not sections["fix"].get("hidden")
-    assert (
-        "mutation" in (REPO_ROOT / ".github" / "workflows" / "semantic-pr-title.yml").read_text()
-    )
+    assert "mutation" in (REPO_ROOT / ".github" / "workflows" / "semantic-pr-title.yml").read_text()
 
 
 def test_manifest_starts_from_the_actual_last_released_version():
