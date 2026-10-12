@@ -10,7 +10,7 @@ source_paths = ["app"]
 do_not_mutate = ["app/tests/*"]
 
 # These modules read repository files (.github/workflows/*.yml, .vscode/tasks.json,
-# docker-compose.dev.yml, .github/scripts/*.sh)
+# docker-compose.dev.yml)
 # via parents[3], which do not exist inside mutants/, so stats collection aborts if
 # they are collected. They import nothing from app/, so they cannot kill an
 # application mutant.

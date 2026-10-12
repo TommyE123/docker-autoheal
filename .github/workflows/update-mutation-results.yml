@@ -6,13 +6,16 @@ name: Update Mutation Results
 #
 # Informational only: a lower score is flagged in the PR but never fails this
 # workflow, blocks the merge or delays Release Please. Runs on every push to main
-# (except a push holding only this workflow's own badge-update commit, which would
-# loop) and on workflow_dispatch, from the Actions tab or an external scheduler
+# and on workflow_dispatch, from the Actions tab or an external scheduler
 # (cron-job.org) calling the API on main. There is deliberately no GitHub schedule.
+# paths-ignore stops this workflow's own badge-only merge from re-triggering it
+# (a loop); a push that also changes any other file still runs.
 on:
   push:
     branches:
       - main
+    paths-ignore:
+      - ".github/badges/mutation.json"
   workflow_dispatch:
 
 permissions:
@@ -26,39 +29,8 @@ env:
   BADGE_FILE: .github/badges/mutation.json
 
 jobs:
-  # Skips the suite only when the push holds nothing but automated badge-update
-  # commits (from the push's before/after SHAs, commit subjects and changed files).
-  guard:
-    name: Check push
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      run: ${{ steps.check.outputs.run }}
-    steps:
-      - name: Checkout main
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Skip badge-only pushes
-        id: check
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BEFORE: ${{ github.event.before }}
-          AFTER: ${{ github.sha }}
-        run: |
-          if [ "$EVENT_NAME" = "push" ] && .github/scripts/mutation-badge-only-push.sh "$BEFORE" "$AFTER"; then
-            echo "Push holds only the automated badge update; skipping the mutation run."
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          fi
-
   update:
     name: Update mutation results
-    needs: guard
-    if: ${{ needs.guard.outputs.run == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
 

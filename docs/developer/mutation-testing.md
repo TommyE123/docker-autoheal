@@ -103,11 +103,9 @@ refreshes it:
   caller's token is configured outside the repository. It always checks out and tests
   `main`; a dispatch against any other ref fails immediately with an error. The score is
   computed from the current `main` commit, independent of any pull request mutation run.
-- To avoid a loop, a `guard` job skips the run when a push holds only the automated
-  badge-update commit(s). `.github/scripts/mutation-badge-only-push.sh` compares the
-  push's `before`/`after` SHAs: every commit must have the subject
-  `mutation: update mutation score badge` and touch only the badge file, and the whole
-  range must change only that file. Normal commits and mixed pushes are not skipped by this check.
+- To avoid a loop, the `push` trigger uses `paths-ignore: .github/badges/mutation.json`, so the
+  updater's own badge-only merge does not start another run. A push that changes any other
+  file (including a mixed push with the badge file) still runs.
 - It runs the same full `./mutation.sh` with `UPDATE_MUTATION_BADGE=1`, then compares the
   new score with the one tracked on `main`. The result is tied to the exact `main` commit
   that was tested; if `main` has moved by the time the run finishes, nothing is published
