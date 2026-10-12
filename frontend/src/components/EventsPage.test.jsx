@@ -163,6 +163,9 @@ describe("EventsPage", () => {
     await screen.findByText("web-app");
 
     await user.click(screen.getByRole("button", { name: /clear all/i }));
+    expect(
+      screen.getByRole("dialog", { name: "Confirm Clear Events" }),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /^cancel$/i }));
 
     expect(clearEvents).not.toHaveBeenCalled();
@@ -180,6 +183,9 @@ describe("EventsPage", () => {
     expect(getEvents).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole("button", { name: /clear all/i }));
+    expect(
+      screen.getByRole("dialog", { name: "Confirm Clear Events" }),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /clear all events/i }));
 
     await waitFor(() => expect(clearEvents).toHaveBeenCalledTimes(1));

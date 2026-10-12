@@ -24,7 +24,7 @@ describe("RestartPolicySettings", () => {
       />,
     );
 
-    await user.selectOptions(screen.getByRole("combobox"), "both");
+    await user.selectOptions(screen.getByLabelText("Restart Mode"), "both");
 
     expect(onConfigChange).toHaveBeenCalledWith({ ...config, mode: "both" });
   });
@@ -41,7 +41,13 @@ describe("RestartPolicySettings", () => {
       />,
     );
 
-    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByLabelText("Respect Manual Stop"));
+
+    expect(screen.getByLabelText("Cooldown (seconds)")).toBeInTheDocument();
+    expect(screen.getByLabelText("Max Restarts")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Max Restarts Window (seconds)"),
+    ).toBeInTheDocument();
 
     expect(onConfigChange).toHaveBeenCalledWith({
       ...config,

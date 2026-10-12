@@ -70,7 +70,9 @@ describe("NotificationsPage", () => {
 
     await screen.findByText(/notifications are disabled/i);
 
-    await user.click(screen.getByRole("checkbox"));
+    await user.click(
+      screen.getByRole("checkbox", { name: "Notification System" }),
+    );
 
     await waitFor(() =>
       expect(updateNotificationsConfig).toHaveBeenCalledWith({ enabled: true }),
@@ -84,7 +86,9 @@ describe("NotificationsPage", () => {
 
     const { unmount } = render(<NotificationsPage />);
     await screen.findByText(/notifications are disabled/i);
-    await user.click(screen.getByRole("checkbox"));
+    await user.click(
+      screen.getByRole("checkbox", { name: "Notification System" }),
+    );
     await screen.findByText(/notifications enabled/i);
 
     const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
@@ -160,12 +164,19 @@ describe("NotificationsPage", () => {
 
     await user.click(screen.getByRole("button", { name: /add service/i }));
 
+    const dialog = await screen.findByRole("dialog", {
+      name: "Add Notification Service",
+    });
+    expect(within(dialog).getByLabelText("Service Name *")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Service Type *")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Enabled")).toBeInTheDocument();
+
     await user.type(
-      screen.getByPlaceholderText(/my discord server/i),
+      within(dialog).getByLabelText("Service Name *"),
       "New Webhook",
     );
     await user.type(
-      screen.getByPlaceholderText(/https:\/\/example\.com\/webhook/i),
+      within(dialog).getByLabelText("Webhook URL *"),
       "https://example.com/hook",
     );
 
@@ -222,11 +233,11 @@ describe("NotificationsPage", () => {
     await user.click(screen.getByRole("button", { name: /add service/i }));
 
     await user.type(
-      screen.getByPlaceholderText(/my discord server/i),
+      screen.getByLabelText("Service Name *"),
       "New Webhook",
     );
     await user.type(
-      screen.getByPlaceholderText(/https:\/\/example\.com\/webhook/i),
+      screen.getByLabelText("Webhook URL *"),
       "https://example.com/hook",
     );
 
@@ -260,7 +271,7 @@ describe("NotificationsPage", () => {
     await user.click(screen.getByRole("button", { name: /add service/i }));
 
     await user.type(
-      screen.getByPlaceholderText(/my discord server/i),
+      screen.getByLabelText("Service Name *"),
       "Incomplete Webhook",
     );
 
@@ -269,7 +280,7 @@ describe("NotificationsPage", () => {
     expect(addButton).toBeDisabled();
 
     await user.type(
-      screen.getByPlaceholderText(/https:\/\/example\.com\/webhook/i),
+      screen.getByLabelText("Webhook URL *"),
       "https://example.com/hook",
     );
 
@@ -301,17 +312,18 @@ describe("NotificationsPage", () => {
 
     await user.click(screen.getByRole("button", { name: /add service/i }));
     await user.type(
-      screen.getByPlaceholderText(/my discord server/i),
+      screen.getByLabelText("Service Name *"),
       "Incomplete Telegram",
     );
-    await user.selectOptions(screen.getByRole("combobox"), "telegram");
+    await user.selectOptions(
+      screen.getByLabelText("Service Type *"),
+      "telegram",
+    );
 
     const addButton = screen.getByRole("button", { name: /^add service$/i });
     expect(addButton).toBeDisabled();
 
-    const botTokenInput = screen.getByPlaceholderText(
-      /123456789:abcdefghijklmnopqrstuvwxyz/i,
-    );
+    const botTokenInput = screen.getByLabelText("Bot Token *");
     await user.type(botTokenInput, "   ");
     expect(addButton).toBeDisabled();
 
@@ -319,7 +331,7 @@ describe("NotificationsPage", () => {
     await user.type(botTokenInput, "123:abc");
     expect(addButton).toBeDisabled();
 
-    await user.type(screen.getByPlaceholderText(/-1001234567890/i), "456");
+    await user.type(screen.getByLabelText("Chat ID *"), "456");
     expect(addButton).toBeEnabled();
   });
 
@@ -336,11 +348,11 @@ describe("NotificationsPage", () => {
 
     await user.click(screen.getByRole("button", { name: /add service/i }));
     await user.type(
-      screen.getByPlaceholderText(/my discord server/i),
+      screen.getByLabelText("Service Name *"),
       "Name Only",
     );
 
-    const typeSelect = screen.getByRole("combobox");
+    const typeSelect = screen.getByLabelText("Service Type *");
     const serviceTypes = Array.from(
       typeSelect.options,
       (option) => option.value,
@@ -380,7 +392,7 @@ describe("NotificationsPage", () => {
     expect(updateButton).toBeDisabled();
 
     await user.type(
-      screen.getByPlaceholderText(/https:\/\/example\.com\/webhook/i),
+      screen.getByLabelText("Webhook URL *"),
       "https://example.com/hook",
     );
 
@@ -495,8 +507,10 @@ describe("NotificationsPage", () => {
 
     await user.click(screen.getAllByRole("button", { name: /^edit$/i })[1]);
 
-    const modal = screen.getByRole("dialog");
-    await user.click(within(modal).getByRole("checkbox"));
+    const modal = screen.getByRole("dialog", {
+      name: "Edit Notification Service",
+    });
+    await user.click(within(modal).getByLabelText("Enabled"));
     await user.click(screen.getByRole("button", { name: /update service/i }));
 
     await waitFor(() =>
@@ -533,8 +547,10 @@ describe("NotificationsPage", () => {
 
     await user.click(screen.getAllByRole("button", { name: /^edit$/i })[0]);
 
-    const modal = screen.getByRole("dialog");
-    await user.click(within(modal).getByRole("checkbox"));
+    const modal = screen.getByRole("dialog", {
+      name: "Edit Notification Service",
+    });
+    await user.click(within(modal).getByLabelText("Enabled"));
     await user.click(screen.getByRole("button", { name: /update service/i }));
 
     await waitFor(() =>
@@ -665,7 +681,9 @@ describe("NotificationsPage", () => {
     render(<NotificationsPage />);
 
     await screen.findByText(/notifications are disabled/i);
-    await user.click(screen.getByRole("checkbox"));
+    await user.click(
+      screen.getByRole("checkbox", { name: "Notification System" }),
+    );
 
     expect(
       await screen.findByText(/failed to update notifications/i),
@@ -755,8 +773,8 @@ describe("NotificationsPage", () => {
       await screen.findByText(/notifications are disabled/i);
 
       await user.click(screen.getByRole("button", { name: /add service/i }));
-      await user.type(screen.getByPlaceholderText(/my discord server/i), name);
-      await user.selectOptions(screen.getByRole("combobox"), type);
+      await user.type(screen.getByLabelText("Service Name *"), name);
+      await user.selectOptions(screen.getByLabelText("Service Type *"), type);
       return user;
     }
 
@@ -771,11 +789,11 @@ describe("NotificationsPage", () => {
     it("sends the url and optional username for a discord service", async () => {
       const user = await openAddModal("discord", "Discord");
       await user.type(
-        screen.getByPlaceholderText(/discord\.com\/api\/webhooks/i),
+        screen.getByLabelText("Discord Webhook URL *"),
         "https://discord.com/api/webhooks/1",
       );
       await user.type(
-        screen.getByPlaceholderText("Docker Auto-Heal"),
+        screen.getByLabelText("Username (optional)"),
         "autoheal-bot",
       );
 
@@ -791,7 +809,7 @@ describe("NotificationsPage", () => {
     it("sends only the url for a slack service", async () => {
       const user = await openAddModal("slack", "Slack");
       await user.type(
-        screen.getByPlaceholderText(/hooks\.slack\.com/i),
+        screen.getByLabelText("Slack Webhook URL *"),
         "https://hooks.slack.com/services/x",
       );
 
@@ -805,8 +823,8 @@ describe("NotificationsPage", () => {
 
     it("sends the bot token and chat id for a telegram service", async () => {
       const user = await openAddModal("telegram", "Telegram");
-      await user.type(screen.getByPlaceholderText(/123456789:abc/i), "123:abc");
-      await user.type(screen.getByPlaceholderText("-1001234567890"), "456");
+      await user.type(screen.getByLabelText("Bot Token *"), "123:abc");
+      await user.type(screen.getByLabelText("Chat ID *"), "456");
 
       expect(await submitAndGetPayload(user)).toEqual({
         name: "Telegram",
@@ -819,17 +837,13 @@ describe("NotificationsPage", () => {
 
     it("sends the topic and optional credentials for an ntfy service", async () => {
       const user = await openAddModal("ntfy", "Ntfy");
-      await user.type(screen.getByPlaceholderText("docker-autoheal"), "alerts");
+      await user.type(screen.getByLabelText("Topic *"), "alerts");
       await user.type(
-        screen.getByPlaceholderText(/ntfy\.sh/i),
+        screen.getByLabelText("Server URL (optional)"),
         "https://ntfy.example.com",
       );
-      const [username] = screen.getAllByRole("textbox").slice(-1);
-      await user.type(username, "me");
-      await user.type(
-        document.querySelector('input[type="password"]'),
-        "secret",
-      );
+      await user.type(screen.getByLabelText("Username (optional)"), "me");
+      await user.type(screen.getByLabelText("Password (optional)"), "secret");
 
       expect(await submitAndGetPayload(user)).toEqual({
         name: "Ntfy",
@@ -844,8 +858,8 @@ describe("NotificationsPage", () => {
 
     it("sends the access token for an ntfy service", async () => {
       const user = await openAddModal("ntfy", "Ntfy");
-      await user.type(screen.getByPlaceholderText("docker-autoheal"), "alerts");
-      await user.type(screen.getByPlaceholderText("tk_..."), "tk_secret");
+      await user.type(screen.getByLabelText("Topic *"), "alerts");
+      await user.type(screen.getByLabelText("Access token (optional)"), "tk_secret");
 
       expect(await submitAndGetPayload(user)).toEqual({
         name: "Ntfy",
@@ -868,8 +882,11 @@ describe("NotificationsPage", () => {
           response: { status: 500, data: { detail: "Server error" } },
         }),
       );
-      await user.type(screen.getByPlaceholderText("docker-autoheal"), "alerts");
-      await user.type(screen.getByPlaceholderText("tk_..."), "tk_leak_check");
+      await user.type(screen.getByLabelText("Topic *"), "alerts");
+      await user.type(
+        screen.getByLabelText("Access token (optional)"),
+        "tk_leak_check",
+      );
 
       await user.click(screen.getByRole("button", { name: /^add service$/i }));
 
@@ -884,10 +901,10 @@ describe("NotificationsPage", () => {
     it("sends the server url and app token for a gotify service", async () => {
       const user = await openAddModal("gotify", "Gotify");
       await user.type(
-        screen.getByPlaceholderText("https://gotify.example.com"),
+        screen.getByLabelText("Server URL *"),
         "https://gotify.local",
       );
-      await user.type(screen.getByPlaceholderText("AaBbCcDdEeFf"), "apptok");
+      await user.type(screen.getByLabelText("App Token *"), "apptok");
 
       expect(await submitAndGetPayload(user)).toEqual({
         name: "Gotify",
@@ -901,11 +918,11 @@ describe("NotificationsPage", () => {
     it("sends the user key and api token for a pushover service", async () => {
       const user = await openAddModal("pushover", "Pushover");
       await user.type(
-        screen.getByPlaceholderText("uQiRzpo4DXghDmr9QzzfQu27cmVRsG"),
+        screen.getByLabelText("User Key *"),
         "ukey",
       );
       await user.type(
-        screen.getByPlaceholderText("azGDORePK8gMaC0QOYAMyEEuzJnyUi"),
+        screen.getByLabelText("API Token *"),
         "atok",
       );
 

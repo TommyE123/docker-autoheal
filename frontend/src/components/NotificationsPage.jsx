@@ -338,7 +338,10 @@ function NotificationsPage() {
                 required
               />
             </Form.Group>
-            <Form.Group controlId={controlId("discord-username")} className="mb-3">
+            <Form.Group
+              controlId={controlId("discord-username")}
+              className="mb-3"
+            >
               <Form.Label>Username (optional)</Form.Label>
               <Form.Control
                 type="text"
@@ -374,7 +377,10 @@ function NotificationsPage() {
       case "telegram":
         return (
           <>
-            <Form.Group controlId={controlId("telegram-bot-token")} className="mb-3">
+            <Form.Group
+              controlId={controlId("telegram-bot-token")}
+              className="mb-3"
+            >
               <Form.Label>Bot Token *</Form.Label>
               <Form.Control
                 type="text"
@@ -386,7 +392,10 @@ function NotificationsPage() {
                 required
               />
             </Form.Group>
-            <Form.Group controlId={controlId("telegram-chat-id")} className="mb-3">
+            <Form.Group
+              controlId={controlId("telegram-chat-id")}
+              className="mb-3"
+            >
               <Form.Label>Chat ID *</Form.Label>
               <Form.Control
                 type="text"
@@ -416,7 +425,10 @@ function NotificationsPage() {
                 required
               />
             </Form.Group>
-            <Form.Group controlId={controlId("ntfy-server-url")} className="mb-3">
+            <Form.Group
+              controlId={controlId("ntfy-server-url")}
+              className="mb-3"
+            >
               <Form.Label>Server URL (optional)</Form.Label>
               <Form.Control
                 type="url"
@@ -427,7 +439,10 @@ function NotificationsPage() {
                 placeholder="https://ntfy.sh (default)"
               />
             </Form.Group>
-            <Form.Group controlId={controlId("ntfy-username")} className="mb-3">
+            <Form.Group
+              controlId={controlId("ntfy-username")}
+              className="mb-3"
+            >
               <Form.Label>Username (optional)</Form.Label>
               <Form.Control
                 type="text"
@@ -437,7 +452,10 @@ function NotificationsPage() {
                 }
               />
             </Form.Group>
-            <Form.Group controlId={controlId("ntfy-password")} className="mb-3">
+            <Form.Group
+              controlId={controlId("ntfy-password")}
+              className="mb-3"
+            >
               <Form.Label>Password (optional)</Form.Label>
               <Form.Control
                 type="password"
@@ -447,7 +465,10 @@ function NotificationsPage() {
                 }
               />
             </Form.Group>
-            <Form.Group controlId={controlId("ntfy-access-token")} className="mb-3">
+            <Form.Group
+              controlId={controlId("ntfy-access-token")}
+              className="mb-3"
+            >
               <Form.Label>Access token (optional)</Form.Label>
               <Form.Control
                 type="password"
@@ -467,7 +488,10 @@ function NotificationsPage() {
       case "gotify":
         return (
           <>
-            <Form.Group controlId={controlId("gotify-server-url")} className="mb-3">
+            <Form.Group
+              controlId={controlId("gotify-server-url")}
+              className="mb-3"
+            >
               <Form.Label>Server URL *</Form.Label>
               <Form.Control
                 type="url"
@@ -479,7 +503,10 @@ function NotificationsPage() {
                 required
               />
             </Form.Group>
-            <Form.Group controlId={controlId("gotify-app-token")} className="mb-3">
+            <Form.Group
+              controlId={controlId("gotify-app-token")}
+              className="mb-3"
+            >
               <Form.Label>App Token *</Form.Label>
               <Form.Control
                 type="text"
@@ -497,7 +524,10 @@ function NotificationsPage() {
       case "pushover":
         return (
           <>
-            <Form.Group controlId={controlId("pushover-user-key")} className="mb-3">
+            <Form.Group
+              controlId={controlId("pushover-user-key")}
+              className="mb-3"
+            >
               <Form.Label>User Key *</Form.Label>
               <Form.Control
                 type="text"
@@ -509,7 +539,10 @@ function NotificationsPage() {
                 required
               />
             </Form.Group>
-            <Form.Group controlId={controlId("pushover-api-token")} className="mb-3">
+            <Form.Group
+              controlId={controlId("pushover-api-token")}
+              className="mb-3"
+            >
               <Form.Label>API Token *</Form.Label>
               <Form.Control
                 type="text"
@@ -568,7 +601,10 @@ function NotificationsPage() {
               <div className="d-flex justify-content-between align-items-center">
                 <div>
                   <h5>
-                    <Form.Label htmlFor={notificationSystemSwitchId}>
+                    <Form.Label
+                      htmlFor={notificationSystemSwitchId}
+                      className="mb-0"
+                    >
                       Notification System
                     </Form.Label>
                   </h5>
@@ -783,7 +819,10 @@ function NotificationsPage() {
               </Form.Select>
             </Form.Group>
 
-            <Form.Group controlId={controlId("service-enabled")} className="mb-3">
+            <Form.Group
+              controlId={controlId("service-enabled")}
+              className="mb-3"
+            >
               <Form.Check
                 type="switch"
                 label="Enabled"

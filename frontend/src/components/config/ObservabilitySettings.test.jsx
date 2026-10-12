@@ -18,7 +18,7 @@ describe("ObservabilitySettings", () => {
       />,
     );
 
-    await user.selectOptions(screen.getByRole("combobox"), "DEBUG");
+    await user.selectOptions(screen.getByLabelText("Log Level"), "DEBUG");
 
     expect(onConfigChange).toHaveBeenCalledWith({
       ...config,
@@ -38,7 +38,7 @@ describe("ObservabilitySettings", () => {
       />,
     );
 
-    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByLabelText("Enable Prometheus Metrics"));
 
     expect(onConfigChange).toHaveBeenCalledWith({
       ...config,
