@@ -47,10 +47,27 @@ def test_config_bootstraps_from_the_last_real_release_commit():
     }
 
     actual_sections = {
-        section["type"]: section["section"] for section in config["changelog-sections"]
+        section["type"]: section["section"]
+        for section in config["changelog-sections"]
+        if not section.get("hidden")
     }
 
     assert actual_sections == expected_sections
+
+
+def test_mutation_commits_are_hidden_from_release_notes():
+    config = json.loads((REPO_ROOT / "release-please-config.json").read_text())
+
+    sections = {section["type"]: section for section in config["changelog-sections"]}
+    assert sections["mutation"].get("hidden") is True
+
+    # Release Please bumps only for feat/fix (and breaking changes); hiding a
+    # type does not bump anything, and the releasing types stay visible.
+    assert not sections["feat"].get("hidden")
+    assert not sections["fix"].get("hidden")
+    assert (
+        "mutation" in (REPO_ROOT / ".github" / "workflows" / "semantic-pr-title.yml").read_text()
+    )
 
 
 def test_manifest_starts_from_the_actual_last_released_version():
