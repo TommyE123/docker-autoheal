@@ -24,8 +24,8 @@ class UptimeKumaClient:
         self.password = password
         self.username = username
         # Use Basic Auth with username (empty for API key) and password/API key
-        # For API key: username="", ******
-        # For user auth: username=username, ******
+        # For API key: username="", password\u003dapi_key
+        # For user auth: username=username, password\u003dpassword
         # Keep BasicAuth's Latin-1 default for compatibility with existing credentials.
         self.auth_header = aiohttp.encode_basic_auth(
             username if username else "", password, encoding="latin1"
