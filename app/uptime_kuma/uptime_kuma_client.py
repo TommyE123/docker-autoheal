@@ -24,8 +24,8 @@ class UptimeKumaClient:
         self.password = password
         self.username = username
         # Use Basic Auth with username (empty for API key) and password/API key
-        # For API key: username="", password=api_key
-        # For user auth: username=username, password=password
+        # For API key: username="", ******
+        # For user auth: username=username, ******
         # Keep BasicAuth's Latin-1 default for compatibility with existing credentials.
         self.auth_header = aiohttp.encode_basic_auth(
             username if username else "", password, encoding="latin1"
@@ -151,15 +151,9 @@ class UptimeKumaClient:
                         return None
 
                     text = await response.text()
-                    # Look for this specific monitor's status. monitor_id (and any custom
-                    # tags) can precede monitor_name in the label set, so don't anchor to it
-                    # being the first label - but still require monitor_name to be a full
-                    # label key (preceded by { or ,), not a substring of a custom tag name.
-                    pattern = rf'monitor_status\{{(?:[^}}]*,)?monitor_name="{re.escape(monitor_name)}"[^}}]*\}}\s+(\d+)'
-                    match = re.search(pattern, text)
-
-                    if match:
-                        return int(match.group(1))
+                    for monitor in self._parse_monitors_from_metrics(text):
+                        if monitor["friendly_name"] == monitor_name:
+                            return monitor["status"]
                     return None
         except Exception as e:
             logger.error("Failed to get monitor status for '%s': %s", monitor_name, e)

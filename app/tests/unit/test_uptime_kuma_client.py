@@ -303,24 +303,21 @@ class TestParseMonitorsFromMetrics:
         assert monitors[0]["friendly_name"] == "Tagged"
         assert monitors[0]["status"] == 1
 
-    def test_escaped_quote_in_monitor_name_is_unescaped(self):
+    @pytest.mark.parametrize(
+        ("friendly_name", "escaped_name"),
+        [
+            ('My "prod" DB', r'My \"prod\" DB'),
+            (r"C:\prod", r"C:\\prod"),
+            ("line\nbreak", r"line\nbreak"),
+        ],
+    )
+    def test_escaped_monitor_names_are_unescaped(self, friendly_name, escaped_name):
         client = UptimeKumaClient("http://kuma.example", "token")
-        text = (
-            r'monitor_status{monitor_id="5",env="prod",monitor_name="My \"prod\" DB",'
-            'monitor_type="http"} 0\n'
-        )
+        text = f'monitor_status{{monitor_name="{escaped_name}"}} 0\n'
 
         monitors = client._parse_monitors_from_metrics(text)
 
-        assert [(m["friendly_name"], m["status"]) for m in monitors] == [('My "prod" DB', 0)]
-
-    def test_escaped_backslash_and_newline_in_monitor_name_are_unescaped(self):
-        client = UptimeKumaClient("http://kuma.example", "token")
-        text = r'monitor_status{monitor_name="C:\\prod\nDB"} 1' + "\n"
-
-        monitors = client._parse_monitors_from_metrics(text)
-
-        assert [m["friendly_name"] for m in monitors] == ["C:\\prod\nDB"]
+        assert [(m["friendly_name"], m["status"]) for m in monitors] == [(friendly_name, 0)]
 
     def test_custom_tag_whose_name_ends_in_monitor_name_is_not_a_phantom_monitor(self):
         """A custom tag like custom_monitor_name must not be matched as monitor_name
@@ -396,6 +393,23 @@ class TestGetMonitorStatusByName:
         client = UptimeKumaClient("http://kuma.example", "token")
 
         assert await client.get_monitor_status_by_name("API") == 0
+
+    @pytest.mark.parametrize(
+        ("monitor_name", "escaped_name"),
+        [
+            ('My "prod" DB', r'My \"prod\" DB'),
+            (r"C:\prod", r"C:\\prod"),
+            ("line\nbreak", r"line\nbreak"),
+        ],
+    )
+    async def test_returns_status_for_monitor_with_escaped_name(
+        self, monkeypatch, monitor_name, escaped_name
+    ):
+        text = f'monitor_status{{monitor_name="{escaped_name}"}} 2\n'
+        _patch_session(monkeypatch, response=_FakeResponse(200, text))
+        client = UptimeKumaClient("http://kuma.example", "token")
+
+        assert await client.get_monitor_status_by_name(monitor_name) == 2
 
     async def test_returns_none_for_unknown_monitor(self, monkeypatch):
         _patch_session(monkeypatch, response=_FakeResponse(200, METRICS_TEXT))
