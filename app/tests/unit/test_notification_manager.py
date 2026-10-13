@@ -776,6 +776,41 @@ async def test_send_event_notification_after_stop_is_dropped_and_logged(
 
 
 @pytest.mark.asyncio
+async def test_send_event_notification_during_drain_is_dropped_and_logged(
+    caplog, monkeypatch, isolated_config_manager
+):
+    """An event arriving while stop() is still draining is refused, not queued."""
+    session = _GatedSession()
+    instance = await _started_manager(monkeypatch, isolated_config_manager, session)
+
+    await instance.send_event_notification(_named_event("in-flight"))
+    await _wait_until(lambda: session.started)
+
+    stop_task = asyncio.create_task(instance.stop())
+    await _wait_until(lambda: instance._stopping)
+    assert not stop_task.done()
+
+    with caplog.at_level(logging.WARNING):
+        await instance.send_event_notification(_named_event("during-drain"))
+
+    assert instance._notification_queue.empty()
+    assert any(
+        r.levelno == logging.WARNING
+        and "Notification manager is stopped; dropping notification for event: restart" in r.message
+        for r in caplog.records
+    )
+
+    session.release.set()
+    await asyncio.wait_for(stop_task, timeout=5)
+
+    await instance.start()
+    await instance.send_event_notification(_named_event("after-restart"))
+    await asyncio.wait_for(instance.stop(), timeout=5)
+
+    assert session.completed == ["in-flight", "after-restart"]
+
+
+@pytest.mark.asyncio
 async def test_stop_drain_is_bounded_and_logs_dropped_count(
     caplog, monkeypatch, isolated_config_manager
 ):
