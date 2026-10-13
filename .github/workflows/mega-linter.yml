@@ -15,8 +15,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Badge-only pull requests (the automated mutation badge update) skip MegaLinter.
+  changes:
+    name: Detect badge-only change
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/badge-only-check.yml
+
   megalinter:
     name: MegaLinter
+    needs: changes
+    if: ${{ needs.changes.outputs.badge-only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 

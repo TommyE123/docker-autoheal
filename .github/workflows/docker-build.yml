@@ -21,9 +21,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Badge-only pull requests (the automated mutation badge update) skip the jobs below.
+  changes:
+    name: Detect badge-only change
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/badge-only-check.yml
+
   # The image the tests run on: linux/amd64 only, exported as an artifact.
   build-amd64:
     name: Build amd64 test image
+    needs: changes
+    if: ${{ needs.changes.outputs.badge-only != 'true' }}
     runs-on: ubuntu-latest
     env:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -77,7 +87,8 @@ jobs:
 
   smoke-test:
     name: Production container smoke test
-    needs: build-amd64
+    needs: [changes, build-amd64]
+    if: ${{ needs.changes.outputs.badge-only != 'true' }}
     permissions:
       contents: read
     uses: ./.github/workflows/production-smoke-test.yml
@@ -90,6 +101,8 @@ jobs:
   # image mismatch), not behaviour that differs on real arm64 hardware.
   arm64-startup:
     name: Start the arm64 image (QEMU)
+    needs: changes
+    if: ${{ needs.changes.outputs.badge-only != 'true' }}
     runs-on: ubuntu-latest
     env:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}

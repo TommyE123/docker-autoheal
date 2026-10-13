@@ -146,7 +146,21 @@ The Mutation Testing workflow runs on source and test pull requests according to
 filters, which do not include `.github/badges/mutation.json`. The updater workflow runs the
 full mutation process itself against `main`, and its PR carries only the resulting JSON, so
 that PR does not trigger another full mutation run. That avoids running the 4-5 minute
-mutation job again for a badge-only change. Its other checks run as for any pull request.
+mutation job again for a badge-only change.
+
+The other heavy pull request workflows also skip a badge-only PR. Each of `tests.yml`
+(unit and frontend tests), `docker-build.yml` (amd64 build, smoke test and Playwright UI
+suite, arm64 start-up) and `mega-linter.yml` starts with a `changes` job that calls the
+reusable `.github/workflows/badge-only-check.yml`. That reports `badge-only=true` only when
+every file in the PR (including a rename's source path) is `.github/badges/mutation.json`;
+anything else, including a mixed PR, reports `false` and runs the normal checks. The heavy
+jobs skip with a job-level `if` rather than a workflow `paths` filter, so every workflow
+and required check name still reports. GitHub treats a skipped job as passing for a
+required check, so branch protection is unchanged and auto-merge still completes. For a
+badge-only PR the same reusable workflow also runs `Validate mutation badge file`, which
+checks that the file is valid JSON in the Shields endpoint shape (`schemaVersion` 1, label
+`Mutation`, a percentage `message` and a `color`). `app/tests/unit/test_badge_only_ci_filter.py`
+pins this wiring.
 
 On a pull request from this repository, a short comment shows this PR's score next to the
 score tracked on `main`, with the change. It is one comment per PR, found by a hidden
