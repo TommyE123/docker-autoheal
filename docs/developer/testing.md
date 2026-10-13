@@ -152,8 +152,10 @@ The suite focuses on the monitoring engine and its restart/recovery behaviour:
   serves canned container information and records restart calls.
 * `mock_notification_manager` (autouse) replaces the notification manager used
   by the monitoring engine, so no outbound requests are attempted.
-* `recorded_sleeps` (autouse) replaces `asyncio.sleep`, so restart-backoff
-  delays are recorded and asserted on rather than actually waited for.
+* `recorded_sleeps` (autouse) replaces `asyncio.sleep`, so any sleep is recorded
+  rather than actually waited for. The restart backoff doesn't sleep; the engine
+  records when the next restart is allowed. `after_backoff` runs a call, lets that wait
+  elapse, and runs it again, for tests that care about the restart itself.
 
 ## Frontend
 

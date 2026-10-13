@@ -41,7 +41,7 @@ import pytest
 from app.api.routes.containers import unquarantine_container
 from app.config.config_manager import AutoHealEvent, NotificationService, config_manager
 from app.notifications.notification_manager import NotificationManager
-from app.tests.unit.conftest import make_container
+from app.tests.unit.conftest import after_backoff, make_container
 from app.tests.unit.test_engine_lifecycle import start_event
 from app.tests.unit.test_notification_manager import _FakeSession
 
@@ -106,7 +106,7 @@ async def emit_one_event_of_each_type(engine, docker_client) -> None:
     # "restart": an unhealthy container below the restart threshold.
     container, info = make_container(name="restart-target", container_id=RESTART_ID)
     docker_client.add_container(container, info)
-    await engine._handle_container_restart(container, info, "unhealthy")
+    await after_backoff(engine, engine._handle_container_restart, container, info, "unhealthy")
 
     # "quarantine": the same path once the restart threshold is exceeded.
     container, info = make_container(name="quarantine-target", container_id=QUARANTINE_ID)

@@ -7,6 +7,8 @@ backoff and quarantine are keyed by the per-replica recovery identifier,
 ``project_service#N``.
 """
 
+from datetime import UTC, datetime
+
 import pytest
 
 from app.api.routes.containers import (
@@ -16,7 +18,7 @@ from app.api.routes.containers import (
 )
 from app.config.config_manager import config_manager
 from app.docker_client.docker_client_wrapper import recovery_identifier
-from app.tests.unit.conftest import make_container
+from app.tests.unit.conftest import after_backoff, make_container
 
 COMPOSE = {
     "com.docker.compose.project": "myapp",
@@ -59,7 +61,7 @@ def two_replicas(docker_client):
 async def quarantine(engine, container, info):
     """Restart until the default ``max_restarts`` (3) quarantines the container."""
     for _ in range(4):
-        await engine._handle_container_restart(container, info, "unhealthy")
+        await after_backoff(engine, engine._handle_container_restart, container, info, "unhealthy")
 
 
 class TestRecoveryIdentifier:
@@ -206,8 +208,8 @@ class TestReplicasRecoverIndependently:
     ):
         (a, a_info), (_b, b_info) = two_replicas
 
-        await engine._handle_container_restart(a, a_info, "unhealthy")
-        await engine._handle_container_restart(a, a_info, "unhealthy")
+        await after_backoff(engine, engine._handle_container_restart, a, a_info, "unhealthy")
+        await after_backoff(engine, engine._handle_container_restart, a, a_info, "unhealthy")
 
         assert config_manager.get_total_restart_count("compose:myapp:web#1") == 2
         assert config_manager.get_total_restart_count(engine.get_recovery_identifier(b_info)) == 0
@@ -218,23 +220,22 @@ class TestReplicasRecoverIndependently:
         update_config(lambda c: setattr(c.restart, "cooldown_seconds", 60))
         (a, a_info), (b, b_info) = two_replicas
 
-        await engine._handle_container_restart(a, a_info, "unhealthy")
-        await engine._handle_container_restart(b, b_info, "unhealthy")
+        await after_backoff(engine, engine._handle_container_restart, a, a_info, "unhealthy")
+        await after_backoff(engine, engine._handle_container_restart, b, b_info, "unhealthy")
 
         assert docker_client.restart_calls == ["myapp-web-1", "myapp-web-2"]
 
-    async def test_backoff_is_per_replica(
-        self, engine, docker_client, two_replicas, recorded_sleeps
-    ):
+    async def test_backoff_is_per_replica(self, engine, docker_client, two_replicas):
         (a, a_info), (b, b_info) = two_replicas
         docker_client.restart_results["myapp-web-1"] = False
-        await engine._handle_container_restart(a, a_info, "unhealthy")
-        await engine._handle_container_restart(a, a_info, "unhealthy")
-        recorded_sleeps.clear()
+        await after_backoff(engine, engine._handle_container_restart, a, a_info, "unhealthy")
+        await after_backoff(engine, engine._handle_container_restart, a, a_info, "unhealthy")
 
         await engine._handle_container_restart(b, b_info, "unhealthy")
 
-        assert recorded_sleeps == [config_manager.get_config().restart.backoff.initial_seconds]
+        initial = config_manager.get_config().restart.backoff.initial_seconds
+        delay = (engine._next_allowed_restart["compose:myapp:web#2"] - datetime.now(UTC)).seconds
+        assert delay == pytest.approx(initial, abs=1)
 
     async def test_quarantining_one_replica_does_not_stop_another_being_restarted(
         self, engine, docker_client
@@ -247,7 +248,7 @@ class TestReplicasRecoverIndependently:
         assert config_manager.is_quarantined("compose:myapp:web#1")
         docker_client.restart_calls.clear()
 
-        await engine._check_single_container(b)
+        await after_backoff(engine, engine._check_single_container, b)
 
         assert docker_client.restart_calls == ["myapp-web-2"]
         assert not config_manager.is_quarantined("compose:myapp:web#2")
@@ -266,7 +267,7 @@ class TestReplicasRecoverIndependently:
         (a, a_info), (b, _b_info) = two_replicas
         await quarantine(engine, a, a_info)
 
-        await engine._check_single_container(b)
+        await after_backoff(engine, engine._check_single_container, b)
 
         assert config_manager.is_quarantined("compose:myapp:web#1")
         assert config_manager.get_total_restart_count("compose:myapp:web#1") == 3
@@ -287,7 +288,7 @@ class TestReplicasRecoverIndependently:
         b_info["state"] = {"Status": "running", "ExitCode": 0}
         docker_client._info[b.id] = b_info
 
-        await engine._check_single_container(b)
+        await after_backoff(engine, engine._check_single_container, b)
 
         assert not config_manager.is_quarantined("compose:myapp:web#2")
         assert config_manager.get_total_restart_count("compose:myapp:web#2") == 0
@@ -302,12 +303,12 @@ class TestReplicasRecoverIndependently:
     async def test_recreated_replica_keeps_its_restart_count(self, engine, docker_client):
         b, b_info = replica(2)
         docker_client.add_container(b, b_info)
-        await engine._handle_container_restart(b, b_info, "unhealthy")
+        await after_backoff(engine, engine._handle_container_restart, b, b_info, "unhealthy")
         # docker compose up recreates the replica: new ID, same container number.
         b2, b2_info = replica(2, container_id="f" * 64)
         docker_client.add_container(b2, b2_info)
 
-        await engine._handle_container_restart(b2, b2_info, "unhealthy")
+        await after_backoff(engine, engine._handle_container_restart, b2, b2_info, "unhealthy")
 
         assert config_manager.get_total_restart_count("compose:myapp:web#2") == 2
 
@@ -319,7 +320,7 @@ class TestUnscaledComposeService:
         container, info = replica(1)
         docker_client.add_container(container, info)
 
-        await engine._handle_container_restart(container, info, "unhealthy")
+        await after_backoff(engine, engine._handle_container_restart, container, info, "unhealthy")
 
         assert config_manager.get_total_restart_count("compose:myapp:web#1") == 1
 
@@ -338,7 +339,7 @@ class TestExplicitMonitoringIdIsShared:
 
         await quarantine(engine, a, a_info)
         docker_client.restart_calls.clear()
-        await engine._check_single_container(b)
+        await after_backoff(engine, engine._check_single_container, b)
 
         assert config_manager.is_quarantined("monitoring.id:shared-web")
         assert docker_client.restart_calls == []

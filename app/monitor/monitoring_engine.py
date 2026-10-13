@@ -6,7 +6,7 @@ Monitors containers and performs auto-healing actions
 import asyncio
 import fnmatch
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from docker.models.containers import Container
 
@@ -42,6 +42,7 @@ class MonitoringEngine:
         self._event_task: asyncio.Task | None = None
         self._last_restart_times: dict[str, datetime] = {}
         self._backoff_delays: dict[str, int] = {}
+        self._next_allowed_restart: dict[str, datetime] = {}
 
     def get_stable_identifier(self, info: dict) -> str:
         """
@@ -279,6 +280,9 @@ class MonitoringEngine:
 
         if needs_restart:
             await self._handle_container_restart(container, info, reason)
+        else:
+            # Recovered on its own: drop any restart still waiting out its backoff
+            self._next_allowed_restart.pop(recovery_id, None)
 
     def should_monitor_container(self, container: Container, info: dict) -> bool:
         """
@@ -518,6 +522,7 @@ class MonitoringEngine:
             config_manager.clear_restart_history(recovery_id)
 
             # Reset backoff delays
+            self._next_allowed_restart.pop(recovery_id, None)
             if recovery_id in self._backoff_delays:
                 config = config_manager.get_config()
                 self._backoff_delays[recovery_id] = config.restart.backoff.initial_seconds
@@ -623,18 +628,33 @@ class MonitoringEngine:
 
             return
 
-        # Apply backoff if enabled (using recovery_id)
+        # Apply backoff if enabled (using recovery_id). The wait is recorded as a
+        # timestamp and checked on later cycles, never slept inline, so one
+        # container's backoff cannot stall the monitoring of the others.
         if config.restart.backoff.enabled:
+            now = datetime.now(UTC)
+            next_allowed = self._next_allowed_restart.get(recovery_id)
             backoff_delay = self._backoff_delays.get(
                 recovery_id, config.restart.backoff.initial_seconds
             )
-            logger.debug(
-                "Applying backoff delay of %ss for %s (recovery_id: %s)",
-                backoff_delay,
-                container_name,
-                recovery_id,
-            )
-            await asyncio.sleep(backoff_delay)
+            if next_allowed is None:
+                logger.debug(
+                    "Applying backoff delay of %ss for %s (recovery_id: %s)",
+                    backoff_delay,
+                    container_name,
+                    recovery_id,
+                )
+                self._next_allowed_restart[recovery_id] = now + timedelta(seconds=backoff_delay)
+                return
+            if now < next_allowed:
+                logger.debug(
+                    "Container %s (recovery_id: %s) waiting out restart backoff (%.1fs left)",
+                    container_name,
+                    recovery_id,
+                    (next_allowed - now).total_seconds(),
+                )
+                return
+            del self._next_allowed_restart[recovery_id]
 
             # Update backoff for next time
             next_backoff = int(backoff_delay * config.restart.backoff.multiplier)
