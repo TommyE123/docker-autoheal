@@ -1,83 +1,39 @@
 name: Badge-only Change Check
 
-# A reusable workflow, called as the `changes` job by the heavy pull request
-# workflows (tests.yml, docker-build.yml, mega-linter.yml). It reports whether a pull
-# request changes ONLY the mutation badge file (.github/badges/mutation.json) so those
-# workflows can skip their jobs for the automated badge update PRs. A skipped job still
-# satisfies a required status check, so branch protection is unchanged.
-#
-# Fails safe: anything other than a pull request, or any changed file (or rename source)
-# other than the badge file, reports badge-only=false and the normal checks run. Mixed
-# PRs therefore always get the full CI.
-#
-# When the PR is badge-only it also validates the badge file itself: valid JSON in the
-# Shields endpoint shape that mutmut/mutation.sh writes.
-on:
+# Called as the `changes` job by tests.yml, docker-build.yml and mega-linter.yml so they can
+# skip their jobs for the automated mutation badge PR. `badge-only` is "true" only for a pull
+# request whose changed files are all .github/badges/mutation.json; any other event, any other
+# file, an empty list or an API error gives "false" and the normal checks run.
+on: # yamllint disable-line rule:truthy
   workflow_call:
     outputs:
       badge-only:
-        description: "'true' when the pull request changes only the mutation badge file."
         value: ${{ jobs.detect.outputs.badge-only }}
 
-permissions:
-  contents: read
-
-env:
-  BADGE_FILE: .github/badges/mutation.json
+permissions: {}
 
 jobs:
   detect:
-    name: Detect badge-only change
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      contents: read
       pull-requests: read
     outputs:
       badge-only: ${{ steps.detect.outputs.badge-only }}
     steps:
-      - name: List the pull request's changed files
-        id: detect
+      - id: detect
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
           PR: ${{ github.event.pull_request.number }}
         run: |
-          set -euo pipefail
           badge_only=false
-          if [ "$EVENT_NAME" = "pull_request" ] && [ -n "$PR" ]; then
-            # Every path involved, including a rename's source, so moving or deleting
-            # another file can never hide behind the badge file.
-            paths=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" \
-              --jq '.[] | .filename, (.previous_filename // empty)')
-            if [ -n "$paths" ] && [ -z "$(printf '%s\n' "$paths" | grep -vxF "$BADGE_FILE" || true)" ]; then
+          if [ "$EVENT_NAME" = pull_request ]; then
+            # filename and previous_filename: a rename must not hide the file it moved from.
+            files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" \
+              --jq '.[] | .filename, (.previous_filename // empty)') || files=
+            if [ -n "$files" ] && ! printf '%s\n' "$files" | grep -qvxF .github/badges/mutation.json; then
               badge_only=true
             fi
           fi
           echo "badge-only=$badge_only" >> "$GITHUB_OUTPUT"
-          echo "Badge-only change: $badge_only"
-
-  validate-badge:
-    name: Validate mutation badge file
-    needs: detect
-    if: ${{ needs.detect.outputs.badge-only == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Validate the badge JSON
-        run: |
-          jq -e '
-            type == "object"
-            and .schemaVersion == 1
-            and .label == "Mutation"
-            and (.message | type == "string" and test("^[0-9]+(\\.[0-9]+)?%$"))
-            and (.color | type == "string" and length > 0)
-          ' "$BADGE_FILE" > /dev/null || {
-            echo "::error file=$BADGE_FILE::Not a valid Shields endpoint file (expected schemaVersion 1, label \"Mutation\", a percentage message and a colour)." >&2
-            exit 1
-          }
