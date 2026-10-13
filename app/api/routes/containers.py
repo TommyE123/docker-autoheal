@@ -184,17 +184,27 @@ async def update_container_selection(request: ContainerSelectionRequest):
             request.container_ids,
             request.enabled,
         )
+
+        # Resolve every container first. The config snapshot is taken only after
+        # the last await, so concurrent selection requests cannot overwrite each
+        # other's updates with a stale copy.
+        resolved: dict[str, dict | None] = {}
+        for cid in request.container_ids:
+            container = await asyncio.to_thread(state.docker_client.get_container, cid)
+            resolved[cid] = (
+                await asyncio.to_thread(state.docker_client.get_container_info, container)
+                if container
+                else None
+            )
+
         config = config_manager.get_config()
 
         if request.enabled:
             # Add to selected list - resolve stable identifiers for persistence
             for cid in request.container_ids:
                 # Try to get container to resolve its stable identifier
-                container = await asyncio.to_thread(state.docker_client.get_container, cid)
-                if container:
-                    info = await asyncio.to_thread(
-                        state.docker_client.get_container_info, container
-                    )
+                info = resolved[cid]
+                if info is not None:
                     container_name = info.get("name")
 
                     # Get stable identifier (handles all edge cases)
@@ -239,11 +249,8 @@ async def update_container_selection(request: ContainerSelectionRequest):
             # Add to excluded list - resolve stable identifiers for persistence
             for cid in request.container_ids:
                 # Try to get container to resolve its stable identifier
-                container = await asyncio.to_thread(state.docker_client.get_container, cid)
-                if container:
-                    info = await asyncio.to_thread(
-                        state.docker_client.get_container_info, container
-                    )
+                info = resolved[cid]
+                if info is not None:
                     container_name = info.get("name")
 
                     # Get stable identifier

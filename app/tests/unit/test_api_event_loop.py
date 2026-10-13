@@ -24,7 +24,7 @@ from app.api.routes.containers import (
 )
 from app.api.routes.health import get_system_status, health_check
 from app.api.routes.healthchecks import add_health_check, delete_health_check, get_health_check
-from app.config.config_manager import HealthCheckConfig
+from app.config.config_manager import HealthCheckConfig, config_manager
 from app.tests.unit.conftest import FakeDockerClient, make_container
 
 WAIT_SECONDS = 5
@@ -229,3 +229,39 @@ class TestErrorsFromWorkerThreadsStillHandled:
 
         assert exc_info.value.status_code == 500
         assert exc_info.value.detail == "daemon unreachable"
+
+
+@pytest.mark.asyncio
+class TestConcurrentSelectionRequests:
+    async def test_overlapping_requests_do_not_overwrite_each_other(self, monkeypatch, engine):
+        """A request paused in Docker must not later write back a stale config copy."""
+        client = BlockingDockerClient("get_container")
+        web, web_info = make_container(name="web", container_id="a" * 64)
+        db, db_info = make_container(name="db", container_id="b" * 64)
+        client.add_container(web, web_info)
+        client.add_container(db, db_info)
+        monkeypatch.setattr("app.api.state.docker_client", client)
+        monkeypatch.setattr("app.api.state.monitoring_engine", engine)
+        original_get_container = FakeDockerClient.get_container
+
+        def block_only_web(container_id):
+            if container_id == "web":
+                return BlockingDockerClient.get_container(client, container_id)
+            return original_get_container(client, container_id)
+
+        monkeypatch.setattr(client, "get_container", block_only_web)
+
+        first = asyncio.create_task(
+            update_container_selection(
+                ContainerSelectionRequest(container_ids=["web"], enabled=False)
+            )
+        )
+        assert await asyncio.to_thread(client.entered.wait, WAIT_SECONDS)
+
+        await update_container_selection(
+            ContainerSelectionRequest(container_ids=["db"], enabled=False)
+        )
+        client.release.set()
+        await asyncio.wait_for(first, WAIT_SECONDS)
+
+        assert set(config_manager.get_config().containers.excluded) >= {"web", "db"}
