@@ -185,14 +185,18 @@ async def update_container_selection(request: ContainerSelectionRequest):
             request.enabled,
         )
 
+        docker_client = state.docker_client
+        if not docker_client:
+            raise HTTPException(status_code=500, detail="Docker client not initialized")
+
         # Resolve every container first. The config snapshot is taken only after
         # the last await, so concurrent selection requests cannot overwrite each
         # other's updates with a stale copy.
         resolved: dict[str, dict | None] = {}
         for cid in request.container_ids:
-            container = await asyncio.to_thread(state.docker_client.get_container, cid)
+            container = await asyncio.to_thread(docker_client.get_container, cid)
             resolved[cid] = (
-                await asyncio.to_thread(state.docker_client.get_container_info, container)
+                await asyncio.to_thread(docker_client.get_container_info, container)
                 if container
                 else None
             )
@@ -304,6 +308,8 @@ async def update_container_selection(request: ContainerSelectionRequest):
             "status": "success",
             "message": f"Updated {len(request.container_ids)} containers",
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Error updating container selection: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
