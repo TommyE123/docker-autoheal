@@ -7,7 +7,7 @@ backoff and quarantine are keyed by the per-replica recovery identifier,
 ``project_service#N``.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -343,6 +343,55 @@ class TestExplicitMonitoringIdIsShared:
 
         assert config_manager.is_quarantined("monitoring.id:shared-web")
         assert docker_client.restart_calls == []
+
+    @pytest.mark.parametrize("healthy_first", [True, False])
+    async def test_healthy_sibling_does_not_cancel_the_unhealthy_replicas_wait(
+        self, engine, docker_client, healthy_first
+    ):
+        """Replicas sharing a ``monitoring.id`` share one backoff wait, but only its owner clears it."""
+        shared = {"monitoring.id": "shared-web"}
+        sick, sick_info = replica(1, status="exited", exit_code=1, extra_labels=shared)
+        well, well_info = replica(2, extra_labels=shared)
+        for container, info in (
+            ((well, well_info), (sick, sick_info))
+            if healthy_first
+            else (
+                (sick, sick_info),
+                (well, well_info),
+            )
+        ):
+            docker_client.add_container(container, info)
+
+        await engine._check_containers()
+
+        assert "monitoring.id:shared-web" in engine._next_allowed_restart
+        assert docker_client.restart_calls == []
+
+        engine._next_allowed_restart["monitoring.id:shared-web"] = datetime.now(UTC) - timedelta(
+            seconds=1
+        )
+        await engine._check_containers()
+
+        assert docker_client.restart_calls == ["myapp-web-1"]
+
+    async def test_owning_replica_recovering_cancels_the_shared_wait(self, engine, docker_client):
+        shared = {"monitoring.id": "shared-web"}
+        sick, sick_info = replica(1, status="exited", exit_code=1, extra_labels=shared)
+        well, well_info = replica(2, extra_labels=shared)
+        docker_client.add_container(sick, sick_info)
+        docker_client.add_container(well, well_info)
+        await engine._check_containers()
+        assert "monitoring.id:shared-web" in engine._next_allowed_restart
+
+        docker_client._info[sick.id] = {
+            **sick_info,
+            "status": "running",
+            "state": {"Status": "running", "ExitCode": 0},
+        }
+        await engine._check_containers()
+
+        assert engine._next_allowed_restart == {}
+        assert engine._restart_wait_owner == {}
 
 
 class TestConfigurationStaysPerService:

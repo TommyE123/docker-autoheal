@@ -445,6 +445,7 @@ class TestRestartBackoff:
             await engine._handle_container_restart(container, info, "unhealthy")
 
         assert delays == pytest.approx([10, 20, 40], abs=1)
+        assert docker_client.restart_calls == ["web"] * 3
         assert engine._backoff_delays["web"] == 80
 
     async def test_backoff_multiplier_is_configurable(self, engine, docker_client, update_config):
@@ -538,6 +539,7 @@ class TestBackoffDoesNotStallMonitoring:
 
         assert docker_client.restart_calls == ["db", "api"]
         assert engine._next_allowed_restart == {}
+        assert engine._restart_wait_owner == {}
 
 
 @pytest.mark.asyncio

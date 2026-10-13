@@ -43,6 +43,9 @@ class MonitoringEngine:
         self._last_restart_times: dict[str, datetime] = {}
         self._backoff_delays: dict[str, int] = {}
         self._next_allowed_restart: dict[str, datetime] = {}
+        # The container whose failure started each pending wait. Replicas sharing a
+        # recovery ID share the wait, so only its owner recovering may cancel it.
+        self._restart_wait_owner: dict[str, str | None] = {}
 
     def get_stable_identifier(self, info: dict) -> str:
         """
@@ -280,9 +283,14 @@ class MonitoringEngine:
 
         if needs_restart:
             await self._handle_container_restart(container, info, reason)
-        else:
-            # Recovered on its own: drop any restart still waiting out its backoff
-            self._next_allowed_restart.pop(recovery_id, None)
+        elif self._restart_wait_owner.get(recovery_id) == container_name:
+            # Recovered on its own: drop the restart it was waiting out its backoff for
+            self._clear_restart_wait(recovery_id)
+
+    def _clear_restart_wait(self, recovery_id: str) -> None:
+        """Forget the restart wait recorded for a recovery ID, and who it belongs to"""
+        self._next_allowed_restart.pop(recovery_id, None)
+        self._restart_wait_owner.pop(recovery_id, None)
 
     def should_monitor_container(self, container: Container, info: dict) -> bool:
         """
@@ -522,7 +530,7 @@ class MonitoringEngine:
             config_manager.clear_restart_history(recovery_id)
 
             # Reset backoff delays
-            self._next_allowed_restart.pop(recovery_id, None)
+            self._clear_restart_wait(recovery_id)
             if recovery_id in self._backoff_delays:
                 config = config_manager.get_config()
                 self._backoff_delays[recovery_id] = config.restart.backoff.initial_seconds
@@ -645,6 +653,7 @@ class MonitoringEngine:
                     recovery_id,
                 )
                 self._next_allowed_restart[recovery_id] = now + timedelta(seconds=backoff_delay)
+                self._restart_wait_owner[recovery_id] = container_name
                 return
             if now < next_allowed:
                 logger.debug(
@@ -661,7 +670,7 @@ class MonitoringEngine:
 
         # The restart goes ahead now, so no wait is pending (backoff may also have been
         # disabled while one was)
-        self._next_allowed_restart.pop(recovery_id, None)
+        self._clear_restart_wait(recovery_id)
 
         # Perform restart
         logger.info(
