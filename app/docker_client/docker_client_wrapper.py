@@ -144,16 +144,20 @@ class DockerClientWrapper:
             logger.error("Failed to get container %s: %s", container_id, e)
             return None
 
-    def get_container_info(self, container: Container) -> dict[str, Any]:
+    def get_container_info(self, container: Container, refresh: bool = True) -> dict[str, Any]:
         """
         Get detailed container information
         Args:
             container: Container object
+            refresh: If True, reload the container first. Pass False when the
+                container was inspected moments ago (e.g. by ``list_containers``)
+                to avoid a second round trip.
         Returns:
             Dictionary with container details
         """
         try:
-            container.reload()  # Refresh container state
+            if refresh:
+                container.reload()  # Refresh container state
             attrs = container.attrs
 
             # Extract relevant information
