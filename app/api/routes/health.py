@@ -1,5 +1,6 @@
 """Health & status endpoints."""
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 
@@ -8,6 +9,7 @@ from fastapi.responses import FileResponse
 
 from app.api import state
 from app.api.models import SystemStatus
+from app.api.routes.containers import _inspect_containers
 from app.config.config_manager import config_manager
 
 logger = logging.getLogger(__name__)
@@ -18,10 +20,13 @@ router = APIRouter()
 @router.get("/health")
 async def health_check():
     """Health check endpoint for the service itself"""
+    docker_connected = (
+        await asyncio.to_thread(state.docker_client.is_connected) if state.docker_client else False
+    )
     return {
         "status": "healthy",
         "timestamp": datetime.now(UTC).isoformat(),
-        "docker_connected": state.docker_client.is_connected() if state.docker_client else False,
+        "docker_connected": docker_connected,
         "monitoring_active": state.monitoring_engine._running if state.monitoring_engine else False,
     }
 
@@ -41,12 +46,21 @@ async def get_system_status():
     try:
         config = config_manager.get_config()
         # Get ALL containers (including stopped) for accurate count
-        containers = docker_client.list_containers(all_containers=True) if docker_client else []
+        # One worker-thread hop for all Docker round trips (list + inspect each,
+        # then connectivity); the per-container inspect is already fresh from list.
+        inspected = (
+            await asyncio.to_thread(_inspect_containers, docker_client, True)
+            if docker_client
+            else []
+        )
+        docker_connected = (
+            await asyncio.to_thread(docker_client.is_connected) if docker_client else False
+        )
+        containers = [container for container, _info in inspected]
         monitored_count = 0
 
         # Count monitored containers
-        for container in containers:
-            info = docker_client.get_container_info(container)
+        for container, info in inspected:
             if monitoring_engine and info:
                 if monitoring_engine.should_monitor_container(container, info):
                     monitored_count += 1
@@ -54,7 +68,7 @@ async def get_system_status():
         maintenance_start = config_manager.get_maintenance_start_time()
         return SystemStatus(
             monitoring_active=monitoring_engine._running if monitoring_engine else False,
-            docker_connected=docker_client.is_connected() if docker_client else False,
+            docker_connected=docker_connected,
             total_containers=len(containers),
             monitored_containers=monitored_count,
             quarantined_containers=len(config_manager.get_quarantined_containers()),

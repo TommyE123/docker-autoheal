@@ -1,5 +1,6 @@
 """Custom health check management endpoints."""
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, HTTPException
@@ -22,11 +23,11 @@ async def add_health_check(health_check: HealthCheckConfig):
             raise HTTPException(status_code=500, detail="Docker client not initialized")
 
         # Get the container to resolve its stable identifier
-        container = docker_client.get_container(health_check.container_id)
+        container = await asyncio.to_thread(docker_client.get_container, health_check.container_id)
         if not container:
             raise HTTPException(status_code=404, detail="Container not found")
 
-        info = docker_client.get_container_info(container)
+        info = await asyncio.to_thread(docker_client.get_container_info, container)
         if not info:
             raise HTTPException(status_code=500, detail="Unable to inspect container")
 
@@ -63,11 +64,11 @@ async def get_health_check(container_id: str):
             raise HTTPException(status_code=500, detail="Docker client not initialized")
 
         # Get the container to resolve its stable identifier
-        container = docker_client.get_container(container_id)
+        container = await asyncio.to_thread(docker_client.get_container, container_id)
         if not container:
             raise HTTPException(status_code=404, detail="Container not found")
 
-        info = docker_client.get_container_info(container)
+        info = await asyncio.to_thread(docker_client.get_container_info, container)
         if not info:
             raise HTTPException(status_code=500, detail="Unable to inspect container")
 
@@ -105,11 +106,11 @@ async def delete_health_check(container_id: str):
             raise HTTPException(status_code=500, detail="Docker client not initialized")
 
         # Get the container to resolve its stable identifier
-        container = docker_client.get_container(container_id)
+        container = await asyncio.to_thread(docker_client.get_container, container_id)
         if not container:
             raise HTTPException(status_code=404, detail="Container not found")
 
-        info = docker_client.get_container_info(container)
+        info = await asyncio.to_thread(docker_client.get_container_info, container)
         if not info:
             raise HTTPException(status_code=500, detail="Unable to inspect container")
 

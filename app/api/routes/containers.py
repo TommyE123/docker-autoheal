@@ -1,5 +1,6 @@
 """Container management endpoints."""
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 
@@ -14,6 +15,17 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _inspect_containers(docker_client, include_stopped: bool) -> list[tuple]:
+    """List containers and inspect each one (blocking: run in a worker thread).
+
+    ``containers.list()`` has just inspected every container it returns, so the
+    per-container ``reload()`` in ``get_container_info`` would be a redundant
+    second round trip.
+    """
+    containers = docker_client.list_containers(all_containers=include_stopped)
+    return [(c, docker_client.get_container_info(c, refresh=False)) for c in containers]
+
+
 @router.get("/api/containers", response_model=list[ContainerInfo])
 async def list_containers(include_stopped: bool = False):
     """List all containers with their monitoring status"""
@@ -23,7 +35,7 @@ async def list_containers(include_stopped: bool = False):
         if not docker_client:
             raise HTTPException(status_code=500, detail="Docker client not initialized")
 
-        containers = docker_client.list_containers(all_containers=include_stopped)
+        inspected = await asyncio.to_thread(_inspect_containers, docker_client, include_stopped)
         result = []
 
         # Get Uptime Kuma configuration
@@ -39,8 +51,7 @@ async def list_containers(include_stopped: bool = False):
         ):
             uptime_kuma_monitor = monitoring_engine.uptime_kuma_monitor
 
-        for container in containers:
-            info = docker_client.get_container_info(container)
+        for container, info in inspected:
             if not info:
                 continue
 
@@ -112,11 +123,11 @@ async def get_container_details(container_id: str):
         if not docker_client:
             raise HTTPException(status_code=500, detail="Docker client not initialized")
 
-        container = docker_client.get_container(container_id)
+        container = await asyncio.to_thread(docker_client.get_container, container_id)
         if not container:
             raise HTTPException(status_code=404, detail="Container not found")
 
-        info = docker_client.get_container_info(container)
+        info = await asyncio.to_thread(docker_client.get_container_info, container)
 
         # Use stable_id for tracking (persists across recreations)
         full_container_id = info.get("full_id")
@@ -173,15 +184,31 @@ async def update_container_selection(request: ContainerSelectionRequest):
             request.container_ids,
             request.enabled,
         )
+
+        docker_client = state.docker_client
+        if not docker_client:
+            raise HTTPException(status_code=500, detail="Docker client not initialized")
+
+        # Resolve every container first. The config snapshot is taken only after
+        # the last await, so concurrent selection requests cannot overwrite each
+        # other's updates with a stale copy.
+        resolved: dict[str, dict | None] = {}
+        for cid in request.container_ids:
+            container = await asyncio.to_thread(docker_client.get_container, cid)
+            resolved[cid] = (
+                await asyncio.to_thread(docker_client.get_container_info, container)
+                if container
+                else None
+            )
+
         config = config_manager.get_config()
 
         if request.enabled:
             # Add to selected list - resolve stable identifiers for persistence
             for cid in request.container_ids:
                 # Try to get container to resolve its stable identifier
-                container = state.docker_client.get_container(cid)
-                if container:
-                    info = state.docker_client.get_container_info(container)
+                info = resolved[cid]
+                if info is not None:
                     container_name = info.get("name")
 
                     # Get stable identifier (handles all edge cases)
@@ -226,9 +253,8 @@ async def update_container_selection(request: ContainerSelectionRequest):
             # Add to excluded list - resolve stable identifiers for persistence
             for cid in request.container_ids:
                 # Try to get container to resolve its stable identifier
-                container = state.docker_client.get_container(cid)
-                if container:
-                    info = state.docker_client.get_container_info(container)
+                info = resolved[cid]
+                if info is not None:
                     container_name = info.get("name")
 
                     # Get stable identifier
@@ -282,6 +308,8 @@ async def update_container_selection(request: ContainerSelectionRequest):
             "status": "success",
             "message": f"Updated {len(request.container_ids)} containers",
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Error updating container selection: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
@@ -295,11 +323,11 @@ async def restart_container_manual(container_id: str):
         if not docker_client:
             raise HTTPException(status_code=500, detail="Docker client not initialized")
 
-        container = docker_client.get_container(container_id)
+        container = await asyncio.to_thread(docker_client.get_container, container_id)
         if not container:
             raise HTTPException(status_code=404, detail="Container not found")
 
-        success = docker_client.restart_container(container)
+        success = await asyncio.to_thread(docker_client.restart_container, container)
 
         if success:
             return {
@@ -323,11 +351,11 @@ async def unquarantine_container(container_id: str):
             raise HTTPException(status_code=500, detail="Docker client not initialized")
 
         # Get the container to resolve stable_id
-        container = docker_client.get_container(container_id)
+        container = await asyncio.to_thread(docker_client.get_container, container_id)
         if not container:
             raise HTTPException(status_code=404, detail="Container not found")
 
-        info = docker_client.get_container_info(container)
+        info = await asyncio.to_thread(docker_client.get_container_info, container)
         container_name = info.get("name")
         recovery_id = info.get("recovery_id")
 
