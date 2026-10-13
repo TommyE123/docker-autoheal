@@ -8,6 +8,7 @@ actual file-reading and streaming code without needing an HTTP client such
 as ``httpx``/``TestClient`` as a test dependency.
 """
 
+import asyncio
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -28,13 +29,26 @@ async def _collect_response(app: Any) -> tuple[int, dict[str, str], bytes]:
         "headers": [],
     }
 
+    request_sent = False
+    response_done = asyncio.Event()
+
     async def receive() -> dict[str, Any]:
-        return {"type": "http.request", "body": b"", "more_body": False}
+        # Behave like a real ASGI channel: deliver the request once, then block
+        # until the response completes and report a disconnect. Returning the
+        # same request forever makes Starlette's disconnect listener spin.
+        nonlocal request_sent
+        if not request_sent:
+            request_sent = True
+            return {"type": "http.request", "body": b"", "more_body": False}
+        await response_done.wait()
+        return {"type": "http.disconnect"}
 
     messages = []
 
     async def send(message: dict[str, Any]) -> None:
         messages.append(message)
+        if message["type"] == "http.response.body" and not message.get("more_body", False):
+            response_done.set()
 
     await app(scope, receive, send)
 
