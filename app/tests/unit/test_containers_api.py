@@ -185,6 +185,15 @@ class TestGetContainerDetails:
 
 @pytest.mark.asyncio
 class TestUpdateContainerSelection:
+    async def test_uninitialized_docker_client_returns_clear_500(self, uninitialized_api):
+        with pytest.raises(HTTPException) as exc_info:
+            await update_container_selection(
+                ContainerSelectionRequest(container_ids=["web"], enabled=True)
+            )
+
+        assert exc_info.value.status_code == 500
+        assert exc_info.value.detail == "Docker client not initialized"
+
     async def test_enabling_adds_stable_id_and_clears_exclusion(self, wired_api):
         docker_client, _engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)

@@ -260,6 +260,14 @@ class TestContainerInfo:
         assert info["health"] is None
         container.reload.assert_called_once()
 
+    def test_refresh_false_skips_the_reload_round_trip(self, wrapper):
+        container = make_sdk_container(labels={"autoheal": "true"})
+
+        info = wrapper.get_container_info(container, refresh=False)
+
+        assert info["name"] == "web"
+        container.reload.assert_not_called()
+
     def test_restart_count_is_read_from_the_top_level_field(self, wrapper):
         # RestartCount is a sibling of State in the Docker inspect payload, not
         # nested inside it - a real regression, caught by an integration test

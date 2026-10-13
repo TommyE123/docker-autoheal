@@ -207,7 +207,7 @@ class FakeDockerClient:
                 return container
         return None
 
-    def get_container_info(self, container: FakeContainer) -> dict:
+    def get_container_info(self, container: FakeContainer, refresh: bool = True) -> dict:
         if container.id in self.info_errors:
             raise self.info_errors[container.id]
         # Mirrors the wrapper's behaviour of returning {} when inspection fails
