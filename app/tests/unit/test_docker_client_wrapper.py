@@ -232,6 +232,18 @@ class TestListingAndLookup:
         ):
             assert wrapper.list_containers() == []
 
+    def test_missing_client_is_handled_like_any_docker_failure(self, wrapper, sdk_client):
+        wrapper._client = None
+
+        with patch(
+            "app.docker_client.docker_client_wrapper.docker.DockerClient",
+            return_value=sdk_client,
+        ):
+            assert wrapper.list_containers() == []
+        wrapper._client = None
+        assert wrapper.get_container("web") is None
+        assert wrapper.get_events() is None
+
     def test_get_container_returns_none_when_not_found(self, wrapper, sdk_client):
         sdk_client.containers.get.side_effect = docker.errors.NotFound("no such container")
 
