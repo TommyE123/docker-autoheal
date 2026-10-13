@@ -654,11 +654,14 @@ class MonitoringEngine:
                     (next_allowed - now).total_seconds(),
                 )
                 return
-            del self._next_allowed_restart[recovery_id]
 
             # Update backoff for next time
             next_backoff = int(backoff_delay * config.restart.backoff.multiplier)
             self._backoff_delays[recovery_id] = next_backoff
+
+        # The restart goes ahead now, so no wait is pending (backoff may also have been
+        # disabled while one was)
+        self._next_allowed_restart.pop(recovery_id, None)
 
         # Perform restart
         logger.info(

@@ -6,6 +6,7 @@ exponential backoff, successful restarts, failed restarts and the events they
 produce.
 """
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -378,6 +379,47 @@ class TestRestartBackoff:
 
         assert docker_client.restart_calls == []
 
+    async def test_disabling_backoff_during_the_wait_leaves_no_stale_wait(
+        self, engine, docker_client, update_config
+    ):
+        update_config(lambda c: setattr(c.restart, "cooldown_seconds", 0))
+        container, info = make_container(name="web", status="exited", exit_code=1)
+        docker_client.add_container(container, info)
+        await engine._check_single_container(container)
+        elapse_backoff(engine, "web")
+        update_config(lambda c: setattr(c.restart.backoff, "enabled", False))
+
+        await engine._check_single_container(container)
+
+        assert docker_client.restart_calls == ["web"]  # restarted at once, no backoff
+        assert "web" not in engine._next_allowed_restart
+
+        update_config(lambda c: setattr(c.restart.backoff, "enabled", True))
+        await engine._check_single_container(container)
+
+        assert docker_client.restart_calls == ["web"]  # a fresh wait, not an instant restart
+        assert scheduled_delay(engine, "web") == pytest.approx(10, abs=1)
+
+    async def test_quarantined_container_that_recovers_loses_its_pending_wait(
+        self, engine, docker_client
+    ):
+        """Quarantined by hand while waiting, then it heals and is auto-unquarantined."""
+        container, info = make_container(name="web", status="exited", exit_code=1)
+        docker_client.add_container(container, info)
+        await engine._check_single_container(container)
+        assert "web" in engine._next_allowed_restart
+        config_manager.quarantine_container("web")
+        docker_client._info[container.id] = {
+            **info,
+            "status": "running",
+            "state": {"Status": "running", "ExitCode": 0},
+        }
+
+        await engine._check_single_container(container)
+
+        assert config_manager.is_quarantined("web") is False
+        assert "web" not in engine._next_allowed_restart
+
     async def test_backoff_resets_after_a_successful_restart(self, engine, docker_client):
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
@@ -454,9 +496,13 @@ class TestRestartBackoff:
 class TestBackoffDoesNotStallMonitoring:
     """Issue #434: a container waiting out its backoff must not block the cycle."""
 
-    async def test_cycle_does_not_sleep_for_a_failing_containers_backoff(
-        self, engine, docker_client, recorded_sleeps, monkeypatch
+    async def test_cycle_is_not_stalled_by_a_failing_containers_backoff(
+        self, engine, docker_client, monkeypatch
     ):
+        """
+        Any ``asyncio.sleep`` here blocks forever, so a cycle that sleeps through a
+        container's backoff never finishes and the timeout fails the test.
+        """
         failing, failing_info = make_container(
             name="db", container_id="a" * 64, status="exited", exit_code=1
         )
@@ -466,6 +512,10 @@ class TestBackoffDoesNotStallMonitoring:
         docker_client.add_container(failing, failing_info)
         docker_client.add_container(other, other_info)
 
+        async def blocked_forever(*_args, **_kwargs):
+            await asyncio.Event().wait()
+
+        monkeypatch.setattr(asyncio, "sleep", blocked_forever)
         evaluated: list[str] = []
         real_evaluate = engine._evaluate_container_health
 
@@ -475,12 +525,19 @@ class TestBackoffDoesNotStallMonitoring:
 
         monkeypatch.setattr(engine, "_evaluate_container_health", spy)
 
-        await engine._check_containers()
+        await asyncio.wait_for(engine._check_containers(), timeout=5)
 
-        assert evaluated == ["db", "api"]
-        assert recorded_sleeps == []  # no inline backoff sleep holds up "api"
+        assert evaluated == ["db", "api"]  # "api" was reached in the same cycle
         assert docker_client.restart_calls == []  # both are still waiting out their backoff
         assert set(engine._next_allowed_restart) == {"db", "api"}
+
+        # Once the waits have run out, the next cycle restarts both.
+        elapse_backoff(engine, "db")
+        elapse_backoff(engine, "api")
+        await asyncio.wait_for(engine._check_containers(), timeout=5)
+
+        assert docker_client.restart_calls == ["db", "api"]
+        assert engine._next_allowed_restart == {}
 
 
 @pytest.mark.asyncio
