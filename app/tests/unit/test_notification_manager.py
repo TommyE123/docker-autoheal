@@ -719,7 +719,9 @@ async def _wait_until(predicate) -> None:
 
 
 @pytest.mark.asyncio
-async def test_stop_delivers_notifications_queued_before_stop(monkeypatch, isolated_config_manager):
+async def test_stop_delivers_notifications_queued_before_stop(
+    caplog, monkeypatch, isolated_config_manager
+):
     """Events queued but not yet picked up by the worker are sent, in order."""
     session = _GatedSession()
     session.release.set()
@@ -727,9 +729,11 @@ async def test_stop_delivers_notifications_queued_before_stop(monkeypatch, isola
 
     await instance.send_event_notification(_named_event("first"))
     await instance.send_event_notification(_named_event("second"))
-    await instance.stop()
+    with caplog.at_level(logging.WARNING):
+        await instance.stop()
 
     assert session.completed == ["first", "second"]
+    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
     assert instance._notification_queue.empty()
     assert session.closed is True
     assert instance._session is None
@@ -796,7 +800,8 @@ async def test_send_event_notification_during_drain_is_dropped_and_logged(
     assert instance._notification_queue.empty()
     assert any(
         r.levelno == logging.WARNING
-        and "Notification manager is stopped; dropping notification for event: restart" in r.message
+        and r.getMessage()
+        == "Notification manager is stopped; dropping notification for event: restart"
         for r in caplog.records
     )
 
@@ -885,6 +890,20 @@ async def test_cancelled_stop_still_releases_worker_and_session(
     assert instance._worker_task.done()
     assert session.closed is True
     assert instance._session is None
+
+
+@pytest.mark.asyncio
+async def test_stop_with_nothing_queued_reports_no_dropped_notifications(
+    caplog, monkeypatch, isolated_config_manager
+):
+    """A manager that never sent anything stops quietly, without a false drop warning."""
+    session = _GatedSession()
+    instance = await _started_manager(monkeypatch, isolated_config_manager, session)
+
+    with caplog.at_level(logging.WARNING):
+        await asyncio.wait_for(instance.stop(), timeout=5)
+
+    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
 
 
 @pytest.mark.asyncio
