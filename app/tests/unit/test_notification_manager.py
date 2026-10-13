@@ -659,6 +659,281 @@ async def test_start_stop_lifecycle_delivers_queued_notification(
     assert instance._session is None
 
 
+class _GatedSession(_FakeAiohttpSession):
+    """Fake session whose POST stays in flight until `release` is set.
+
+    `started` records each POST that began; `completed` only those that ran to
+    the end (a cancelled POST is started but never completed). With
+    `hang=True` the POST never finishes on its own.
+    """
+
+    def __init__(self, hang: bool = False):
+        super().__init__()
+        self.hang = hang
+        self.release = asyncio.Event()
+        self.started: list[str] = []
+        self.completed: list[str] = []
+
+    def post(self, url, **kwargs):
+        return _GatedResponse(self, kwargs["json"]["event"]["container_name"])
+
+
+class _GatedResponse(_FakeResponse):
+    def __init__(self, session: _GatedSession, name: str):
+        super().__init__()
+        self._session = session
+        self._name = name
+
+    async def __aenter__(self):
+        self._session.started.append(self._name)
+        if self._session.hang:
+            await asyncio.Event().wait()
+        await self._session.release.wait()
+        self._session.completed.append(self._name)
+        return self
+
+
+def _named_event(name: str) -> AutoHealEvent:
+    event = _make_event("restart")
+    event.container_name = name
+    return event
+
+
+async def _started_manager(monkeypatch, isolated_config_manager, session: _GatedSession):
+    monkeypatch.setattr(
+        "app.notifications.notification_manager.aiohttp.ClientSession",
+        lambda *args, **kwargs: session,
+    )
+    _configure_webhook(isolated_config_manager)
+    instance = NotificationManager()
+    await instance.start()
+    return instance
+
+
+async def _wait_until(predicate) -> None:
+    for _ in range(200):
+        if predicate():
+            return
+        await asyncio.sleep(0.01)
+    raise AssertionError("condition not reached")
+
+
+@pytest.mark.asyncio
+async def test_stop_delivers_notifications_queued_before_stop(
+    caplog, monkeypatch, isolated_config_manager
+):
+    """Events queued but not yet picked up by the worker are sent, in order."""
+    session = _GatedSession()
+    session.release.set()
+    instance = await _started_manager(monkeypatch, isolated_config_manager, session)
+
+    await instance.send_event_notification(_named_event("first"))
+    await instance.send_event_notification(_named_event("second"))
+    with caplog.at_level(logging.WARNING):
+        await instance.stop()
+
+    assert session.completed == ["first", "second"]
+    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+    assert instance._notification_queue.empty()
+    assert session.closed is True
+    assert instance._session is None
+
+
+@pytest.mark.asyncio
+async def test_stop_lets_in_flight_notification_finish(monkeypatch, isolated_config_manager):
+    """A notification being sent when stop() is called is not cancelled mid-send."""
+    session = _GatedSession()
+    instance = await _started_manager(monkeypatch, isolated_config_manager, session)
+
+    await instance.send_event_notification(_named_event("in-flight"))
+    await _wait_until(lambda: session.started)
+
+    stop_task = asyncio.create_task(instance.stop())
+    await asyncio.sleep(0.05)
+    assert not stop_task.done()
+    assert session.closed is False
+
+    session.release.set()
+    await asyncio.wait_for(stop_task, timeout=5)
+
+    assert session.completed == ["in-flight"]
+    assert session.closed is True
+
+
+@pytest.mark.asyncio
+async def test_send_event_notification_after_stop_is_dropped_and_logged(
+    caplog, monkeypatch, isolated_config_manager
+):
+    session = _GatedSession()
+    session.release.set()
+    instance = await _started_manager(monkeypatch, isolated_config_manager, session)
+    await instance.stop()
+
+    with caplog.at_level(logging.WARNING):
+        await instance.send_event_notification(_named_event("late"))
+
+    assert instance._notification_queue.empty()
+    assert any(
+        r.levelno == logging.WARNING and "stopped" in r.message and "restart" in r.message
+        for r in caplog.records
+    )
+
+
+@pytest.mark.asyncio
+async def test_send_event_notification_during_drain_is_dropped_and_logged(
+    caplog, monkeypatch, isolated_config_manager
+):
+    """An event arriving while stop() is still draining is refused, not queued."""
+    session = _GatedSession()
+    instance = await _started_manager(monkeypatch, isolated_config_manager, session)
+
+    await instance.send_event_notification(_named_event("in-flight"))
+    await _wait_until(lambda: session.started)
+
+    stop_task = asyncio.create_task(instance.stop())
+    await _wait_until(lambda: instance._stopping)
+    assert not stop_task.done()
+
+    with caplog.at_level(logging.WARNING):
+        await instance.send_event_notification(_named_event("during-drain"))
+
+    assert instance._notification_queue.empty()
+    assert any(
+        r.levelno == logging.WARNING
+        and r.getMessage()
+        == "Notification manager is stopped; dropping notification for event: restart"
+        for r in caplog.records
+    )
+
+    session.release.set()
+    await asyncio.wait_for(stop_task, timeout=5)
+
+    await instance.start()
+    await instance.send_event_notification(_named_event("after-restart"))
+    await asyncio.wait_for(instance.stop(), timeout=5)
+
+    assert session.completed == ["in-flight", "after-restart"]
+
+
+@pytest.mark.asyncio
+async def test_stop_drain_is_bounded_and_logs_dropped_count(
+    caplog, monkeypatch, isolated_config_manager
+):
+    """An unreachable provider cannot hold shutdown open; the loss is logged."""
+    session = _GatedSession(hang=True)
+    instance = await _started_manager(monkeypatch, isolated_config_manager, session)
+    monkeypatch.setattr(instance, "SHUTDOWN_DRAIN_TIMEOUT_SECONDS", 0.1)
+
+    await instance.send_event_notification(_named_event("stuck"))
+    await _wait_until(lambda: session.started)
+    await instance.send_event_notification(_named_event("queued-1"))
+    await instance.send_event_notification(_named_event("queued-2"))
+
+    with caplog.at_level(logging.WARNING):
+        await asyncio.wait_for(instance.stop(), timeout=5)
+
+    assert session.completed == []
+    assert session.closed is True
+    assert instance._session is None
+    assert instance._worker_task is not None
+    assert instance._worker_task.done()
+    assert instance._notification_queue.empty()
+    assert any(
+        r.levelno == logging.WARNING
+        and r.getMessage()
+        == "Notification manager stopped with 3 undelivered notification(s) dropped"
+        for r in caplog.records
+    )
+
+
+@pytest.mark.asyncio
+async def test_events_dropped_by_timed_out_stop_are_not_sent_after_restart(
+    monkeypatch, isolated_config_manager
+):
+    """Events reported as dropped must really be dropped, not delivered on a later start()."""
+    session = _GatedSession(hang=True)
+    instance = await _started_manager(monkeypatch, isolated_config_manager, session)
+    monkeypatch.setattr(instance, "SHUTDOWN_DRAIN_TIMEOUT_SECONDS", 0.1)
+
+    await instance.send_event_notification(_named_event("stuck"))
+    await _wait_until(lambda: session.started)
+    await instance.send_event_notification(_named_event("stale"))
+    await asyncio.wait_for(instance.stop(), timeout=5)
+
+    session.hang = False
+    session.release.set()
+    await instance.start()
+    await asyncio.wait_for(instance.stop(), timeout=5)
+
+    assert session.completed == []
+
+
+@pytest.mark.asyncio
+async def test_cancelled_stop_still_releases_worker_and_session(
+    monkeypatch, isolated_config_manager
+):
+    """Cancelling stop() while it drains must not leak the worker or the HTTP session."""
+    session = _GatedSession(hang=True)
+    instance = await _started_manager(monkeypatch, isolated_config_manager, session)
+
+    await instance.send_event_notification(_named_event("stuck"))
+    await _wait_until(lambda: session.started)
+
+    stop_task = asyncio.create_task(instance.stop())
+    await asyncio.sleep(0.05)
+    stop_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await stop_task
+
+    assert instance._running is False
+    assert instance._worker_task is not None
+    assert instance._worker_task.done()
+    assert session.closed is True
+    assert instance._session is None
+
+
+@pytest.mark.asyncio
+async def test_stop_with_nothing_queued_reports_no_dropped_notifications(
+    caplog, monkeypatch, isolated_config_manager
+):
+    """A manager that never sent anything stops quietly, without a false drop warning."""
+    session = _GatedSession()
+    instance = await _started_manager(monkeypatch, isolated_config_manager, session)
+
+    with caplog.at_level(logging.WARNING):
+        await asyncio.wait_for(instance.stop(), timeout=5)
+
+    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+
+@pytest.mark.asyncio
+async def test_stop_tolerates_running_manager_without_worker_or_session():
+    """A partially started manager (no worker/session yet) can still be stopped."""
+    instance = NotificationManager()
+    instance._running = True
+
+    await asyncio.wait_for(instance.stop(), timeout=5)
+
+    assert instance._running is False
+    assert instance._session is None
+
+
+@pytest.mark.asyncio
+async def test_manager_accepts_notifications_again_after_restart(
+    monkeypatch, isolated_config_manager
+):
+    session = _GatedSession()
+    session.release.set()
+    instance = await _started_manager(monkeypatch, isolated_config_manager, session)
+    await instance.stop()
+
+    await instance.start()
+    await instance.send_event_notification(_named_event("after-restart"))
+    await instance.stop()
+
+    assert session.completed == ["after-restart"]
+
+
 @pytest.mark.asyncio
 async def test_start_when_already_running_is_a_noop(monkeypatch, isolated_config_manager):
     monkeypatch.setattr(
