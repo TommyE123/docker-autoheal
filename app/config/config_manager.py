@@ -314,15 +314,19 @@ def _atomic_write_json(path: Path, data: Any, **dump_kwargs: Any) -> None:
     directory (so the final rename stays on one filesystem), flushed to disk,
     then moved over ``path`` with ``os.replace``. If anything fails, the
     previous ``path`` is left untouched and the temporary file is removed.
-    An existing file keeps its permission bits, and a symlinked ``path`` is
-    written through to its target, matching the previous truncate-in-place
-    behaviour.
+    An existing file keeps its permission bits and, where the process is
+    allowed to restore it, its owner and group; a symlinked ``path`` is written
+    through to its target. This matches the previous truncate-in-place
+    behaviour. Restoring ownership is best effort: it needs privilege (or a
+    group the process belongs to), so without it the save still succeeds and
+    the file is simply owned by the process that wrote it. ACLs and extended
+    attributes are not carried over.
     """
     path = Path(os.path.realpath(path))
     temp_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
-    existing_mode: int | None = None
+    existing: os.stat_result | None = None
     with contextlib.suppress(FileNotFoundError):
-        existing_mode = stat.S_IMODE(path.stat().st_mode)
+        existing = path.stat()
     try:
         # Exclusive create. A new file keeps the umask default, like "w" did. An
         # existing file may be stricter than that default (for example 0600,
@@ -332,11 +336,20 @@ def _atomic_write_json(path: Path, data: Any, **dump_kwargs: Any) -> None:
         fd = os.open(
             temp_path,
             os.O_WRONLY | os.O_CREAT | os.O_EXCL,
-            0o666 if existing_mode is None else 0o600,
+            0o666 if existing is None else 0o600,
         )
         with os.fdopen(fd, "w") as f:
-            if existing_mode is not None:
-                os.fchmod(fd, existing_mode)
+            if existing is not None:
+                # Ownership first: chown can clear setuid/setgid bits, so the
+                # mode is applied after it. The file stays 0600 until then, so
+                # handing it to the original owner never makes it readable by
+                # anyone the original was not. Failing to chown (no privilege,
+                # or a filesystem that cannot) must not fail the save.
+                try:
+                    os.fchown(fd, existing.st_uid, existing.st_gid)
+                except OSError as error:
+                    logger.debug("Could not preserve ownership of %s: %s", path, error)
+                os.fchmod(fd, stat.S_IMODE(existing.st_mode))
             json.dump(data, f, **dump_kwargs)
             f.flush()
             os.fsync(f.fileno())
