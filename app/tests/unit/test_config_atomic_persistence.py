@@ -14,6 +14,7 @@ file to survive byte for byte.
 
 import json
 import os
+import stat
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -181,3 +182,42 @@ def test_failure_after_serialisation_keeps_previous_file_and_cleans_up(
 
     assert path.read_bytes() == good_bytes
     assert list(path.parent.glob(f".{path.name}.*")) == [], "temporary file was left behind"
+
+
+@pytest.mark.parametrize("existing_mode", [0o600, 0o640, 0o644])
+def test_temp_file_is_never_more_permissive_than_the_file_it_replaces(
+    isolated_config_manager, monkeypatch, existing_mode
+):
+    """A hardened file (e.g. 0600, it holds credentials) must not be copied into a
+    temp file that is readable under a permissive umask, even briefly."""
+    manager = isolated_config_manager
+    _save_config(manager, 45)
+    manager.CONFIG_FILE.chmod(existing_mode)
+
+    modes_at_creation: list[int] = []
+    real_fchmod = os.fchmod
+
+    def spying_fchmod(fd, mode):
+        modes_at_creation.append(stat.S_IMODE(os.fstat(fd).st_mode))
+        return real_fchmod(fd, mode)
+
+    monkeypatch.setattr(os, "fchmod", spying_fchmod)
+    previous_umask = os.umask(0o022)
+    try:
+        _save_config(manager, 50)
+    finally:
+        os.umask(previous_umask)
+
+    assert modes_at_creation == [0o600]
+    assert stat.S_IMODE(manager.CONFIG_FILE.stat().st_mode) == existing_mode
+
+
+def test_new_file_gets_the_umask_default_mode(isolated_config_manager):
+    manager = isolated_config_manager
+    previous_umask = os.umask(0o027)
+    try:
+        _save_config(manager, 45)
+    finally:
+        os.umask(previous_umask)
+
+    assert stat.S_IMODE(manager.CONFIG_FILE.stat().st_mode) == 0o640

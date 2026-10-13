@@ -320,11 +320,23 @@ def _atomic_write_json(path: Path, data: Any, **dump_kwargs: Any) -> None:
     """
     path = Path(os.path.realpath(path))
     temp_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    existing_mode: int | None = None
+    with contextlib.suppress(FileNotFoundError):
+        existing_mode = stat.S_IMODE(path.stat().st_mode)
     try:
-        # Exclusive create ("x") honours the process umask like "w" did.
-        with temp_path.open("x") as f:
-            with contextlib.suppress(FileNotFoundError):
-                os.fchmod(f.fileno(), stat.S_IMODE(path.stat().st_mode))
+        # Exclusive create. A new file keeps the umask default, like "w" did. An
+        # existing file may be stricter than that default (for example 0600,
+        # since it holds credentials), so its replacement starts owner-only and
+        # is widened to the existing mode before any data is written; it is
+        # never readable by anyone the original was not.
+        fd = os.open(
+            temp_path,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o666 if existing_mode is None else 0o600,
+        )
+        with os.fdopen(fd, "w") as f:
+            if existing_mode is not None:
+                os.fchmod(fd, existing_mode)
             json.dump(data, f, **dump_kwargs)
             f.flush()
             os.fsync(f.fileno())
