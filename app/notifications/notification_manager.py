@@ -43,12 +43,20 @@ class NotificationManager:
     Manages notification delivery to various services
     """
 
+    # Upper bound on how long stop() waits for queued notifications to be
+    # delivered before dropping the rest, so an unreachable provider cannot
+    # delay process exit.
+    SHUTDOWN_DRAIN_TIMEOUT_SECONDS = 5.0
+
     def __init__(self):
         """Initialize notification manager"""
         self._session: aiohttp.ClientSession | None = None
         self._notification_queue: asyncio.Queue = asyncio.Queue()
         self._worker_task: asyncio.Task | None = None
         self._running = False
+        # True once stop() has begun; new events are refused until start().
+        self._stopping = False
+        self._in_flight = False
 
     async def start(self) -> None:
         """Start the notification manager"""
@@ -57,6 +65,7 @@ class NotificationManager:
             return
 
         self._running = True
+        self._stopping = False
         self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30))
         self._worker_task = asyncio.create_task(self._notification_worker())
         logger.info("Notification manager started")
@@ -66,18 +75,36 @@ class NotificationManager:
         if not self._running:
             return
 
-        self._running = False
+        # Refuse new events, then give the worker a bounded time to deliver
+        # what is already queued (including a notification mid-send).
+        self._stopping = True
 
-        if self._worker_task:
-            self._worker_task.cancel()
+        try:
             try:
-                await self._worker_task
-            except asyncio.CancelledError:
-                pass
+                await asyncio.wait_for(
+                    self._notification_queue.join(),
+                    timeout=self.SHUTDOWN_DRAIN_TIMEOUT_SECONDS,
+                )
+            except TimeoutError:
+                dropped = self._notification_queue.qsize() + int(self._in_flight)
+                logger.warning(
+                    "Notification manager stop timed out after %.1fs; dropped %d undelivered notification(s)",
+                    self.SHUTDOWN_DRAIN_TIMEOUT_SECONDS,
+                    dropped,
+                )
+        finally:
+            self._running = False
 
-        if self._session:
-            await self._session.close()
-            self._session = None
+            if self._worker_task:
+                self._worker_task.cancel()
+                try:
+                    await self._worker_task
+                except asyncio.CancelledError:
+                    pass
+
+            if self._session:
+                await self._session.close()
+                self._session = None
 
         logger.info("Notification manager stopped")
 
@@ -101,6 +128,13 @@ class NotificationManager:
         # Check event filters
         if not self._should_notify_for_event(event):
             logger.debug("Event type '%s' filtered out, skipping notification", event.event_type)
+            return
+
+        if self._stopping:
+            logger.warning(
+                "Notification manager is stopped; dropping notification for event: %s",
+                event.event_type,
+            )
             return
 
         # Queue the notification
@@ -138,7 +172,12 @@ class NotificationManager:
                     continue
 
                 # Process the notification
-                await self._process_notification(event)
+                self._in_flight = True
+                try:
+                    await self._process_notification(event)
+                finally:
+                    self._in_flight = False
+                    self._notification_queue.task_done()
 
             except asyncio.CancelledError:
                 break
