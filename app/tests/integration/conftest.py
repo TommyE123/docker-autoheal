@@ -29,6 +29,7 @@ AUTOHEAL_METRICS_URL = os.environ.get("AUTOHEAL_METRICS_URL", "http://localhost:
 
 try:
     import docker
+    import docker.errors
 except ImportError:  # pragma: no cover - docker is a runtime dependency of the app
     docker = None
 
