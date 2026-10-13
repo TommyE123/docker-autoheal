@@ -833,7 +833,12 @@ async def test_stop_drain_is_bounded_and_logs_dropped_count(
     assert instance._worker_task is not None
     assert instance._worker_task.done()
     assert instance._notification_queue.empty()
-    assert any("3" in r.message and "dropped" in r.message.lower() for r in caplog.records)
+    assert any(
+        r.levelno == logging.WARNING
+        and r.getMessage()
+        == "Notification manager stopped with 3 undelivered notification(s) dropped"
+        for r in caplog.records
+    )
 
 
 @pytest.mark.asyncio
