@@ -11,6 +11,7 @@ import socket
 from unittest.mock import MagicMock, patch
 
 import docker
+import docker.errors
 import pytest
 
 from app.docker_client.docker_client_wrapper import DockerClientWrapper

@@ -8,6 +8,7 @@ import socket
 from typing import Any
 
 import docker
+import docker.errors
 import requests
 from docker.models.containers import Container
 
