@@ -543,6 +543,127 @@ class TestBackoffDoesNotStallMonitoring:
 
 
 @pytest.mark.asyncio
+class TestAbandonedRestartWait:
+    """A pending restart wait must not outlive the container that started it."""
+
+    @staticmethod
+    def _assert_consistent(engine):
+        assert set(engine._next_allowed_restart) == set(engine._restart_wait_owner)
+
+    async def test_wait_is_dropped_when_its_container_disappears(self, engine, docker_client):
+        container, info = make_container(name="web", status="exited", exit_code=1)
+        bystander, bystander_info = make_container(name="db", container_id="d" * 64)
+        docker_client.add_container(container, info)
+        docker_client.add_container(bystander, bystander_info)
+        await engine._check_containers()
+        assert "web" in engine._next_allowed_restart
+
+        docker_client.remove_container(container)
+        await engine._check_containers()
+
+        assert engine._next_allowed_restart == {}
+        assert engine._restart_wait_owner == {}
+        assert docker_client.restart_calls == []
+
+    async def test_wait_is_kept_while_its_container_is_still_listed(self, engine, docker_client):
+        container, info = make_container(name="web", status="exited", exit_code=1)
+        docker_client.add_container(container, info)
+        await engine._check_containers()
+        deadline = engine._next_allowed_restart["web"]
+
+        await engine._check_containers()
+
+        assert engine._next_allowed_restart == {"web": deadline}
+        self._assert_consistent(engine)
+
+    async def test_wait_is_not_dropped_when_listing_fails(self, engine, docker_client):
+        container, info = make_container(name="web", status="exited", exit_code=1)
+        docker_client.add_container(container, info)
+        await engine._check_containers()
+        docker_client.list_containers_error = RuntimeError("docker daemon unavailable")
+
+        await engine._check_containers()
+
+        assert "web" in engine._next_allowed_restart
+        self._assert_consistent(engine)
+
+    async def test_wait_is_not_dropped_when_listing_returns_nothing(
+        self, engine, docker_client, monkeypatch
+    ):
+        """DockerClientWrapper.list_containers logs a failure and returns [], not an error."""
+        container, info = make_container(name="web", status="exited", exit_code=1)
+        docker_client.add_container(container, info)
+        await engine._check_containers()
+        deadline = engine._next_allowed_restart["web"]
+        monkeypatch.setattr(docker_client, "list_containers", lambda all_containers=False: [])
+
+        await engine._check_containers()
+
+        assert engine._next_allowed_restart == {"web": deadline}
+        self._assert_consistent(engine)
+
+    async def test_wait_is_dropped_when_its_container_stops_being_monitored(
+        self, engine, docker_client, update_config
+    ):
+        container, info = make_container(name="web", status="exited", exit_code=1)
+        docker_client.add_container(container, info)
+        await engine._check_containers()
+        assert "web" in engine._next_allowed_restart
+
+        update_config(lambda c: c.containers.excluded.append("web"))
+        await engine._check_containers()
+
+        assert engine._next_allowed_restart == {}
+        assert engine._restart_wait_owner == {}
+        assert docker_client.restart_calls == []
+
+        # Monitored again and still failing: it gets a fresh wait, not an instant restart.
+        update_config(lambda c: c.containers.excluded.remove("web"))
+        await engine._check_containers()
+
+        assert docker_client.restart_calls == []
+        assert scheduled_delay(engine, "web") == pytest.approx(10, abs=1)
+        self._assert_consistent(engine)
+
+    async def test_replacement_does_not_inherit_the_abandoned_deadline(self, engine, docker_client):
+        """
+        A recreated container has the same name and recovery ID but a new ID. Its
+        predecessor's wait, even one that has already run out, is not the new
+        container's: it must wait for itself. Restart history is kept regardless.
+        """
+        old, old_info = make_container(
+            name="web", container_id="a" * 64, status="exited", exit_code=1
+        )
+        docker_client.add_container(old, old_info)
+        config_manager.record_restart("web")
+        engine._backoff_delays["web"] = 40
+        last_restart = datetime.now(UTC) - timedelta(hours=1)
+        engine._last_restart_times["web"] = last_restart
+        await engine._check_containers()
+        elapse_backoff(engine, "web")  # the predecessor's deadline has run out
+
+        docker_client.remove_container(old)
+        new, new_info = make_container(
+            name="web", container_id="b" * 64, status="exited", exit_code=1
+        )
+        docker_client.add_container(new, new_info)
+        await engine._check_containers()
+
+        assert docker_client.restart_calls == []  # it did not restart straight away
+        assert scheduled_delay(engine, "web") == pytest.approx(40, abs=1)  # escalation kept
+        assert engine._restart_wait_owner == {"web": new.id}
+        assert config_manager.get_total_restart_count("web") == 1  # history kept
+        assert engine._last_restart_times["web"] == last_restart  # cooldown history kept
+        self._assert_consistent(engine)
+
+        elapse_backoff(engine, "web")
+        await engine._check_containers()
+
+        assert docker_client.restart_calls == ["web"]
+        assert config_manager.get_total_restart_count("web") == 2
+
+
+@pytest.mark.asyncio
 class TestQuarantineAlerts:
     """Webhook alerting on quarantine."""
 

@@ -393,6 +393,49 @@ class TestExplicitMonitoringIdIsShared:
         assert engine._next_allowed_restart == {}
         assert engine._restart_wait_owner == {}
 
+    async def test_sibling_does_not_inherit_the_wait_of_a_replica_that_disappeared(
+        self, engine, docker_client
+    ):
+        shared = {"monitoring.id": "shared-web"}
+        gone, gone_info = replica(1, status="exited", exit_code=1, extra_labels=shared)
+        sick, sick_info = replica(2, status="exited", exit_code=1, extra_labels=shared)
+        docker_client.add_container(gone, gone_info)
+        await engine._check_containers()
+        engine._next_allowed_restart["monitoring.id:shared-web"] = datetime.now(UTC) - timedelta(
+            seconds=1
+        )  # the first replica's wait has run out
+        docker_client.remove_container(gone)
+        docker_client.add_container(sick, sick_info)
+
+        await engine._check_containers()
+
+        assert docker_client.restart_calls == []
+        assert engine._restart_wait_owner == {"monitoring.id:shared-web": sick.id}
+        assert set(engine._next_allowed_restart) == {"monitoring.id:shared-web"}
+
+    @pytest.mark.parametrize("healthy_first", [True, False])
+    async def test_valid_wait_survives_a_healthy_sibling_and_an_absent_one(
+        self, engine, docker_client, healthy_first
+    ):
+        """The owner is still listed and failing, so neither sibling's presence nor absence matters."""
+        shared = {"monitoring.id": "shared-web"}
+        sick, sick_info = replica(1, status="exited", exit_code=1, extra_labels=shared)
+        well, well_info = replica(2, extra_labels=shared)
+        for container, info in (
+            ((well, well_info), (sick, sick_info))
+            if healthy_first
+            else ((sick, sick_info), (well, well_info))
+        ):
+            docker_client.add_container(container, info)
+        await engine._check_containers()
+        deadline = engine._next_allowed_restart["monitoring.id:shared-web"]
+
+        docker_client.remove_container(well)  # an unrelated sibling goes away
+        await engine._check_containers()
+
+        assert engine._next_allowed_restart == {"monitoring.id:shared-web": deadline}
+        assert engine._restart_wait_owner == {"monitoring.id:shared-web": sick.id}
+
 
 class TestConfigurationStaysPerService:
     def test_selection_by_service_id_monitors_every_replica(self, engine, update_config):
