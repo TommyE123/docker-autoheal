@@ -3,9 +3,13 @@ Configuration management for Docker Auto-Heal Service
 Handles in-memory configuration state with JSON export/import support
 """
 
+import contextlib
 import json
 import logging
+import os
+import stat
 import threading
+import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -303,6 +307,33 @@ _CONFIG_SECTION_MODELS: dict[str, type] = {
 }
 
 
+def _atomic_write_json(path: Path, data: Any, **dump_kwargs: Any) -> None:
+    """Write ``data`` as JSON to ``path`` without ever exposing a partial file.
+
+    The document is written to a uniquely named temporary file in the same
+    directory (so the final rename stays on one filesystem), flushed to disk,
+    then moved over ``path`` with ``os.replace``. If anything fails, the
+    previous ``path`` is left untouched and the temporary file is removed.
+    An existing file keeps its permission bits, and a symlinked ``path`` is
+    written through to its target, matching the previous truncate-in-place
+    behaviour.
+    """
+    path = Path(os.path.realpath(path))
+    temp_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        # Exclusive create ("x") honours the process umask like "w" did.
+        with temp_path.open("x") as f:
+            with contextlib.suppress(FileNotFoundError):
+                os.fchmod(f.fileno(), stat.S_IMODE(path.stat().st_mode))
+            json.dump(data, f, **dump_kwargs)
+            f.flush()
+            os.fsync(f.fileno())
+        temp_path.replace(path)
+    except BaseException:
+        temp_path.unlink(missing_ok=True)
+        raise
+
+
 class ConfigManager:
     """
     Thread-safe configuration manager with file-based persistence
@@ -450,8 +481,7 @@ class ConfigManager:
             config_dict["custom_health_checks"] = {
                 cid: hc.model_dump() for cid, hc in self._custom_health_checks.items()
             }
-            with self.CONFIG_FILE.open("w") as f:
-                json.dump(config_dict, f, indent=2, default=str)
+            _atomic_write_json(self.CONFIG_FILE, config_dict, indent=2, default=str)
             logger.debug("Configuration saved to disk")
         except Exception as e:
             logger.error("Failed to save config to disk: %s", e)
@@ -491,8 +521,7 @@ class ConfigManager:
         """Save events to file"""
         try:
             events_data = [event.model_dump(mode="json") for event in self._event_log]
-            with self.EVENTS_FILE.open("w") as f:
-                json.dump(events_data, f, indent=2, default=str)
+            _atomic_write_json(self.EVENTS_FILE, events_data, indent=2, default=str)
             logger.debug("Saved %s events to disk", len(self._event_log))
         except Exception as e:
             logger.error("Failed to save events to disk: %s", e)
@@ -519,8 +548,7 @@ class ConfigManager:
     def _save_quarantine(self) -> None:
         """Save quarantine list to file"""
         try:
-            with self.QUARANTINE_FILE.open("w") as f:
-                json.dump(list(self._quarantined_containers), f, indent=2)
+            _atomic_write_json(self.QUARANTINE_FILE, list(self._quarantined_containers), indent=2)
             logger.debug(
                 "Saved %s quarantined containers to disk",
                 len(self._quarantined_containers),
@@ -553,8 +581,7 @@ class ConfigManager:
                 if self._maintenance_start_time
                 else None,
             }
-            with self.MAINTENANCE_FILE.open("w") as f:
-                json.dump(data, f, indent=2)
+            _atomic_write_json(self.MAINTENANCE_FILE, data, indent=2)
             logger.debug("Saved maintenance mode state: %s", self._maintenance_mode)
         except Exception as e:
             logger.error("Failed to save maintenance mode to disk: %s", e)
