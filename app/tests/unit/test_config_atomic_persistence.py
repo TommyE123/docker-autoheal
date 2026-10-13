@@ -97,9 +97,11 @@ def test_interrupted_config_write_does_not_reset_settings_on_next_load(
     manager = isolated_config_manager
     _save_config(manager, 45)
 
-    monkeypatch.setattr(config_manager_module.json, "dump", _interrupted_dump)
-    _save_config(manager, 99)
-    monkeypatch.undo()
+    # Scoped context: a bare monkeypatch.undo() would also revert the autouse
+    # fixtures' patches (asyncio.sleep, notification manager) mid-test.
+    with monkeypatch.context() as patch_context:
+        patch_context.setattr(config_manager_module.json, "dump", _interrupted_dump)
+        _save_config(manager, 99)
 
     assert manager._load_config().monitor.interval_seconds == 45
 
@@ -157,3 +159,25 @@ def test_symlinked_file_is_written_through_not_replaced(isolated_config_manager)
 
     assert manager.CONFIG_FILE.is_symlink()
     assert json.loads(real_file.read_text())["monitor"]["interval_seconds"] == 45
+
+
+@pytest.mark.parametrize("failing_step", ["fsync", "replace"])
+@pytest.mark.parametrize("case", PERSISTENCE_CASES)
+def test_failure_after_serialisation_keeps_previous_file_and_cleans_up(
+    isolated_config_manager, monkeypatch, case, failing_step
+):
+    file_attribute, first_save, second_save = PERSISTENCE_CASES[case]
+    manager = isolated_config_manager
+    path: Path = getattr(manager, file_attribute)
+
+    first_save(manager)
+    good_bytes = path.read_bytes()
+
+    def failing(*args, **kwargs):
+        raise OSError(5, "Input/output error")
+
+    monkeypatch.setattr(os, failing_step, failing)
+    second_save(manager)
+
+    assert path.read_bytes() == good_bytes
+    assert list(path.parent.glob(f".{path.name}.*")) == [], "temporary file was left behind"
