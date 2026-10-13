@@ -797,7 +797,66 @@ async def test_stop_drain_is_bounded_and_logs_dropped_count(
     assert instance._session is None
     assert instance._worker_task is not None
     assert instance._worker_task.done()
+    assert instance._notification_queue.empty()
     assert any("3" in r.message and "dropped" in r.message.lower() for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_events_dropped_by_timed_out_stop_are_not_sent_after_restart(
+    monkeypatch, isolated_config_manager
+):
+    """Events reported as dropped must really be dropped, not delivered on a later start()."""
+    session = _GatedSession(hang=True)
+    instance = await _started_manager(monkeypatch, isolated_config_manager, session)
+    monkeypatch.setattr(instance, "SHUTDOWN_DRAIN_TIMEOUT_SECONDS", 0.1)
+
+    await instance.send_event_notification(_named_event("stuck"))
+    await _wait_until(lambda: session.started)
+    await instance.send_event_notification(_named_event("stale"))
+    await asyncio.wait_for(instance.stop(), timeout=5)
+
+    session.hang = False
+    session.release.set()
+    await instance.start()
+    await asyncio.wait_for(instance.stop(), timeout=5)
+
+    assert session.completed == []
+
+
+@pytest.mark.asyncio
+async def test_cancelled_stop_still_releases_worker_and_session(
+    monkeypatch, isolated_config_manager
+):
+    """Cancelling stop() while it drains must not leak the worker or the HTTP session."""
+    session = _GatedSession(hang=True)
+    instance = await _started_manager(monkeypatch, isolated_config_manager, session)
+
+    await instance.send_event_notification(_named_event("stuck"))
+    await _wait_until(lambda: session.started)
+
+    stop_task = asyncio.create_task(instance.stop())
+    await asyncio.sleep(0.05)
+    stop_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await stop_task
+
+    assert instance._running is False
+    assert instance._worker_task is not None
+    assert instance._worker_task.done()
+    assert session.closed is True
+    assert instance._session is None
+
+
+@pytest.mark.asyncio
+async def test_stop_tolerates_running_manager_without_worker_or_session():
+    """A partially started manager (no worker/session yet) can still be stopped."""
+    instance = NotificationManager()
+    instance._running = True
+
+    await asyncio.wait_for(instance.stop(), timeout=5)
+
+    assert instance._running is False
+    assert instance._session is None
 
 
 @pytest.mark.asyncio

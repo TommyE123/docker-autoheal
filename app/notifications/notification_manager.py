@@ -5,6 +5,7 @@ Supports: Webhook, Discord, Slack, Telegram, Email, Ntfy, Gotify, Pushover
 
 import asyncio
 import logging
+from contextlib import suppress
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
@@ -80,20 +81,16 @@ class NotificationManager:
         self._stopping = True
 
         try:
-            try:
+            with suppress(TimeoutError):
                 await asyncio.wait_for(
                     self._notification_queue.join(),
                     timeout=self.SHUTDOWN_DRAIN_TIMEOUT_SECONDS,
                 )
-            except TimeoutError:
-                dropped = self._notification_queue.qsize() + int(self._in_flight)
-                logger.warning(
-                    "Notification manager stop timed out after %.1fs; dropped %d undelivered notification(s)",
-                    self.SHUTDOWN_DRAIN_TIMEOUT_SECONDS,
-                    dropped,
-                )
         finally:
             self._running = False
+            # Anything still queued or mid-send now (drain timed out, or stop()
+            # was cancelled) will not be delivered. Count it before cancelling.
+            dropped = self._notification_queue.qsize() + int(self._in_flight)
 
             if self._worker_task:
                 self._worker_task.cancel()
@@ -101,6 +98,18 @@ class NotificationManager:
                     await self._worker_task
                 except asyncio.CancelledError:
                     pass
+
+            # Discard what is left so it is not sent after a later start() and
+            # the queue's unfinished-task count stays consistent.
+            while not self._notification_queue.empty():
+                self._notification_queue.get_nowait()
+                self._notification_queue.task_done()
+
+            if dropped:
+                logger.warning(
+                    "Notification manager stopped with %d undelivered notification(s) dropped",
+                    dropped,
+                )
 
             if self._session:
                 await self._session.close()
