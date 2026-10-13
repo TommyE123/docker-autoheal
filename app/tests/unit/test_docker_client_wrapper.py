@@ -232,6 +232,15 @@ class TestListingAndLookup:
         ):
             assert wrapper.list_containers() == []
 
+    def test_require_client_returns_the_sdk_client(self, wrapper, sdk_client):
+        assert wrapper._require_client() is sdk_client
+
+    def test_require_client_raises_when_client_is_missing(self, wrapper):
+        wrapper._client = None
+
+        with pytest.raises(RuntimeError, match=r"^Docker client not initialized$"):
+            wrapper._require_client()
+
     def test_missing_client_is_handled_like_any_docker_failure(self, wrapper, sdk_client):
         wrapper._client = None
 
