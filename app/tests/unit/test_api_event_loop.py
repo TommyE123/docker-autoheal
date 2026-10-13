@@ -161,9 +161,7 @@ class TestDockerCallsDoNotBlockEventLoop:
 
     async def test_unquarantine(self, monkeypatch, engine):
         client = _wire(monkeypatch, engine, "get_container_info")
-        monkeypatch.setattr(
-            "app.api.state.notification_manager", _NoopNotifier(), raising=False
-        )
+        monkeypatch.setattr("app.api.state.notification_manager", _NoopNotifier(), raising=False)
 
         result = await _assert_loop_stays_responsive(client, lambda: unquarantine_container("web"))
 
