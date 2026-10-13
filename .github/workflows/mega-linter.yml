@@ -19,6 +19,7 @@ jobs:
   # itself fails, badge-only is empty and it runs. See badge-only-check.yml.
   changes:
     permissions:
+      contents: read
       pull-requests: read
     uses: ./.github/workflows/badge-only-check.yml
 

@@ -17,23 +17,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      contents: read
       pull-requests: read
     outputs:
       badge-only: ${{ steps.detect.outputs.badge-only }}
     steps:
+      # The script comes from the checked-out ref, so check out the PR's own code.
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - id: detect
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
           PR: ${{ github.event.pull_request.number }}
-        run: |
-          badge_only=false
-          if [ "$EVENT_NAME" = pull_request ]; then
-            # filename and previous_filename: a rename must not hide the file it moved from.
-            files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" \
-              --jq '.[] | .filename, (.previous_filename // empty)') || files=
-            if [ -n "$files" ] && ! printf '%s\n' "$files" | grep -qvxF .github/badges/mutation.json; then
-              badge_only=true
-            fi
-          fi
-          echo "badge-only=$badge_only" >> "$GITHUB_OUTPUT"
+        run: .github/scripts/badge-only.sh

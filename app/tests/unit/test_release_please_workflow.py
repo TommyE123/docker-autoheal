@@ -262,3 +262,25 @@ def test_badge_only_pr_skips_ci_without_path_filters_or_failing_open():
         assert "paths" not in triggers
         assert "uses: ./.github/workflows/badge-only-check.yml" in jobs
         assert "if: ${{ !cancelled() && needs.changes.outputs.badge-only != 'true' }}" in jobs
+
+
+def test_required_unit_tests_job_always_runs_and_validates_the_badge_for_badge_only_prs():
+    text = (REPO_ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")
+    job = re.search(r"(?ms)^  unit-tests:\n(.*?)(?=^  [\w-]+:\n|\Z)", text).group(1)
+
+    # A job skipped by `if` counts as passing for the required check, so it must not be skipped.
+    assert "    if: ${{ !cancelled() }}\n" in job
+    assert (
+        "if: ${{ needs.changes.outputs.badge-only == 'true' }}\n        run: .github/scripts/validate-badge.sh"
+        in job
+    )
+    # Every expensive step is skipped for a badge-only PR.
+    for step in (
+        "Install dependencies",
+        "Run unit tests with coverage",
+        "Upload coverage reports to Codecov",
+    ):
+        assert (
+            f"name: {step}\n        if: ${{{{ needs.changes.outputs.badge-only != 'true' }}}}"
+            in job
+        )
