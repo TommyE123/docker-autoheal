@@ -656,37 +656,11 @@ class MonitoringEngine:
 
             return
 
-        # Apply backoff if enabled (using recovery_id). The wait is recorded as a
-        # timestamp and checked on later cycles, never slept inline, so one
-        # container's backoff cannot stall the monitoring of the others.
-        if config.restart.backoff.enabled:
-            now = datetime.now(UTC)
-            next_allowed = self._next_allowed_restart.get(recovery_id)
-            backoff_delay = self._backoff_delays.get(
-                recovery_id, config.restart.backoff.initial_seconds
-            )
-            if next_allowed is None:
-                logger.debug(
-                    "Applying backoff delay of %ss for %s (recovery_id: %s)",
-                    backoff_delay,
-                    container_name,
-                    recovery_id,
-                )
-                self._next_allowed_restart[recovery_id] = now + timedelta(seconds=backoff_delay)
-                self._restart_wait_owner[recovery_id] = container_id
-                return
-            if now < next_allowed:
-                logger.debug(
-                    "Container %s (recovery_id: %s) waiting out restart backoff (%.1fs left)",
-                    container_name,
-                    recovery_id,
-                    (next_allowed - now).total_seconds(),
-                )
-                return
-
-            # Update backoff for next time
-            next_backoff = int(backoff_delay * config.restart.backoff.multiplier)
-            self._backoff_delays[recovery_id] = next_backoff
+        # Apply backoff if enabled (using recovery_id)
+        if config.restart.backoff.enabled and not self._restart_wait_elapsed(
+            recovery_id, container_id, container_name, config
+        ):
+            return
 
         # The restart goes ahead now, so no wait is pending (backoff may also have been
         # disabled while one was)
@@ -734,6 +708,58 @@ class MonitoringEngine:
                 container_name,
                 recovery_id,
             )
+
+    def _restart_wait_elapsed(
+        self,
+        recovery_id: str,
+        container_id: str | None,
+        container_name: str | None,
+        config: AutoHealConfig,
+    ) -> bool:
+        """
+        Apply the restart backoff for a container that needs restarting
+
+        The wait is recorded as a timestamp and checked on later cycles, never slept
+        inline, so one container's backoff cannot stall the monitoring of the others.
+
+        Args:
+            recovery_id: Recovery identifier the wait is recorded under
+            container_id: Docker ID of the container, recorded as the owner of a new wait
+            container_name: Container name, for logging
+            config: Current configuration
+
+        Returns:
+            True if the restart may go ahead now. False if a wait was just scheduled
+            or the existing one has not run out yet.
+        """
+        now = datetime.now(UTC)
+        next_allowed = self._next_allowed_restart.get(recovery_id)
+        backoff_delay = self._backoff_delays.get(
+            recovery_id, config.restart.backoff.initial_seconds
+        )
+        if next_allowed is None:
+            logger.debug(
+                "Applying backoff delay of %ss for %s (recovery_id: %s)",
+                backoff_delay,
+                container_name,
+                recovery_id,
+            )
+            self._next_allowed_restart[recovery_id] = now + timedelta(seconds=backoff_delay)
+            self._restart_wait_owner[recovery_id] = container_id
+            return False
+        if now < next_allowed:
+            logger.debug(
+                "Container %s (recovery_id: %s) waiting out restart backoff (%.1fs left)",
+                container_name,
+                recovery_id,
+                (next_allowed - now).total_seconds(),
+            )
+            return False
+
+        # Update backoff for next time
+        next_backoff = int(backoff_delay * config.restart.backoff.multiplier)
+        self._backoff_delays[recovery_id] = next_backoff
+        return True
 
     async def _send_alert(self, event: AutoHealEvent) -> None:
         """
