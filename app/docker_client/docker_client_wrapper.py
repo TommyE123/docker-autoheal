@@ -82,6 +82,16 @@ class DockerClientWrapper:
             logger.error("Failed to connect to Docker daemon: %s", e)
             raise
 
+    def _require_client(self) -> docker.DockerClient:
+        """Return the SDK client, raising if it is not available.
+
+        Called inside each method's existing ``try`` block so a missing client is
+        logged and handled exactly like any other Docker failure.
+        """
+        if self._client is None:
+            raise RuntimeError("Docker client not initialized")
+        return self._client
+
     @staticmethod
     def _close_client(client: docker.DockerClient) -> None:
         """Close an SDK client best-effort: a close error is logged, never raised"""
@@ -121,7 +131,7 @@ class DockerClientWrapper:
             List of Container objects
         """
         try:
-            return self._client.containers.list(all=all_containers)
+            return self._require_client().containers.list(all=all_containers)
         except Exception as e:
             logger.error("Failed to list containers: %s", e)
             if not self.is_connected():
@@ -137,7 +147,7 @@ class DockerClientWrapper:
             Container object or None if not found
         """
         try:
-            return self._client.containers.get(container_id)
+            return self._require_client().containers.get(container_id)
         except docker.errors.NotFound:
             logger.warning("Container %s not found", container_id)
             return None
@@ -145,16 +155,20 @@ class DockerClientWrapper:
             logger.error("Failed to get container %s: %s", container_id, e)
             return None
 
-    def get_container_info(self, container: Container) -> dict[str, Any]:
+    def get_container_info(self, container: Container, refresh: bool = True) -> dict[str, Any]:
         """
         Get detailed container information
         Args:
             container: Container object
+            refresh: If True, reload the container first. Pass False when the
+                container was inspected moments ago (e.g. by ``list_containers``)
+                to avoid a second round trip.
         Returns:
             Dictionary with container details
         """
         try:
-            container.reload()  # Refresh container state
+            if refresh:
+                container.reload()  # Refresh container state
             attrs = container.attrs
 
             # Extract relevant information
@@ -324,7 +338,7 @@ class DockerClientWrapper:
             Generator of events
         """
         try:
-            return self._client.events(decode=decode, filters=filters)
+            return self._require_client().events(decode=decode, filters=filters)
         except Exception as e:
             logger.error("Failed to get events stream: %s", e)
             return None

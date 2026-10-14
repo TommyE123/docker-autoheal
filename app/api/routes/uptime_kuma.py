@@ -1,5 +1,6 @@
 """Uptime-Kuma integration endpoints."""
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, HTTPException
@@ -73,10 +74,12 @@ async def enable_uptime_kuma_integration(integration_config: dict):
         monitors = await client.get_all_monitors() or []
 
         # Perform auto-mapping
-        containers = docker_client.list_containers(all_containers=False)
+        if docker_client is None:
+            raise RuntimeError("Docker client not initialized")
+        containers = await asyncio.to_thread(docker_client.list_containers, all_containers=False)
         container_infos = []
         for container in containers:
-            info = docker_client.get_container_info(container)
+            info = await asyncio.to_thread(docker_client.get_container_info, container)
             if not info or not info.get("stable_id"):
                 continue
             container_infos.append(info)
@@ -162,11 +165,13 @@ async def create_uptime_kuma_mapping(mapping: dict):
     docker_client = state.docker_client
     try:
         # Get the container to resolve stable_id
-        container = docker_client.get_container(mapping["container_id"])
+        if docker_client is None:
+            raise RuntimeError("Docker client not initialized")
+        container = await asyncio.to_thread(docker_client.get_container, mapping["container_id"])
         if not container:
             raise HTTPException(status_code=404, detail="Container not found")
 
-        info = docker_client.get_container_info(container)
+        info = await asyncio.to_thread(docker_client.get_container_info, container)
         stable_id = info.get("stable_id")
 
         config = config_manager.get_config()

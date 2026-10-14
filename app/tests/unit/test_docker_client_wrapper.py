@@ -232,6 +232,27 @@ class TestListingAndLookup:
         ):
             assert wrapper.list_containers() == []
 
+    def test_require_client_returns_the_sdk_client(self, wrapper, sdk_client):
+        assert wrapper._require_client() is sdk_client
+
+    def test_require_client_raises_when_client_is_missing(self, wrapper):
+        wrapper._client = None
+
+        with pytest.raises(RuntimeError, match=r"^Docker client not initialized$"):
+            wrapper._require_client()
+
+    def test_missing_client_is_handled_like_any_docker_failure(self, wrapper, sdk_client):
+        wrapper._client = None
+
+        with patch(
+            "app.docker_client.docker_client_wrapper.docker.DockerClient",
+            return_value=sdk_client,
+        ):
+            assert wrapper.list_containers() == []
+        wrapper._client = None
+        assert wrapper.get_container("web") is None
+        assert wrapper.get_events() is None
+
     def test_get_container_returns_none_when_not_found(self, wrapper, sdk_client):
         sdk_client.containers.get.side_effect = docker.errors.NotFound("no such container")
 
@@ -259,6 +280,14 @@ class TestContainerInfo:
         assert info["state"]["Status"] == "running"
         assert info["health"] is None
         container.reload.assert_called_once()
+
+    def test_refresh_false_skips_the_reload_round_trip(self, wrapper):
+        container = make_sdk_container(labels={"autoheal": "true"})
+
+        info = wrapper.get_container_info(container, refresh=False)
+
+        assert info["name"] == "web"
+        container.reload.assert_not_called()
 
     def test_restart_count_is_read_from_the_top_level_field(self, wrapper):
         # RestartCount is a sibling of State in the Docker inspect payload, not
