@@ -46,7 +46,7 @@
     {
       "description": "Automerge eligible patch updates once all required CI checks pass. Excludes 0.x versions, where a patch can still be breaking. Minor and major updates keep automerge disabled. Relies on GitHub required status checks; see docs/maintainer/dependency-management.md.",
       "matchUpdateTypes": ["patch"],
-      "matchCurrentVersion": "!/^0\\./",
+      "matchCurrentVersion": "!/^0(\\.|$)/",
       "automerge": true
     },
     {

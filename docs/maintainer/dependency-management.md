@@ -118,7 +118,7 @@ Renovate automatically merges only **eligible patch updates**, and only once eve
 GitHub status check has passed. An update is eligible when:
 
 * it is a patch update (`matchUpdateTypes: ["patch"]`), and
-* its current version is not on `0.x` (`matchCurrentVersion: "!/^0\\./"`), because patch
+* its current version is not on `0.x` (`matchCurrentVersion: "!/^0(\\.|$)/"`), because patch
   releases on pre-1.0 versions can still change behaviour.
 
 Minor, major, digest, pin and security updates that are not also eligible patch updates
