@@ -604,7 +604,7 @@ class TestAbandonedRestartWait:
         self._assert_consistent(engine)
 
     async def test_wait_is_dropped_when_its_container_stops_being_monitored(
-        self, engine, docker_client, update_config
+        self, engine, docker_client, update_config, caplog
     ):
         container, info = make_container(name="web", status="exited", exit_code=1)
         docker_client.add_container(container, info)
@@ -617,6 +617,7 @@ class TestAbandonedRestartWait:
         assert engine._next_allowed_restart == {}
         assert engine._restart_wait_owner == {}
         assert docker_client.restart_calls == []
+        assert "Error checking container" not in caplog.text  # cleared without raising
 
         # Monitored again and still failing: it gets a fresh wait, not an instant restart.
         update_config(lambda c: c.containers.excluded.remove("web"))

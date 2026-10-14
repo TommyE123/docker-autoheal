@@ -220,9 +220,13 @@ class MonitoringEngine:
             # about whether the containers still exist.
             if containers:
                 listed_ids = {container.id for container in containers}
-                for recovery_id, owner in list(self._restart_wait_owner.items()):
-                    if owner not in listed_ids:
-                        self._clear_restart_wait(recovery_id)
+                abandoned = [
+                    recovery_id
+                    for recovery_id, owner in self._restart_wait_owner.items()
+                    if owner not in listed_ids
+                ]
+                for recovery_id in abandoned:
+                    self._clear_restart_wait(recovery_id)
 
             for container in containers:
                 try:
@@ -301,9 +305,13 @@ class MonitoringEngine:
 
     def _clear_restart_waits_owned_by(self, container_id: str | None) -> None:
         """Forget every restart wait that the given container (by Docker ID) started"""
-        for recovery_id, owner in list(self._restart_wait_owner.items()):
-            if owner == container_id:
-                self._clear_restart_wait(recovery_id)
+        owned = [
+            recovery_id
+            for recovery_id, owner in self._restart_wait_owner.items()
+            if owner == container_id
+        ]
+        for recovery_id in owned:
+            self._clear_restart_wait(recovery_id)
 
     def _clear_restart_wait(self, recovery_id: str) -> None:
         """Forget the restart wait recorded for a recovery ID, and who it belongs to"""
