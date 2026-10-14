@@ -114,24 +114,32 @@ proposing it. `internalChecksFilter: "strict"` makes Renovate skip releases that
 cleared this window instead of selecting a newer, still-pending release. Security updates
 bypass the minimum release age so that vulnerability fixes are not delayed.
 
-Renovate does **not** automatically merge dependency updates.
+Renovate automatically merges only **eligible patch updates**, and only once every required
+GitHub status check has passed. An update is eligible when:
 
-All dependency-update pull requests require manual review and merge.
+* it is a patch update (`matchUpdateTypes: ["patch"]`), and
+* its current version is not on `0.x` (`matchCurrentVersion: "!/^0(\\.|$)/"`), because patch
+  releases on pre-1.0 versions can still change behaviour.
 
-This deliberately conservative policy currently applies to:
+Minor, major, digest, pin and security updates that are not also eligible patch updates
+still require manual review and merge. Automerge is disabled globally and re-enabled only by
+the narrower rule in `renovate.json`.
 
-* patch updates
+All other dependency-update pull requests require manual review and merge.
+
+Manual review and merge applies to:
+
 * minor updates
 * major updates
+* `0.x` patch updates
 * Docker digest updates
 * GitHub Actions digest updates
 * `pin` updates
 * `pinDigest` updates
-* security updates
+* security updates that are not eligible patch updates
 
-A future change may introduce narrowly scoped automerge rules for demonstrably low-risk
-updates once test coverage and CI confidence justify doing so. Such a change should be made
-explicitly rather than relying on a blanket semver-based automerge rule.
+Automerge is not blanket semver-based: it is limited to the explicit patch rule described
+above. Broadening it to other update types should be a separate, deliberate change.
 
 ### Frontend toolchain grouping
 
@@ -161,7 +169,8 @@ conventions.
 
 ## Digest pinning
 
-Digest pinning remains enabled even though automerge is disabled.
+Digest pinning remains enabled and is independent of automerge, which applies only to eligible
+patch updates.
 
 Two important Renovate behaviours are retained:
 
@@ -177,16 +186,17 @@ immutable references without being allowed to merge the resulting changes automa
 
 ## Security updates
 
-Security updates are also subject to the manual-review policy.
+Security updates are subject to the same policy as other updates.
 
-A security fix may result in a patch, minor, or major dependency update, but Renovate does not
-automatically merge any of these updates.
+A security fix that is an eligible patch update (not `0.x`) may be automerged once required
+checks pass. A minor or major security fix, or a fix to a `0.x` dependency, is not automerged
+and requires manual review.
 
-Security-related dependency PRs therefore receive the same CI validation and human review as
-other dependency updates.
+Security-related dependency PRs therefore receive the same CI validation as other dependency
+updates, and human review unless they are eligible patch updates.
 
-This is intentional: security fixes are important, but automatically merging them can still
-introduce compatibility or behavioural changes.
+Manual review of non-patch security fixes is intentional: security fixes are important, but
+automatically merging them can still introduce compatibility or behavioural changes.
 
 ## Why some things are left alone
 
@@ -197,8 +207,10 @@ introduce compatibility or behavioural changes.
 * **Node 18** — the frontend build currently uses the Node 18 Alpine image. This is retained
   until there is a deliberate decision to change the frontend build/runtime baseline.
 
-* **Pre-1.0 and build tooling dependencies** — these remain manual-review updates. A patch or
-  minor version does not automatically mean a dependency is behaviourally risk-free.
+* **Pre-1.0 and build tooling dependencies** — `0.x` dependencies remain manual-review updates
+  even for patch releases. Other build tooling is automerged only when its update is an eligible
+  patch. A patch or minor version does not automatically mean a dependency is behaviourally
+  risk-free.
 
 * **`checkov` as a Dev Container tool** — it is deliberately absent from
   `mise.toml`. Installing it alongside `semgrep` hangs
@@ -226,17 +238,39 @@ GitHub Actions runs
 CI passes
         |
         v
+Eligible patch update?  --yes-->  Renovate automerges once required checks pass
+        |
+        no
+        v
 Maintainer reviews the changes
         |
         v
 Maintainer approves and merges
 ```
 
-Renovate may maintain the PR and keep it rebased, but the final merge decision remains with a
-maintainer.
+Renovate may maintain the PR and keep it rebased. Non-eligible updates remain under the
+maintainer's final merge decision.
 
-`platformAutomerge` is disabled in `renovate.json`, so Renovate does not request GitHub's native
-auto-merge for dependency-update PRs.
+`platformAutomerge` is kept `false` in `renovate.json`, so Renovate performs automerge itself
+rather than requesting GitHub's native auto-merge. Renovate merges an eligible PR only when its
+branch's status checks are green.
 
-This policy is intentionally conservative while the project's test coverage, integration
-testing and CI confidence continue to improve.
+### Required repository settings
+
+Automerge of eligible patch updates depends on these GitHub settings. They are not stored in
+the repository and must be verified in the repository's settings:
+
+* Branch protection on `main` requires the mandatory CI status checks, so a PR cannot merge
+  until they pass. Do not weaken this to make automerge work.
+* Branch protection must not require an approving review for the bot's PR to merge. If it does,
+  Renovate cannot complete automerge and those patch PRs wait for a maintainer.
+* The Renovate app must be allowed to push and merge in this repository.
+
+### Limitations
+
+* Automerge only runs when Renovate next processes the PR, so a merge may lag a green check.
+* Each PR waits for the seven-day minimum release age before Renovate proposes it.
+* Patch updates that fail CI or depend on an unmerged PR are not merged.
+
+This policy is intentionally narrow while the project's test coverage, integration testing and
+CI confidence continue to improve.

@@ -13,7 +13,7 @@
     ".github/workflows/issue-triage.lock.yml",
     "**/.mise/locks/**"
   ],
-  "description": "Dependency-update policy for docker-autoheal. Renovate creates and maintains dependency PRs, but all updates require manual review and merge. See docs/maintainer/dependency-management.md for the full explanation.",
+  "description": "Dependency-update policy for docker-autoheal. Renovate creates and maintains dependency PRs. Only eligible patch updates (not 0.x) are automerged once required checks pass; all other updates require manual review and merge. See docs/maintainer/dependency-management.md for the full explanation.",
   "internalChecksFilter": "strict",
   "forkProcessing": "enabled",
   "platformAutomerge": false,
@@ -24,7 +24,7 @@
   "prHourlyLimit": 5,
   "packageRules": [
     {
-      "description": "Require manual review and merge for all dependency updates. No Renovate update is automatically merged.",
+      "description": "Keep automerge disabled by default for all dependency updates. A later, narrower rule enables it only for eligible patch updates. See docs/maintainer/dependency-management.md.",
       "matchPackageNames": ["*"],
       "automerge": false,
       "minimumReleaseAge": "7 days"
@@ -42,6 +42,12 @@
       "matchUpdateTypes": ["major"],
       "groupName": "frontend Vite/Vitest toolchain (major)",
       "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Automerge eligible patch updates once all required CI checks pass. Excludes 0.x versions, where a patch can still be breaking. Minor and major updates keep automerge disabled. Relies on GitHub required status checks; see docs/maintainer/dependency-management.md.",
+      "matchUpdateTypes": ["patch"],
+      "matchCurrentVersion": "!/^0(\\.|$)/",
+      "automerge": true
     },
     {
       "description": "Label Renovate patch updates.",
