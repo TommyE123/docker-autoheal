@@ -436,6 +436,23 @@ class TestExplicitMonitoringIdIsShared:
         assert engine._next_allowed_restart == {"monitoring.id:shared-web": deadline}
         assert engine._restart_wait_owner == {"monitoring.id:shared-web": sick.id}
 
+    async def test_auto_unquarantining_a_sibling_does_not_cancel_the_owners_wait(
+        self, engine, docker_client
+    ):
+        """A healthy replica with its own quarantine entry is released; the sick one's wait stays."""
+        shared = {"monitoring.id": "shared-web"}
+        sick, sick_info = replica(1, status="exited", exit_code=1, extra_labels=shared)
+        well, well_info = replica(2, extra_labels=shared)
+        docker_client.add_container(sick, sick_info)
+        docker_client.add_container(well, well_info)
+        config_manager.quarantine_container(well.name)  # keyed by container name
+
+        await engine._check_containers()
+
+        assert not config_manager.is_quarantined(well.name)  # the sibling was released
+        assert "monitoring.id:shared-web" in engine._next_allowed_restart
+        assert engine._restart_wait_owner == {"monitoring.id:shared-web": sick.id}
+
 
 class TestConfigurationStaysPerService:
     def test_selection_by_service_id_monitors_every_replica(self, engine, update_config):

@@ -419,6 +419,7 @@ class TestRestartBackoff:
 
         assert config_manager.is_quarantined("web") is False
         assert "web" not in engine._next_allowed_restart
+        assert engine._restart_wait_owner == {}
 
     async def test_backoff_resets_after_a_successful_restart(self, engine, docker_client):
         container, info = make_container(name="web")

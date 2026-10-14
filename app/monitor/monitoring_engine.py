@@ -547,8 +547,10 @@ class MonitoringEngine:
             # Also clear the restart count so it starts fresh
             config_manager.clear_restart_history(recovery_id)
 
-            # Reset backoff delays
-            self._clear_restart_wait(recovery_id)
+            # Reset backoff delays; a wait started by another replica sharing this
+            # recovery ID is still valid
+            if self._restart_wait_owner.get(recovery_id) == container_id:
+                self._clear_restart_wait(recovery_id)
             if recovery_id in self._backoff_delays:
                 config = config_manager.get_config()
                 self._backoff_delays[recovery_id] = config.restart.backoff.initial_seconds
