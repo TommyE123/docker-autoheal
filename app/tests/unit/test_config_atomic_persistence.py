@@ -317,3 +317,67 @@ def test_new_file_ownership_is_left_to_the_process(isolated_config_manager, monk
 
     assert chowned == []
     assert manager.CONFIG_FILE.stat().st_uid == os.geteuid()
+
+
+def _foreign_gid() -> int | None:
+    """A group other than the one new files get by default, that we can assign."""
+    if os.geteuid() == 0:
+        return 4242
+    others = [gid for gid in os.getgroups() if gid != os.getegid()]
+    return others[0] if others else None
+
+
+def _refuse_chown(monkeypatch) -> None:
+    def refusing_fchown(fd, uid, gid):
+        raise OSError(errno.EPERM, os.strerror(errno.EPERM))
+
+    monkeypatch.setattr(os, "fchown", refusing_fchown)
+
+
+def test_group_permissions_are_dropped_when_the_original_group_cannot_be_restored(
+    isolated_config_manager, monkeypatch
+):
+    """If chown is refused the file ends up in another group; giving that group the
+    original group's permission bits would grant it access the original never did."""
+    gid = _foreign_gid()
+    if gid is None:
+        pytest.skip("needs root, or a second group to give the file to")
+    manager = isolated_config_manager
+    _save_config(manager, 45)
+    os.chown(manager.CONFIG_FILE, -1, gid)
+    manager.CONFIG_FILE.chmod(0o664)
+    _refuse_chown(monkeypatch)
+
+    _save_config(manager, 50)
+
+    after = manager.CONFIG_FILE.stat()
+    assert after.st_gid != gid
+    assert stat.S_IMODE(after.st_mode) == 0o604  # group bits dropped; owner and other kept
+    assert json.loads(manager.CONFIG_FILE.read_text())["monitor"]["interval_seconds"] == 50
+
+
+def test_group_permissions_are_kept_when_the_file_already_has_the_original_group(
+    isolated_config_manager, monkeypatch
+):
+    """A setgid directory can hand the new file the original's group even though
+    chown is refused; the file's actual group is what matters, not the process's."""
+    gid = _foreign_gid()
+    if gid is None:
+        pytest.skip("needs root, or a second group to give the file to")
+    manager = isolated_config_manager
+    os.chown(manager.DATA_DIR, -1, gid)
+    manager.DATA_DIR.chmod(0o2775)
+    probe = manager.DATA_DIR / "probe"
+    probe.write_text("")
+    if probe.stat().st_gid != gid:
+        pytest.skip("this filesystem does not honour setgid directories")
+    probe.unlink()
+    _save_config(manager, 45)
+    manager.CONFIG_FILE.chmod(0o664)
+    _refuse_chown(monkeypatch)
+
+    _save_config(manager, 50)
+
+    after = manager.CONFIG_FILE.stat()
+    assert after.st_gid == gid
+    assert stat.S_IMODE(after.st_mode) == 0o664

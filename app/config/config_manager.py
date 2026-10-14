@@ -345,11 +345,18 @@ def _atomic_write_json(path: Path, data: Any, **dump_kwargs: Any) -> None:
                 # handing it to the original owner never makes it readable by
                 # anyone the original was not. Failing to chown (no privilege,
                 # or a filesystem that cannot) must not fail the save.
+                mode = stat.S_IMODE(existing.st_mode)
                 try:
                     os.fchown(fd, existing.st_uid, existing.st_gid)
                 except OSError as error:
                     logger.debug("Could not preserve ownership of %s: %s", path, error)
-                os.fchmod(fd, stat.S_IMODE(existing.st_mode))
+                    # The file may now be in a different group (the process's, or
+                    # one inherited from a setgid directory). Giving that group
+                    # the original group's permissions would grant it access the
+                    # original never did, so drop them unless the groups match.
+                    if os.fstat(fd).st_gid != existing.st_gid:
+                        mode &= ~0o070
+                os.fchmod(fd, mode)
             json.dump(data, f, **dump_kwargs)
             f.flush()
             os.fsync(f.fileno())
