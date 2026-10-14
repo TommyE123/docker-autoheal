@@ -307,6 +307,22 @@ class TestUptimeKumaIntegration:
 
         assert exc_info.value.status_code == 500
 
+    async def test_enable_without_docker_client_returns_500(self, monkeypatch):
+        monkeypatch.setattr("app.api.state.docker_client", None)
+        fake_client = FakeUptimeKumaClient(monitors=[])
+        monkeypatch.setattr(
+            "app.uptime_kuma.uptime_kuma_client.UptimeKumaClient",
+            lambda *a, **k: fake_client,
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await enable_uptime_kuma_integration(
+                {"server_url": "http://kuma.example", "api_token": "token"}
+            )
+
+        assert exc_info.value.status_code == 500
+        assert exc_info.value.detail == "Docker client not initialized"
+
     async def test_enable_restarts_initialized_monitor(self, wired_api, monkeypatch):
         _docker_client, engine = wired_api
         engine.uptime_kuma_monitor = MagicMock()
@@ -353,6 +369,17 @@ class TestUptimeKumaIntegration:
             )
 
         assert exc_info.value.status_code == 500
+
+    async def test_create_mapping_without_docker_client_returns_500(self, monkeypatch):
+        monkeypatch.setattr("app.api.state.docker_client", None)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await create_uptime_kuma_mapping(
+                {"container_id": "web", "monitor_friendly_name": "Monitor"}
+            )
+
+        assert exc_info.value.status_code == 500
+        assert exc_info.value.detail == "Docker client not initialized"
 
     async def test_delete_mapping_persistence_error_returns_500(self, monkeypatch):
         monkeypatch.setattr(
