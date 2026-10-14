@@ -234,7 +234,8 @@ class TestReplicasRecoverIndependently:
         await engine._handle_container_restart(b, b_info, "unhealthy")
 
         initial = config_manager.get_config().restart.backoff.initial_seconds
-        delay = (engine._next_allowed_restart["compose:myapp:web#2"] - datetime.now(UTC)).seconds
+        deadline = engine._next_allowed_restart["compose:myapp:web#2"]
+        delay = (deadline - datetime.now(UTC)).total_seconds()
         assert delay == pytest.approx(initial, abs=1)
 
     async def test_quarantining_one_replica_does_not_stop_another_being_restarted(
