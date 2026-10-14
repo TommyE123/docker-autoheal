@@ -40,7 +40,8 @@
         "@vitest/coverage-v8"
       ],
       "matchUpdateTypes": ["major"],
-      "groupName": "frontend Vite/Vitest toolchain (major)"
+      "groupName": "frontend Vite/Vitest toolchain (major)",
+      "minimumReleaseAge": "7 days"
     },
     {
       "description": "Label Renovate patch updates.",
