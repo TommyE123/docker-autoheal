@@ -72,6 +72,14 @@ jobs:
         with:
           report_type: coverage
 
+      - name: Upload Python coverage artifact
+        if: ${{ !cancelled() && hashFiles('coverage.xml') != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: python-coverage
+          path: coverage.xml
+          retention-days: 7
+
   frontend-tests:
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.badge-only != 'true' }}
@@ -110,3 +118,11 @@ jobs:
           files: frontend/coverage/lcov.info
           flags: frontend
           report_type: coverage
+
+      - name: Upload frontend coverage artifact
+        if: ${{ !cancelled() && hashFiles('frontend/coverage/lcov.info') != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/lcov.info
+          retention-days: 7

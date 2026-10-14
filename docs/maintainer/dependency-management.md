@@ -133,6 +133,17 @@ A future change may introduce narrowly scoped automerge rules for demonstrably l
 updates once test coverage and CI confidence justify doing so. Such a change should be made
 explicitly rather than relying on a blanket semver-based automerge rule.
 
+### Frontend toolchain grouping
+
+Vite, Vitest and their plugins have interdependent peer dependency ranges, so updating one
+package alone can fail lockfile generation. `renovate.json` extends `group:vite` and
+`group:vitestMonorepo` for the recommended Vite and Vitest groupings. A package rule also
+groups **major** updates to `vite`, `@vitejs/plugin-react`, `vitest` and
+`@vitest/coverage-v8` in `frontend/package.json` into a single pull request. Patch and minor
+updates are not part of that group, and unrelated frontend dependencies such as React or
+ESLint are not grouped with it. Manual review and merge, the seven-day minimum release age and
+disabled automerge apply to the group as usual.
+
 ### Rebasing
 
 `rebaseWhen: "behind-base-branch"` is enabled.
