@@ -8,7 +8,7 @@ set -euo pipefail
 
 file=${1:-.github/badges/mutation.json}
 
-if [ ! -f "$file" ]; then
+if [[ ! -f "$file" ]]; then
   echo "::error::$file is missing." >&2
   exit 1
 fi

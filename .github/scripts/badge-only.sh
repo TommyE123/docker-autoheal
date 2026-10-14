@@ -7,12 +7,12 @@
 set -euo pipefail
 
 badge_only=false
-if [ "$EVENT_NAME" = pull_request ]; then
+if [[ "$EVENT_NAME" == "pull_request" ]]; then
   # filename and previous_filename: a rename must not hide the file it moved from.
   files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/${PR:-}/files" \
     --jq '.[] | .filename, (.previous_filename // empty)') || files=
   # Exact comparison, not a short-reading pipeline: a grep -q that exits early can break the pipe.
-  if [ "$files" = .github/badges/mutation.json ]; then
+  if [[ "$files" == ".github/badges/mutation.json" ]]; then
     badge_only=true
   fi
 fi
