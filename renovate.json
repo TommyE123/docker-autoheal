@@ -24,7 +24,7 @@
   "prHourlyLimit": 5,
   "packageRules": [
     {
-      "description": "Require manual review and merge for all dependency updates. No Renovate update is automatically merged.",
+      "description": "Keep automerge disabled by default for all dependency updates. A later, narrower rule enables it only for eligible patch updates. See docs/maintainer/dependency-management.md.",
       "matchPackageNames": ["*"],
       "automerge": false,
       "minimumReleaseAge": "7 days"
