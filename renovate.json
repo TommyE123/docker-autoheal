@@ -3,7 +3,9 @@
   "extends": [
     "config:recommended",
     "helpers:pinGitHubActionDigests",
-    "customManagers:dockerfileVersions"
+    "customManagers:dockerfileVersions",
+    "group:vite",
+    "group:vitestMonorepo"
   ],
   "ignorePaths": [
     "**/node_modules/**",
@@ -26,6 +28,14 @@
       "matchPackageNames": ["*"],
       "automerge": false,
       "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Coordinate major upgrades of the interdependent frontend build and test toolchain in one PR, so lockfile generation sees compatible Vite, Vitest and plugin majors together. Patch and minor updates keep their normal grouping.",
+      "matchManagers": ["npm"],
+      "matchFileNames": ["frontend/package.json"],
+      "matchPackageNames": ["vite", "@vitejs/plugin-react", "vitest", "@vitest/coverage-v8"],
+      "matchUpdateTypes": ["major"],
+      "groupName": "frontend Vite/Vitest toolchain (major)"
     },
     {
       "description": "Label Renovate patch updates.",
