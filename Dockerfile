@@ -31,11 +31,13 @@ LABEL description="Automated container monitoring and healing service with React
 WORKDIR /app
 
 # renovate: datasource=deb depName=curl versioning=deb registryUrl=https://deb.debian.org/debian?suite=trixie&components=main&binaryArch=amd64
-ARG CURL_VERSION=8.14.1-2+deb13u5
+ARG CURL_VERSION=8.14.1-2+deb13u7
 
 # Install system dependencies
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl="${CURL_VERSION}" \
+    && apt-get install -y --no-install-recommends \
+        curl="${CURL_VERSION}" \
+        libcurl4t64="${CURL_VERSION}" \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
