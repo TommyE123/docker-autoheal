@@ -29,7 +29,7 @@ while [ "$#" -gt 0 ]; do
   fi
   shift
 done
-printf '%s' "$FAKE_API_JSON" | jq -r "$expr"
+jq -r "$expr" "$FAKE_API_FILE"
 """
 
 
@@ -51,6 +51,8 @@ def _detect(tmp_path, api_json=None, event="pull_request", api_fail=False):
     gh.write_text(GH_STUB)
     gh.chmod(0o755)
     output = tmp_path / "github_output"
+    response = tmp_path / "response.json"
+    response.write_text(api_json or "[]")
     env = {
         **os.environ,
         "PATH": f"{stub_dir}{os.pathsep}{os.environ['PATH']}",
@@ -58,7 +60,7 @@ def _detect(tmp_path, api_json=None, event="pull_request", api_fail=False):
         "PR": "1" if event == "pull_request" else "",
         "GITHUB_REPOSITORY": "owner/repo",
         "GITHUB_OUTPUT": str(output),
-        "FAKE_API_JSON": api_json or "[]",
+        "FAKE_API_FILE": str(response),
         "FAKE_API_FAIL": "1" if api_fail else "",
     }
     assert _run("badge-only.sh", env=env).returncode == 0
@@ -89,6 +91,13 @@ def _detect(tmp_path, api_json=None, event="pull_request", api_fail=False):
             "false",
         ),
         (_files(BADGE + ".bak"), "pull_request", False, "false"),
+        # grep -q stops at the first non-badge path; a large list must not turn that into "true".
+        (
+            _files("app/main.py", *(f"docs/dir/file_{i:05d}.md" for i in range(5000))),
+            "pull_request",
+            False,
+            "false",
+        ),
     ],
     ids=[
         "badge-only",
@@ -101,6 +110,7 @@ def _detect(tmp_path, api_json=None, event="pull_request", api_fail=False):
         "rename-into-badge",
         "rename-out-of-badge",
         "lookalike-path",
+        "large-mixed-list",
     ],
 )
 def test_detector_only_reports_badge_only_when_certain(
@@ -139,6 +149,8 @@ def test_validation_accepts_generated_percentages(tmp_path, message):
         pytest.param("", id="empty-file"),
         pytest.param("{not json", id="malformed-json"),
         pytest.param("[]", id="not-an-object"),
+        pytest.param("1\n" + json.dumps(_badge()), id="extra-value-before-badge"),
+        pytest.param(json.dumps(_badge()) + "\n{}", id="extra-value-after-badge"),
         pytest.param(_badge(schemaVersion=None), id="no-schemaVersion"),
         pytest.param(_badge(label=None), id="no-label"),
         pytest.param(_badge(message=None), id="no-message"),

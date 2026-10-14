@@ -253,15 +253,30 @@ def test_weekly_workflow_enables_auto_merge_with_the_non_default_token():
     assert "GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}" not in AUTO_MERGE_WORKFLOW
 
 
+# Jobs that skip for a badge-only PR, per workflow. The smoke test follows build-amd64 via needs,
+# and unit-tests (the required check) has its own test below.
+BADGE_SKIPPED_JOBS = {
+    "tests": ["frontend-tests"],
+    "docker-build": ["build-amd64", "arm64-startup"],
+    "mega-linter": ["megalinter"],
+}
+
+
 def test_badge_only_pr_skips_ci_without_path_filters_or_failing_open():
     # A workflow-level paths filter would leave the required unit-tests check pending, so the
     # skip is per job. !cancelled() keeps a failed `changes` job from skipping the real checks.
-    for name in ("tests", "docker-build", "mega-linter"):
+    for name, skipped_jobs in BADGE_SKIPPED_JOBS.items():
         text = (REPO_ROOT / ".github" / "workflows" / f"{name}.yml").read_text(encoding="utf-8")
         triggers, jobs = text.split("\njobs:\n", 1)
         assert "paths" not in triggers
         assert "uses: ./.github/workflows/badge-only-check.yml" in jobs
-        assert "if: ${{ !cancelled() && needs.changes.outputs.badge-only != 'true' }}" in jobs
+        for job in skipped_jobs:
+            block = re.search(rf"(?ms)^  {job}:\n(.*?)(?=^  [\w-]+:\n|\Z)", jobs).group(1)
+            assert re.search(r"^    needs: changes$", block, re.MULTILINE), (name, job)
+            assert (
+                "    if: ${{ !cancelled() && needs.changes.outputs.badge-only != 'true' }}\n"
+                in block
+            ), (name, job)
 
 
 def test_required_unit_tests_job_always_runs_and_validates_the_badge_for_badge_only_prs():

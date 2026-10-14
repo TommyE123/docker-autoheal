@@ -13,12 +13,14 @@ if [ ! -f "$file" ]; then
   exit 1
 fi
 
-if ! jq -e '
-  type == "object"
-  and .schemaVersion == 1
-  and (.label | type == "string" and length > 0)
-  and (.message | type == "string" and test("^[0-9]+\\.[0-9]%$") and (rtrimstr("%") | tonumber) <= 100)
-  and (.color | type == "string" and test("^#[0-9a-fA-F]{6}$"))
+# --slurp + length == 1: exactly one JSON value (jq -e alone only looks at the last result).
+if ! jq -e --slurp '
+  length == 1 and (.[0] |
+    type == "object"
+    and .schemaVersion == 1
+    and (.label | type == "string" and length > 0)
+    and (.message | type == "string" and test("^[0-9]+\\.[0-9]%$") and (rtrimstr("%") | tonumber) <= 100)
+    and (.color | type == "string" and test("^#[0-9a-fA-F]{6}$")))
 ' "$file" >/dev/null; then
   echo "::error::$file is not valid JSON in the format mutmut badge writes (schemaVersion 1, label, message like 66.0%, colour like #adff00)." >&2
   exit 1
