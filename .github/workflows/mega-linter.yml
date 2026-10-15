@@ -15,8 +15,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Skips MegaLinter for the automated mutation badge PR (badge file only). If this job
+  # itself fails, badge-only is empty and it runs. See badge-only-check.yml.
+  changes:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/badge-only-check.yml
+
   megalinter:
     name: MegaLinter
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.badge-only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
