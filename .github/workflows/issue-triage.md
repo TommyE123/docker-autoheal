@@ -8,7 +8,14 @@ on:
 permissions:
   contents: read
   issues: read
-engine: gemini
+engine:
+  id: gemini
+  # Gemini CLI >= 0.60.0 skips the AWF system settings file (parent dir not
+  # root-owned) and exits 41 "Invalid auth method selected"; 0.59.0 is the last
+  # good version. See #583. The model is pinned because the default Pro-class
+  # model has no free-tier quota for this key.
+  version: "0.59.0"
+  model: gemini-3.5-flash
 features:
   # actionlint (as pinned by this repo's MegaLinter) doesn't yet recognize
   # the "queue" concurrency key gh-aw emits by default; disable it rather
