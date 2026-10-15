@@ -496,16 +496,49 @@ async def test_webhook_exception_is_caught_and_logged(caplog, isolated_config_ma
     assert any("Failed to send webhook notification" in r.message for r in caplog.records)
 
 
+_SERVICES_BY_LABEL = {
+    "webhook": NotificationService(
+        name="svc", type="webhook", enabled=True, url="https://example.invalid/hook"
+    ),
+    "Discord": NotificationService(
+        name="svc", type="discord", enabled=True, url="https://example.invalid/hook"
+    ),
+    "Slack": NotificationService(
+        name="svc", type="slack", enabled=True, url="https://example.invalid/hook"
+    ),
+    "Telegram": NotificationService(
+        name="svc", type="telegram", enabled=True, bot_token="abc", chat_id="1"
+    ),
+    "Ntfy": NotificationService(name="svc", type="ntfy", enabled=True, topic="alerts"),
+    "Gotify": NotificationService(
+        name="svc",
+        type="gotify",
+        enabled=True,
+        server_url="https://gotify.example.invalid",
+        app_token="tok",
+    ),
+    "Pushover": NotificationService(
+        name="svc", type="pushover", enabled=True, api_token="tok", user_key="usr"
+    ),
+}
+
+
 @pytest.mark.asyncio
-async def test_missing_session_is_logged_and_does_not_raise(caplog, isolated_config_manager):
+@pytest.mark.parametrize("label", list(_SERVICES_BY_LABEL))
+async def test_missing_session_is_logged_per_provider_and_does_not_raise(
+    label, caplog, isolated_config_manager
+):
     unstarted = NotificationManager()
     assert unstarted._session is None
-    _configure_webhook(isolated_config_manager)
+    _configure_service(isolated_config_manager, _SERVICES_BY_LABEL[label])
 
-    with caplog.at_level(logging.ERROR):
+    with caplog.at_level(logging.DEBUG):
         await unstarted._process_notification(_make_event("restart"))
 
-    assert any("no active session" in r.message for r in caplog.records)
+    messages = [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR]
+    assert messages == [
+        f"Failed to send {label} notification: notification manager has no active session"
+    ]
 
 
 @pytest.mark.asyncio
