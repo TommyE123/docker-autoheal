@@ -76,7 +76,13 @@ and `DELETE /api/healthchecks/{id}`.
    `restart.cooldown_seconds` ago, Auto-Heal waits.
 2. **Backoff** — if `restart.backoff.enabled`, Auto-Heal waits an increasing delay
    (`initial_seconds`, then multiplied by `multiplier` on each subsequent restart of that
-   container) before restarting.
+   container) before restarting. The wait doesn't pause monitoring: other containers keep
+   being checked, and the restart happens on the first monitoring cycle after the delay
+   has passed, if the container is still unhealthy then. Because that is checked once per
+   `monitor.interval_seconds`, the effective wait is rounded up to a whole interval. If the
+   container is seen healthy at any check during the wait, the wait is cancelled and a later
+   failure starts a new one, so a container that alternates between healthy and unhealthy on
+   every check is not restarted.
 3. **Threshold and quarantine** — once a container has been restarted `max_restarts`
    times within `max_restarts_window_seconds`, it's **quarantined**: Auto-Heal stops
    trying to restart it until you intervene, or until it becomes healthy on its own (see
