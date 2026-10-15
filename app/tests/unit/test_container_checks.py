@@ -309,3 +309,15 @@ async def test_name_filters_do_not_match_container_info_without_name(engine):
     config_manager.update_config(config)
 
     assert engine.should_monitor_container(container, info) is False
+
+
+@pytest.mark.asyncio
+async def test_container_info_missing_name_is_skipped_without_restart(engine, docker_client):
+    container, info = make_container(name="web", status="exited", exit_code=1)
+    del info["name"]
+    docker_client.add_container(container, info)
+
+    await engine._check_single_container(container)
+
+    assert docker_client.restart_calls == []
+    assert config_manager.get_events() == []

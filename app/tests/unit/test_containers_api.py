@@ -431,6 +431,16 @@ class TestUnquarantineContainer:
         assert event.timestamp.tzinfo is not None
         assert event.timestamp.utcoffset() == timedelta(0)
 
+    async def test_uninspectable_container_returns_500(self, wired_api):
+        docker_client, _engine = wired_api
+        container, _info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, {})
+
+        with pytest.raises(HTTPException) as exc_info:
+            await unquarantine_container("a" * 64)
+
+        assert exc_info.value.status_code == 500
+
     async def test_container_info_missing_identifier_returns_500_and_keeps_quarantine(
         self, wired_api
     ):

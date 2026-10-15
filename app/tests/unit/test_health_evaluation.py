@@ -270,3 +270,18 @@ class TestUptimeKumaEvaluation:
 
         assert needs_restart is False
         assert engine.uptime_kuma_monitor is None
+
+
+@pytest.mark.asyncio
+async def test_custom_health_check_is_found_by_id_when_info_has_no_name(engine, update_config):
+    update_config(lambda c: setattr(c.restart, "mode", "health"))
+    container, info = make_container(name="web")
+    del info["name"]
+    config_manager.add_custom_health_check(
+        HealthCheckConfig(container_id=info["full_id"], check_type="docker")
+    )
+    engine._perform_custom_health_check = AsyncMock(return_value=False)
+
+    needs_restart, _reason = await engine._evaluate_container_health(container, info)
+
+    assert needs_restart is True

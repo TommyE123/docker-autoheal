@@ -370,6 +370,20 @@ class TestUptimeKumaIntegration:
 
         assert exc_info.value.status_code == 500
 
+    async def test_create_mapping_without_stable_id_returns_500(self, wired_api):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        del info["stable_id"]
+        docker_client.add_container(container, info)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await create_uptime_kuma_mapping(
+                {"container_id": "a" * 64, "monitor_friendly_name": "Monitor"}
+            )
+
+        assert exc_info.value.status_code == 500
+        assert config_manager.get_config().uptime_kuma_mappings == []
+
     async def test_create_mapping_without_docker_client_returns_500(self, monkeypatch):
         monkeypatch.setattr("app.api.state.docker_client", None)
 
