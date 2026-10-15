@@ -298,3 +298,14 @@ class TestAutoUnquarantineFailure:
 
         assert config_manager.is_quarantined("web") is True
         assert config_manager.get_events() == []
+
+
+@pytest.mark.asyncio
+async def test_name_filters_do_not_match_container_info_without_name(engine):
+    container, info = make_container(name="web")
+    del info["name"]
+    config = config_manager.get_config()
+    config.filters.whitelist_names = ["*"]
+    config_manager.update_config(config)
+
+    assert engine.should_monitor_container(container, info) is False

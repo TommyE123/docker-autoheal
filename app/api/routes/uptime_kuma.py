@@ -173,6 +173,10 @@ async def create_uptime_kuma_mapping(mapping: dict):
 
         info = await asyncio.to_thread(docker_client.get_container_info, container)
         stable_id = info.get("stable_id")
+        if stable_id is None:
+            raise HTTPException(
+                status_code=500, detail="Unable to resolve container stable identifier"
+            )
 
         config = config_manager.get_config()
         new_mapping = UptimeKumaMapping(

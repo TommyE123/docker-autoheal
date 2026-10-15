@@ -155,6 +155,27 @@ class TestGetContainerDetails:
         assert details["quarantined"] is False
         assert details["total_restart_count"] == 0
 
+    async def test_uninspectable_container_returns_500(self, wired_api):
+        docker_client, _engine = wired_api
+        container, _info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, {})
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_container_details("a" * 64)
+
+        assert exc_info.value.status_code == 500
+
+    async def test_container_info_missing_identifier_returns_500(self, wired_api):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        del info["recovery_id"]
+        docker_client.add_container(container, info)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_container_details("a" * 64)
+
+        assert exc_info.value.status_code == 500
+
     async def test_unknown_container_returns_404(self, wired_api):
         with pytest.raises(HTTPException) as exc_info:
             await get_container_details("does-not-exist")
@@ -240,6 +261,17 @@ class TestUpdateContainerSelection:
         updated = config_manager.get_config()
         assert "ghost-container" in updated.containers.selected
         assert "ghost-container" not in updated.containers.excluded
+
+    async def test_uninspectable_container_falls_back_to_raw_identifier(self, wired_api):
+        docker_client, _engine = wired_api
+        container, _info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, {})
+
+        await update_container_selection(
+            ContainerSelectionRequest(container_ids=["a" * 64], enabled=True)
+        )
+
+        assert config_manager.get_config().containers.selected == ["a" * 64]
 
     @pytest.mark.parametrize(
         ("labels", "expected_id"),
@@ -398,6 +430,21 @@ class TestUnquarantineContainer:
         assert event.event_type == "unquarantine"
         assert event.timestamp.tzinfo is not None
         assert event.timestamp.utcoffset() == timedelta(0)
+
+    async def test_container_info_missing_identifier_returns_500_and_keeps_quarantine(
+        self, wired_api
+    ):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        del info["full_id"]
+        docker_client.add_container(container, info)
+        config_manager.quarantine_container("web")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await unquarantine_container("a" * 64)
+
+        assert exc_info.value.status_code == 500
+        assert config_manager.is_quarantined("web") is True
 
     async def test_unknown_container_returns_404(self, wired_api):
         with pytest.raises(HTTPException) as exc_info:

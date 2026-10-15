@@ -51,7 +51,7 @@ class MonitoringEngine:
         # Attached by the service after construction; None when Uptime Kuma is not set up.
         self.uptime_kuma_monitor: UptimeKumaMonitor | None = None
 
-    def get_stable_identifier(self, info: dict) -> str:
+    def get_stable_identifier(self, info: dict) -> str | None:
         """
         Get stable identifier for a container with priority fallback.
 
@@ -69,7 +69,8 @@ class MonitoringEngine:
             info: Container information dict
 
         Returns:
-            Stable identifier string
+            Stable identifier string, or None if the container info carries no name
+            to fall back to
 
         Note:
             An empty ``monitoring.id`` label is returned as-is. Container
@@ -91,7 +92,7 @@ class MonitoringEngine:
         # Priority 3: Container name (fallback)
         return info.get("name")
 
-    def get_recovery_identifier(self, info: dict) -> str:
+    def get_recovery_identifier(self, info: dict) -> str | None:
         """
         Get the key for a container's restart count, cooldown, backoff and quarantine.
 
@@ -104,7 +105,7 @@ class MonitoringEngine:
             info: Container information dict
 
         Returns:
-            Recovery identifier string
+            Recovery identifier string, or None if there is no stable identifier
         """
         return recovery_identifier(self.get_stable_identifier(info), info.get("labels", {}))
 
@@ -266,6 +267,12 @@ class MonitoringEngine:
 
         # Check if container is quarantined (by recovery ID, name, or ID for backwards compatibility)
         recovery_id = self.get_recovery_identifier(info)
+        if not container_id or not container_name or recovery_id is None:
+            logger.warning(
+                "Skipping container with incomplete identifiers: %s",
+                container_name or container_id,
+            )
+            return
         quarantine_id = None
         if config_manager.is_quarantined(recovery_id):
             quarantine_id = recovery_id
@@ -378,14 +385,14 @@ class MonitoringEngine:
 
         # Check blacklist names
         for pattern in config.filters.blacklist_names:
-            if fnmatch.fnmatch(container_name, pattern):
+            if container_name is not None and fnmatch.fnmatch(container_name, pattern):
                 return False
 
         # Check whitelist names (if specified, must match at least one)
         if config.filters.whitelist_names:
             matched = False
             for pattern in config.filters.whitelist_names:
-                if fnmatch.fnmatch(container_name, pattern):
+                if container_name is not None and fnmatch.fnmatch(container_name, pattern):
                     matched = True
                     break
             if not matched:
@@ -466,11 +473,12 @@ class MonitoringEngine:
             container_name = info.get("name")
 
             # Check custom health checks (by stable_id, name, then ID for backwards compatibility)
-            custom_hc = config_manager.get_custom_health_check(stable_id)
-            if not custom_hc:
-                custom_hc = config_manager.get_custom_health_check(container_name)
-            if not custom_hc:
-                custom_hc = config_manager.get_custom_health_check(container_id)
+            custom_hc = None
+            for key in (stable_id, container_name, container_id):
+                if key is not None:
+                    custom_hc = config_manager.get_custom_health_check(key)
+                    if custom_hc:
+                        break
             if custom_hc:
                 health_ok = await self._perform_custom_health_check(container, custom_hc)
                 if not health_ok:
@@ -484,7 +492,7 @@ class MonitoringEngine:
                     return True, "Docker health check reports unhealthy"
 
         # Check Uptime-Kuma monitor status (if configured and enabled)
-        if self.uptime_kuma_monitor:
+        if self.uptime_kuma_monitor and stable_id is not None:
             if await self.uptime_kuma_monitor.should_restart_from_uptime_kuma(stable_id):
                 return True, "Uptime-Kuma monitor reports DOWN"
 
@@ -607,6 +615,12 @@ class MonitoringEngine:
         # Get recovery identifier: the stable identifier (handles auto-generated names,
         # compose services, explicit IDs), made per replica for scaled Compose services
         recovery_id = self.get_recovery_identifier(info)
+        if not container_id or not container_name or recovery_id is None:
+            logger.warning(
+                "Not restarting container with incomplete identifiers: %s",
+                container_name or container_id,
+            )
+            return
         labels = info.get("labels", {})
 
         # Use STABLE IDENTIFIER as primary (persists across container recreations)
@@ -931,6 +945,11 @@ class MonitoringEngine:
                     if not info:
                         continue
 
+                    container_id = info.get("full_id")
+                    container_name = info.get("name")
+                    if not container_id or not container_name:
+                        continue
+
                     labels = info.get("labels", {})
 
                     # Check if container has the configured monitoring label (autoheal=true by default)
@@ -941,9 +960,9 @@ class MonitoringEngine:
                     try:
                         event_obj = self._auto_monitor_container(
                             config,
-                            stable_id=self._auto_monitor_stable_id(labels, info.get("name")),
-                            container_id=info.get("full_id"),
-                            container_name=info.get("name"),
+                            stable_id=self._auto_monitor_stable_id(labels, container_name),
+                            container_id=container_id,
+                            container_name=container_name,
                             startup=True,
                             label=label,
                         )

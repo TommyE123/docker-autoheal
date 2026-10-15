@@ -778,3 +778,17 @@ def test_cleanup_restart_counts_is_disabled_and_leaves_all_entries_untouched():
         "web": 1,
         "stale-container": 2,
     }
+
+
+@pytest.mark.asyncio
+async def test_restart_is_skipped_when_container_info_lacks_identifiers(engine, docker_client):
+    """Incomplete info must not restart a container or record state under a missing key."""
+    container, info = make_container(name="web")
+    del info["name"]
+    docker_client.add_container(container, info)
+
+    await engine._handle_container_restart(container, info, "Container exited with code 1")
+
+    assert docker_client.restart_calls == []
+    assert config_manager.get_config().containers.restart_counts == {}
+    assert config_manager.get_events() == []

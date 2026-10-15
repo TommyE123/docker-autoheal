@@ -124,6 +124,8 @@ async def get_container_details(container_id: str):
             raise HTTPException(status_code=404, detail="Container not found")
 
         info = await asyncio.to_thread(docker_client.get_container_info, container)
+        if not info:
+            raise HTTPException(status_code=500, detail="Unable to inspect container")
 
         # Use stable_id for tracking (persists across recreations)
         full_container_id = info.get("full_id")
@@ -131,6 +133,13 @@ async def get_container_details(container_id: str):
         stable_id = info.get("stable_id")
         # Restart counts and quarantine are stored per replica (recovery_id)
         recovery_id = info.get("recovery_id")
+        if (
+            full_container_id is None
+            or container_name is None
+            or stable_id is None
+            or recovery_id is None
+        ):
+            raise HTTPException(status_code=500, detail="Unable to resolve container identifiers")
 
         # Get locally tracked restart counts (using recovery_id)
         recent_restart_count = config_manager.get_restart_count(
@@ -204,9 +213,8 @@ async def update_container_selection(request: ContainerSelectionRequest):
             for cid in request.container_ids:
                 # Try to get container to resolve its stable identifier
                 info = resolved[cid]
-                if info is not None:
-                    container_name = info.get("name")
-
+                container_name = info.get("name") if info else None
+                if info is not None and container_name is not None:
                     # Get stable identifier (handles all edge cases)
                     labels = info.get("labels", {})
                     monitoring_id = labels.get("monitoring.id")
@@ -250,9 +258,8 @@ async def update_container_selection(request: ContainerSelectionRequest):
             for cid in request.container_ids:
                 # Try to get container to resolve its stable identifier
                 info = resolved[cid]
-                if info is not None:
-                    container_name = info.get("name")
-
+                container_name = info.get("name") if info else None
+                if info is not None and container_name is not None:
                     # Get stable identifier
                     labels = info.get("labels", {})
                     monitoring_id = labels.get("monitoring.id")
@@ -352,8 +359,13 @@ async def unquarantine_container(container_id: str):
             raise HTTPException(status_code=404, detail="Container not found")
 
         info = await asyncio.to_thread(docker_client.get_container_info, container)
+        if not info:
+            raise HTTPException(status_code=500, detail="Unable to inspect container")
         container_name = info.get("name")
         recovery_id = info.get("recovery_id")
+        full_container_id = info.get("full_id")
+        if container_name is None or recovery_id is None or full_container_id is None:
+            raise HTTPException(status_code=500, detail="Unable to resolve container identifiers")
 
         # Remove from quarantine using recovery_id (matches how quarantine is stored)
         config_manager.unquarantine_container(recovery_id)
@@ -364,7 +376,7 @@ async def unquarantine_container(container_id: str):
         event = AutoHealEvent(
             timestamp=datetime.now(UTC),
             container_name=f"{container_name} ({recovery_id})",
-            container_id=info.get("full_id"),  # Store current ID for reference
+            container_id=full_container_id,  # Store current ID for reference
             event_type="unquarantine",
             restart_count=0,
             status="success",
