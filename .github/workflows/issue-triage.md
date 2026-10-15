@@ -82,10 +82,10 @@ apostrophes, which break a single-quoted JSON argument. Write the body to a
 file with a quoted heredoc, then build the JSON with `jq` and pipe it in:
 
 ```bash
-cat <<'EOF' > /tmp/gh-aw/comment.md
+cat <<'EOF' > /tmp/gh-aw/agent/comment.md
 COMMENT TEXT
 EOF
-jq -Rs '{body: .}' /tmp/gh-aw/comment.md | safeoutputs add_comment .
+jq -Rs '{body: .}' /tmp/gh-aw/agent/comment.md | safeoutputs add_comment .
 ```
 
 Keep the `|`. Without it nothing is sent.
@@ -121,18 +121,24 @@ Keep the `|`. Without it nothing is sent.
    - Add `status/needs-information` if not already present.
    - Remove every `kind/*`, `area/*`, and `status/needs-triage` label
      currently on the issue.
-   - Decide whether the exact marker
-     `<!-- gh-aw:issue-triage:needs-information -->` is already on the issue.
+   - Decide whether the needs-information marker is already on the issue.
+     The marker is three pieces joined with nothing between them and without
+     the backticks shown here: `<!`, then `-- gh-aw:issue-triage:needs-information --`,
+     then `>`. They are written apart because the prompt loader deletes any
+     complete HTML comment. To check for it, search each comment body for the
+     token `gh-aw:issue-triage:needs-information`, not for the joined text.
      Look at the `comments` count in the issue response from step 1. If it is
      absent or zero, treat the issue as having no comments. Otherwise call
      `github issue_read --method get_comments` as described under Tools and
      inspect every page. Never infer that the marker is absent merely because
      it is not in the issue response.
-   - If no comment contains the marker, add one comment with that exact
-     marker plus a short, friendly request for: what happened, what was
-     expected, reproduction steps, the docker-autoheal version, the Docker
-     version, the host OS, and relevant logs. If a comment with that marker
-     already exists, do not add another.
+   - If no comment contains the token, add one comment containing the joined
+     marker inside a backtick span, plus a short, friendly request for: what
+     happened, what was expected, reproduction steps, the docker-autoheal
+     version, the Docker version, the host OS, and relevant logs. Always keep
+     the marker inside backticks. A raw HTML comment is stripped before the
+     comment is posted, so the next run would not find it and would add a
+     duplicate. If a comment with the token already exists, do not add another.
 
    **C. Uncertain, but not insufficient** — there is real content, but you
    cannot confidently settle on one `kind/*` and one `area/*`.
