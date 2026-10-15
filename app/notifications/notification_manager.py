@@ -142,7 +142,12 @@ class NotificationManager:
         logger.info("Notification manager stopped")
 
     def _get_session(self, service_label: str) -> _HttpSession | None:
-        """Return the HTTP session, or log and return None when it is unavailable."""
+        """
+        Return the HTTP session, or log and return None when it is unavailable.
+
+        The session only exists between start() and stop(), so callers should
+        skip the send when this returns None rather than retry.
+        """
         if self._session is None:
             logger.error(
                 "Failed to send %s notification: notification manager has no active session",

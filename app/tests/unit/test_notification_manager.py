@@ -532,7 +532,7 @@ async def test_missing_session_is_logged_per_provider_and_does_not_raise(
     assert unstarted._session is None
     _configure_service(isolated_config_manager, _SERVICES_BY_LABEL[label])
 
-    with caplog.at_level(logging.DEBUG):
+    with caplog.at_level(logging.ERROR):
         await unstarted._process_notification(_make_event("restart"))
 
     messages = [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR]
