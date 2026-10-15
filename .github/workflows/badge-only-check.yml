@@ -1,0 +1,36 @@
+name: Badge-only Change Check
+
+# Called as the `changes` job by tests.yml, docker-build.yml and mega-linter.yml so they can
+# skip their jobs for the automated mutation badge PR. `badge-only` is "true" only for a pull
+# request whose changed files are all .github/badges/mutation.json; any other event, any other
+# file, an empty list or an API error gives "false" and the normal checks run.
+on: # yamllint disable-line rule:truthy
+  workflow_call:
+    outputs:
+      badge-only:
+        value: ${{ jobs.detect.outputs.badge-only }}
+
+permissions: {}
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      badge-only: ${{ steps.detect.outputs.badge-only }}
+    steps:
+      # The script comes from the checked-out ref, so check out the PR's own code.
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+        run: .github/scripts/badge-only.sh

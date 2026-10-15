@@ -146,7 +146,12 @@ The Mutation Testing workflow runs on source and test pull requests according to
 filters, which do not include `.github/badges/mutation.json`. The updater workflow runs the
 full mutation process itself against `main`, and its PR carries only the resulting JSON, so
 that PR does not trigger another full mutation run. That avoids running the 4-5 minute
-mutation job again for a badge-only change. Its other checks run as for any pull request.
+mutation job again for a badge-only change. The frontend tests, Docker build and smoke tests, and
+MegaLinter also skip such a PR (a `changes` job calling `.github/workflows/badge-only-check.yml`,
+which reports it badge-only only when the badge file is the sole changed file). The required
+`unit-tests` check still runs but, instead of the test suite, only runs
+`.github/scripts/validate-badge.sh`, which fails on a missing or malformed badge file. Any PR that
+changes another file, or where detection fails, runs everything.
 
 On a pull request from this repository, a short comment shows this PR's score next to the
 score tracked on `main`, with the change. It is one comment per PR, found by a hidden
