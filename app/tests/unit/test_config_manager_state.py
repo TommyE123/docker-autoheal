@@ -314,21 +314,21 @@ def test_import_config_with_invalid_custom_health_check_leaves_state_unchanged(
 
 
 def test_config_write_failure_is_logged_and_does_not_escape(isolated_config_manager, caplog):
-    with patch("pathlib.Path.open", side_effect=OSError("disk full")):
+    with patch("os.open", side_effect=OSError("disk full")):
         isolated_config_manager.update_config(isolated_config_manager.get_config())
 
     assert "Failed to save config to disk: disk full" in caplog.text
 
 
 def test_events_write_failure_is_logged_and_does_not_escape(isolated_config_manager, caplog):
-    with patch("pathlib.Path.open", side_effect=OSError("disk full")):
+    with patch("os.open", side_effect=OSError("disk full")):
         isolated_config_manager.add_event(_make_event("web"))
 
     assert "Failed to save events to disk: disk full" in caplog.text
 
 
 def test_quarantine_write_failure_is_logged_and_does_not_escape(isolated_config_manager, caplog):
-    with patch("pathlib.Path.open", side_effect=OSError("disk full")):
+    with patch("os.open", side_effect=OSError("disk full")):
         isolated_config_manager.quarantine_container("web")
 
     assert "Failed to save quarantine list to disk: disk full" in caplog.text
@@ -337,7 +337,7 @@ def test_quarantine_write_failure_is_logged_and_does_not_escape(isolated_config_
 def test_maintenance_mode_write_failure_is_logged_and_does_not_escape(
     isolated_config_manager, caplog
 ):
-    with patch("pathlib.Path.open", side_effect=OSError("disk full")):
+    with patch("os.open", side_effect=OSError("disk full")):
         isolated_config_manager.enable_maintenance_mode()
 
     assert "Failed to save maintenance mode to disk: disk full" in caplog.text
