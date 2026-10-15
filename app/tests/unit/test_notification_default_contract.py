@@ -106,10 +106,14 @@ async def emit_one_event_of_each_type(engine, docker_client) -> None:
     # "restart": an unhealthy container below the restart threshold.
     container, info = make_container(name="restart-target", container_id=RESTART_ID)
     docker_client.add_container(container, info)
-    await after_backoff(engine, engine._handle_container_restart, container, info, "unhealthy")
+    await after_backoff(
+        engine, engine._handle_container_restart, container, info, "unhealthy"
+    )
 
     # "quarantine": the same path once the restart threshold is exceeded.
-    container, info = make_container(name="quarantine-target", container_id=QUARANTINE_ID)
+    container, info = make_container(
+        name="quarantine-target", container_id=QUARANTINE_ID
+    )
     docker_client.add_container(container, info)
     for _ in range(3):  # default restart.max_restarts
         config_manager.record_restart("quarantine-target")
@@ -126,12 +130,18 @@ async def emit_one_event_of_each_type(engine, docker_client) -> None:
     await engine._check_single_container(container)
 
     # "auto_monitor": a labelled container starting while the engine runs.
-    container, info = make_container(name="auto-monitor-target", container_id=AUTO_MONITOR_ID)
+    container, info = make_container(
+        name="auto-monitor-target", container_id=AUTO_MONITOR_ID
+    )
     docker_client.add_container(container, info)
-    await engine._process_container_start_event(start_event(container.id, "auto-monitor-target"))
+    await engine._process_container_start_event(
+        start_event(container.id, "auto-monitor-target")
+    )
 
     # "unquarantine": user-initiated, emitted by the API rather than the engine.
-    container, info = make_container(name="unquarantine-target", container_id=UNQUARANTINE_ID)
+    container, info = make_container(
+        name="unquarantine-target", container_id=UNQUARANTINE_ID
+    )
     docker_client.add_container(container, info)
     config_manager.quarantine_container("unquarantine-target")
     await unquarantine_container(UNQUARANTINE_ID)
@@ -161,7 +171,10 @@ class TestDefaultNotificationContract:
 
     async def test_default_event_filters_are_the_shipped_defaults(self):
         """Guard: the rest of this module is only meaningful against the default."""
-        assert config_manager.get_config().notifications.event_filters == DEFAULT_EVENT_FILTERS
+        assert (
+            config_manager.get_config().notifications.event_filters
+            == DEFAULT_EVENT_FILTERS
+        )
 
     async def test_every_emitted_event_type_is_covered(
         self, engine, docker_client, real_notification_manager
@@ -204,7 +217,10 @@ class TestDefaultNotificationContract:
         await emit_one_event_of_each_type(engine, docker_client)
 
         assert "health_check_failed" not in DEFAULT_EVENT_FILTERS
-        assert "health_check_failed" not in config_manager.get_config().notifications.event_filters
+        assert (
+            "health_check_failed"
+            not in config_manager.get_config().notifications.event_filters
+        )
         emitted = {event.event_type for event in config_manager.get_events()}
         assert "health_check_failed" not in emitted
 
@@ -217,7 +233,7 @@ class TestDefaultNotificationContract:
         await emit_one_event_of_each_type(engine, docker_client)
         await drain_notification_queue(real_notification_manager)
 
-        assert real_notification_manager._session.calls == []
+        assert fake_session(real_notification_manager).calls == []
 
 
 @pytest.mark.asyncio
@@ -237,7 +253,7 @@ class TestDefaultNotificationPayloads:
 
         titles_by_type = {
             call["json"]["event"]["type"]: call["json"]["title"]
-            for call in real_notification_manager._session.calls
+            for call in fake_session(real_notification_manager).calls
         }
 
         assert titles_by_type["restart"] == "Container Restarted"
@@ -245,7 +261,9 @@ class TestDefaultNotificationPayloads:
         assert titles_by_type["auto_unquarantine"] == "Container Auto-Unquarantined"
         assert titles_by_type["auto_monitor"] == "Container Auto-Monitored"
 
-    async def test_generic_title_fallback_has_no_leading_space(self, real_notification_manager):
+    async def test_generic_title_fallback_has_no_leading_space(
+        self, real_notification_manager
+    ):
         event = AutoHealEvent(
             timestamp=datetime.now(timezone.utc),
             container_id="a" * 64,
@@ -268,8 +286,8 @@ class TestDefaultNotificationPayloads:
         await emit_one_event_of_each_type(engine, docker_client)
         await drain_notification_queue(real_notification_manager)
 
-        assert len(real_notification_manager._session.calls) == 4
-        for call in real_notification_manager._session.calls:
+        assert len(fake_session(real_notification_manager).calls) == 4
+        for call in fake_session(real_notification_manager).calls:
             assert call["url"] == WEBHOOK_URL
             event = call["json"]["event"]
             assert event["container_name"].endswith("-target)")

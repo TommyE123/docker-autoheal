@@ -96,7 +96,9 @@ def _configure_webhook(isolated_config_manager, event_filters=None, enabled=True
             url="https://example.invalid/webhook",
         )
     ]
-    config.notifications.event_filters = event_filters if event_filters is not None else []
+    config.notifications.event_filters = (
+        event_filters if event_filters is not None else []
+    )
     isolated_config_manager.update_config(config)
     return config
 
@@ -117,7 +119,9 @@ class _FakeAiohttpSession(_FakeSession):
         super().__init__()
 
 
-def test_event_filters_restrict_which_events_notify(isolated_config_manager, manager):
+def test_event_filters_restrict_which_events_notify(
+    isolated_config_manager, manager: NotificationManager
+):
     _configure_webhook(isolated_config_manager, event_filters=["restart", "quarantine"])
 
     assert manager._should_notify_for_event(_make_event("restart")) is True
@@ -125,7 +129,9 @@ def test_event_filters_restrict_which_events_notify(isolated_config_manager, man
     assert manager._should_notify_for_event(_make_event("auto_monitor")) is False
 
 
-def test_empty_event_filters_notify_for_every_event(isolated_config_manager, manager):
+def test_empty_event_filters_notify_for_every_event(
+    isolated_config_manager, manager: NotificationManager
+):
     _configure_webhook(isolated_config_manager, event_filters=[])
 
     assert manager._should_notify_for_event(_make_event("auto_monitor")) is True
@@ -144,8 +150,8 @@ async def test_send_event_notification_queues_and_delivers_to_webhook(
     queued_event = await manager._notification_queue.get()
     await manager._process_notification(queued_event)
 
-    assert len(manager._session.calls) == 1
-    call = manager._session.calls[0]
+    assert len(fake_session(manager).calls) == 1
+    call = fake_session(manager).calls[0]
     assert call["url"] == "https://example.invalid/webhook"
     assert call["json"]["event"]["container_name"] == "nginx-test"
     assert call["json"]["event"]["type"] == "restart"
@@ -166,7 +172,9 @@ async def test_send_event_notification_skips_filtered_out_event_types(
 async def test_send_event_notification_noop_when_notifications_disabled(
     isolated_config_manager, manager
 ):
-    _configure_webhook(isolated_config_manager, event_filters=["restart"], enabled=False)
+    _configure_webhook(
+        isolated_config_manager, event_filters=["restart"], enabled=False
+    )
 
     await manager.send_event_notification(_make_event("restart"))
 
@@ -174,14 +182,16 @@ async def test_send_event_notification_noop_when_notifications_disabled(
 
 
 @pytest.mark.asyncio
-async def test_disabled_service_is_not_sent_to(isolated_config_manager, manager):
+async def test_disabled_service_is_not_sent_to(
+    isolated_config_manager, manager: NotificationManager
+):
     config = _configure_webhook(isolated_config_manager, event_filters=["restart"])
     config.notifications.services[0].enabled = False
     isolated_config_manager.update_config(config)
 
     await manager._process_notification(_make_event("restart"))
 
-    assert manager._session.calls == []
+    assert fake_session(manager).calls == []
 
 
 @pytest.mark.asyncio
@@ -193,8 +203,8 @@ async def test_test_notification_reports_success_and_sends_a_test_payload(
     result = await manager.test_notification("Test Webhook")
 
     assert result == {"success": True, "message": "Test notification sent successfully"}
-    assert len(manager._session.calls) == 1
-    assert manager._session.calls[0]["json"]["event"]["type"] == "test"
+    assert len(fake_session(manager).calls) == 1
+    assert fake_session(manager).calls[0]["json"]["event"]["type"] == "test"
 
 
 @pytest.mark.asyncio
@@ -209,21 +219,29 @@ async def test_test_notification_reports_failure_for_unknown_service(
         "success": False,
         "message": "Service 'Nonexistent Service' not found",
     }
-    assert manager._session.calls == []
+    assert fake_session(manager).calls == []
 
 
-def test_format_notification_maps_event_type_to_title_and_priority(manager):
-    title, _message, priority = manager._format_notification(_make_event("unquarantine"))
+def test_format_notification_maps_event_type_to_title_and_priority(
+    manager: NotificationManager,
+):
+    title, _message, priority = manager._format_notification(
+        _make_event("unquarantine")
+    )
     assert title == "Container Unquarantined"
     assert priority == NotificationPriority.NORMAL
 
-    title, _message, priority = manager._format_notification(_make_event("unknown_event"))
+    title, _message, priority = manager._format_notification(
+        _make_event("unknown_event")
+    )
     assert title == "Unknown Event"
     assert priority == NotificationPriority.NORMAL
 
 
 @pytest.mark.asyncio
-async def test_send_discord_builds_embed_payload(isolated_config_manager, manager):
+async def test_send_discord_builds_embed_payload(
+    isolated_config_manager, manager: NotificationManager
+):
     _configure_service(
         isolated_config_manager,
         NotificationService(
@@ -236,7 +254,7 @@ async def test_send_discord_builds_embed_payload(isolated_config_manager, manage
 
     await manager._process_notification(_make_event("quarantine"))
 
-    call = manager._session.calls[0]
+    call = fake_session(manager).calls[0]
     assert call["url"] == "https://example.invalid/discord"
     embed = call["json"]["embeds"][0]
     assert embed["title"] == "Container Quarantined"
@@ -246,7 +264,9 @@ async def test_send_discord_builds_embed_payload(isolated_config_manager, manage
 
 
 @pytest.mark.asyncio
-async def test_send_slack_builds_blocks_payload(isolated_config_manager, manager):
+async def test_send_slack_builds_blocks_payload(
+    isolated_config_manager, manager: NotificationManager
+):
     _configure_service(
         isolated_config_manager,
         NotificationService(
@@ -259,7 +279,7 @@ async def test_send_slack_builds_blocks_payload(isolated_config_manager, manager
 
     await manager._process_notification(_make_event("restart"))
 
-    call = manager._session.calls[0]
+    call = fake_session(manager).calls[0]
     payload = call["json"]
     assert payload["text"] == "Container Restarted"
     section_text = payload["blocks"][1]["text"]["text"]
@@ -268,7 +288,9 @@ async def test_send_slack_builds_blocks_payload(isolated_config_manager, manager
 
 
 @pytest.mark.asyncio
-async def test_send_telegram_builds_message_and_url(isolated_config_manager, manager):
+async def test_send_telegram_builds_message_and_url(
+    isolated_config_manager, manager: NotificationManager
+):
     _configure_service(
         isolated_config_manager,
         NotificationService(
@@ -282,7 +304,7 @@ async def test_send_telegram_builds_message_and_url(isolated_config_manager, man
 
     await manager._process_notification(_make_event("restart"))
 
-    call = manager._session.calls[0]
+    call = fake_session(manager).calls[0]
     assert call["url"] == "https://api.telegram.org/botabc123/sendMessage"
     payload = call["json"]
     assert payload["chat_id"] == "999"
@@ -290,7 +312,9 @@ async def test_send_telegram_builds_message_and_url(isolated_config_manager, man
 
 
 @pytest.mark.asyncio
-async def test_send_telegram_skips_when_not_configured(isolated_config_manager, manager):
+async def test_send_telegram_skips_when_not_configured(
+    isolated_config_manager, manager: NotificationManager
+):
     _configure_service(
         isolated_config_manager,
         NotificationService(name="Telegram", type="telegram", enabled=True),
@@ -298,11 +322,13 @@ async def test_send_telegram_skips_when_not_configured(isolated_config_manager, 
 
     await manager._process_notification(_make_event("restart"))
 
-    assert manager._session.calls == []
+    assert fake_session(manager).calls == []
 
 
 @pytest.mark.asyncio
-async def test_send_ntfy_builds_headers_with_auth(isolated_config_manager, manager):
+async def test_send_ntfy_builds_headers_with_auth(
+    isolated_config_manager, manager: NotificationManager
+):
     _configure_service(
         isolated_config_manager,
         NotificationService(
@@ -318,10 +344,13 @@ async def test_send_ntfy_builds_headers_with_auth(isolated_config_manager, manag
 
     await manager._process_notification(_make_event("quarantine"))
 
-    call = manager._session.calls[0]
+    call = fake_session(manager).calls[0]
     assert call["url"] == "https://ntfy.example.invalid/alerts"
     assert call["headers"]["Priority"] == "4"  # HIGH priority
-    assert call["headers"]["Authorization"] == "Basic " + base64.b64encode(b"user:pass").decode()
+    assert (
+        call["headers"]["Authorization"]
+        == "Basic " + base64.b64encode(b"user:pass").decode()
+    )
     assert "**" not in call["data"]
 
 
@@ -336,11 +365,13 @@ async def test_send_ntfy_without_credentials_sends_no_authorization(
 
     await manager._process_notification(_make_event("health_check_failed"))
 
-    assert "Authorization" not in manager._session.calls[0]["headers"]
+    assert "Authorization" not in fake_session(manager).calls[0]["headers"]
 
 
 @pytest.mark.asyncio
-async def test_send_ntfy_with_access_token_sends_bearer_header(isolated_config_manager, manager):
+async def test_send_ntfy_with_access_token_sends_bearer_header(
+    isolated_config_manager, manager: NotificationManager
+):
     _configure_service(
         isolated_config_manager,
         NotificationService(
@@ -354,7 +385,9 @@ async def test_send_ntfy_with_access_token_sends_bearer_header(isolated_config_m
 
     await manager._process_notification(_make_event("health_check_failed"))
 
-    assert manager._session.calls[0]["headers"]["Authorization"] == "Bearer tk_secret"
+    assert (
+        fake_session(manager).calls[0]["headers"]["Authorization"] == "Bearer tk_secret"
+    )
 
 
 @pytest.mark.asyncio
@@ -376,12 +409,16 @@ async def test_send_ntfy_access_token_takes_precedence_over_basic_auth(
 
     await manager._process_notification(_make_event("health_check_failed"))
 
-    assert manager._session.calls[0]["headers"]["Authorization"] == "Bearer tk_secret"
+    assert (
+        fake_session(manager).calls[0]["headers"]["Authorization"] == "Bearer tk_secret"
+    )
 
 
 @pytest.mark.parametrize("status", [200, 500])
 @pytest.mark.asyncio
-async def test_send_ntfy_access_token_not_logged(caplog, isolated_config_manager, manager, status):
+async def test_send_ntfy_access_token_not_logged(
+    caplog, isolated_config_manager, manager: NotificationManager, status
+):
     manager._session = _FakeSession(status=status)
     _configure_service(
         isolated_config_manager,
@@ -428,7 +465,9 @@ async def test_send_ntfy_access_token_not_logged_on_exception(
 
 
 @pytest.mark.asyncio
-async def test_send_gotify_builds_payload(isolated_config_manager, manager):
+async def test_send_gotify_builds_payload(
+    isolated_config_manager, manager: NotificationManager
+):
     _configure_service(
         isolated_config_manager,
         NotificationService(
@@ -442,14 +481,16 @@ async def test_send_gotify_builds_payload(isolated_config_manager, manager):
 
     await manager._process_notification(_make_event("auto_monitor"))
 
-    call = manager._session.calls[0]
+    call = fake_session(manager).calls[0]
     assert call["url"] == "https://gotify.example.invalid/message"
     assert call["headers"]["X-Gotify-Key"] == "tok123"
     assert call["json"]["priority"] == 2  # LOW priority
 
 
 @pytest.mark.asyncio
-async def test_send_pushover_builds_form_payload(isolated_config_manager, manager):
+async def test_send_pushover_builds_form_payload(
+    isolated_config_manager, manager: NotificationManager
+):
     _configure_service(
         isolated_config_manager,
         NotificationService(
@@ -463,7 +504,7 @@ async def test_send_pushover_builds_form_payload(isolated_config_manager, manage
 
     await manager._process_notification(_make_event("quarantine"))
 
-    call = manager._session.calls[0]
+    call = fake_session(manager).calls[0]
     assert call["url"] == "https://api.pushover.net/1/messages.json"
     assert call["data"]["user"] == "userkey"
     assert call["data"]["token"] == "apitoken"
@@ -471,7 +512,9 @@ async def test_send_pushover_builds_form_payload(isolated_config_manager, manage
 
 
 @pytest.mark.asyncio
-async def test_webhook_error_status_is_logged_not_raised(caplog, isolated_config_manager, manager):
+async def test_webhook_error_status_is_logged_not_raised(
+    caplog, isolated_config_manager, manager: NotificationManager
+):
     manager._session = _FakeSession(status=500)
     _configure_webhook(isolated_config_manager)
 
@@ -482,10 +525,15 @@ async def test_webhook_error_status_is_logged_not_raised(caplog, isolated_config
 
 
 @pytest.mark.asyncio
-async def test_webhook_exception_is_caught_and_logged(caplog, isolated_config_manager, manager):
+async def test_webhook_exception_is_caught_and_logged(
+    caplog, isolated_config_manager, manager: NotificationManager
+):
     class _RaisingSession:
         def post(self, *args, **kwargs):
             raise ConnectionError("network unreachable")
+
+        async def close(self) -> None:
+            pass
 
     manager._session = _RaisingSession()
     _configure_webhook(isolated_config_manager)
@@ -493,7 +541,9 @@ async def test_webhook_exception_is_caught_and_logged(caplog, isolated_config_ma
     with caplog.at_level(logging.ERROR):
         await manager._process_notification(_make_event("restart"))
 
-    assert any("Failed to send webhook notification" in r.message for r in caplog.records)
+    assert any(
+        "Failed to send webhook notification" in r.message for r in caplog.records
+    )
 
 
 _SERVICES_BY_LABEL = {
@@ -567,8 +617,8 @@ async def test_process_notification_dispatches_only_to_enabled_known_services(
     with caplog.at_level(logging.WARNING):
         await manager._process_notification(_make_event("restart"))
 
-    assert len(manager._session.calls) == 1
-    assert manager._session.calls[0]["url"] == "https://example.invalid/webhook"
+    assert len(fake_session(manager).calls) == 1
+    assert fake_session(manager).calls[0]["url"] == "https://example.invalid/webhook"
     assert any("Unsupported notification type" in r.message for r in caplog.records)
 
 
@@ -583,7 +633,7 @@ async def test_test_notification_reports_failure_for_disabled_service(
     result = await manager.test_notification("Test Webhook")
 
     assert result == {"success": False, "message": "Service 'Test Webhook' is disabled"}
-    assert manager._session.calls == []
+    assert fake_session(manager).calls == []
 
 
 @pytest.mark.asyncio
@@ -627,7 +677,7 @@ async def test_notification_worker_recovers_after_processing_error(
     worker = asyncio.create_task(manager._notification_worker())
 
     for _ in range(200):
-        if len(manager._session.calls) >= 1:
+        if len(fake_session(manager).calls) >= 1:
             break
         await asyncio.sleep(0.01)
 
@@ -639,7 +689,7 @@ async def test_notification_worker_recovers_after_processing_error(
         pass
 
     assert len(calls) == 2
-    assert len(manager._session.calls) == 1
+    assert len(fake_session(manager).calls) == 1
 
 
 @pytest.mark.asyncio
@@ -671,7 +721,7 @@ async def test_notification_worker_keeps_polling_after_queue_wait_timeout(
         worker = asyncio.create_task(manager._notification_worker())
 
         for _ in range(200):
-            if manager._session.calls:
+            if fake_session(manager).calls:
                 break
             await asyncio.sleep(0.01)
 
@@ -681,7 +731,7 @@ async def test_notification_worker_keeps_polling_after_queue_wait_timeout(
             await worker
 
     assert timeouts_raised == 1
-    assert len(manager._session.calls) == 1
+    assert len(fake_session(manager).calls) == 1
     assert not any("Error in notification worker" in r.message for r in caplog.records)
 
 
@@ -757,7 +807,9 @@ def _named_event(name: str) -> AutoHealEvent:
     return event
 
 
-async def _started_manager(monkeypatch, isolated_config_manager, session: _GatedSession):
+async def _started_manager(
+    monkeypatch, isolated_config_manager, session: _GatedSession
+):
     monkeypatch.setattr(
         "app.notifications.notification_manager.aiohttp.ClientSession",
         lambda *args, **kwargs: session,
@@ -798,7 +850,9 @@ async def test_stop_delivers_notifications_queued_before_stop(
 
 
 @pytest.mark.asyncio
-async def test_stop_lets_in_flight_notification_finish(monkeypatch, isolated_config_manager):
+async def test_stop_lets_in_flight_notification_finish(
+    monkeypatch, isolated_config_manager
+):
     """A notification being sent when stop() is called is not cancelled mid-send."""
     session = _GatedSession()
     instance = await _started_manager(monkeypatch, isolated_config_manager, session)
@@ -832,7 +886,9 @@ async def test_send_event_notification_after_stop_is_dropped_and_logged(
 
     assert instance._notification_queue.empty()
     assert any(
-        r.levelno == logging.WARNING and "stopped" in r.message and "restart" in r.message
+        r.levelno == logging.WARNING
+        and "stopped" in r.message
+        and "restart" in r.message
         for r in caplog.records
     )
 
@@ -993,7 +1049,9 @@ async def test_manager_accepts_notifications_again_after_restart(
 
 
 @pytest.mark.asyncio
-async def test_start_when_already_running_is_a_noop(monkeypatch, isolated_config_manager):
+async def test_start_when_already_running_is_a_noop(
+    monkeypatch, isolated_config_manager
+):
     monkeypatch.setattr(
         "app.notifications.notification_manager.aiohttp.ClientSession",
         _FakeAiohttpSession,
@@ -1081,7 +1139,7 @@ async def test_missing_credentials_skip_request_without_calling_session(
     with caplog.at_level(logging.WARNING):
         await manager._process_notification(_make_event("restart"))
 
-    assert manager._session.calls == []
+    assert fake_session(manager).calls == []
     assert any(expected_warning in r.message for r in caplog.records)
 
 
@@ -1190,7 +1248,9 @@ async def test_request_exception_is_caught_and_logged(
 
 
 @pytest.mark.asyncio
-async def test_send_webhook_includes_priority_and_custom_headers(isolated_config_manager, manager):
+async def test_send_webhook_includes_priority_and_custom_headers(
+    isolated_config_manager, manager: NotificationManager
+):
     """Webhook is the only provider whose payload carries a raw priority value
     and supports arbitrary custom headers; neither is exercised elsewhere."""
     _configure_service(
@@ -1206,7 +1266,7 @@ async def test_send_webhook_includes_priority_and_custom_headers(isolated_config
 
     await manager._process_notification(_make_event("quarantine"))
 
-    call = manager._session.calls[0]
+    call = fake_session(manager).calls[0]
     assert call["json"]["priority"] == "high"
     assert call["headers"]["X-Api-Key"] == "secret123"
     assert call["headers"]["Content-Type"] == "application/json"
@@ -1283,19 +1343,28 @@ async def test_one_provider_failure_does_not_block_other_notifications(
     failing_url = "https://example.invalid/webhook"
     working_url = "https://example.invalid/discord"
     barrier = _StartBarrier(count=2)
-    manager._session = _PerUrlBarrierSession(failing_url=failing_url, barrier=barrier)
+    session = _PerUrlBarrierSession(failing_url=failing_url, barrier=barrier)
+    manager._session = session
 
     config = isolated_config_manager.get_config()
     config.notifications.enabled = True
     config.notifications.services = [
-        NotificationService(name="Webhook", type="webhook", enabled=True, url=failing_url),
-        NotificationService(name="Discord", type="discord", enabled=True, url=working_url),
+        NotificationService(
+            name="Webhook", type="webhook", enabled=True, url=failing_url
+        ),
+        NotificationService(
+            name="Discord", type="discord", enabled=True, url=working_url
+        ),
     ]
     isolated_config_manager.update_config(config)
 
     with caplog.at_level(logging.ERROR):
-        await asyncio.wait_for(manager._process_notification(_make_event("restart")), timeout=2)
+        await asyncio.wait_for(
+            manager._process_notification(_make_event("restart")), timeout=2
+        )
 
-    called_urls = {call["url"] for call in manager._session.calls}
+    called_urls = {call["url"] for call in session.calls}
     assert called_urls == {failing_url, working_url}
-    assert any("Failed to send webhook notification" in r.message for r in caplog.records)
+    assert any(
+        "Failed to send webhook notification" in r.message for r in caplog.records
+    )
