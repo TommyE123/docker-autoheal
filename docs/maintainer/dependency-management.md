@@ -206,9 +206,9 @@ automatically merging them can still introduce compatibility or behavioural chan
   until there is a deliberate decision to change the frontend build/runtime baseline.
 
 * **Pre-1.0 and build tooling dependencies** — `0.x` patch updates are automerged like other
-  eligible patch updates, except security fixes, which stay manual. Build tooling is automerged only when its update is a patch. A patch
-  or minor version does not automatically mean a dependency is behaviourally
-  risk-free.
+  eligible patch updates, except security fixes, which stay manual. Build tooling is automerged
+  only when its update is a patch. A patch or minor version does not automatically mean a
+  dependency is behaviourally risk-free.
 
 * **`checkov` as a Dev Container tool** — it is deliberately absent from
   `mise.toml`. Installing it alongside `semgrep` hangs
