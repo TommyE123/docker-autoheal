@@ -65,6 +65,21 @@ class FakeContainer:
         return f"<FakeContainer {self.name} {self.id[:12]}>"
 
 
+INCOMPLETE_INFO_CASES = [
+    # Compose labels keep the stable and recovery IDs resolvable without a name
+    (
+        "name",
+        {
+            "autoheal": "true",
+            "com.docker.compose.project": "stack",
+            "com.docker.compose.service": "web",
+        },
+    ),
+    ("name", {"autoheal": "true"}),
+    ("full_id", {"autoheal": "true"}),
+]
+
+
 def make_container(
     name: str = "web",
     container_id: str = "a" * 64,

@@ -9,7 +9,7 @@ restarts.
 import pytest
 
 from app.config.config_manager import config_manager
-from app.tests.unit.conftest import after_backoff, make_container
+from app.tests.unit.conftest import INCOMPLETE_INFO_CASES, after_backoff, make_container
 
 
 def event_types() -> list:
@@ -312,12 +312,21 @@ async def test_name_filters_do_not_match_container_info_without_name(engine):
 
 
 @pytest.mark.asyncio
-async def test_container_info_missing_name_is_skipped_without_restart(engine, docker_client):
-    container, info = make_container(name="web", status="exited", exit_code=1)
-    del info["name"]
+@pytest.mark.parametrize(("missing", "labels"), INCOMPLETE_INFO_CASES)
+async def test_container_info_missing_identifier_is_skipped_without_restart(
+    engine, docker_client, caplog, missing, labels
+):
+    container, info = make_container(name="web", status="exited", exit_code=1, labels=labels)
+    del info[missing]
     docker_client.add_container(container, info)
 
-    await engine._check_single_container(container)
+    with caplog.at_level("WARNING"):
+        await engine._check_single_container(container)
 
     assert docker_client.restart_calls == []
     assert config_manager.get_events() == []
+    # Logs the name, or the ID when the name is what is missing
+    assert [r.getMessage() for r in caplog.records] == [
+        "Skipping container with incomplete identifiers: "
+        + (info.get("name") or info.get("full_id"))
+    ]
