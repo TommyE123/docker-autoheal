@@ -187,7 +187,8 @@ immutable references without being allowed to merge the resulting changes automa
 Security updates are subject to the same policy as other updates.
 
 A security fix that is an eligible patch update may be automerged once required checks pass.
-A minor or major security fix is not automerged and requires manual review.
+A minor or major security fix, or a security fix to a `0.x` dependency, is not automerged and
+requires manual review.
 
 Security-related dependency PRs therefore receive the same CI validation as other dependency
 updates, and human review unless they are eligible patch updates.
@@ -205,7 +206,7 @@ automatically merging them can still introduce compatibility or behavioural chan
   until there is a deliberate decision to change the frontend build/runtime baseline.
 
 * **Pre-1.0 and build tooling dependencies** — `0.x` patch updates are automerged like other
-  eligible patch updates. Build tooling is automerged only when its update is a patch. A patch
+  eligible patch updates, except security fixes, which stay manual. Build tooling is automerged only when its update is a patch. A patch
   or minor version does not automatically mean a dependency is behaviourally
   risk-free.
 

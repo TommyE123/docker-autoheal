@@ -49,6 +49,12 @@
       "automerge": true
     },
     {
+      "description": "Keep security (vulnerability alert) fixes to 0.x dependencies manual. The patch rule above covers 0.x, so this restores the documented manual review for those security fixes.",
+      "matchCurrentVersion": "/^0(\\.|$)/",
+      "isVulnerabilityAlert": true,
+      "automerge": false
+    },
+    {
       "description": "Label Renovate patch updates.",
       "matchUpdateTypes": ["patch"],
       "addLabels": ["renovate:patch"]
