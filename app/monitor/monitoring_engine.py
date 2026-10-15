@@ -20,6 +20,7 @@ from app.docker_client.docker_client_wrapper import (
     DockerClientWrapper,
     recovery_identifier,
 )
+from app.monitor.uptime_kuma_monitor import UptimeKumaMonitor
 from app.notifications.notification_manager import notification_manager
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,8 @@ class MonitoringEngine:
         # sharing a recovery ID share the wait, so only its owner recovering may cancel
         # it. A recreated container has a new ID, so it never inherits a predecessor's wait.
         self._restart_wait_owner: dict[str, str | None] = {}
+        # Attached by the service after construction; None when Uptime Kuma is not set up.
+        self.uptime_kuma_monitor: UptimeKumaMonitor | None = None
 
     def get_stable_identifier(self, info: dict) -> str:
         """
@@ -481,7 +484,7 @@ class MonitoringEngine:
                     return True, "Docker health check reports unhealthy"
 
         # Check Uptime-Kuma monitor status (if configured and enabled)
-        if hasattr(self, "uptime_kuma_monitor") and self.uptime_kuma_monitor:
+        if self.uptime_kuma_monitor:
             if await self.uptime_kuma_monitor.should_restart_from_uptime_kuma(stable_id):
                 return True, "Uptime-Kuma monitor reports DOWN"
 
