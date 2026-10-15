@@ -183,6 +183,27 @@ async def get_container_details(container_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _stable_id_from_info(info: dict | None) -> str | None:
+    """
+    Stable identifier for persisting a container selection.
+
+    Uses the ``monitoring.id`` label, then the Compose project and service, then the
+    name. None when the container could not be inspected or has none of these.
+    """
+    if not info:
+        return None
+    labels = info.get("labels", {})
+    monitoring_id = labels.get("monitoring.id")
+    compose_project = labels.get("com.docker.compose.project")
+    compose_service = labels.get("com.docker.compose.service")
+
+    if monitoring_id:
+        return monitoring_id
+    if compose_project and compose_service:
+        return f"{compose_project}_{compose_service}"
+    return info.get("name")
+
+
 @router.post("/api/containers/select")
 async def update_container_selection(request: ContainerSelectionRequest):
     """Enable or disable auto-heal for specific containers"""
@@ -217,20 +238,8 @@ async def update_container_selection(request: ContainerSelectionRequest):
                 # Try to get container to resolve its stable identifier
                 info = resolved[cid]
                 container_name = info.get("name") if info else None
-                if info is not None and container_name is not None:
-                    # Get stable identifier (handles all edge cases)
-                    labels = info.get("labels", {})
-                    monitoring_id = labels.get("monitoring.id")
-                    compose_project = labels.get("com.docker.compose.project")
-                    compose_service = labels.get("com.docker.compose.service")
-
-                    if monitoring_id:
-                        stable_id = monitoring_id
-                    elif compose_project and compose_service:
-                        stable_id = f"{compose_project}_{compose_service}"
-                    else:
-                        stable_id = container_name
-
+                stable_id = _stable_id_from_info(info)
+                if info is not None and stable_id is not None:
                     # Store by stable_id for persistence across recreations
                     if stable_id not in config.containers.selected:
                         config.containers.selected.append(stable_id)
@@ -242,7 +251,9 @@ async def update_container_selection(request: ContainerSelectionRequest):
                         )
 
                     # Remove from excluded if present (check stable_id, name, and ID)
-                    for identifier in [stable_id, container_name, cid]:
+                    for identifier in [
+                        i for i in (stable_id, container_name, cid) if i is not None
+                    ]:
                         if identifier in config.containers.excluded:
                             config.containers.excluded.remove(identifier)
                             logger.debug("Removed '%s' from excluded list", identifier)
@@ -262,20 +273,8 @@ async def update_container_selection(request: ContainerSelectionRequest):
                 # Try to get container to resolve its stable identifier
                 info = resolved[cid]
                 container_name = info.get("name") if info else None
-                if info is not None and container_name is not None:
-                    # Get stable identifier
-                    labels = info.get("labels", {})
-                    monitoring_id = labels.get("monitoring.id")
-                    compose_project = labels.get("com.docker.compose.project")
-                    compose_service = labels.get("com.docker.compose.service")
-
-                    if monitoring_id:
-                        stable_id = monitoring_id
-                    elif compose_project and compose_service:
-                        stable_id = f"{compose_project}_{compose_service}"
-                    else:
-                        stable_id = container_name
-
+                stable_id = _stable_id_from_info(info)
+                if info is not None and stable_id is not None:
                     # Store by stable_id for persistence across recreations
                     if stable_id not in config.containers.excluded:
                         config.containers.excluded.append(stable_id)
@@ -287,7 +286,9 @@ async def update_container_selection(request: ContainerSelectionRequest):
                         )
 
                     # Remove from selected if present (check stable_id, name, and ID)
-                    for identifier in [stable_id, container_name, cid]:
+                    for identifier in [
+                        i for i in (stable_id, container_name, cid) if i is not None
+                    ]:
                         if identifier in config.containers.selected:
                             config.containers.selected.remove(identifier)
                             logger.debug("Removed '%s' from selected list", identifier)
