@@ -43,7 +43,7 @@ from app.config.config_manager import AutoHealEvent, NotificationService, config
 from app.notifications.notification_manager import NotificationManager
 from app.tests.unit.conftest import after_backoff, make_container
 from app.tests.unit.test_engine_lifecycle import start_event
-from app.tests.unit.test_notification_manager import _FakeSession
+from app.tests.unit.test_notification_manager import _FakeSession, fake_session
 
 WEBHOOK_URL = "https://example.invalid/default-contract"
 
@@ -149,7 +149,7 @@ async def drain_notification_queue(manager: NotificationManager) -> None:
 
 
 def delivered_event_types(manager: NotificationManager) -> list:
-    return [call["json"]["event"]["type"] for call in manager._session.calls]
+    return [call["json"]["event"]["type"] for call in fake_session(manager).calls]
 
 
 @pytest.mark.asyncio
