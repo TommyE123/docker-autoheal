@@ -79,7 +79,7 @@ async def get_health_check(container_id: str):
             )
 
         health_check = config_manager.get_custom_health_check(stable_id)
-        if not health_check:
+        if not health_check and container.id is not None:
             # Fall back to the container's current full Docker ID for checks
             # persisted before stable-ID storage that haven't been re-added.
             health_check = config_manager.get_custom_health_check(container.id)
@@ -124,7 +124,7 @@ async def delete_health_check(container_id: str):
         # stable ID, or (for checks persisted before stable-ID storage)
         # the container's current full Docker ID.
         remove_key = stable_id
-        if not config_manager.get_custom_health_check(remove_key):
+        if not config_manager.get_custom_health_check(remove_key) and container.id is not None:
             remove_key = container.id
         config_manager.remove_custom_health_check(remove_key)
         return {

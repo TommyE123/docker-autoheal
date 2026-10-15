@@ -9,7 +9,7 @@ restarts.
 import pytest
 
 from app.config.config_manager import config_manager
-from app.tests.unit.conftest import after_backoff, make_container
+from app.tests.unit.conftest import INCOMPLETE_INFO_CASES, after_backoff, make_container
 
 
 def event_types() -> list:
@@ -298,3 +298,35 @@ class TestAutoUnquarantineFailure:
 
         assert config_manager.is_quarantined("web") is True
         assert config_manager.get_events() == []
+
+
+@pytest.mark.asyncio
+async def test_name_filters_do_not_match_container_info_without_name(engine):
+    container, info = make_container(name="web")
+    del info["name"]
+    config = config_manager.get_config()
+    config.filters.whitelist_names = ["*"]
+    config_manager.update_config(config)
+
+    assert engine.should_monitor_container(container, info) is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("missing", "labels"), INCOMPLETE_INFO_CASES)
+async def test_container_info_missing_identifier_is_skipped_without_restart(
+    engine, docker_client, caplog, missing, labels
+):
+    container, info = make_container(name="web", status="exited", exit_code=1, labels=labels)
+    del info[missing]
+    docker_client.add_container(container, info)
+
+    with caplog.at_level("WARNING"):
+        await engine._check_single_container(container)
+
+    assert docker_client.restart_calls == []
+    assert config_manager.get_events() == []
+    # Logs the name, or the ID when the name is what is missing
+    logged = info["full_id"] if missing == "name" else info["name"]
+    assert [r.getMessage() for r in caplog.records] == [
+        "Skipping container with incomplete identifiers: " + logged
+    ]

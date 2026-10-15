@@ -109,6 +109,19 @@ class TestStartStop:
 class TestScanExistingContainers:
     """Startup discovery of containers already running with ``autoheal=true``."""
 
+    @pytest.mark.parametrize("missing", ["name", "full_id"])
+    async def test_container_info_missing_identifier_is_not_added(
+        self, engine, docker_client, missing
+    ):
+        container, info = make_container(name="web")
+        del info[missing]
+        docker_client.add_container(container, info)
+
+        await engine._scan_existing_containers()
+
+        assert config_manager.get_config().containers.selected == []
+        assert config_manager.get_events() == []
+
     async def test_labelled_container_is_added_to_monitoring(self, engine, docker_client):
         container, info = make_container(name="web", labels={"autoheal": "true"})
         docker_client.add_container(container, info)
@@ -118,6 +131,7 @@ class TestScanExistingContainers:
         assert config_manager.get_config().containers.selected == ["web"]
         assert [e.event_type for e in config_manager.get_events()] == ["auto_monitor"]
         assert "autoheal=true" in config_manager.get_events()[0].message
+        assert config_manager.get_events()[0].container_name == "web (web)"
 
     async def test_custom_label_container_is_added_to_monitoring(
         self, engine, docker_client, update_config
