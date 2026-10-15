@@ -9,7 +9,7 @@ restarts.
 import pytest
 
 from app.config.config_manager import config_manager
-from app.tests.unit.conftest import make_container
+from app.tests.unit.conftest import after_backoff, make_container
 
 
 def event_types() -> list:
@@ -33,7 +33,7 @@ class TestCheckSingleContainer:
         container, info = make_container(name="web", status="exited", exit_code=1)
         docker_client.add_container(container, info)
 
-        await engine._check_single_container(container)
+        await after_backoff(engine, engine._check_single_container, container)
 
         assert docker_client.restart_calls == ["web"]
         assert event_types() == ["restart"]
@@ -60,10 +60,10 @@ class TestCheckSingleContainer:
         container, info = make_container(name="web", status="exited", exit_code=1)
         docker_client.add_container(container, info)
         config_manager.enable_maintenance_mode()
-        await engine._check_single_container(container)
+        await after_backoff(engine, engine._check_single_container, container)
         config_manager.disable_maintenance_mode()
 
-        await engine._check_single_container(container)
+        await after_backoff(engine, engine._check_single_container, container)
 
         assert docker_client.restart_calls == ["web"]
 
@@ -200,7 +200,7 @@ class TestContainerDisappearance:
         docker_client.add_container(gone, gone_info)
         docker_client._info.pop(gone.id)  # still listed, but no longer inspectable
 
-        await engine._check_containers()
+        await after_backoff(engine, engine._check_containers)
 
         assert docker_client.restart_calls == ["web"]
 
@@ -215,7 +215,7 @@ class TestContainerDisappearance:
         docker_client.add_container(healthy, healthy_info)
         docker_client.info_errors[broken.id] = RuntimeError("container is gone")
 
-        await engine._check_containers()
+        await after_backoff(engine, engine._check_containers)
 
         assert docker_client.restart_calls == ["web"]
 
@@ -229,7 +229,7 @@ class TestCheckContainersDockerFailures:
         docker_client.add_container(container, info)
         docker_client.connected = False
 
-        await engine._check_containers()
+        await after_backoff(engine, engine._check_containers)
 
         assert docker_client.reconnect_calls == 1
         assert docker_client.restart_calls == ["web"]
@@ -273,7 +273,7 @@ class TestCheckContainersDockerFailures:
         ):
             docker_client.add_container(container, info)
 
-        await engine._check_containers()
+        await after_backoff(engine, engine._check_containers)
 
         assert docker_client.restart_calls == ["crashed"]
 

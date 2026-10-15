@@ -6,7 +6,7 @@ Monitors containers and performs auto-healing actions
 import asyncio
 import fnmatch
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from docker.models.containers import Container
 
@@ -42,6 +42,11 @@ class MonitoringEngine:
         self._event_task: asyncio.Task | None = None
         self._last_restart_times: dict[str, datetime] = {}
         self._backoff_delays: dict[str, int] = {}
+        self._next_allowed_restart: dict[str, datetime] = {}
+        # The container (by Docker ID) whose failure started each pending wait. Replicas
+        # sharing a recovery ID share the wait, so only its owner recovering may cancel
+        # it. A recreated container has a new ID, so it never inherits a predecessor's wait.
+        self._restart_wait_owner: dict[str, str | None] = {}
 
     def get_stable_identifier(self, info: dict) -> str:
         """
@@ -210,6 +215,19 @@ class MonitoringEngine:
                 self.docker_client.list_containers, all_containers=True
             )
 
+            # A wait belongs to the container that started it; drop those that are gone.
+            # list_containers returns [] when the Docker call fails, which says nothing
+            # about whether the containers still exist.
+            if containers:
+                listed_ids = {container.id for container in containers}
+                abandoned = [
+                    recovery_id
+                    for recovery_id, owner in self._restart_wait_owner.items()
+                    if owner not in listed_ids
+                ]
+                for recovery_id in abandoned:
+                    self._clear_restart_wait(recovery_id)
+
             for container in containers:
                 try:
                     await self._check_single_container(container)
@@ -239,6 +257,8 @@ class MonitoringEngine:
 
         # Check if container should be monitored
         if not self.should_monitor_container(container, info):
+            # No longer monitored: a wait it started would otherwise linger
+            self._clear_restart_waits_owned_by(container_id)
             return
 
         # Check if container is quarantined (by recovery ID, name, or ID for backwards compatibility)
@@ -279,6 +299,24 @@ class MonitoringEngine:
 
         if needs_restart:
             await self._handle_container_restart(container, info, reason)
+        elif self._restart_wait_owner.get(recovery_id) == container_id:
+            # Recovered on its own: drop the restart it was waiting out its backoff for
+            self._clear_restart_wait(recovery_id)
+
+    def _clear_restart_waits_owned_by(self, container_id: str | None) -> None:
+        """Forget every restart wait that the given container (by Docker ID) started"""
+        owned = [
+            recovery_id
+            for recovery_id, owner in self._restart_wait_owner.items()
+            if owner == container_id
+        ]
+        for recovery_id in owned:
+            self._clear_restart_wait(recovery_id)
+
+    def _clear_restart_wait(self, recovery_id: str) -> None:
+        """Forget the restart wait recorded for a recovery ID, and who it belongs to"""
+        self._next_allowed_restart.pop(recovery_id, None)
+        self._restart_wait_owner.pop(recovery_id, None)
 
     def should_monitor_container(self, container: Container, info: dict) -> bool:
         """
@@ -517,7 +555,10 @@ class MonitoringEngine:
             # Also clear the restart count so it starts fresh
             config_manager.clear_restart_history(recovery_id)
 
-            # Reset backoff delays
+            # Reset backoff delays; a wait started by another replica sharing this
+            # recovery ID is still valid
+            if self._restart_wait_owner.get(recovery_id) == container_id:
+                self._clear_restart_wait(recovery_id)
             if recovery_id in self._backoff_delays:
                 config = config_manager.get_config()
                 self._backoff_delays[recovery_id] = config.restart.backoff.initial_seconds
@@ -624,21 +665,14 @@ class MonitoringEngine:
             return
 
         # Apply backoff if enabled (using recovery_id)
-        if config.restart.backoff.enabled:
-            backoff_delay = self._backoff_delays.get(
-                recovery_id, config.restart.backoff.initial_seconds
-            )
-            logger.debug(
-                "Applying backoff delay of %ss for %s (recovery_id: %s)",
-                backoff_delay,
-                container_name,
-                recovery_id,
-            )
-            await asyncio.sleep(backoff_delay)
+        if config.restart.backoff.enabled and not self._restart_wait_elapsed(
+            recovery_id, container_id, container_name, config
+        ):
+            return
 
-            # Update backoff for next time
-            next_backoff = int(backoff_delay * config.restart.backoff.multiplier)
-            self._backoff_delays[recovery_id] = next_backoff
+        # The restart goes ahead now, so no wait is pending (backoff may also have been
+        # disabled while one was)
+        self._clear_restart_wait(recovery_id)
 
         # Perform restart
         logger.info(
@@ -682,6 +716,58 @@ class MonitoringEngine:
                 container_name,
                 recovery_id,
             )
+
+    def _restart_wait_elapsed(
+        self,
+        recovery_id: str,
+        container_id: str | None,
+        container_name: str | None,
+        config: AutoHealConfig,
+    ) -> bool:
+        """
+        Apply the restart backoff for a container that needs restarting
+
+        The wait is recorded as a timestamp and checked on later cycles, never slept
+        inline, so one container's backoff cannot stall the monitoring of the others.
+
+        Args:
+            recovery_id: Recovery identifier the wait is recorded under
+            container_id: Docker ID of the container, recorded as the owner of a new wait
+            container_name: Container name, for logging
+            config: Current configuration
+
+        Returns:
+            True if the restart may go ahead now. False if a wait was just scheduled
+            or the existing one has not run out yet.
+        """
+        now = datetime.now(UTC)
+        next_allowed = self._next_allowed_restart.get(recovery_id)
+        backoff_delay = self._backoff_delays.get(
+            recovery_id, config.restart.backoff.initial_seconds
+        )
+        if next_allowed is None:
+            logger.debug(
+                "Applying backoff delay of %ss for %s (recovery_id: %s)",
+                backoff_delay,
+                container_name,
+                recovery_id,
+            )
+            self._next_allowed_restart[recovery_id] = now + timedelta(seconds=backoff_delay)
+            self._restart_wait_owner[recovery_id] = container_id
+            return False
+        if now < next_allowed:
+            logger.debug(
+                "Container %s (recovery_id: %s) waiting out restart backoff (%.1fs left)",
+                container_name,
+                recovery_id,
+                (next_allowed - now).total_seconds(),
+            )
+            return False
+
+        # Update backoff for next time
+        next_backoff = int(backoff_delay * config.restart.backoff.multiplier)
+        self._backoff_delays[recovery_id] = next_backoff
+        return True
 
     async def _send_alert(self, event: AutoHealEvent) -> None:
         """
