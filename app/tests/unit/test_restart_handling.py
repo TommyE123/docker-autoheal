@@ -481,8 +481,8 @@ class TestRestartBackoff:
         assert recorded_sleeps == []
         assert docker_client.restart_calls == ["web"]
 
-    async def test_no_backoff_delay_when_container_is_quarantined(
-        self, engine, docker_client, recorded_sleeps
+    async def test_no_backoff_wait_is_scheduled_when_container_is_quarantined(
+        self, engine, docker_client
     ):
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
@@ -491,7 +491,10 @@ class TestRestartBackoff:
 
         await engine._handle_container_restart(container, info, "unhealthy")
 
-        assert recorded_sleeps == []
+        assert config_manager.is_quarantined("web") is True
+        assert docker_client.restart_calls == []
+        assert engine._next_allowed_restart == {}
+        assert engine._restart_wait_owner == {}
 
 
 @pytest.mark.asyncio
