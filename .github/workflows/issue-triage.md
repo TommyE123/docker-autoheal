@@ -54,12 +54,35 @@ Classify issue #${{ github.event.issue.number }} against the label taxonomy in
 to match exactly one of the three outcomes below. Never modify the issue
 title or body.
 
+## Tools
+
+There is no direct network access in this sandbox, and `gh` and `curl` are not
+authenticated. Do not use them, and do not call the GitHub REST API from
+Python. All GitHub reads and writes go through two CLIs on your `PATH`, which
+you run from the shell:
+
+- **Reads: `github`**. To fetch an issue, run
+  `github issue_read --method get --owner OWNER --repo REPO --issue_number N`,
+  where `OWNER/REPO` is `${{ github.repository }}`. To fetch its comments, use
+  `--method get_comments` with the same flags. If a flag is rejected, run
+  `github issue_read --help` and use the flags it lists.
+- **Writes: `safeoutputs`**. Pass one JSON object as a single quoted argument:
+  - `safeoutputs add_labels '{"labels":["kind/bug","area/restart"]}'`
+  - `safeoutputs remove_labels '{"labels":["status/needs-triage"]}'`
+  - `safeoutputs add_comment '{"body":"..."}'`
+  - `safeoutputs noop '{"message":"..."}'`
+  - `safeoutputs report_incomplete '{"reason":"..."}'`
+
 ## Steps
 
 1. Fetch issue #${{ github.event.issue.number }} (its title, body, and its
-   current labels) using the GitHub tools.
+   current labels) with `github issue_read` as described under Tools. If you
+   cannot fetch it, call `report_incomplete` with the reason and stop. Never
+   call `noop` for this, because it hides the failure.
 2. Read `.github/labels.yml` for the exact allowed `kind/*`, `area/*`, and
-   `status/*` label names.
+   `status/*` label names. The file is short, so read the whole file. If the
+   read returns nothing, retry without a line range or run
+   `cat .github/labels.yml`.
 3. Decide which of these three outcomes applies. Do not take any label action
    until you have decided, and do not partially apply an outcome.
 
