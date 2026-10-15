@@ -253,8 +253,8 @@ def test_weekly_workflow_enables_auto_merge_with_the_non_default_token():
     assert "GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}" not in AUTO_MERGE_WORKFLOW
 
 
-# Jobs that skip for a badge-only PR, per workflow. The smoke test follows build-amd64 via needs,
-# and unit-tests (the required check) has its own test below.
+# Jobs that skip for a badge-only PR, per workflow. The smoke test has its own test below, and
+# so does unit-tests (the required check).
 BADGE_SKIPPED_JOBS = {
     "tests": ["frontend-tests"],
     "docker-build": ["build-amd64", "arm64-startup"],
@@ -277,6 +277,16 @@ def test_badge_only_pr_skips_ci_without_path_filters_or_failing_open():
                 "    if: ${{ !cancelled() && needs.changes.outputs.badge-only != 'true' }}\n"
                 in block
             ), (name, job)
+
+
+def test_smoke_test_still_runs_when_the_changes_job_fails_and_skips_with_the_build():
+    # success() also checks ancestors, so without !cancelled() a failed `changes` job would skip it
+    # even though build-amd64 ran; the result check keeps it skipped when the build is skipped.
+    text = (REPO_ROOT / ".github" / "workflows" / "docker-build.yml").read_text(encoding="utf-8")
+    job = re.search(r"(?ms)^  smoke-test:\n(.*?)(?=^  [\w-]+:\n|\Z)", text).group(1)
+
+    assert re.search(r"^    needs: build-amd64$", job, re.MULTILINE)
+    assert "    if: ${{ !cancelled() && needs.build-amd64.result == 'success' }}\n" in job
 
 
 def test_required_unit_tests_job_always_runs_and_validates_the_badge_for_badge_only_prs():

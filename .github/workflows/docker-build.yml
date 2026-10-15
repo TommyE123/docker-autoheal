@@ -88,6 +88,9 @@ jobs:
   smoke-test:
     name: Production container smoke test
     needs: build-amd64
+    # success() also looks at ancestors, so a failed `changes` job would skip this job even though
+    # the image was built; !cancelled() with an explicit result check does not.
+    if: ${{ !cancelled() && needs.build-amd64.result == 'success' }}
     permissions:
       contents: read
     uses: ./.github/workflows/production-smoke-test.yml
