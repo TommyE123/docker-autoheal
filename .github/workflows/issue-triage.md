@@ -64,8 +64,10 @@ you run from the shell:
 - **Reads: `github`**. To fetch an issue, run
   `github issue_read --method get --owner OWNER --repo REPO --issue_number N`,
   where `OWNER/REPO` is `${{ github.repository }}`. To fetch its comments, use
-  `--method get_comments` with the same flags. If a flag is rejected, run
-  `github issue_read --help` and use the flags it lists.
+  `--method get_comments` with the same flags plus `--perPage 100`. A call
+  returns one page (30 comments by default), so also check `--page 2`, `3`
+  and so on if a page comes back with exactly 100 comments. If a flag is
+  rejected, run `github issue_read --help` and use the flags it lists.
 - **Writes: `safeoutputs`**. Pass one JSON object as a single quoted argument:
   - `safeoutputs add_labels '{"labels":["kind/bug","area/restart"]}'`
   - `safeoutputs remove_labels '{"labels":["status/needs-triage"]}'`
