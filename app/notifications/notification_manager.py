@@ -5,16 +5,40 @@ Supports: Webhook, Discord, Slack, Telegram, Email, Ntfy, Gotify, Pushover
 
 import asyncio
 import logging
-from contextlib import suppress
+from contextlib import AbstractAsyncContextManager, suppress
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Protocol
 
 import aiohttp
 
 from app.config.config_manager import AutoHealEvent, config_manager
 
 logger = logging.getLogger(__name__)
+
+
+class _HttpResponse(Protocol):
+    """The slice of ``aiohttp.ClientResponse`` that delivery relies on."""
+
+    @property
+    def status(self) -> int: ...
+
+    async def text(self) -> str: ...
+
+
+class _HttpSession(Protocol):
+    """
+    The slice of ``aiohttp.ClientSession`` that delivery relies on.
+
+    Typing ``_session`` structurally lets tests substitute a fake session
+    without it having to claim to be an ``aiohttp.ClientSession``.
+    """
+
+    def post(
+        self, url: str, *, json: Any = ..., data: Any = ..., headers: Any = ...
+    ) -> AbstractAsyncContextManager[_HttpResponse]: ...
+
+    async def close(self) -> None: ...
 
 
 class NotificationType(StrEnum):
@@ -51,7 +75,7 @@ class NotificationManager:
 
     def __init__(self):
         """Initialize notification manager"""
-        self._session: aiohttp.ClientSession | None = None
+        self._session: _HttpSession | None = None
         self._notification_queue: asyncio.Queue = asyncio.Queue()
         self._worker_task: asyncio.Task | None = None
         self._running = False
@@ -116,6 +140,20 @@ class NotificationManager:
                 self._session = None
 
         logger.info("Notification manager stopped")
+
+    def _get_session(self, service_label: str) -> _HttpSession | None:
+        """
+        Return the HTTP session, or log and return None when it is unavailable.
+
+        The session only exists between start() and stop(), so callers should
+        skip the send when this returns None rather than retry.
+        """
+        if self._session is None:
+            logger.error(
+                "Failed to send %s notification: notification manager has no active session",
+                service_label,
+            )
+        return self._session
 
     async def send_event_notification(self, event: AutoHealEvent) -> None:
         """
@@ -318,8 +356,12 @@ class NotificationManager:
         if service.headers:
             headers.update(service.headers)
 
+        session = self._get_session("webhook")
+        if session is None:
+            return
+
         try:
-            async with self._session.post(service.url, json=payload, headers=headers) as response:
+            async with session.post(service.url, json=payload, headers=headers) as response:
                 if response.status >= 400:
                     logger.error(
                         "Webhook failed with status %s: %s",
@@ -365,8 +407,12 @@ class NotificationManager:
             "username": service.username or "Docker Auto-Heal",
         }
 
+        session = self._get_session("Discord")
+        if session is None:
+            return
+
         try:
-            async with self._session.post(service.url, json=payload) as response:
+            async with session.post(service.url, json=payload) as response:
                 if response.status >= 400:
                     logger.error("Discord webhook failed with status %s", response.status)
                 else:
@@ -398,8 +444,12 @@ class NotificationManager:
             ],
         }
 
+        session = self._get_session("Slack")
+        if session is None:
+            return
+
         try:
-            async with self._session.post(service.url, json=payload) as response:
+            async with session.post(service.url, json=payload) as response:
                 if response.status >= 400:
                     logger.error("Slack webhook failed with status %s", response.status)
                 else:
@@ -430,8 +480,12 @@ class NotificationManager:
             "parse_mode": "Markdown",
         }
 
+        session = self._get_session("Telegram")
+        if session is None:
+            return
+
         try:
-            async with self._session.post(url, json=payload) as response:
+            async with session.post(url, json=payload) as response:
                 if response.status >= 400:
                     logger.error("Telegram API failed with status %s", response.status)
                 else:
@@ -479,8 +533,12 @@ class NotificationManager:
             encoded = base64.b64encode(credentials.encode()).decode()
             headers["Authorization"] = f"Basic {encoded}"
 
+        session = self._get_session("Ntfy")
+        if session is None:
+            return
+
         try:
-            async with self._session.post(
+            async with session.post(
                 url, data=message.replace("**", ""), headers=headers
             ) as response:
                 if response.status >= 400:
@@ -520,8 +578,12 @@ class NotificationManager:
 
         headers = {"X-Gotify-Key": service.app_token}
 
+        session = self._get_session("Gotify")
+        if session is None:
+            return
+
         try:
-            async with self._session.post(url, json=payload, headers=headers) as response:
+            async with session.post(url, json=payload, headers=headers) as response:
                 if response.status >= 400:
                     logger.error("Gotify failed with status %s", response.status)
                 else:
@@ -559,8 +621,12 @@ class NotificationManager:
             "priority": priority_map.get(priority, 0),
         }
 
+        session = self._get_session("Pushover")
+        if session is None:
+            return
+
         try:
-            async with self._session.post(url, data=payload) as response:
+            async with session.post(url, data=payload) as response:
                 if response.status >= 400:
                     logger.error("Pushover failed with status %s", response.status)
                 else:

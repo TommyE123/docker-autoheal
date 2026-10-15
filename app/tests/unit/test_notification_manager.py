@@ -39,13 +39,30 @@ class _FakeResponse:
 
 
 class _FakeSession:
+    """Fake HTTP session satisfying the manager's session protocol.
+
+    ``calls`` and ``closed`` are fake-only; use ``fake_session()`` to read them
+    from a manager so they are typed on this class, not on the real session.
+    """
+
     def __init__(self, status: int = 200):
         self.status = status
         self.calls: list[dict] = []
+        self.closed = False
 
     def post(self, url, **kwargs):
         self.calls.append({"url": url, **kwargs})
         return _FakeResponse(self.status)
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+def fake_session(manager: NotificationManager) -> _FakeSession:
+    """Return the manager's session, narrowed to the fake installed by tests."""
+    session = manager._session
+    assert isinstance(session, _FakeSession)
+    return session
 
 
 @pytest.fixture
@@ -98,10 +115,6 @@ class _FakeAiohttpSession(_FakeSession):
 
     def __init__(self, *args, **kwargs):
         super().__init__()
-        self.closed = False
-
-    async def close(self):
-        self.closed = True
 
 
 def test_event_filters_restrict_which_events_notify(isolated_config_manager, manager):
@@ -483,6 +496,51 @@ async def test_webhook_exception_is_caught_and_logged(caplog, isolated_config_ma
     assert any("Failed to send webhook notification" in r.message for r in caplog.records)
 
 
+_SERVICES_BY_LABEL = {
+    "webhook": NotificationService(
+        name="svc", type="webhook", enabled=True, url="https://example.invalid/hook"
+    ),
+    "Discord": NotificationService(
+        name="svc", type="discord", enabled=True, url="https://example.invalid/hook"
+    ),
+    "Slack": NotificationService(
+        name="svc", type="slack", enabled=True, url="https://example.invalid/hook"
+    ),
+    "Telegram": NotificationService(
+        name="svc", type="telegram", enabled=True, bot_token="abc", chat_id="1"
+    ),
+    "Ntfy": NotificationService(name="svc", type="ntfy", enabled=True, topic="alerts"),
+    "Gotify": NotificationService(
+        name="svc",
+        type="gotify",
+        enabled=True,
+        server_url="https://gotify.example.invalid",
+        app_token="tok",
+    ),
+    "Pushover": NotificationService(
+        name="svc", type="pushover", enabled=True, api_token="tok", user_key="usr"
+    ),
+}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("label", list(_SERVICES_BY_LABEL))
+async def test_missing_session_is_logged_per_provider_and_does_not_raise(
+    label, caplog, isolated_config_manager
+):
+    unstarted = NotificationManager()
+    assert unstarted._session is None
+    _configure_service(isolated_config_manager, _SERVICES_BY_LABEL[label])
+
+    with caplog.at_level(logging.ERROR):
+        await unstarted._process_notification(_make_event("restart"))
+
+    messages = [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR]
+    assert messages == [
+        f"Failed to send {label} notification: notification manager has no active session"
+    ]
+
+
 @pytest.mark.asyncio
 async def test_process_notification_dispatches_only_to_enabled_known_services(
     caplog, isolated_config_manager, manager
@@ -641,18 +699,18 @@ async def test_start_stop_lifecycle_delivers_queued_notification(
     await instance.start()
     assert instance._running is True
     assert instance._worker_task is not None
-    assert instance._session is not None
+    started_session = fake_session(instance)
 
     await instance.send_event_notification(_make_event("restart"))
 
     for _ in range(200):
-        if instance._session.calls:
+        if started_session.calls:
             break
         await asyncio.sleep(0.01)
 
-    assert len(instance._session.calls) == 1
+    assert len(started_session.calls) == 1
 
-    session = instance._session
+    session = started_session
     await instance.stop()
     assert instance._running is False
     assert session.closed is True
