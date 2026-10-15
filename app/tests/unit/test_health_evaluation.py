@@ -269,4 +269,4 @@ class TestUptimeKumaEvaluation:
         needs_restart, _ = await engine._evaluate_container_health(container, info)
 
         assert needs_restart is False
-        assert not hasattr(engine, "uptime_kuma_monitor")
+        assert engine.uptime_kuma_monitor is None

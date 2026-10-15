@@ -108,7 +108,7 @@ async def enable_uptime_kuma_integration(integration_config: dict):
         config_manager.update_config(config)
 
         # Restart Uptime-Kuma monitor
-        if hasattr(monitoring_engine, "uptime_kuma_monitor"):
+        if monitoring_engine and monitoring_engine.uptime_kuma_monitor:
             await monitoring_engine.uptime_kuma_monitor.stop()
             await monitoring_engine.uptime_kuma_monitor.start()
 
@@ -224,7 +224,7 @@ async def disable_uptime_kuma_integration():
         config_manager.update_config(config)
 
         # Stop monitoring
-        if hasattr(monitoring_engine, "uptime_kuma_monitor"):
+        if monitoring_engine and monitoring_engine.uptime_kuma_monitor:
             await monitoring_engine.uptime_kuma_monitor.stop()
 
         logger.info("Uptime-Kuma integration disabled")

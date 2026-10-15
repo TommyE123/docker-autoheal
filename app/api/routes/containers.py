@@ -44,11 +44,7 @@ async def list_containers(include_stopped: bool = False):
 
         # Use the uptime_kuma_monitor from monitoring_engine if available
         uptime_kuma_monitor = None
-        if (
-            uptime_kuma_enabled
-            and monitoring_engine
-            and hasattr(monitoring_engine, "uptime_kuma_monitor")
-        ):
+        if uptime_kuma_enabled and monitoring_engine:
             uptime_kuma_monitor = monitoring_engine.uptime_kuma_monitor
 
         for container, info in inspected:

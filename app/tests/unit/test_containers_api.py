@@ -86,9 +86,9 @@ class TestListContainers:
         config = config_manager.get_config()
         config.uptime_kuma.enabled = True
         config_manager.update_config(config)
-        # engine has no `uptime_kuma_monitor` attribute, mirroring a service
+        # engine's `uptime_kuma_monitor` is still None, mirroring a service
         # that hasn't finished initializing the integration yet.
-        assert not hasattr(engine, "uptime_kuma_monitor")
+        assert engine.uptime_kuma_monitor is None
 
         result = await list_containers()
 
