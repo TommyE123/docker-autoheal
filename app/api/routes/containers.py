@@ -110,7 +110,10 @@ async def list_containers(include_stopped: bool = False):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/api/containers/{container_id}")
+@router.get(
+    "/api/containers/{container_id}",
+    responses={500: {"description": "Container could not be inspected or identified"}},
+)
 async def get_container_details(container_id: str):
     """Get detailed information about a specific container"""
     docker_client = state.docker_client
@@ -345,7 +348,10 @@ async def restart_container_manual(container_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/api/containers/{container_id}/unquarantine")
+@router.post(
+    "/api/containers/{container_id}/unquarantine",
+    responses={500: {"description": "Container could not be inspected or identified"}},
+)
 async def unquarantine_container(container_id: str):
     """Remove container from quarantine"""
     docker_client = state.docker_client

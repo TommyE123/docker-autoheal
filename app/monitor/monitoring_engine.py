@@ -109,6 +109,26 @@ class MonitoringEngine:
         """
         return recovery_identifier(self.get_stable_identifier(info), info.get("labels", {}))
 
+    def _container_identifiers(self, info: dict) -> tuple[str, str, str] | None:
+        """
+        Full ID, name and recovery ID of a container, or None if any is missing.
+
+        ``get_container_info`` returns an empty dict when inspection fails, so the
+        identifiers cannot be assumed present.
+
+        Args:
+            info: Container information dict
+
+        Returns:
+            Tuple of (container_id, container_name, recovery_id), or None
+        """
+        container_id = info.get("full_id")
+        container_name = info.get("name")
+        recovery_id = self.get_recovery_identifier(info)
+        if not container_id or not container_name or recovery_id is None:
+            return None
+        return container_id, container_name, recovery_id
+
     @staticmethod
     def _auto_monitor_stable_id(labels: dict, container_name: str) -> str:
         """
@@ -266,13 +286,14 @@ class MonitoringEngine:
             return
 
         # Check if container is quarantined (by recovery ID, name, or ID for backwards compatibility)
-        recovery_id = self.get_recovery_identifier(info)
-        if not container_id or not container_name or recovery_id is None:
+        identifiers = self._container_identifiers(info)
+        if identifiers is None:
             logger.warning(
                 "Skipping container with incomplete identifiers: %s",
                 container_name or container_id,
             )
             return
+        container_id, container_name, recovery_id = identifiers
         quarantine_id = None
         if config_manager.is_quarantined(recovery_id):
             quarantine_id = recovery_id
@@ -614,13 +635,14 @@ class MonitoringEngine:
 
         # Get recovery identifier: the stable identifier (handles auto-generated names,
         # compose services, explicit IDs), made per replica for scaled Compose services
-        recovery_id = self.get_recovery_identifier(info)
-        if not container_id or not container_name or recovery_id is None:
+        identifiers = self._container_identifiers(info)
+        if identifiers is None:
             logger.warning(
                 "Not restarting container with incomplete identifiers: %s",
                 container_name or container_id,
             )
             return
+        container_id, container_name, recovery_id = identifiers
         labels = info.get("labels", {})
 
         # Use STABLE IDENTIFIER as primary (persists across container recreations)
@@ -942,13 +964,10 @@ class MonitoringEngine:
                     # Get container info including labels
                     info = await asyncio.to_thread(self.docker_client.get_container_info, container)
 
-                    if not info:
+                    identifiers = self._container_identifiers(info)
+                    if identifiers is None:
                         continue
-
-                    container_id = info.get("full_id")
-                    container_name = info.get("name")
-                    if not container_id or not container_name:
-                        continue
+                    container_id, container_name, _recovery_id = identifiers
 
                     labels = info.get("labels", {})
 

@@ -797,7 +797,7 @@ async def test_restart_is_skipped_when_container_info_lacks_identifiers(
     assert config_manager.get_config().containers.restart_counts == {}
     assert config_manager.get_events() == []
     # Logs the name, or the ID when the name is what is missing
+    logged = info["full_id"] if missing == "name" else info["name"]
     assert [r.getMessage() for r in caplog.records] == [
-        "Not restarting container with incomplete identifiers: "
-        + (info.get("name") or info.get("full_id"))
+        "Not restarting container with incomplete identifiers: " + logged
     ]

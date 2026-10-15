@@ -326,7 +326,7 @@ async def test_container_info_missing_identifier_is_skipped_without_restart(
     assert docker_client.restart_calls == []
     assert config_manager.get_events() == []
     # Logs the name, or the ID when the name is what is missing
+    logged = info["full_id"] if missing == "name" else info["name"]
     assert [r.getMessage() for r in caplog.records] == [
-        "Skipping container with incomplete identifiers: "
-        + (info.get("name") or info.get("full_id"))
+        "Skipping container with incomplete identifiers: " + logged
     ]

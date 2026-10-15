@@ -159,7 +159,10 @@ async def get_uptime_kuma_mappings():
     return {"mappings": [m.model_dump() for m in config.uptime_kuma_mappings]}
 
 
-@router.post("/api/uptime-kuma/mappings")
+@router.post(
+    "/api/uptime-kuma/mappings",
+    responses={500: {"description": "Container could not be mapped"}},
+)
 async def create_uptime_kuma_mapping(mapping: dict):
     """Create a new container-to-monitor mapping"""
     docker_client = state.docker_client
