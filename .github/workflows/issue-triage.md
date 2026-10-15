@@ -61,19 +61,34 @@ authenticated. Do not use them, and do not call the GitHub REST API from
 Python. All GitHub reads and writes go through two CLIs on your `PATH`, which
 you run from the shell:
 
-- **Reads: `github`**. To fetch an issue, run
-  `github issue_read --method get --owner OWNER --repo REPO --issue_number N`,
-  where `OWNER/REPO` is `${{ github.repository }}`. To fetch its comments, use
-  `--method get_comments` with the same flags plus `--perPage 100`. A call
-  returns one page (30 comments by default), so also check `--page 2`, `3`
-  and so on if a page comes back with exactly 100 comments. If a flag is
-  rejected, run `github issue_read --help` and use the flags it lists.
+- **Reads: `github`**. `${{ github.repository }}` is `OWNER/REPO`. Split it
+  at `/`: pass the part before the slash as `--owner` and the part after it as
+  `--repo`. Never pass the combined `OWNER/REPO` value to either flag. To fetch
+  an issue, run
+  `github issue_read --method get --owner OWNER --repo REPO --issue_number N`.
+  To fetch its comments, run the same command with
+  `--method get_comments --perPage 100 --page 1`. Continue with `--page 2`,
+  `--page 3` and so on only when the current page contains exactly 100
+  comments. Stop when a page contains fewer than 100. If a flag is rejected,
+  run `github issue_read --help` and use the flags it lists.
 - **Writes: `safeoutputs`**. Pass one JSON object as a single quoted argument:
   - `safeoutputs add_labels '{"labels":["kind/bug","area/restart"]}'`
   - `safeoutputs remove_labels '{"labels":["status/needs-triage"]}'`
-  - `safeoutputs add_comment '{"body":"..."}'`
   - `safeoutputs noop '{"message":"..."}'`
   - `safeoutputs report_incomplete '{"reason":"..."}'`
+
+**Comments: `safeoutputs add_comment`.** A comment body can contain
+apostrophes, which break a single-quoted JSON argument. Write the body to a
+file with a quoted heredoc, then build the JSON with `jq` and pipe it in:
+
+```bash
+cat <<'EOF' > /tmp/gh-aw/comment.md
+COMMENT TEXT
+EOF
+jq -Rs '{body: .}' /tmp/gh-aw/comment.md | safeoutputs add_comment .
+```
+
+Keep the `|`. Without it nothing is sent.
 
 ## Steps
 
@@ -106,12 +121,18 @@ you run from the shell:
    - Add `status/needs-information` if not already present.
    - Remove every `kind/*`, `area/*`, and `status/needs-triage` label
      currently on the issue.
-   - Check the issue's existing comments for one containing the exact marker
-     `<!-- gh-aw:issue-triage:needs-information -->`. If none contains it,
-     add one comment with that exact marker plus a short, friendly request
-     for: what happened, what was expected, reproduction steps, the
-     docker-autoheal version, the Docker version, the host OS, and relevant
-     logs. If a comment with that marker already exists, do not add another.
+   - Decide whether the exact marker
+     `<!-- gh-aw:issue-triage:needs-information -->` is already on the issue.
+     Look at the `comments` count in the issue response from step 1. If it is
+     absent or zero, treat the issue as having no comments. Otherwise call
+     `github issue_read --method get_comments` as described under Tools and
+     inspect every page. Never infer that the marker is absent merely because
+     it is not in the issue response.
+   - If no comment contains the marker, add one comment with that exact
+     marker plus a short, friendly request for: what happened, what was
+     expected, reproduction steps, the docker-autoheal version, the Docker
+     version, the host OS, and relevant logs. If a comment with that marker
+     already exists, do not add another.
 
    **C. Uncertain, but not insufficient** — there is real content, but you
    cannot confidently settle on one `kind/*` and one `area/*`.
