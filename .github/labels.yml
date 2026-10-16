@@ -71,6 +71,18 @@
   color: "0e7490"
   description: Unit tests, integration tests, test coverage.
 
+- name: area:api
+  color: "0a3069"
+  description: REST API routes, request/response handling, FastAPI backend.
+
+- name: area:frontend
+  color: "bf3989"
+  description: React web UI, components, styling, client-side behaviour.
+
+- name: area:notifications
+  color: "953800"
+  description: Notification providers, delivery, alerts and message formatting.
+
 # --- status:* --------------------------------------------------------------
 
 - name: status:needs-triage
