@@ -142,7 +142,9 @@ def test_docker_job_only_runs_when_a_release_was_actually_created():
 
 
 def test_beta_job_runs_after_release_please_regardless_of_release_creation():
-    beta_job = re.search(r"(?ms)^  beta-build:\n(.*?)(?=^  [\w-]+:\n|\Z)", WORKFLOW).group(1)
+    beta_job_match = re.search(r"(?ms)^  beta-build:\n(.*?)(?=^  [\w-]+:\n|\Z)", WORKFLOW)
+    assert beta_job_match is not None
+    beta_job = beta_job_match.group(1)
 
     assert re.search(r"^    needs: release-please$", beta_job, re.MULTILINE)
     assert "release_created" not in beta_job
@@ -271,7 +273,9 @@ def test_badge_only_pr_skips_ci_without_path_filters_or_failing_open():
         assert "paths" not in triggers
         assert "uses: ./.github/workflows/badge-only-check.yml" in jobs
         for job in skipped_jobs:
-            block = re.search(rf"(?ms)^  {job}:\n(.*?)(?=^  [\w-]+:\n|\Z)", jobs).group(1)
+            block_match = re.search(rf"(?ms)^  {job}:\n(.*?)(?=^  [\w-]+:\n|\Z)", jobs)
+            assert block_match is not None
+            block = block_match.group(1)
             assert re.search(r"^    needs: changes$", block, re.MULTILINE), (name, job)
             assert (
                 "    if: ${{ !cancelled() && needs.changes.outputs.badge-only != 'true' }}\n"
@@ -283,7 +287,9 @@ def test_smoke_test_still_runs_when_the_changes_job_fails_and_skips_with_the_bui
     # success() also checks ancestors, so without !cancelled() a failed `changes` job would skip it
     # even though build-amd64 ran; the result check keeps it skipped when the build is skipped.
     text = (REPO_ROOT / ".github" / "workflows" / "docker-build.yml").read_text(encoding="utf-8")
-    job = re.search(r"(?ms)^  smoke-test:\n(.*?)(?=^  [\w-]+:\n|\Z)", text).group(1)
+    job_match = re.search(r"(?ms)^  smoke-test:\n(.*?)(?=^  [\w-]+:\n|\Z)", text)
+    assert job_match is not None
+    job = job_match.group(1)
 
     assert re.search(r"^    needs: build-amd64$", job, re.MULTILINE)
     assert "    if: ${{ !cancelled() && needs.build-amd64.result == 'success' }}\n" in job
@@ -291,7 +297,9 @@ def test_smoke_test_still_runs_when_the_changes_job_fails_and_skips_with_the_bui
 
 def test_required_unit_tests_job_always_runs_and_validates_the_badge_for_badge_only_prs():
     text = (REPO_ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")
-    job = re.search(r"(?ms)^  unit-tests:\n(.*?)(?=^  [\w-]+:\n|\Z)", text).group(1)
+    job_match = re.search(r"(?ms)^  unit-tests:\n(.*?)(?=^  [\w-]+:\n|\Z)", text)
+    assert job_match is not None
+    job = job_match.group(1)
 
     # A job skipped by `if` counts as passing for the required check, so it must not be skipped.
     assert "    if: ${{ !cancelled() }}\n" in job
