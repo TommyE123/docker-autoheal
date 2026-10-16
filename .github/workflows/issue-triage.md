@@ -5,6 +5,10 @@ on:
   issues:
     types: [opened, edited, reopened]
   roles: all
+# Never triage issues authored by Renovate (the Dependency Dashboard). Checking
+# the issue author rather than the actor also covers a person ticking a box on
+# the dashboard, which would otherwise start a run.
+if: ${{ github.event.issue.user.login != 'renovate[bot]' }}
 permissions:
   contents: read
   issues: read
