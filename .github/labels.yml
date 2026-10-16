@@ -20,10 +20,8 @@
 # single repository-wide object, so renaming one via label-sync (or deleting
 # one via the repo-wide "delete a label" endpoint) would affect every issue
 # *and every pull request* that happens to carry it - not just the issues
-# this taxonomy is about. Migrating legacy issue labels onto this taxonomy
-# is instead done issue-by-issue in labels-sync.yml's migrate-issue-labels
-# job, which only ever adds/removes labels on individual issues and never
-# touches the shared label object.
+# this taxonomy is about. Moving existing issues onto this taxonomy is
+# done manually.
 
 # --- kind:* --------------------------------------------------------------
 
