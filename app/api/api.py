@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="Docker Auto-Heal Service",
     description="Automated container monitoring and healing service",
-    version="2.2.0",  # x-release-please-version
+    version="2.3.0",  # x-release-please-version
 )
 
 # No CORS middleware: the bundled UI is served by this same app (and the Vite
