@@ -16,12 +16,13 @@ async def enable_maintenance_mode():
     """Enable maintenance mode - stops all auto-healing"""
     try:
         config_manager.enable_maintenance_mode()
+        maintenance_start = config_manager.get_maintenance_start_time()
         logger.info("Maintenance mode enabled")
         return {
             "status": "success",
             "message": "Maintenance mode enabled",
             "maintenance_mode": True,
-            "maintenance_start_time": config_manager.get_maintenance_start_time().isoformat(),
+            "maintenance_start_time": maintenance_start.isoformat() if maintenance_start else None,
         }
     except Exception as e:
         logger.error("Error enabling maintenance mode: %s", e)
