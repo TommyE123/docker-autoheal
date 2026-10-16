@@ -9,3 +9,10 @@ misconfigurations:
     paths:
       - .devcontainer/Dockerfile
     statement: "Devcontainer health check is not required for this development-only image"
+
+vulnerabilities:
+  - id: CVE-2026-59951
+    paths:
+      - ".mise/locks/pypi-semgrep/**/uv.lock"
+    statement: "Dev-only semgrep CLI pins mcp==1.29.0; flaw affects Streamable HTTP servers, which we never run. Remove once semgrep pins mcp>=1.30.0, see issue #596"
+    expired_at: 2026-12-16
