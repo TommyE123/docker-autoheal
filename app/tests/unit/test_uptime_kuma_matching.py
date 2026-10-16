@@ -286,7 +286,9 @@ class TestParsedMonitorsReachTheMatcher:
         )
 
         monitors = client._parse_monitors_from_metrics(metrics)
-        result = match_uptime_kuma_monitors([_container("web", "web")], monitors)
+        result = match_uptime_kuma_monitors(
+            [_container("web", "web")], [_monitor(m["friendly_name"]) for m in monitors]
+        )
 
         assert len(monitors) == 2
         assert result == []
