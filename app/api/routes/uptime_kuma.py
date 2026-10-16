@@ -46,7 +46,10 @@ async def test_uptime_kuma_connection(config_data: dict):
         return {"success": False, "message": f"Connection error: {e!s}"}
 
 
-@router.post("/api/uptime-kuma/enable")
+@router.post(
+    "/api/uptime-kuma/enable",
+    responses={400: {"description": "server_url and api_token are required"}},
+)
 async def enable_uptime_kuma_integration(integration_config: dict):
     """Enable Uptime-Kuma integration and fetch monitors"""
     from app.uptime_kuma.matching import MonitorInfo, match_uptime_kuma_monitors
