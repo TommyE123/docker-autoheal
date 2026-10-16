@@ -217,7 +217,7 @@ class TestDefaultNotificationContract:
         await emit_one_event_of_each_type(engine, docker_client)
         await drain_notification_queue(real_notification_manager)
 
-        assert real_notification_manager._session.calls == []
+        assert fake_session(real_notification_manager).calls == []
 
 
 @pytest.mark.asyncio
@@ -237,7 +237,7 @@ class TestDefaultNotificationPayloads:
 
         titles_by_type = {
             call["json"]["event"]["type"]: call["json"]["title"]
-            for call in real_notification_manager._session.calls
+            for call in fake_session(real_notification_manager).calls
         }
 
         assert titles_by_type["restart"] == "Container Restarted"
@@ -268,8 +268,8 @@ class TestDefaultNotificationPayloads:
         await emit_one_event_of_each_type(engine, docker_client)
         await drain_notification_queue(real_notification_manager)
 
-        assert len(real_notification_manager._session.calls) == 4
-        for call in real_notification_manager._session.calls:
+        assert len(fake_session(real_notification_manager).calls) == 4
+        for call in fake_session(real_notification_manager).calls:
             assert call["url"] == WEBHOOK_URL
             event = call["json"]["event"]
             assert event["container_name"].endswith("-target)")
