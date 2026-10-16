@@ -1,10 +1,14 @@
 ---
 name: Issue Triage
-description: Classifies opened/edited/reopened issues against the repository's kind/*, area/*, status/* label taxonomy using Gemini, and applies only allow-listed labels.
+description: Classifies opened/edited/reopened issues against the repository's kind:*, area:*, status:* label taxonomy using Gemini, and applies only allow-listed labels.
 on:
   issues:
     types: [opened, edited, reopened]
   roles: all
+# Never triage issues authored by Renovate (the Dependency Dashboard). Checking
+# the issue author rather than the actor also covers a person ticking a box on
+# the dashboard, which would otherwise start a run.
+if: ${{ github.event.issue.user.login != 'renovate[bot]' }}
 permissions:
   contents: read
   issues: read
@@ -24,23 +28,33 @@ features:
   # than exempt the compiled output from linting.
   group-concurrency-queue: false
 tools:
+  # Explicit shell allow-list, required by strict mode when min-integrity is
+  # none. The prompt needs the github and safeoutputs CLIs, cat/jq for the
+  # comment body, and read-only file inspection.
+  bash: ["cat", "jq", "ls", "find", "grep", "head", "tail", "wc", "github", "safeoutputs"]
   github:
     toolsets: [issues]
+    # gh-aw applies min-integrity "approved" automatically on a public repo,
+    # and its access guard then filters every issue_read result (the resource
+    # shows as issue:<repo>#unknown), so the agent cannot read the issue it is
+    # triaging. Triage must read untrusted issue text by design; its writes are
+    # limited to the label and comment safe-outputs below.
+    min-integrity: none
 safe-outputs:
   threat-detection: false
   add-labels:
-    allowed: ["kind/*", "area/*", "status/needs-triage", "status/needs-information"]
+    allowed: ["kind:*", "area:*", "status:needs-triage", "status:needs-information"]
     create-if-missing: false
     max: 3
     pull-requests: false
   remove-labels:
-    allowed: ["kind/*", "area/*", "status/needs-triage", "status/needs-information"]
-    # Outcome A must be able to remove every stale kind/*, area/*, and
-    # status/* label in one run, not just the usual one-of-each case. 13 is
-    # the full current taxonomy size (4 kind/* + 7 area/* + 2 status/*, see
+    allowed: ["kind:*", "area:*", "status:needs-triage", "status:needs-information"]
+    # Outcome A must be able to remove every stale kind:*, area:*, and
+    # status:* label in one run, not just the usual one-of-each case. 16 is
+    # the full current taxonomy size (4 kind:* + 10 area:* + 2 status:*, see
     # .github/labels.yml) so this can never silently truncate the removal
     # set - a lower cap here is a real correctness bug, not a safety limit.
-    max: 13
+    max: 16
     pull-requests: false
   add-comment:
     max: 1
@@ -50,7 +64,7 @@ safe-outputs:
 # Issue Triage
 
 Classify issue #${{ github.event.issue.number }} against the label taxonomy in
-`.github/labels.yml`, then bring its `kind/*`, `area/*`, and `status/*` labels
+`.github/labels.yml`, then bring its `kind:*`, `area:*`, and `status:*` labels
 to match exactly one of the three outcomes below. Never modify the issue
 title or body.
 
@@ -72,8 +86,8 @@ you run from the shell:
   comments. Stop when a page contains fewer than 100. If a flag is rejected,
   run `github issue_read --help` and use the flags it lists.
 - **Writes: `safeoutputs`**. Pass one JSON object as a single quoted argument:
-  - `safeoutputs add_labels '{"labels":["kind/bug","area/restart"]}'`
-  - `safeoutputs remove_labels '{"labels":["status/needs-triage"]}'`
+  - `safeoutputs add_labels '{"labels":["kind:bug","area:restart"]}'`
+  - `safeoutputs remove_labels '{"labels":["status:needs-triage"]}'`
   - `safeoutputs noop '{"message":"..."}'`
   - `safeoutputs report_incomplete '{"reason":"..."}'`
 
@@ -96,30 +110,30 @@ Keep the `|`. Without it nothing is sent.
    current labels) with `github issue_read` as described under Tools. If you
    cannot fetch it, call `report_incomplete` with the reason and stop. Never
    call `noop` for this, because it hides the failure.
-2. Read `.github/labels.yml` for the exact allowed `kind/*`, `area/*`, and
-   `status/*` label names. The file is short, so read the whole file. If the
+2. Read `.github/labels.yml` for the exact allowed `kind:*`, `area:*`, and
+   `status:*` label names. The file is short, so read the whole file. If the
    read returns nothing, retry without a line range or run
    `cat .github/labels.yml`.
 3. Decide which of these three outcomes applies. Do not take any label action
    until you have decided, and do not partially apply an outcome.
 
-   **A. Confident classification** — you can determine exactly one `kind/*`
-   and exactly one `area/*` label with reasonable confidence. A title-only
+   **A. Confident classification** — you can determine exactly one `kind:*`
+   and exactly one `area:*` label with reasonable confidence. A title-only
    issue can still be enough on its own (for example "Container does not
    restart after Uptime Kuma reports DOWN" is classifiable even with an
    empty body) — do not require a minimum body length.
-   - Add the new `kind/*` and `area/*` labels.
-   - Then remove every `kind/*`, `area/*`, `status/needs-triage`, and
-     `status/needs-information` label currently on the issue **other than**
-     the two you just added, so the issue ends up with exactly one `kind/*`
-     and exactly one `area/*`, and neither status label.
+   - Add the new `kind:*` and `area:*` labels.
+   - Then remove every `kind:*`, `area:*`, `status:needs-triage`, and
+     `status:needs-information` label currently on the issue **other than**
+     the two you just added, so the issue ends up with exactly one `kind:*`
+     and exactly one `area:*`, and neither status label.
 
    **B. Genuinely insufficient content** — the title and body together give
    you nothing to classify (for example a title of "help" with an empty
    body). This is not a length check: short but specific content is enough,
    as in the restart example above.
-   - Add `status/needs-information` if not already present.
-   - Remove every `kind/*`, `area/*`, and `status/needs-triage` label
+   - Add `status:needs-information` if not already present.
+   - Remove every `kind:*`, `area:*`, and `status:needs-triage` label
      currently on the issue.
    - Decide whether the needs-information marker is already on the issue.
      The marker is three pieces joined with nothing between them and without
@@ -141,15 +155,15 @@ Keep the `|`. Without it nothing is sent.
      duplicate. If a comment with the token already exists, do not add another.
 
    **C. Uncertain, but not insufficient** — there is real content, but you
-   cannot confidently settle on one `kind/*` and one `area/*`.
-   - Add `status/needs-triage` if not already present.
-   - Remove `status/needs-information` if present.
-   - Do not add or remove any `kind/*` or `area/*` label.
+   cannot confidently settle on one `kind:*` and one `area:*`.
+   - Add `status:needs-triage` if not already present.
+   - Remove `status:needs-information` if present.
+   - Do not add or remove any `kind:*` or `area:*` label.
 
 ## Rules
 
 - Only ever request labels from the taxonomy in `.github/labels.yml`:
-  `kind/*`, `area/*`, `status/needs-triage`, or `status/needs-information`.
+  `kind:*`, `area:*`, `status:needs-triage`, or `status:needs-information`.
   Never invent, combine, or modify a label name, and never remove a label
   outside that taxonomy (priority, assignment, milestone, `release:*`, or any
   other human-applied label).
