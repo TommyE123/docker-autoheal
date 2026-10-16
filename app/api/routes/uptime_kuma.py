@@ -52,15 +52,25 @@ async def enable_uptime_kuma_integration(integration_config: dict):
     from app.uptime_kuma.matching import MonitorInfo, match_uptime_kuma_monitors
     from app.uptime_kuma.uptime_kuma_client import UptimeKumaClient
 
+    server_url = integration_config.get("server_url")
+    api_token = integration_config.get("api_token")
+    if not (
+        isinstance(server_url, str)
+        and server_url.strip()
+        and isinstance(api_token, str)
+        and api_token.strip()
+    ):
+        raise HTTPException(status_code=400, detail="server_url and api_token are required")
+
     docker_client = state.docker_client
     monitoring_engine = state.monitoring_engine
     try:
         # Update configuration
         config = config_manager.get_config()
         config.uptime_kuma.enabled = True
-        config.uptime_kuma.server_url = integration_config.get("server_url") or ""
+        config.uptime_kuma.server_url = server_url
         config.uptime_kuma.username = integration_config.get("username", "")
-        config.uptime_kuma.api_token = integration_config.get("api_token") or ""
+        config.uptime_kuma.api_token = api_token
         config.uptime_kuma.auto_restart_on_down = integration_config.get(
             "auto_restart_on_down", True
         )
