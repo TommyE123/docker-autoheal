@@ -77,7 +77,7 @@
 
 - name: status:needs-triage
   color: e16f24
-  description: Awaiting kind:area classification.
+  description: Awaiting kind/area classification.
 
 - name: status:needs-information
   color: bf8700
