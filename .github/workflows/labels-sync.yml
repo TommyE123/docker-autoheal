@@ -23,7 +23,7 @@ jobs:
             .github/labels.yml
           sparse-checkout-cone-mode: false
 
-      # Creates/updates the kind/*, area/*, status/* labels by exact name
+      # Creates/updates the kind:*, area:*, status:* labels by exact name
       # only - labels.yml intentionally has no `aliases`, since renaming an
       # existing label is a repository-wide operation that would also touch
       # any pull request carrying that label. Migrating issues onto this
@@ -40,9 +40,10 @@ jobs:
     needs: sync-labels
     runs-on: ubuntu-latest
     steps:
-      # Migrates each open ISSUE (never a PR) off the retired flat/
-      # colon-namespaced classification labels, then flags anything left
-      # unclassified with status/needs-triage.
+      # Migrates each open ISSUE (never a PR) off the retired flat,
+      # type:/area: and slash-namespaced (kind/, area/, status/)
+      # classification labels, then flags anything left unclassified with
+      # status:needs-triage.
       #
       # A GitHub label is a single object shared by every issue and pull
       # request that carries it - there is no such thing as an issue-scoped
@@ -64,20 +65,34 @@ jobs:
           script: |
             // Old label -> new taxonomy label, for names with a direct
             // equivalent (mirrors the `aliases` labels.yml used before it
-            // was made PR-safe).
+            // was made PR-safe). The slash-prefixed entries are the previous
+            // taxonomy. `area:config` is deliberately absent: it is both a
+            // legacy name and a current taxonomy name, so it needs no move.
             const OLD_TO_NEW = {
-              bug: 'kind/bug',
-              'type:bug': 'kind/bug',
-              enhancement: 'kind/enhancement',
-              'type:enhancement': 'kind/enhancement',
-              'type:story': 'kind/enhancement',
-              documentation: 'kind/documentation',
-              'type:chore': 'kind/chore',
-              'type:task': 'kind/chore',
-              'area:monitoring': 'area/health-check',
-              'area:config': 'area/config',
-              'area:ci': 'area/github-actions',
-              'area:testing': 'area/tests',
+              'kind/bug': 'kind:bug',
+              'kind/enhancement': 'kind:enhancement',
+              'kind/documentation': 'kind:documentation',
+              'kind/chore': 'kind:chore',
+              'area/docker': 'area:docker',
+              'area/restart': 'area:restart',
+              'area/health-check': 'area:health-check',
+              'area/config': 'area:config',
+              'area/logging': 'area:logging',
+              'area/github-actions': 'area:github-actions',
+              'area/tests': 'area:tests',
+              'status/needs-triage': 'status:needs-triage',
+              'status/needs-information': 'status:needs-information',
+              bug: 'kind:bug',
+              'type:bug': 'kind:bug',
+              enhancement: 'kind:enhancement',
+              'type:enhancement': 'kind:enhancement',
+              'type:story': 'kind:enhancement',
+              documentation: 'kind:documentation',
+              'type:chore': 'kind:chore',
+              'type:task': 'kind:chore',
+              'area:monitoring': 'area:health-check',
+              'area:ci': 'area:github-actions',
+              'area:testing': 'area:tests',
             };
 
             // Retired labels with no new-taxonomy equivalent: stripped from
@@ -157,9 +172,9 @@ jobs:
               for (const name of toRemove) finalLabels.delete(name);
               for (const name of toAdd) finalLabels.add(name);
 
-              const hasKind = [...finalLabels].some((name) => name.startsWith('kind/'));
-              const hasArea = [...finalLabels].some((name) => name.startsWith('area/'));
-              const hasStatus = [...finalLabels].some((name) => name.startsWith('status/'));
+              const hasKind = [...finalLabels].some((name) => name.startsWith('kind:'));
+              const hasArea = [...finalLabels].some((name) => name.startsWith('area:'));
+              const hasStatus = [...finalLabels].some((name) => name.startsWith('status:'));
 
               if ((hasKind && hasArea) || hasStatus) continue;
 
@@ -167,7 +182,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issue.number,
-                labels: ['status/needs-triage'],
+                labels: ['status:needs-triage'],
               });
-              core.info(`Issue #${issue.number}: added status/needs-triage`);
+              core.info(`Issue #${issue.number}: added status:needs-triage`);
             }
