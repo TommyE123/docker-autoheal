@@ -28,8 +28,18 @@ features:
   # than exempt the compiled output from linting.
   group-concurrency-queue: false
 tools:
+  # Explicit shell allow-list, required by strict mode when min-integrity is
+  # none. The prompt needs the github and safeoutputs CLIs, cat/jq for the
+  # comment body, and read-only file inspection.
+  bash: ["cat", "jq", "ls", "find", "grep", "head", "tail", "wc", "github", "safeoutputs"]
   github:
     toolsets: [issues]
+    # gh-aw applies min-integrity "approved" automatically on a public repo,
+    # and its access guard then filters every issue_read result (the resource
+    # shows as issue:<repo>#unknown), so the agent cannot read the issue it is
+    # triaging. Triage must read untrusted issue text by design; its writes are
+    # limited to the label and comment safe-outputs below.
+    min-integrity: none
 safe-outputs:
   threat-detection: false
   add-labels:
