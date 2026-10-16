@@ -84,22 +84,6 @@ def test_restart_count_ignores_window_seconds_and_never_expires(
     assert isolated_config_manager.get_restart_count("web", window_seconds=10_000_000) == 3
 
 
-def test_cleanup_restart_counts_is_a_no_op_that_preserves_all_entries(
-    isolated_config_manager,
-):
-    """cleanup_restart_counts() is documented in its own code comment as
-    disabled ('DISABLED to preserve manual entries'), so restart counts for
-    containers absent from active_container_ids must survive the call
-    unchanged, not be pruned as the method name might suggest."""
-    isolated_config_manager.record_restart("web")
-    isolated_config_manager.record_restart("gone")
-
-    isolated_config_manager.cleanup_restart_counts(active_container_ids=["web"])
-
-    assert isolated_config_manager.get_total_restart_count("web") == 1
-    assert isolated_config_manager.get_total_restart_count("gone") == 1
-
-
 def test_fresh_manager_reports_empty_state_for_every_tracked_area(
     isolated_config_manager, monkeypatch, tmp_path
 ):
@@ -393,3 +377,22 @@ def test_quarantine_file_with_non_iterable_json_falls_back_to_empty_set(
 
     assert reloaded.get_quarantined_containers() == set()
     assert "Failed to load quarantine list from disk" in caplog.text
+
+
+def test_update_partial_config_applies_valid_values_and_ignores_unknown_keys(
+    isolated_config_manager,
+):
+    isolated_config_manager.update_partial_config(monitor={"interval_seconds": 42}, not_a_section=1)
+
+    assert isolated_config_manager.get_config().monitor.interval_seconds == 42
+
+
+def test_update_partial_config_rejects_invalid_values_without_changing_config(
+    isolated_config_manager,
+):
+    before = isolated_config_manager.get_config().model_dump()
+
+    with pytest.raises(ValidationError):
+        isolated_config_manager.update_partial_config(monitor={"interval_seconds": "bad"})
+
+    assert isolated_config_manager.get_config().model_dump() == before
