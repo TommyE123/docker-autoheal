@@ -138,6 +138,12 @@ class UptimeKumaMonitor:
                 # On error, resync to next interval
                 next_check = asyncio.get_event_loop().time() + interval
 
+    def _require_client(self) -> UptimeKumaClient:
+        """Return the client, failing loudly if the monitor has not been started."""
+        if self.client is None:
+            raise RuntimeError("Uptime-Kuma client not initialized")
+        return self.client
+
     async def _update_status_cache(self):
         """Update cache of container health statuses from Uptime-Kuma monitors"""
         config = config_manager.get_config()
@@ -150,7 +156,7 @@ class UptimeKumaMonitor:
         try:
             # Fetch /metrics once per refresh and reuse it for every mapped container,
             # instead of re-fetching the full endpoint once per mapping (see #94)
-            monitors = await self.client.get_all_monitors()
+            monitors = await self._require_client().get_all_monitors()
         except Exception as e:
             logger.error("Error fetching Uptime-Kuma monitor statuses: %s", e)
             monitors = None

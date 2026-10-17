@@ -15,6 +15,14 @@ from docker.models.containers import Container
 logger = logging.getLogger(__name__)
 
 
+def _require_container_id(container: Container) -> str:
+    """Return the container's ID; the SDK types it optional but the daemon always sets it."""
+    container_id = container.id
+    if container_id is None:
+        raise ValueError("container has no id")
+    return container_id
+
+
 def recovery_identifier[S](stable_id: S, labels: dict) -> S | str:
     """
     Key for one running container's recovery state, derived from its labels.
@@ -189,15 +197,20 @@ class DockerClientWrapper:
                     stable_id = container.name
 
             # Get image info for tracking
-            image_name = container.image.tags[0] if container.image.tags else container.image.id
+            image = container.image
+            if image is None:
+                raise ValueError("container has no image")
+            image_name = image.tags[0] if image.tags else image.id
             image_id = attrs.get("Image", "")
+
+            container_id = _require_container_id(container)
 
             # Get network info for uniqueness
             networks = list(attrs.get("NetworkSettings", {}).get("Networks", {}).keys())
 
             return {
-                "id": container.id[:12],  # Short ID
-                "full_id": container.id,
+                "id": container_id[:12],  # Short ID
+                "full_id": container_id,
                 "name": container.name,
                 "stable_id": stable_id,  # NEW: Stable identifier for tracking
                 # Per-replica key for restart counts and quarantine
@@ -246,7 +259,11 @@ class DockerClientWrapper:
             True if restart successful, False otherwise
         """
         try:
-            logger.info("Restarting container %s (%s)", container.name, container.id[:12])
+            logger.info(
+                "Restarting container %s (%s)",
+                container.name,
+                _require_container_id(container)[:12],
+            )
             container.restart(timeout=timeout)
             return True
         except Exception as e:
@@ -263,7 +280,9 @@ class DockerClientWrapper:
             True if stop successful, False otherwise
         """
         try:
-            logger.info("Stopping container %s (%s)", container.name, container.id[:12])
+            logger.info(
+                "Stopping container %s (%s)", container.name, _require_container_id(container)[:12]
+            )
             container.stop(timeout=timeout)
             return True
         except Exception as e:
@@ -281,7 +300,12 @@ class DockerClientWrapper:
         """
         try:
             exec_result = container.exec_run(command)
-            return exec_result.exit_code, exec_result.output.decode("utf-8")
+            # Without stream/socket/demux, the SDK returns an int exit code and bytes.
+            exit_code = exec_result.exit_code
+            output = exec_result.output
+            if exit_code is None or not isinstance(output, bytes):
+                raise TypeError("unexpected exec_run result")
+            return exit_code, output.decode("utf-8")
         except Exception as e:
             logger.error("Failed to execute command in container %s: %s", container.name, e)
             return -1, str(e)
