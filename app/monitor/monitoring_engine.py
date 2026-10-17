@@ -560,10 +560,11 @@ class MonitoringEngine:
                 )
                 return status == "healthy" if status else True  # Assume healthy if no check
             logger.warning("Unknown health check type: %s", check_type)
-            return True
         except Exception as e:
             logger.error("Error performing health check: %s", e)
             return False
+        else:
+            return True
 
     async def _auto_unquarantine_container(
         self,

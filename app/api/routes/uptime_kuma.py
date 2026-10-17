@@ -37,13 +37,14 @@ async def test_uptime_kuma_connection(config_data: dict):
                 "message": "Connection successful",
                 "monitor_count": len(monitors),
             }
+    except Exception as e:
+        logger.error("Uptime-Kuma connection test failed: %s", e)
+        return {"success": False, "message": f"Connection error: {e!s}"}
+    else:
         return {
             "success": False,
             "message": "Connection failed - check URL and credentials",
         }
-    except Exception as e:
-        logger.error("Uptime-Kuma connection test failed: %s", e)
-        return {"success": False, "message": f"Connection error: {e!s}"}
 
 
 @router.post(
@@ -161,10 +162,11 @@ async def get_uptime_kuma_monitors():
             config.uptime_kuma.username,  # username (optional, empty for API key)
         )
         monitors = await client.get_all_monitors() or []
-        return {"monitors": monitors}
     except Exception as e:
         logger.error("Failed to fetch Uptime-Kuma monitors: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+    else:
+        return {"monitors": monitors}
 
 
 @router.get("/api/uptime-kuma/mappings")
@@ -229,11 +231,11 @@ async def delete_uptime_kuma_mapping(container_id: str):
         config_manager.update_config(config)
 
         logger.info("Deleted Uptime-Kuma mapping for stable_id: %s", container_id)
-
-        return {"success": True}
     except Exception as e:
         logger.error("Failed to delete Uptime-Kuma mapping: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+    else:
+        return {"success": True}
 
 
 @router.post("/api/uptime-kuma/disable")
@@ -250,8 +252,8 @@ async def disable_uptime_kuma_integration():
             await monitoring_engine.uptime_kuma_monitor.stop()
 
         logger.info("Uptime-Kuma integration disabled")
-
-        return {"success": True}
     except Exception as e:
         logger.error("Failed to disable Uptime-Kuma: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+    else:
+        return {"success": True}

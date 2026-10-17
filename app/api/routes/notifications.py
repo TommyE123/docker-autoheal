@@ -145,16 +145,16 @@ async def delete_notification_service(service_name: str):
             raise HTTPException(status_code=404, detail=f"Service '{service_name}' not found")
 
         config_manager.update_config(config)
-
-        return {
-            "status": "success",
-            "message": f"Notification service '{service_name}' deleted",
-        }
     except HTTPException:
         raise
     except Exception as e:
         logger.error("Error deleting notification service: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+    else:
+        return {
+            "status": "success",
+            "message": f"Notification service '{service_name}' deleted",
+        }
 
 
 @router.post("/api/notifications/test/{service_name}")
