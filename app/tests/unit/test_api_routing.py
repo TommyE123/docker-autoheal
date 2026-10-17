@@ -17,7 +17,7 @@ reached here touches Docker.
 """
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from fastapi.routing import APIRoute
@@ -34,6 +34,9 @@ from app.api.routes import (
     ui,
     uptime_kuma,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import MutableMapping
 
 CATCH_ALL_PATH = "/{full_path:path}"
 
@@ -113,7 +116,7 @@ async def _request(
     headers: dict[str, str] = {}
     body = b""
 
-    async def send(message: dict[str, Any]) -> None:
+    async def send(message: MutableMapping[str, Any]) -> None:
         nonlocal status, headers, body
         if message["type"] == "http.response.start":
             status = message["status"]

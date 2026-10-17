@@ -22,6 +22,7 @@ from app.main import (
     get_ui_url,
     signal_handler,
 )
+from app.notifications.notification_manager import NotificationManager
 
 
 class TestCancelledErrorFilter:
@@ -494,12 +495,14 @@ class TestAutoHealServiceStartFailure:
             mock_cm.get_config.return_value = self._make_config()
 
             service = AutoHealService()
-            service.notification_manager = None
+            # The service never holds None here; the double must satisfy stop().
+            service.notification_manager = MagicMock(spec_set=NotificationManager, stop=AsyncMock())
 
             with pytest.raises(RuntimeError, match="engine broke"):
                 await service.start()
 
             mock_docker_cls.return_value.close.assert_called_once()
+            service.notification_manager.stop.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_config_load_failure_reraises_before_any_component_created(self):
