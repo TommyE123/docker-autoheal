@@ -538,8 +538,10 @@ class MonitoringEngine:
                 # value fails here and is reported as unhealthy by the handler below.
                 endpoint = health_check.http_endpoint
                 expected_status = health_check.http_expected_status
-                if endpoint is None or expected_status is None:
-                    raise ValueError("missing http_endpoint and http_expected_status")
+                if endpoint is None:
+                    raise ValueError("missing http_endpoint")
+                if expected_status is None:
+                    raise ValueError("missing http_expected_status")
                 return await asyncio.to_thread(
                     self.docker_client.check_http_health,
                     container,

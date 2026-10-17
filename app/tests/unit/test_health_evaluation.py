@@ -241,6 +241,7 @@ class TestCustomHealthChecks:
         ("check_type", "fields"),
         [
             ("http", {}),
+            ("http", {"http_expected_status": 200}),
             ("http", {"http_endpoint": "http://localhost/", "http_expected_status": None}),
             ("tcp", {}),
             ("exec", {}),
