@@ -5,6 +5,7 @@ removed from quarantine with an event logged.
 """
 
 from datetime import UTC, datetime
+from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -21,7 +22,7 @@ class TestAutoUnquarantine:
         from app.config.config_manager import ConfigManager
 
         # Create temp directory for test data
-        temp_dir = tempfile.mkdtemp()
+        temp_dir = Path(tempfile.mkdtemp())
 
         try:
             # Patch the data directory
