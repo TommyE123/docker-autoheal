@@ -237,6 +237,31 @@ class TestCustomHealthChecks:
         assert needs_restart is True
         assert reason == "Custom health check failed (http)"
 
+    @pytest.mark.parametrize(
+        ("check_type", "fields"),
+        [
+            ("http", {}),
+            ("http", {"http_endpoint": "http://localhost/", "http_expected_status": None}),
+            ("tcp", {}),
+            ("exec", {}),
+        ],
+    )
+    async def test_missing_required_field_is_reported_as_unhealthy(
+        self, engine, docker_client, check_type, fields
+    ):
+        """A check without the field its type needs fails closed, never reaching Docker."""
+        container, info = make_container(name="web")
+        docker_client.add_container(container, info)
+        docker_client.health_results["web"] = True
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="web", check_type=check_type, **fields)
+        )
+
+        needs_restart, reason = await engine._evaluate_container_health(container, info)
+
+        assert needs_restart is True
+        assert reason == f"Custom health check failed ({check_type})"
+
 
 @pytest.mark.asyncio
 class TestUptimeKumaEvaluation:

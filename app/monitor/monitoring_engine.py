@@ -534,25 +534,37 @@ class MonitoringEngine:
 
         try:
             if check_type == "http":
+                # HealthCheckConfig does not require these for http checks; a missing
+                # value fails here and is reported as unhealthy by the handler below.
+                endpoint = health_check.http_endpoint
+                expected_status = health_check.http_expected_status
+                if endpoint is None or expected_status is None:
+                    raise ValueError("missing http_endpoint and http_expected_status")
                 return await asyncio.to_thread(
                     self.docker_client.check_http_health,
                     container,
-                    health_check.http_endpoint,
-                    health_check.http_expected_status,
+                    endpoint,
+                    expected_status,
                     health_check.timeout_seconds,
                 )
             if check_type == "tcp":
+                port = health_check.tcp_port
+                if port is None:
+                    raise ValueError("missing tcp_port")
                 return await asyncio.to_thread(
                     self.docker_client.check_tcp_health,
                     container,
-                    health_check.tcp_port,
+                    port,
                     health_check.timeout_seconds,
                 )
             if check_type == "exec":
+                command = health_check.exec_command
+                if command is None:
+                    raise ValueError("missing exec_command")
                 return await asyncio.to_thread(
                     self.docker_client.check_exec_health,
                     container,
-                    health_check.exec_command,
+                    command,
                 )
             if check_type == "docker":
                 status = await asyncio.to_thread(
