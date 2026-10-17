@@ -23,8 +23,8 @@ async def test_uptime_kuma_connection(config_data: dict):
 
     try:
         client = UptimeKumaClient(
-            config_data.get("server_url"),
-            config_data.get("api_token"),  # password (API key or user password)
+            config_data.get("server_url") or "",
+            config_data.get("api_token") or "",  # password (API key or user password)
             config_data.get("username", ""),  # username (optional, empty for API key)
         )
         success = await client.connect()
@@ -46,11 +46,24 @@ async def test_uptime_kuma_connection(config_data: dict):
         return {"success": False, "message": f"Connection error: {e!s}"}
 
 
-@router.post("/api/uptime-kuma/enable")
+@router.post(
+    "/api/uptime-kuma/enable",
+    responses={400: {"description": "server_url and api_token are required"}},
+)
 async def enable_uptime_kuma_integration(integration_config: dict):
     """Enable Uptime-Kuma integration and fetch monitors"""
-    from app.uptime_kuma.matching import match_uptime_kuma_monitors
+    from app.uptime_kuma.matching import MonitorInfo, match_uptime_kuma_monitors
     from app.uptime_kuma.uptime_kuma_client import UptimeKumaClient
+
+    server_url = integration_config.get("server_url")
+    api_token = integration_config.get("api_token")
+    if not (
+        isinstance(server_url, str)
+        and server_url.strip()
+        and isinstance(api_token, str)
+        and api_token.strip()
+    ):
+        raise HTTPException(status_code=400, detail="server_url and api_token are required")
 
     docker_client = state.docker_client
     monitoring_engine = state.monitoring_engine
@@ -58,9 +71,9 @@ async def enable_uptime_kuma_integration(integration_config: dict):
         # Update configuration
         config = config_manager.get_config()
         config.uptime_kuma.enabled = True
-        config.uptime_kuma.server_url = integration_config.get("server_url")
+        config.uptime_kuma.server_url = server_url
         config.uptime_kuma.username = integration_config.get("username", "")
-        config.uptime_kuma.api_token = integration_config.get("api_token")
+        config.uptime_kuma.api_token = api_token
         config.uptime_kuma.auto_restart_on_down = integration_config.get(
             "auto_restart_on_down", True
         )
@@ -84,7 +97,9 @@ async def enable_uptime_kuma_integration(integration_config: dict):
                 continue
             container_infos.append(info)
 
-        matches = match_uptime_kuma_monitors(container_infos, monitors)
+        # The matcher only needs each monitor's friendly name.
+        monitor_infos: list[MonitorInfo] = [{"friendly_name": m["friendly_name"]} for m in monitors]
+        matches = match_uptime_kuma_monitors(container_infos, monitor_infos)
         auto_mappings = [
             UptimeKumaMapping(
                 container_id=match["container_id"],
