@@ -103,7 +103,6 @@ async def update_notification_service(service_name: str, service: dict):
 
         # Find and update service
         updated_service = None
-        found = False
         for i, existing in enumerate(config.notifications.services):
             if existing.name == service_name:
                 # Preserve name if not provided
@@ -111,10 +110,9 @@ async def update_notification_service(service_name: str, service: dict):
                     service["name"] = service_name
                 updated_service = NotificationService(**service)
                 config.notifications.services[i] = updated_service
-                found = True
                 break
 
-        if not found:
+        if updated_service is None:
             raise HTTPException(status_code=404, detail=f"Service '{service_name}' not found")
 
         config_manager.update_config(config)
