@@ -307,6 +307,17 @@ _CONFIG_SECTION_MODELS: dict[str, type] = {
 }
 
 
+def _merge_dicts(current: Any, update: Any) -> Any:
+    """Recursively merge ``update`` into ``current`` when both are dicts.
+
+    Omitted keys keep their current values at every level. Any other
+    ``update`` value replaces ``current`` outright.
+    """
+    if not (isinstance(current, dict) and isinstance(update, dict)):
+        return update
+    return {**current, **{k: _merge_dicts(current.get(k), v) for k, v in update.items()}}
+
+
 def _atomic_write_json(path: Path, data: Any, **dump_kwargs: Any) -> None:
     """Write ``data`` as JSON to ``path`` without ever exposing a partial file.
 
@@ -632,8 +643,8 @@ class ConfigManager:
         """Update specific top-level configuration fields.
 
         Unknown keys are ignored. A dict value is merged into the existing
-        section, so omitted fields keep their current values; any other value
-        replaces the section. The merged result is validated before it
+        section recursively, so omitted fields keep their current values at every
+        level; any other value replaces the section. The merged result is validated before it
         replaces the current config, so an invalid value raises
         ``ValidationError`` and leaves the config and file untouched.
         """
@@ -642,10 +653,7 @@ class ConfigManager:
             for key, value in kwargs.items():
                 if key not in config_dict:
                     continue
-                if isinstance(value, dict) and isinstance(config_dict[key], dict):
-                    config_dict[key] = {**config_dict[key], **value}
-                else:
-                    config_dict[key] = value
+                config_dict[key] = _merge_dicts(config_dict[key], value)
             self._config = AutoHealConfig.model_validate(config_dict)
             self._save_config()
 

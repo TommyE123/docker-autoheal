@@ -399,6 +399,16 @@ def test_update_partial_config_keeps_omitted_fields_of_a_partial_section(
     assert monitor.label_key == "custom.label"
 
 
+def test_update_partial_config_keeps_omitted_fields_of_nested_sections(isolated_config_manager):
+    isolated_config_manager.update_partial_config(restart={"backoff": {"initial_seconds": 20}})
+
+    isolated_config_manager.update_partial_config(restart={"backoff": {"multiplier": 3.0}})
+
+    backoff = isolated_config_manager.get_config().restart.backoff
+    assert backoff.initial_seconds == 20
+    assert backoff.multiplier == 3.0
+
+
 def test_update_partial_config_replaces_a_section_given_a_model(isolated_config_manager):
     isolated_config_manager.update_partial_config(monitor={"label_key": "custom.label"})
 
