@@ -24,8 +24,24 @@ class TestMaintenanceMode:
         result = await enable_maintenance_mode()
 
         assert result["maintenance_mode"] is True
-        assert result["maintenance_start_time"] is not None
+        start_time = config_manager.get_maintenance_start_time()
+        assert start_time is not None
+        assert result["maintenance_start_time"] == start_time.isoformat()
         assert config_manager.is_maintenance_mode() is True
+
+    async def test_enable_reports_null_start_time_when_unavailable(self, monkeypatch):
+        monkeypatch.setattr(config_manager, "get_maintenance_start_time", lambda: None)
+
+        result = await enable_maintenance_mode()
+
+        assert result["maintenance_mode"] is True
+        assert result["maintenance_start_time"] is None
+
+    async def test_status_reports_null_start_time_when_not_in_maintenance(self):
+        status = await get_maintenance_status()
+
+        assert status["maintenance_mode"] is False
+        assert status["maintenance_start_time"] is None
 
     async def test_disable_clears_maintenance_mode(self):
         config_manager.enable_maintenance_mode()
