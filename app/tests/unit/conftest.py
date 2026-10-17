@@ -256,7 +256,7 @@ class FakeDockerClient:
             raise self.health_check_error
         return self.native_health.get(container.name)
 
-    def get_events(self, decode=True, filters=None):
+    def get_events(self, decode: bool = True, filters: Any = None) -> Any:
         if callable(self.events):
             return self.events()
         return self.events
