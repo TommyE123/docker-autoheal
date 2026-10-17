@@ -386,6 +386,12 @@ class TestContainerActions:
 
         assert wrapper.restart_container(container) is False
 
+    def test_stop_returns_true_on_success(self, wrapper):
+        container = make_sdk_container()
+
+        assert wrapper.stop_container(container) is True
+        container.stop.assert_called_once_with(timeout=10)
+
     def test_stop_returns_false_on_api_error(self, wrapper):
         container = make_sdk_container()
         container.stop.side_effect = docker.errors.APIError("boom")
@@ -639,6 +645,40 @@ class TestTcpHealth:
             assert wrapper.check_tcp_health(container, port=8080) is False
 
         mock_socket_cls.assert_not_called()
+
+
+class TestHttpHealth:
+    """``check_http_health`` - ``requests.get`` is mocked, no real network access."""
+
+    def test_http_health_check_compares_status_against_the_expected_status(self, wrapper):
+        container = make_sdk_container()
+
+        with patch("app.docker_client.docker_client_wrapper.requests.get") as mock_get:
+            mock_get.return_value = MagicMock(status_code=200)
+            assert wrapper.check_http_health(container, "http://localhost:3131/health") is True
+
+            mock_get.return_value = MagicMock(status_code=503)
+            assert wrapper.check_http_health(container, "http://localhost:3131/health") is False
+
+            mock_get.return_value = MagicMock(status_code=204)
+            assert (
+                wrapper.check_http_health(
+                    container, "http://localhost:3131/health", expected_status=204
+                )
+                is True
+            )
+
+        # localhost is rewritten to the container's IP before the request is made.
+        mock_get.assert_called_with("http://172.17.0.2:3131/health", timeout=5)
+
+    def test_http_health_check_fails_when_the_request_raises(self, wrapper):
+        container = make_sdk_container()
+
+        with patch(
+            "app.docker_client.docker_client_wrapper.requests.get",
+            side_effect=ConnectionError("refused"),
+        ):
+            assert wrapper.check_http_health(container, "http://localhost:3131/health") is False
 
 
 class TestEvents:

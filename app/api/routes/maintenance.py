@@ -35,14 +35,15 @@ async def disable_maintenance_mode():
     try:
         config_manager.disable_maintenance_mode()
         logger.info("Maintenance mode disabled")
+    except Exception as e:
+        logger.error("Error disabling maintenance mode: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+    else:
         return {
             "status": "success",
             "message": "Maintenance mode disabled",
             "maintenance_mode": False,
         }
-    except Exception as e:
-        logger.error("Error disabling maintenance mode: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/api/maintenance/status")

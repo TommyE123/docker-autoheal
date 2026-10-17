@@ -167,7 +167,12 @@ async def get_container_details(container_id: str):
 
         # Override restart_count in info with locally tracked count
         info["restart_count"] = total_restart_count
-
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error getting container details: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+    else:
         return {
             **info,
             "monitored": monitored,
@@ -176,11 +181,6 @@ async def get_container_details(container_id: str):
             "total_restart_count": total_restart_count,
             "custom_health_check": custom_hc,
         }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Error getting container details: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 def _stable_id_from_info(info: dict | None) -> str | None:
@@ -393,13 +393,13 @@ async def unquarantine_container(container_id: str):
 
         # Send notification for quarantine event
         await state.notification_manager.send_event_notification(event)
-
-        return {
-            "status": "success",
-            "message": f"Container {container_name} removed from quarantine",
-        }
     except HTTPException:
         raise
     except Exception as e:
         logger.error("Error unquarantining container: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+    else:
+        return {
+            "status": "success",
+            "message": f"Container {container_name} removed from quarantine",
+        }

@@ -59,7 +59,8 @@ async def clear_events():
     """Clear all events from the log"""
     try:
         config_manager.clear_events()
-        return {"status": "success", "message": "All events cleared"}
     except Exception as e:
         logger.error("Error clearing events: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+    else:
+        return {"status": "success", "message": "All events cleared"}

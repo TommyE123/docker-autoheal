@@ -115,10 +115,11 @@ class DockerClientWrapper:
             self._close_client(self._client)
         try:
             self._connect()
-            return True
         except Exception as e:
             logger.error("Reconnection failed: %s", e)
             return False
+        else:
+            return True
 
     def is_connected(self) -> bool:
         """Check if connected to Docker daemon"""
@@ -265,10 +266,11 @@ class DockerClientWrapper:
                 _require_container_id(container)[:12],
             )
             container.restart(timeout=timeout)
-            return True
         except Exception as e:
             logger.error("Failed to restart container %s: %s", container.name, e)
             return False
+        else:
+            return True
 
     def stop_container(self, container: Container, timeout: int = 10) -> bool:
         """
@@ -284,10 +286,11 @@ class DockerClientWrapper:
                 "Stopping container %s (%s)", container.name, _require_container_id(container)[:12]
             )
             container.stop(timeout=timeout)
-            return True
         except Exception as e:
             logger.error("Failed to stop container %s: %s", container.name, e)
             return False
+        else:
+            return True
 
     def execute_command(self, container: Container, command: list[str]) -> tuple[int, str]:
         """
@@ -347,10 +350,11 @@ class DockerClientWrapper:
             endpoint = endpoint.replace("localhost", ip_address).replace("127.0.0.1", ip_address)
 
             response = requests.get(endpoint, timeout=timeout)
-            return response.status_code == expected_status
         except Exception as e:
             logger.warning("HTTP health check failed for %s: %s", container.name, e)
             return False
+        else:
+            return response.status_code == expected_status
 
     def get_events(self, decode=True, filters=None):
         """
@@ -394,11 +398,11 @@ class DockerClientWrapper:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                 sock.settimeout(timeout)
                 result = sock.connect_ex((ip_address, port))
-
-            return result == 0
         except Exception as e:
             logger.warning("TCP health check failed for %s: %s", container.name, e)
             return False
+        else:
+            return result == 0
 
     def check_exec_health(self, container: Container, command: list[str]) -> bool:
         """
@@ -426,9 +430,10 @@ class DockerClientWrapper:
             health = info.get("health")
             if health:
                 return health.get("status")
-            return None
         except Exception as e:
             logger.error("Failed to get native health for %s: %s", container.name, e)
+            return None
+        else:
             return None
 
     def close(self) -> None:
