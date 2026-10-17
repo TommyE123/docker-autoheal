@@ -35,6 +35,9 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "lcov"],
       reportsDirectory: "./coverage",
+      // Vitest 4+ only reports files loaded during tests; list the source
+      // globs so untested files still show as uncovered, as before the upgrade.
+      include: ["src/**/*.{js,jsx}"],
       // globalSetup runs in the main process before worker pools start, so
       // v8 coverage instrumentation never sees it execute; excluding it
       // keeps coverage % from being diluted by a file that can never show
