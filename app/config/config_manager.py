@@ -307,6 +307,17 @@ _CONFIG_SECTION_MODELS: dict[str, type] = {
 }
 
 
+def _merge_dicts(current: Any, update: Any) -> Any:
+    """Recursively merge ``update`` into ``current`` when both are dicts.
+
+    Omitted keys keep their current values at every level. Any other
+    ``update`` value replaces ``current`` outright.
+    """
+    if not (isinstance(current, dict) and isinstance(update, dict)):
+        return update
+    return {**current, **{k: _merge_dicts(current.get(k), v) for k, v in update.items()}}
+
+
 def _atomic_write_json(path: Path, data: Any, **dump_kwargs: Any) -> None:
     """Write ``data`` as JSON to ``path`` without ever exposing a partial file.
 
@@ -392,7 +403,10 @@ class ConfigManager:
         # Load persisted data or initialize with defaults
         self._config = self._load_config()
         self._event_log: list[StoredAutoHealEvent] = self._load_events()
-        self._custom_health_checks: dict[str, HealthCheckConfig] = self._load_custom_health_checks()
+        # Populated by _load_config() from the custom_health_checks section.
+        self._custom_health_checks: dict[str, HealthCheckConfig] = getattr(
+            self, "_custom_health_checks", {}
+        )
         # _container_restart_counts removed - now stored in self._config.containers.restart_counts
         self._quarantined_containers: set = self._load_quarantine()
         self._maintenance_mode: bool = False
@@ -558,10 +572,6 @@ class ConfigManager:
         except Exception as e:
             logger.error("Failed to save events to disk: %s", e)
 
-    def _load_custom_health_checks(self) -> dict[str, HealthCheckConfig]:
-        """Load custom health checks (already loaded in _load_config)"""
-        return getattr(self, "_custom_health_checks", {})
-
     # Restart counts are now stored in config.json, no separate file needed
 
     def _load_quarantine(self) -> set:
@@ -630,12 +640,21 @@ class ConfigManager:
             self._save_config()
 
     def update_partial_config(self, **kwargs) -> None:
-        """Update specific configuration fields"""
+        """Update specific top-level configuration fields.
+
+        Unknown keys are ignored. A dict value is merged into the existing
+        section recursively, so omitted fields keep their current values at every
+        level; any other value replaces the section. The merged result is validated before it
+        replaces the current config, so an invalid value raises
+        ``ValidationError`` and leaves the config and file untouched.
+        """
         with self._lock:
             config_dict = self._config.model_dump()
             for key, value in kwargs.items():
-                if key in config_dict:
-                    setattr(self._config, key, value)
+                if key not in config_dict:
+                    continue
+                config_dict[key] = _merge_dicts(config_dict[key], value)
+            self._config = AutoHealConfig.model_validate(config_dict)
             self._save_config()
 
     def export_config(self) -> str:
@@ -731,12 +750,6 @@ class ConfigManager:
         """Get total restart count (all time) - from config.json"""
         with self._lock:
             return self._config.containers.restart_counts.get(container_id, 0)
-
-    def cleanup_restart_counts(self, active_container_ids: list[str]) -> None:
-        """Remove restart counts for containers that no longer exist (DISABLED to preserve manual entries)"""
-        # DISABLED: Auto-cleanup was removing manual entries because stable_id matching is complex
-        # Users can manually edit config.json to remove old entries if needed
-        pass
 
     def quarantine_container(self, container_id: str) -> None:
         """Mark container as quarantined"""
