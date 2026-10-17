@@ -7,6 +7,7 @@ import asyncio
 import fnmatch
 import logging
 from datetime import UTC, datetime, timedelta
+from typing import Any, Protocol
 
 from docker.models.containers import Container
 
@@ -16,14 +17,50 @@ from app.config.config_manager import (
     HealthCheckConfig,
     config_manager,
 )
-from app.docker_client.docker_client_wrapper import (
-    DockerClientWrapper,
-    recovery_identifier,
-)
+from app.docker_client.docker_client_wrapper import recovery_identifier
 from app.monitor.uptime_kuma_monitor import UptimeKumaMonitor
 from app.notifications.notification_manager import notification_manager
 
 logger = logging.getLogger(__name__)
+
+
+class DockerClient(Protocol):
+    """
+    The subset of ``DockerClientWrapper`` the monitoring engine calls.
+
+    Defaults are ``...`` because the real defaults live on the wrapper.
+
+    Declared at the injection boundary so test doubles can satisfy the engine
+    without inheriting the real wrapper (whose constructor connects to Docker).
+    """
+
+    def is_connected(self) -> bool: ...
+
+    def reconnect(self) -> bool: ...
+
+    def list_containers(self, all_containers: bool = ...) -> list[Container]: ...
+
+    def get_container(self, container_id: str) -> Container | None: ...
+
+    def get_container_info(self, container: Container, refresh: bool = ...) -> dict[str, Any]: ...
+
+    def restart_container(self, container: Container, timeout: int = ...) -> bool: ...
+
+    def check_http_health(
+        self,
+        container: Container,
+        endpoint: str,
+        expected_status: int = ...,
+        timeout: int = ...,
+    ) -> bool: ...
+
+    def check_tcp_health(self, container: Container, port: int, timeout: int = ...) -> bool: ...
+
+    def check_exec_health(self, container: Container, command: list[str]) -> bool: ...
+
+    def get_docker_native_health(self, container: Container) -> str | None: ...
+
+    def get_events(self, decode: bool = ..., filters: Any = ...) -> Any: ...
 
 
 class MonitoringEngine:
@@ -31,7 +68,7 @@ class MonitoringEngine:
     Core monitoring engine that checks container health and performs restarts
     """
 
-    def __init__(self, docker_client: DockerClientWrapper):
+    def __init__(self, docker_client: DockerClient):
         """
         Initialize monitoring engine
         Args:

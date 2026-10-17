@@ -74,6 +74,8 @@ def disposable_container(real_docker_client):
 
     Usage: ``container = disposable_container(image="nginx:alpine", labels={...})``
     """
+    # real_docker_client skips when the SDK is missing, so it is importable here.
+    assert docker is not None
     client = docker.DockerClient(base_url="unix://var/run/docker.sock")
     created = []
 
