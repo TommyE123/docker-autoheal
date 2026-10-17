@@ -209,51 +209,54 @@ class FakeDockerClient:
             self.connected = True
         return self.reconnect_succeeds
 
-    def list_containers(self, all_containers: bool = False) -> list:
+    def list_containers(self, all_containers: bool = False) -> list[Any]:
         if self.list_containers_error is not None:
             raise self.list_containers_error
         if all_containers:
             return list(self._containers)
         return [c for c in self._containers if c.status == "running"]
 
-    def get_container(self, container_id: str):
+    def get_container(self, container_id: str) -> Any:
+        # Returns FakeContainer, which stands in for docker's Container.
         for container in self._containers:
             if container.id == container_id or container.name == container_id:
                 return container
         return None
 
-    def get_container_info(self, container: FakeContainer, refresh: bool = True) -> dict:
+    def get_container_info(self, container: Any, refresh: bool = True) -> dict:
         if container.id in self.info_errors:
             raise self.info_errors[container.id]
         # Mirrors the wrapper's behaviour of returning {} when inspection fails
         # (which is what happens when a container disappears).
         return deepcopy(self._info.get(container.id, {}))
 
-    def restart_container(self, container: FakeContainer, timeout: int = 10) -> bool:
+    def restart_container(self, container: Any, timeout: int = 10) -> bool:
         self.restart_calls.append(container.name)
         return self.restart_results.get(container.name, True)
 
-    def check_http_health(self, container, endpoint, expected_status=200, timeout=5) -> bool:
+    def check_http_health(
+        self, container: Any, endpoint: str, expected_status: int = 200, timeout: int = 5
+    ) -> bool:
         if self.health_check_error is not None:
             raise self.health_check_error
         return self.health_results.get(container.name, True)
 
-    def check_tcp_health(self, container, port, timeout=5) -> bool:
+    def check_tcp_health(self, container: Any, port: int, timeout: int = 5) -> bool:
         if self.health_check_error is not None:
             raise self.health_check_error
         return self.health_results.get(container.name, True)
 
-    def check_exec_health(self, container, command) -> bool:
+    def check_exec_health(self, container: Any, command: list[str]) -> bool:
         if self.health_check_error is not None:
             raise self.health_check_error
         return self.health_results.get(container.name, True)
 
-    def get_docker_native_health(self, container) -> str | None:
+    def get_docker_native_health(self, container: Any) -> str | None:
         if self.health_check_error is not None:
             raise self.health_check_error
         return self.native_health.get(container.name)
 
-    def get_events(self, decode=True, filters=None):
+    def get_events(self, decode: bool = True, filters: Any = None) -> Any:
         if callable(self.events):
             return self.events()
         return self.events
