@@ -26,7 +26,7 @@ from app.api.routes.containers import (
     unquarantine_container,
     update_container_selection,
 )
-from app.config.config_manager import UptimeKumaMapping, config_manager
+from app.config.config_manager import AutoHealEvent, UptimeKumaMapping, config_manager
 from app.tests.unit.conftest import make_container
 
 
@@ -492,6 +492,8 @@ class TestUnquarantineContainer:
         events = config_manager.get_events()
         event = events[-1]
         assert event.event_type == "unquarantine"
+        # Current events carry a UTC-aware datetime; LegacyAutoHealEvent keeps str.
+        assert isinstance(event, AutoHealEvent)
         assert event.timestamp.tzinfo is not None
         assert event.timestamp.utcoffset() == timedelta(0)
 
