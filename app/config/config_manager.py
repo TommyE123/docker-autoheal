@@ -631,13 +631,21 @@ class ConfigManager:
     def update_partial_config(self, **kwargs) -> None:
         """Update specific top-level configuration fields.
 
-        Unknown keys are ignored. The merged result is validated before it
+        Unknown keys are ignored. A dict value is merged into the existing
+        section, so omitted fields keep their current values; any other value
+        replaces the section. The merged result is validated before it
         replaces the current config, so an invalid value raises
         ``ValidationError`` and leaves the config and file untouched.
         """
         with self._lock:
             config_dict = self._config.model_dump()
-            config_dict.update({k: v for k, v in kwargs.items() if k in config_dict})
+            for key, value in kwargs.items():
+                if key not in config_dict:
+                    continue
+                if isinstance(value, dict) and isinstance(config_dict[key], dict):
+                    config_dict[key] = {**config_dict[key], **value}
+                else:
+                    config_dict[key] = value
             self._config = AutoHealConfig.model_validate(config_dict)
             self._save_config()
 

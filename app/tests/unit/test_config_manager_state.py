@@ -387,6 +387,17 @@ def test_update_partial_config_applies_valid_values_and_ignores_unknown_keys(
     assert isolated_config_manager.get_config().monitor.interval_seconds == 42
 
 
+def test_update_partial_config_keeps_omitted_fields_of_a_partial_section(
+    isolated_config_manager,
+):
+    isolated_config_manager.update_partial_config(monitor={"label_key": "custom.label"})
+    isolated_config_manager.update_partial_config(monitor={"interval_seconds": 42})
+
+    monitor = isolated_config_manager.get_config().monitor
+    assert monitor.interval_seconds == 42
+    assert monitor.label_key == "custom.label"
+
+
 def test_update_partial_config_rejects_invalid_values_without_changing_config(
     isolated_config_manager,
 ):
