@@ -238,19 +238,28 @@ class TestCustomHealthChecks:
         assert reason == "Custom health check failed (http)"
 
     @pytest.mark.parametrize(
-        ("check_type", "fields"),
+        "case",
         [
-            ("http", {}),
-            ("http", {"http_expected_status": 200}),
-            ("http", {"http_endpoint": "http://localhost/", "http_expected_status": None}),
-            ("tcp", {}),
-            ("exec", {}),
+            ("http", {}, "missing http_endpoint or http_expected_status"),
+            (
+                "http",
+                {"http_expected_status": 200},
+                "missing http_endpoint or http_expected_status",
+            ),
+            (
+                "http",
+                {"http_endpoint": "http://localhost/", "http_expected_status": None},
+                "missing http_endpoint or http_expected_status",
+            ),
+            ("tcp", {}, "missing tcp_port"),
+            ("exec", {}, "missing exec_command"),
         ],
     )
     async def test_missing_required_field_is_reported_as_unhealthy(
-        self, engine, docker_client, check_type, fields
+        self, engine, docker_client, caplog, case
     ):
         """A check without the field its type needs fails closed, never reaching Docker."""
+        check_type, fields, message = case
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
         docker_client.health_results["web"] = True
@@ -262,6 +271,39 @@ class TestCustomHealthChecks:
 
         assert needs_restart is True
         assert reason == f"Custom health check failed ({check_type})"
+        assert f"Error performing health check: {message}" in caplog.text
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            (
+                "check_http_health",
+                {
+                    "http_endpoint": "http://localhost/health",
+                    "http_expected_status": 204,
+                    "timeout_seconds": 7,
+                },
+                ("http://localhost/health", 204, 7),
+            ),
+            ("check_tcp_health", {"tcp_port": 8080, "timeout_seconds": 7}, (8080, 7)),
+            ("check_exec_health", {"exec_command": ["true", "-x"]}, (["true", "-x"],)),
+        ],
+    )
+    async def test_valid_check_passes_configured_values_to_docker_client(
+        self, engine, docker_client, monkeypatch, case
+    ):
+        """Narrowing must forward the configured values unchanged to the check."""
+        method, fields, expected_args = case
+        container, _ = make_container(name="web")
+        check = MagicMock(return_value=True)
+        monkeypatch.setattr(docker_client, method, check)
+        check_type = method.removeprefix("check_").removesuffix("_health")
+        health_check = HealthCheckConfig(container_id="web", check_type=check_type, **fields)
+
+        healthy = await engine._perform_custom_health_check(container, health_check)
+
+        assert healthy is True
+        check.assert_called_once_with(container, *expected_args)
 
 
 @pytest.mark.asyncio
