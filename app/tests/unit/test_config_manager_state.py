@@ -11,6 +11,7 @@ from app.config.config_manager import (
     AutoHealEvent,
     ConfigManager,
     HealthCheckConfig,
+    MonitorConfig,
     NotificationService,
     UptimeKumaMapping,
 )
@@ -396,6 +397,16 @@ def test_update_partial_config_keeps_omitted_fields_of_a_partial_section(
     monitor = isolated_config_manager.get_config().monitor
     assert monitor.interval_seconds == 42
     assert monitor.label_key == "custom.label"
+
+
+def test_update_partial_config_replaces_a_section_given_a_model(isolated_config_manager):
+    isolated_config_manager.update_partial_config(monitor={"label_key": "custom.label"})
+
+    isolated_config_manager.update_partial_config(monitor=MonitorConfig(interval_seconds=7))
+
+    monitor = isolated_config_manager.get_config().monitor
+    assert monitor.interval_seconds == 7
+    assert monitor.label_key == "autoheal"
 
 
 def test_update_partial_config_rejects_invalid_values_without_changing_config(
