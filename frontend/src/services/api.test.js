@@ -17,6 +17,11 @@ vi.mock("axios", () => ({
 import axios from "axios";
 import * as api from "./api";
 
+// api.js calls axios.create() once at import time. Vitest 5 clears mock call
+// history before each test (clearMocks defaults to true), so capture the
+// config here rather than asserting on axios.create inside the test.
+const createConfig = axios.create.mock.calls[0]?.[0];
+
 beforeEach(() => {
   mockInstance.get.mockClear();
   mockInstance.post.mockClear();
@@ -27,7 +32,7 @@ beforeEach(() => {
 
 describe("api service", () => {
   it("creates the axios instance with a JSON content type and no-cache headers", () => {
-    expect(axios.create).toHaveBeenCalledWith(
+    expect(createConfig).toEqual(
       expect.objectContaining({
         headers: expect.objectContaining({
           "Content-Type": "application/json",
