@@ -341,7 +341,7 @@ class TestHealthCheckManagement:
         # Mock config_manager.add_custom_health_check to raise an exception
         original_add = config_manager.add_custom_health_check
 
-        def mock_add_raises(check):
+        def mock_add_raises(health_check):
             raise ValueError("Unexpected config error")
 
         config_manager.add_custom_health_check = mock_add_raises
