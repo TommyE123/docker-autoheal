@@ -43,15 +43,16 @@ async def add_health_check(health_check: HealthCheckConfig):
         health_check.container_id = stable_id
 
         config_manager.add_custom_health_check(health_check)
-        return {
-            "status": "success",
-            "message": f"Health check added for container {health_check.container_id}",
-        }
     except HTTPException:
         raise
     except Exception as e:
         logger.error("Error adding health check: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+    else:
+        return {
+            "status": "success",
+            "message": f"Health check added for container {health_check.container_id}",
+        }
 
 
 @router.get("/api/healthchecks/{container_id}")
@@ -79,7 +80,7 @@ async def get_health_check(container_id: str):
             )
 
         health_check = config_manager.get_custom_health_check(stable_id)
-        if not health_check:
+        if not health_check and container.id is not None:
             # Fall back to the container's current full Docker ID for checks
             # persisted before stable-ID storage that haven't been re-added.
             health_check = config_manager.get_custom_health_check(container.id)
@@ -88,12 +89,13 @@ async def get_health_check(container_id: str):
                 status_code=404,
                 detail="No custom health check found for this container",
             )
-        return health_check
     except HTTPException:
         raise
     except Exception as e:
         logger.error("Error getting health check: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+    else:
+        return health_check
 
 
 @router.delete("/api/healthchecks/{container_id}")
@@ -124,18 +126,19 @@ async def delete_health_check(container_id: str):
         # stable ID, or (for checks persisted before stable-ID storage)
         # the container's current full Docker ID.
         remove_key = stable_id
-        if not config_manager.get_custom_health_check(remove_key):
+        if not config_manager.get_custom_health_check(remove_key) and container.id is not None:
             remove_key = container.id
         config_manager.remove_custom_health_check(remove_key)
-        return {
-            "status": "success",
-            "message": f"Health check removed for container {container_id}",
-        }
     except HTTPException:
         raise
     except Exception as e:
         logger.error("Error deleting health check: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+    else:
+        return {
+            "status": "success",
+            "message": f"Health check removed for container {container_id}",
+        }
 
 
 @router.get("/api/healthchecks")

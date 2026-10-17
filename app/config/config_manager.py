@@ -3,9 +3,13 @@ Configuration management for Docker Auto-Heal Service
 Handles in-memory configuration state with JSON export/import support
 """
 
+import contextlib
 import json
 import logging
+import os
+import stat
 import threading
+import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -303,6 +307,76 @@ _CONFIG_SECTION_MODELS: dict[str, type] = {
 }
 
 
+def _merge_dicts(current: Any, update: Any) -> Any:
+    """Recursively merge ``update`` into ``current`` when both are dicts.
+
+    Omitted keys keep their current values at every level. Any other
+    ``update`` value replaces ``current`` outright.
+    """
+    if not (isinstance(current, dict) and isinstance(update, dict)):
+        return update
+    return {**current, **{k: _merge_dicts(current.get(k), v) for k, v in update.items()}}
+
+
+def _atomic_write_json(path: Path, data: Any, **dump_kwargs: Any) -> None:
+    """Write ``data`` as JSON to ``path`` without ever exposing a partial file.
+
+    The document is written to a uniquely named temporary file in the same
+    directory (so the final rename stays on one filesystem), flushed to disk,
+    then moved over ``path`` with ``os.replace``. If anything fails, the
+    previous ``path`` is left untouched and the temporary file is removed.
+    An existing file keeps its permission bits and, where the process is
+    allowed to restore it, its owner and group; a symlinked ``path`` is written
+    through to its target. This matches the previous truncate-in-place
+    behaviour. Restoring ownership is best effort: it needs privilege (or a
+    group the process belongs to), so without it the save still succeeds and
+    the file is simply owned by the process that wrote it. ACLs and extended
+    attributes are not carried over.
+    """
+    path = Path(os.path.realpath(path))
+    temp_path = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    existing: os.stat_result | None = None
+    with contextlib.suppress(FileNotFoundError):
+        existing = path.stat()
+    try:
+        # Exclusive create. A new file keeps the umask default, like "w" did. An
+        # existing file may be stricter than that default (for example 0600,
+        # since it holds credentials), so its replacement starts owner-only and
+        # is widened to the existing mode before any data is written; it is
+        # never readable by anyone the original was not.
+        fd = os.open(
+            temp_path,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o666 if existing is None else 0o600,
+        )
+        with os.fdopen(fd, "w") as f:
+            if existing is not None:
+                # Ownership first: chown can clear setuid/setgid bits, so the
+                # mode is applied after it. The file stays 0600 until then, so
+                # handing it to the original owner never makes it readable by
+                # anyone the original was not. Failing to chown (no privilege,
+                # or a filesystem that cannot) must not fail the save.
+                mode = stat.S_IMODE(existing.st_mode)
+                try:
+                    os.fchown(fd, existing.st_uid, existing.st_gid)
+                except OSError as error:
+                    logger.debug("Could not preserve ownership of %s: %s", path, error)
+                    # The file may now be in a different group (the process's, or
+                    # one inherited from a setgid directory). Giving that group
+                    # the original group's permissions would grant it access the
+                    # original never did, so drop them unless the groups match.
+                    if os.fstat(fd).st_gid != existing.st_gid:
+                        mode &= ~0o070
+                os.fchmod(fd, mode)
+            json.dump(data, f, **dump_kwargs)
+            f.flush()
+            os.fsync(f.fileno())
+        temp_path.replace(path)
+    except BaseException:
+        temp_path.unlink(missing_ok=True)
+        raise
+
+
 class ConfigManager:
     """
     Thread-safe configuration manager with file-based persistence
@@ -329,7 +403,10 @@ class ConfigManager:
         # Load persisted data or initialize with defaults
         self._config = self._load_config()
         self._event_log: list[StoredAutoHealEvent] = self._load_events()
-        self._custom_health_checks: dict[str, HealthCheckConfig] = self._load_custom_health_checks()
+        # Populated by _load_config() from the custom_health_checks section.
+        self._custom_health_checks: dict[str, HealthCheckConfig] = getattr(
+            self, "_custom_health_checks", {}
+        )
         # _container_restart_counts removed - now stored in self._config.containers.restart_counts
         self._quarantined_containers: set = self._load_quarantine()
         self._maintenance_mode: bool = False
@@ -450,8 +527,7 @@ class ConfigManager:
             config_dict["custom_health_checks"] = {
                 cid: hc.model_dump() for cid, hc in self._custom_health_checks.items()
             }
-            with self.CONFIG_FILE.open("w") as f:
-                json.dump(config_dict, f, indent=2, default=str)
+            _atomic_write_json(self.CONFIG_FILE, config_dict, indent=2, default=str)
             logger.debug("Configuration saved to disk")
         except Exception as e:
             logger.error("Failed to save config to disk: %s", e)
@@ -491,15 +567,10 @@ class ConfigManager:
         """Save events to file"""
         try:
             events_data = [event.model_dump(mode="json") for event in self._event_log]
-            with self.EVENTS_FILE.open("w") as f:
-                json.dump(events_data, f, indent=2, default=str)
+            _atomic_write_json(self.EVENTS_FILE, events_data, indent=2, default=str)
             logger.debug("Saved %s events to disk", len(self._event_log))
         except Exception as e:
             logger.error("Failed to save events to disk: %s", e)
-
-    def _load_custom_health_checks(self) -> dict[str, HealthCheckConfig]:
-        """Load custom health checks (already loaded in _load_config)"""
-        return getattr(self, "_custom_health_checks", {})
 
     # Restart counts are now stored in config.json, no separate file needed
 
@@ -519,8 +590,7 @@ class ConfigManager:
     def _save_quarantine(self) -> None:
         """Save quarantine list to file"""
         try:
-            with self.QUARANTINE_FILE.open("w") as f:
-                json.dump(list(self._quarantined_containers), f, indent=2)
+            _atomic_write_json(self.QUARANTINE_FILE, list(self._quarantined_containers), indent=2)
             logger.debug(
                 "Saved %s quarantined containers to disk",
                 len(self._quarantined_containers),
@@ -553,8 +623,7 @@ class ConfigManager:
                 if self._maintenance_start_time
                 else None,
             }
-            with self.MAINTENANCE_FILE.open("w") as f:
-                json.dump(data, f, indent=2)
+            _atomic_write_json(self.MAINTENANCE_FILE, data, indent=2)
             logger.debug("Saved maintenance mode state: %s", self._maintenance_mode)
         except Exception as e:
             logger.error("Failed to save maintenance mode to disk: %s", e)
@@ -571,12 +640,21 @@ class ConfigManager:
             self._save_config()
 
     def update_partial_config(self, **kwargs) -> None:
-        """Update specific configuration fields"""
+        """Update specific top-level configuration fields.
+
+        Unknown keys are ignored. A dict value is merged into the existing
+        section recursively, so omitted fields keep their current values at every
+        level; any other value replaces the section. The merged result is validated before it
+        replaces the current config, so an invalid value raises
+        ``ValidationError`` and leaves the config and file untouched.
+        """
         with self._lock:
             config_dict = self._config.model_dump()
             for key, value in kwargs.items():
-                if key in config_dict:
-                    setattr(self._config, key, value)
+                if key not in config_dict:
+                    continue
+                config_dict[key] = _merge_dicts(config_dict[key], value)
+            self._config = AutoHealConfig.model_validate(config_dict)
             self._save_config()
 
     def export_config(self) -> str:
@@ -672,12 +750,6 @@ class ConfigManager:
         """Get total restart count (all time) - from config.json"""
         with self._lock:
             return self._config.containers.restart_counts.get(container_id, 0)
-
-    def cleanup_restart_counts(self, active_container_ids: list[str]) -> None:
-        """Remove restart counts for containers that no longer exist (DISABLED to preserve manual entries)"""
-        # DISABLED: Auto-cleanup was removing manual entries because stable_id matching is complex
-        # Users can manually edit config.json to remove old entries if needed
-        pass
 
     def quarantine_container(self, container_id: str) -> None:
         """Mark container as quarantined"""

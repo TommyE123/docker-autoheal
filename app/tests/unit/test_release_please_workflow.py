@@ -142,7 +142,9 @@ def test_docker_job_only_runs_when_a_release_was_actually_created():
 
 
 def test_beta_job_runs_after_release_please_regardless_of_release_creation():
-    beta_job = re.search(r"(?ms)^  beta-build:\n(.*?)(?=^  [\w-]+:\n|\Z)", WORKFLOW).group(1)
+    beta_job_match = re.search(r"(?ms)^  beta-build:\n(.*?)(?=^  [\w-]+:\n|\Z)", WORKFLOW)
+    assert beta_job_match is not None
+    beta_job = beta_job_match.group(1)
 
     assert re.search(r"^    needs: release-please$", beta_job, re.MULTILINE)
     assert "release_created" not in beta_job
@@ -251,3 +253,67 @@ def test_weekly_workflow_enables_auto_merge_with_the_non_default_token():
     # class of problem release-please.yml itself was fixed for.
     assert "GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}" in AUTO_MERGE_WORKFLOW
     assert "GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}" not in AUTO_MERGE_WORKFLOW
+
+
+# Jobs that skip for a badge-only PR, per workflow. The smoke test has its own test below, and
+# so does unit-tests (the required check).
+BADGE_SKIPPED_JOBS = {
+    "tests": ["frontend-tests"],
+    "docker-build": ["build-amd64", "arm64-startup"],
+    "mega-linter": ["megalinter"],
+}
+
+
+def test_badge_only_pr_skips_ci_without_path_filters_or_failing_open():
+    # A workflow-level paths filter would leave the required unit-tests check pending, so the
+    # skip is per job. !cancelled() keeps a failed `changes` job from skipping the real checks.
+    for name, skipped_jobs in BADGE_SKIPPED_JOBS.items():
+        text = (REPO_ROOT / ".github" / "workflows" / f"{name}.yml").read_text(encoding="utf-8")
+        triggers, jobs = text.split("\njobs:\n", 1)
+        assert "paths" not in triggers
+        assert "uses: ./.github/workflows/badge-only-check.yml" in jobs
+        for job in skipped_jobs:
+            block_match = re.search(rf"(?ms)^  {job}:\n(.*?)(?=^  [\w-]+:\n|\Z)", jobs)
+            assert block_match is not None
+            block = block_match.group(1)
+            assert re.search(r"^    needs: changes$", block, re.MULTILINE), (name, job)
+            assert (
+                "    if: ${{ !cancelled() && needs.changes.outputs.badge-only != 'true' }}\n"
+                in block
+            ), (name, job)
+
+
+def test_smoke_test_still_runs_when_the_changes_job_fails_and_skips_with_the_build():
+    # success() also checks ancestors, so without !cancelled() a failed `changes` job would skip it
+    # even though build-amd64 ran; the result check keeps it skipped when the build is skipped.
+    text = (REPO_ROOT / ".github" / "workflows" / "docker-build.yml").read_text(encoding="utf-8")
+    job_match = re.search(r"(?ms)^  smoke-test:\n(.*?)(?=^  [\w-]+:\n|\Z)", text)
+    assert job_match is not None
+    job = job_match.group(1)
+
+    assert re.search(r"^    needs: build-amd64$", job, re.MULTILINE)
+    assert "    if: ${{ !cancelled() && needs.build-amd64.result == 'success' }}\n" in job
+
+
+def test_required_unit_tests_job_always_runs_and_validates_the_badge_for_badge_only_prs():
+    text = (REPO_ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")
+    job_match = re.search(r"(?ms)^  unit-tests:\n(.*?)(?=^  [\w-]+:\n|\Z)", text)
+    assert job_match is not None
+    job = job_match.group(1)
+
+    # A job skipped by `if` counts as passing for the required check, so it must not be skipped.
+    assert "    if: ${{ !cancelled() }}\n" in job
+    assert (
+        "if: ${{ needs.changes.outputs.badge-only == 'true' }}\n        run: .github/scripts/validate-badge.sh"
+        in job
+    )
+    # Every expensive step is skipped for a badge-only PR.
+    for step in (
+        "Install dependencies",
+        "Run unit tests with coverage",
+        "Upload coverage reports to Codecov",
+    ):
+        assert (
+            f"name: {step}\n        if: ${{{{ needs.changes.outputs.badge-only != 'true' }}}}"
+            in job
+        )

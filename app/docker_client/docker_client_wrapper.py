@@ -15,6 +15,14 @@ from docker.models.containers import Container
 logger = logging.getLogger(__name__)
 
 
+def _require_container_id(container: Container) -> str:
+    """Return the container's ID; the SDK types it optional but the daemon always sets it."""
+    container_id = container.id
+    if container_id is None:
+        raise ValueError("container has no id")
+    return container_id
+
+
 def recovery_identifier[S](stable_id: S, labels: dict) -> S | str:
     """
     Key for one running container's recovery state, derived from its labels.
@@ -107,10 +115,11 @@ class DockerClientWrapper:
             self._close_client(self._client)
         try:
             self._connect()
-            return True
         except Exception as e:
             logger.error("Reconnection failed: %s", e)
             return False
+        else:
+            return True
 
     def is_connected(self) -> bool:
         """Check if connected to Docker daemon"""
@@ -189,15 +198,20 @@ class DockerClientWrapper:
                     stable_id = container.name
 
             # Get image info for tracking
-            image_name = container.image.tags[0] if container.image.tags else container.image.id
+            image = container.image
+            if image is None:
+                raise ValueError("container has no image")
+            image_name = image.tags[0] if image.tags else image.id
             image_id = attrs.get("Image", "")
+
+            container_id = _require_container_id(container)
 
             # Get network info for uniqueness
             networks = list(attrs.get("NetworkSettings", {}).get("Networks", {}).keys())
 
             return {
-                "id": container.id[:12],  # Short ID
-                "full_id": container.id,
+                "id": container_id[:12],  # Short ID
+                "full_id": container_id,
                 "name": container.name,
                 "stable_id": stable_id,  # NEW: Stable identifier for tracking
                 # Per-replica key for restart counts and quarantine
@@ -246,12 +260,17 @@ class DockerClientWrapper:
             True if restart successful, False otherwise
         """
         try:
-            logger.info("Restarting container %s (%s)", container.name, container.id[:12])
+            logger.info(
+                "Restarting container %s (%s)",
+                container.name,
+                _require_container_id(container)[:12],
+            )
             container.restart(timeout=timeout)
-            return True
         except Exception as e:
             logger.error("Failed to restart container %s: %s", container.name, e)
             return False
+        else:
+            return True
 
     def stop_container(self, container: Container, timeout: int = 10) -> bool:
         """
@@ -263,12 +282,15 @@ class DockerClientWrapper:
             True if stop successful, False otherwise
         """
         try:
-            logger.info("Stopping container %s (%s)", container.name, container.id[:12])
+            logger.info(
+                "Stopping container %s (%s)", container.name, _require_container_id(container)[:12]
+            )
             container.stop(timeout=timeout)
-            return True
         except Exception as e:
             logger.error("Failed to stop container %s: %s", container.name, e)
             return False
+        else:
+            return True
 
     def execute_command(self, container: Container, command: list[str]) -> tuple[int, str]:
         """
@@ -281,7 +303,12 @@ class DockerClientWrapper:
         """
         try:
             exec_result = container.exec_run(command)
-            return exec_result.exit_code, exec_result.output.decode("utf-8")
+            # Without stream/socket/demux, the SDK returns an int exit code and bytes.
+            exit_code = exec_result.exit_code
+            output = exec_result.output
+            if exit_code is None or not isinstance(output, bytes):
+                raise TypeError("unexpected exec_run result")
+            return exit_code, output.decode("utf-8")
         except Exception as e:
             logger.error("Failed to execute command in container %s: %s", container.name, e)
             return -1, str(e)
@@ -323,10 +350,11 @@ class DockerClientWrapper:
             endpoint = endpoint.replace("localhost", ip_address).replace("127.0.0.1", ip_address)
 
             response = requests.get(endpoint, timeout=timeout)
-            return response.status_code == expected_status
         except Exception as e:
             logger.warning("HTTP health check failed for %s: %s", container.name, e)
             return False
+        else:
+            return response.status_code == expected_status
 
     def get_events(self, decode=True, filters=None):
         """
@@ -370,11 +398,11 @@ class DockerClientWrapper:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                 sock.settimeout(timeout)
                 result = sock.connect_ex((ip_address, port))
-
-            return result == 0
         except Exception as e:
             logger.warning("TCP health check failed for %s: %s", container.name, e)
             return False
+        else:
+            return result == 0
 
     def check_exec_health(self, container: Container, command: list[str]) -> bool:
         """
@@ -402,9 +430,10 @@ class DockerClientWrapper:
             health = info.get("health")
             if health:
                 return health.get("status")
-            return None
         except Exception as e:
             logger.error("Failed to get native health for %s: %s", container.name, e)
+            return None
+        else:
             return None
 
     def close(self) -> None:

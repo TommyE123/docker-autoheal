@@ -23,8 +23,8 @@ async def test_uptime_kuma_connection(config_data: dict):
 
     try:
         client = UptimeKumaClient(
-            config_data.get("server_url"),
-            config_data.get("api_token"),  # password (API key or user password)
+            config_data.get("server_url") or "",
+            config_data.get("api_token") or "",  # password (API key or user password)
             config_data.get("username", ""),  # username (optional, empty for API key)
         )
         success = await client.connect()
@@ -37,20 +37,34 @@ async def test_uptime_kuma_connection(config_data: dict):
                 "message": "Connection successful",
                 "monitor_count": len(monitors),
             }
+    except Exception as e:
+        logger.error("Uptime-Kuma connection test failed: %s", e)
+        return {"success": False, "message": f"Connection error: {e!s}"}
+    else:
         return {
             "success": False,
             "message": "Connection failed - check URL and credentials",
         }
-    except Exception as e:
-        logger.error("Uptime-Kuma connection test failed: %s", e)
-        return {"success": False, "message": f"Connection error: {e!s}"}
 
 
-@router.post("/api/uptime-kuma/enable")
+@router.post(
+    "/api/uptime-kuma/enable",
+    responses={400: {"description": "server_url and api_token are required"}},
+)
 async def enable_uptime_kuma_integration(integration_config: dict):
     """Enable Uptime-Kuma integration and fetch monitors"""
-    from app.uptime_kuma.matching import match_uptime_kuma_monitors
+    from app.uptime_kuma.matching import MonitorInfo, match_uptime_kuma_monitors
     from app.uptime_kuma.uptime_kuma_client import UptimeKumaClient
+
+    server_url = integration_config.get("server_url")
+    api_token = integration_config.get("api_token")
+    if not (
+        isinstance(server_url, str)
+        and server_url.strip()
+        and isinstance(api_token, str)
+        and api_token.strip()
+    ):
+        raise HTTPException(status_code=400, detail="server_url and api_token are required")
 
     docker_client = state.docker_client
     monitoring_engine = state.monitoring_engine
@@ -58,9 +72,9 @@ async def enable_uptime_kuma_integration(integration_config: dict):
         # Update configuration
         config = config_manager.get_config()
         config.uptime_kuma.enabled = True
-        config.uptime_kuma.server_url = integration_config.get("server_url")
+        config.uptime_kuma.server_url = server_url
         config.uptime_kuma.username = integration_config.get("username", "")
-        config.uptime_kuma.api_token = integration_config.get("api_token")
+        config.uptime_kuma.api_token = api_token
         config.uptime_kuma.auto_restart_on_down = integration_config.get(
             "auto_restart_on_down", True
         )
@@ -84,7 +98,9 @@ async def enable_uptime_kuma_integration(integration_config: dict):
                 continue
             container_infos.append(info)
 
-        matches = match_uptime_kuma_monitors(container_infos, monitors)
+        # The matcher only needs each monitor's friendly name.
+        monitor_infos: list[MonitorInfo] = [{"friendly_name": m["friendly_name"]} for m in monitors]
+        matches = match_uptime_kuma_monitors(container_infos, monitor_infos)
         auto_mappings = [
             UptimeKumaMapping(
                 container_id=match["container_id"],
@@ -108,7 +124,7 @@ async def enable_uptime_kuma_integration(integration_config: dict):
         config_manager.update_config(config)
 
         # Restart Uptime-Kuma monitor
-        if hasattr(monitoring_engine, "uptime_kuma_monitor"):
+        if monitoring_engine and monitoring_engine.uptime_kuma_monitor:
             await monitoring_engine.uptime_kuma_monitor.stop()
             await monitoring_engine.uptime_kuma_monitor.start()
 
@@ -146,10 +162,11 @@ async def get_uptime_kuma_monitors():
             config.uptime_kuma.username,  # username (optional, empty for API key)
         )
         monitors = await client.get_all_monitors() or []
-        return {"monitors": monitors}
     except Exception as e:
         logger.error("Failed to fetch Uptime-Kuma monitors: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+    else:
+        return {"monitors": monitors}
 
 
 @router.get("/api/uptime-kuma/mappings")
@@ -159,7 +176,10 @@ async def get_uptime_kuma_mappings():
     return {"mappings": [m.model_dump() for m in config.uptime_kuma_mappings]}
 
 
-@router.post("/api/uptime-kuma/mappings")
+@router.post(
+    "/api/uptime-kuma/mappings",
+    responses={500: {"description": "Container could not be mapped"}},
+)
 async def create_uptime_kuma_mapping(mapping: dict):
     """Create a new container-to-monitor mapping"""
     docker_client = state.docker_client
@@ -173,6 +193,10 @@ async def create_uptime_kuma_mapping(mapping: dict):
 
         info = await asyncio.to_thread(docker_client.get_container_info, container)
         stable_id = info.get("stable_id")
+        if stable_id is None:
+            raise HTTPException(
+                status_code=500, detail="Unable to resolve container stable identifier"
+            )
 
         config = config_manager.get_config()
         new_mapping = UptimeKumaMapping(
@@ -207,11 +231,11 @@ async def delete_uptime_kuma_mapping(container_id: str):
         config_manager.update_config(config)
 
         logger.info("Deleted Uptime-Kuma mapping for stable_id: %s", container_id)
-
-        return {"success": True}
     except Exception as e:
         logger.error("Failed to delete Uptime-Kuma mapping: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+    else:
+        return {"success": True}
 
 
 @router.post("/api/uptime-kuma/disable")
@@ -224,12 +248,12 @@ async def disable_uptime_kuma_integration():
         config_manager.update_config(config)
 
         # Stop monitoring
-        if hasattr(monitoring_engine, "uptime_kuma_monitor"):
+        if monitoring_engine and monitoring_engine.uptime_kuma_monitor:
             await monitoring_engine.uptime_kuma_monitor.stop()
 
         logger.info("Uptime-Kuma integration disabled")
-
-        return {"success": True}
     except Exception as e:
         logger.error("Failed to disable Uptime-Kuma: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+    else:
+        return {"success": True}

@@ -11,6 +11,7 @@ from app.config.config_manager import (
     AutoHealEvent,
     ConfigManager,
     HealthCheckConfig,
+    MonitorConfig,
     NotificationService,
     UptimeKumaMapping,
 )
@@ -82,22 +83,6 @@ def test_restart_count_ignores_window_seconds_and_never_expires(
     assert isolated_config_manager.get_restart_count("web", window_seconds=1) == 3
     # A huge window returns the same total, confirming window_seconds has no effect.
     assert isolated_config_manager.get_restart_count("web", window_seconds=10_000_000) == 3
-
-
-def test_cleanup_restart_counts_is_a_no_op_that_preserves_all_entries(
-    isolated_config_manager,
-):
-    """cleanup_restart_counts() is documented in its own code comment as
-    disabled ('DISABLED to preserve manual entries'), so restart counts for
-    containers absent from active_container_ids must survive the call
-    unchanged, not be pruned as the method name might suggest."""
-    isolated_config_manager.record_restart("web")
-    isolated_config_manager.record_restart("gone")
-
-    isolated_config_manager.cleanup_restart_counts(active_container_ids=["web"])
-
-    assert isolated_config_manager.get_total_restart_count("web") == 1
-    assert isolated_config_manager.get_total_restart_count("gone") == 1
 
 
 def test_fresh_manager_reports_empty_state_for_every_tracked_area(
@@ -314,21 +299,21 @@ def test_import_config_with_invalid_custom_health_check_leaves_state_unchanged(
 
 
 def test_config_write_failure_is_logged_and_does_not_escape(isolated_config_manager, caplog):
-    with patch("pathlib.Path.open", side_effect=OSError("disk full")):
+    with patch("os.open", side_effect=OSError("disk full")):
         isolated_config_manager.update_config(isolated_config_manager.get_config())
 
     assert "Failed to save config to disk: disk full" in caplog.text
 
 
 def test_events_write_failure_is_logged_and_does_not_escape(isolated_config_manager, caplog):
-    with patch("pathlib.Path.open", side_effect=OSError("disk full")):
+    with patch("os.open", side_effect=OSError("disk full")):
         isolated_config_manager.add_event(_make_event("web"))
 
     assert "Failed to save events to disk: disk full" in caplog.text
 
 
 def test_quarantine_write_failure_is_logged_and_does_not_escape(isolated_config_manager, caplog):
-    with patch("pathlib.Path.open", side_effect=OSError("disk full")):
+    with patch("os.open", side_effect=OSError("disk full")):
         isolated_config_manager.quarantine_container("web")
 
     assert "Failed to save quarantine list to disk: disk full" in caplog.text
@@ -337,7 +322,7 @@ def test_quarantine_write_failure_is_logged_and_does_not_escape(isolated_config_
 def test_maintenance_mode_write_failure_is_logged_and_does_not_escape(
     isolated_config_manager, caplog
 ):
-    with patch("pathlib.Path.open", side_effect=OSError("disk full")):
+    with patch("os.open", side_effect=OSError("disk full")):
         isolated_config_manager.enable_maintenance_mode()
 
     assert "Failed to save maintenance mode to disk: disk full" in caplog.text
@@ -393,3 +378,53 @@ def test_quarantine_file_with_non_iterable_json_falls_back_to_empty_set(
 
     assert reloaded.get_quarantined_containers() == set()
     assert "Failed to load quarantine list from disk" in caplog.text
+
+
+def test_update_partial_config_applies_valid_values_and_ignores_unknown_keys(
+    isolated_config_manager,
+):
+    isolated_config_manager.update_partial_config(monitor={"interval_seconds": 42}, not_a_section=1)
+
+    assert isolated_config_manager.get_config().monitor.interval_seconds == 42
+
+
+def test_update_partial_config_keeps_omitted_fields_of_a_partial_section(
+    isolated_config_manager,
+):
+    isolated_config_manager.update_partial_config(monitor={"label_key": "custom.label"})
+    isolated_config_manager.update_partial_config(monitor={"interval_seconds": 42})
+
+    monitor = isolated_config_manager.get_config().monitor
+    assert monitor.interval_seconds == 42
+    assert monitor.label_key == "custom.label"
+
+
+def test_update_partial_config_keeps_omitted_fields_of_nested_sections(isolated_config_manager):
+    isolated_config_manager.update_partial_config(restart={"backoff": {"initial_seconds": 20}})
+
+    isolated_config_manager.update_partial_config(restart={"backoff": {"multiplier": 3.0}})
+
+    backoff = isolated_config_manager.get_config().restart.backoff
+    assert backoff.initial_seconds == 20
+    assert backoff.multiplier == 3.0
+
+
+def test_update_partial_config_replaces_a_section_given_a_model(isolated_config_manager):
+    isolated_config_manager.update_partial_config(monitor={"label_key": "custom.label"})
+
+    isolated_config_manager.update_partial_config(monitor=MonitorConfig(interval_seconds=7))
+
+    monitor = isolated_config_manager.get_config().monitor
+    assert monitor.interval_seconds == 7
+    assert monitor.label_key == "autoheal"
+
+
+def test_update_partial_config_rejects_invalid_values_without_changing_config(
+    isolated_config_manager,
+):
+    before = isolated_config_manager.get_config().model_dump()
+
+    with pytest.raises(ValidationError):
+        isolated_config_manager.update_partial_config(monitor={"interval_seconds": "bad"})
+
+    assert isolated_config_manager.get_config().model_dump() == before

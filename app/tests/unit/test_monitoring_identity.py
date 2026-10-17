@@ -122,6 +122,12 @@ class TestShouldMonitorContainer:
 
         assert engine.should_monitor_container(container, info) is False
 
+    def test_blacklist_name_pattern_leaves_other_containers_monitored(self, engine, update_config):
+        container, info = make_container(name="web-1", labels={"autoheal": "true"})
+        update_config(lambda c: c.filters.blacklist_names.append("db-*"))
+
+        assert engine.should_monitor_container(container, info) is True
+
     def test_whitelist_name_pattern_requires_a_match(self, engine, update_config):
         matching, matching_info = make_container(name="web-1", labels={"autoheal": "true"})
         other, other_info = make_container(name="worker-1", labels={"autoheal": "true"})

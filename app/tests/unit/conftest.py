@@ -13,9 +13,8 @@ directory:
   starts from the documented defaults.
 * ``mock_notification_manager`` replaces the global notification manager used
   by the monitoring engine, so no HTTP requests are ever attempted.
-* ``recorded_sleeps`` replaces ``asyncio.sleep`` so restart-backoff delays are
-  recorded rather than actually waited for, keeping tests fast and
-  deterministic.
+* ``recorded_sleeps`` replaces ``asyncio.sleep`` so any sleep is recorded rather
+  than actually waited for, keeping tests fast and deterministic.
 """
 
 import asyncio
@@ -23,6 +22,7 @@ import shutil
 import sys
 import tempfile
 from copy import deepcopy
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -63,6 +63,21 @@ class FakeContainer:
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid only
         return f"<FakeContainer {self.name} {self.id[:12]}>"
+
+
+INCOMPLETE_INFO_CASES = [
+    # Compose labels keep the stable and recovery IDs resolvable without a name
+    (
+        "name",
+        {
+            "autoheal": "true",
+            "com.docker.compose.project": "stack",
+            "com.docker.compose.service": "web",
+        },
+    ),
+    ("name", {"autoheal": "true"}),
+    ("full_id", {"autoheal": "true"}),
+]
 
 
 def make_container(
@@ -122,6 +137,23 @@ def make_container(
         "compose_service": labels.get("com.docker.compose.service"),
     }
     return container, info
+
+
+async def after_backoff(engine: MonitoringEngine, action, *args) -> None:
+    """
+    Run ``action`` and, if it left a restart waiting out its backoff, run it again
+    once that wait has elapsed.
+
+    The engine no longer sleeps for the backoff delay; it records when the next
+    restart is allowed and skips the restart until then. Tests that care about
+    the restart rather than the wait use this instead of sleeping.
+    """
+    await action(*args)
+    if engine._next_allowed_restart:
+        elapsed = datetime.now(UTC) - timedelta(seconds=1)
+        for recovery_id in engine._next_allowed_restart:
+            engine._next_allowed_restart[recovery_id] = elapsed
+        await action(*args)
 
 
 class FakeDockerClient:
@@ -361,9 +393,8 @@ def recorded_sleeps(monkeypatch) -> list:
     """
     Replace ``asyncio.sleep`` with a recorder.
 
-    The monitoring engine sleeps for the restart backoff delay; recording the
-    requested delay makes backoff assertions possible without slowing the suite
-    down or making it timing dependent.
+    The restart backoff no longer sleeps (see ``after_backoff``), so a recorded
+    sleep during a monitoring cycle means something is blocking it.
     """
     delays: list[float] = []
     real_sleep = asyncio.sleep

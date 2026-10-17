@@ -20,20 +20,20 @@ url_api = "https://api.github.com/repos/aquasecurity/trivy/releases/assets/60333
 provenance = "cosign"
 
 [[tools."aqua:astral-sh/ruff"]]
-version = "0.16.10"
+version = "0.17.0"
 backend = "aqua:astral-sh/ruff"
-specifiers = ["0.16.10"]
+specifiers = ["0.17.0"]
 
 [tools."aqua:astral-sh/ruff"."platforms.linux-arm64"]
-checksum = "sha256:dc0d74de837ef0a7bcc62ce98c48a622b075d057161f13b958be2934becd55a6"
-url = "https://github.com/astral-sh/ruff/releases/download/0.16.10/ruff-aarch64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/603826868"
+checksum = "sha256:294e181ba6ccb0c2ffd778580e3c42b19f038bdbcb844f39fd9a6a26e8148804"
+url = "https://github.com/astral-sh/ruff/releases/download/0.17.0/ruff-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/625999236"
 provenance = "github-attestations"
 
 [tools."aqua:astral-sh/ruff"."platforms.linux-x64"]
-checksum = "sha256:9567ff1201e2fb3da31ff04c35587d768c66d6cb42dfa84de474e2bfe360b608"
-url = "https://github.com/astral-sh/ruff/releases/download/0.16.10/ruff-x86_64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/603827060"
+checksum = "sha256:c94fc1dc71f054d06d9f1149442dcb471516aa2b7d4b7e8124e05d082d4c91d3"
+url = "https://github.com/astral-sh/ruff/releases/download/0.17.0/ruff-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/625999382"
 provenance = "github-attestations"
 
 [[tools."aqua:betterleaks/betterleaks"]]
@@ -186,10 +186,10 @@ specifiers = ["1.46.4"]
 uv = { path = ".mise/locks/pypi-djlint/1.46.4", digest = "sha256:0747e40741ce66f4eb8e373c0dd81a19b3b76f11c8d4c0ef844e6e9418e17242" }
 
 [[tools."pypi:semgrep"]]
-version = "1.179.0"
+version = "1.180.0"
 backend = "pypi:semgrep"
-specifiers = ["1.179.0"]
-uv = { path = ".mise/locks/pypi-semgrep/1.179.0", digest = "sha256:7a73dece28938112afea91b4c98c7e5511814d4eec20b06d700f59eae5fa0674" }
+specifiers = ["1.180.0"]
+uv = { path = ".mise/locks/pypi-semgrep/1.180.0", digest = "sha256:b65304104fc85f99d9f03557686c0668c8c8a135b83c4df94f5336315c7c0577" }
 
 [[tools."pypi:yamllint"]]
 version = "1.38.0"

@@ -352,6 +352,22 @@ class TestUpdateStatusCache:
 
         assert monitor.get_container_status("web") is None
 
+    async def test_missing_client_is_treated_as_failed_fetch_and_keeps_configured_status(
+        self, caplog
+    ):
+        _add_mapping("web", "Web Monitor")
+        monitor = UptimeKumaMonitor()
+        monitor.client = None
+        monitor._container_status_cache["web"] = 1
+        monitor._container_status_mapping_cache["web"] = "Web Monitor"
+        monitor._container_status_cache["old"] = 0
+        monitor._container_status_mapping_cache["old"] = "Old Monitor"
+
+        await monitor._update_status_cache()
+
+        assert monitor._container_status_cache == {"web": 1}
+        assert "Uptime-Kuma client not initialized" in caplog.text
+
     async def test_status_for_unmapped_container_is_dropped(self):
         _add_mapping("web", "Web Monitor")
         monitor = UptimeKumaMonitor()

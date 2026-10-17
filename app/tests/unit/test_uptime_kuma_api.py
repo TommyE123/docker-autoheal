@@ -112,6 +112,36 @@ class TestUptimeKumaIntegration:
         assert result["auto_mappings"][0]["monitor_friendly_name"] == "web"
         assert config_manager.get_config().uptime_kuma.enabled is True
 
+    @pytest.mark.parametrize(
+        "integration_config",
+        [
+            {},
+            {"server_url": "http://kuma.example"},
+            {"api_token": "token"},
+            {"server_url": "", "api_token": "token"},
+            {"server_url": "http://kuma.example", "api_token": "   "},
+            {"server_url": None, "api_token": "token"},
+            {"server_url": "http://kuma.example", "api_token": 123},
+        ],
+        ids=[
+            "empty",
+            "missing-token",
+            "missing-url",
+            "blank-url",
+            "whitespace-token",
+            "null-url",
+            "non-string-token",
+        ],
+    )
+    async def test_enable_without_valid_connection_fields_returns_400_and_stays_disabled(
+        self, integration_config
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await enable_uptime_kuma_integration(integration_config)
+
+        assert exc_info.value.status_code == 400
+        assert config_manager.get_config().uptime_kuma.enabled is False
+
     async def test_enable_auto_maps_compose_containers_by_service_name(
         self, wired_api, monkeypatch
     ):
@@ -369,6 +399,20 @@ class TestUptimeKumaIntegration:
             )
 
         assert exc_info.value.status_code == 500
+
+    async def test_create_mapping_without_stable_id_returns_500(self, wired_api):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        del info["stable_id"]
+        docker_client.add_container(container, info)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await create_uptime_kuma_mapping(
+                {"container_id": "a" * 64, "monitor_friendly_name": "Monitor"}
+            )
+
+        assert exc_info.value.status_code == 500
+        assert config_manager.get_config().uptime_kuma_mappings == []
 
     async def test_create_mapping_without_docker_client_returns_500(self, monkeypatch):
         monkeypatch.setattr("app.api.state.docker_client", None)

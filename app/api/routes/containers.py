@@ -44,11 +44,7 @@ async def list_containers(include_stopped: bool = False):
 
         # Use the uptime_kuma_monitor from monitoring_engine if available
         uptime_kuma_monitor = None
-        if (
-            uptime_kuma_enabled
-            and monitoring_engine
-            and hasattr(monitoring_engine, "uptime_kuma_monitor")
-        ):
+        if uptime_kuma_enabled and monitoring_engine:
             uptime_kuma_monitor = monitoring_engine.uptime_kuma_monitor
 
         for container, info in inspected:
@@ -114,7 +110,10 @@ async def list_containers(include_stopped: bool = False):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/api/containers/{container_id}")
+@router.get(
+    "/api/containers/{container_id}",
+    responses={500: {"description": "Container could not be inspected or identified"}},
+)
 async def get_container_details(container_id: str):
     """Get detailed information about a specific container"""
     docker_client = state.docker_client
@@ -128,6 +127,8 @@ async def get_container_details(container_id: str):
             raise HTTPException(status_code=404, detail="Container not found")
 
         info = await asyncio.to_thread(docker_client.get_container_info, container)
+        if not info:
+            raise HTTPException(status_code=500, detail="Unable to inspect container")
 
         # Use stable_id for tracking (persists across recreations)
         full_container_id = info.get("full_id")
@@ -135,6 +136,13 @@ async def get_container_details(container_id: str):
         stable_id = info.get("stable_id")
         # Restart counts and quarantine are stored per replica (recovery_id)
         recovery_id = info.get("recovery_id")
+        if (
+            full_container_id is None
+            or container_name is None
+            or stable_id is None
+            or recovery_id is None
+        ):
+            raise HTTPException(status_code=500, detail="Unable to resolve container identifiers")
 
         # Get locally tracked restart counts (using recovery_id)
         recent_restart_count = config_manager.get_restart_count(
@@ -159,7 +167,12 @@ async def get_container_details(container_id: str):
 
         # Override restart_count in info with locally tracked count
         info["restart_count"] = total_restart_count
-
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error getting container details: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+    else:
         return {
             **info,
             "monitored": monitored,
@@ -168,11 +181,27 @@ async def get_container_details(container_id: str):
             "total_restart_count": total_restart_count,
             "custom_health_check": custom_hc,
         }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Error getting container details: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _stable_id_from_info(info: dict | None) -> str | None:
+    """
+    Stable identifier for persisting a container selection.
+
+    Uses the ``monitoring.id`` label, then the Compose project and service, then the
+    name. None when the container could not be inspected or has none of these.
+    """
+    if not info:
+        return None
+    labels = info.get("labels", {})
+    monitoring_id = labels.get("monitoring.id")
+    compose_project = labels.get("com.docker.compose.project")
+    compose_service = labels.get("com.docker.compose.service")
+
+    if monitoring_id:
+        return monitoring_id
+    if compose_project and compose_service:
+        return f"{compose_project}_{compose_service}"
+    return info.get("name")
 
 
 @router.post("/api/containers/select")
@@ -208,22 +237,9 @@ async def update_container_selection(request: ContainerSelectionRequest):
             for cid in request.container_ids:
                 # Try to get container to resolve its stable identifier
                 info = resolved[cid]
-                if info is not None:
-                    container_name = info.get("name")
-
-                    # Get stable identifier (handles all edge cases)
-                    labels = info.get("labels", {})
-                    monitoring_id = labels.get("monitoring.id")
-                    compose_project = labels.get("com.docker.compose.project")
-                    compose_service = labels.get("com.docker.compose.service")
-
-                    if monitoring_id:
-                        stable_id = monitoring_id
-                    elif compose_project and compose_service:
-                        stable_id = f"{compose_project}_{compose_service}"
-                    else:
-                        stable_id = container_name
-
+                container_name = info.get("name") if info else None
+                stable_id = _stable_id_from_info(info)
+                if info is not None and stable_id is not None:
                     # Store by stable_id for persistence across recreations
                     if stable_id not in config.containers.selected:
                         config.containers.selected.append(stable_id)
@@ -235,7 +251,9 @@ async def update_container_selection(request: ContainerSelectionRequest):
                         )
 
                     # Remove from excluded if present (check stable_id, name, and ID)
-                    for identifier in [stable_id, container_name, cid]:
+                    for identifier in [
+                        i for i in (stable_id, container_name, cid) if i is not None
+                    ]:
                         if identifier in config.containers.excluded:
                             config.containers.excluded.remove(identifier)
                             logger.debug("Removed '%s' from excluded list", identifier)
@@ -254,22 +272,9 @@ async def update_container_selection(request: ContainerSelectionRequest):
             for cid in request.container_ids:
                 # Try to get container to resolve its stable identifier
                 info = resolved[cid]
-                if info is not None:
-                    container_name = info.get("name")
-
-                    # Get stable identifier
-                    labels = info.get("labels", {})
-                    monitoring_id = labels.get("monitoring.id")
-                    compose_project = labels.get("com.docker.compose.project")
-                    compose_service = labels.get("com.docker.compose.service")
-
-                    if monitoring_id:
-                        stable_id = monitoring_id
-                    elif compose_project and compose_service:
-                        stable_id = f"{compose_project}_{compose_service}"
-                    else:
-                        stable_id = container_name
-
+                container_name = info.get("name") if info else None
+                stable_id = _stable_id_from_info(info)
+                if info is not None and stable_id is not None:
                     # Store by stable_id for persistence across recreations
                     if stable_id not in config.containers.excluded:
                         config.containers.excluded.append(stable_id)
@@ -281,7 +286,9 @@ async def update_container_selection(request: ContainerSelectionRequest):
                         )
 
                     # Remove from selected if present (check stable_id, name, and ID)
-                    for identifier in [stable_id, container_name, cid]:
+                    for identifier in [
+                        i for i in (stable_id, container_name, cid) if i is not None
+                    ]:
                         if identifier in config.containers.selected:
                             config.containers.selected.remove(identifier)
                             logger.debug("Removed '%s' from selected list", identifier)
@@ -342,7 +349,10 @@ async def restart_container_manual(container_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/api/containers/{container_id}/unquarantine")
+@router.post(
+    "/api/containers/{container_id}/unquarantine",
+    responses={500: {"description": "Container could not be inspected or identified"}},
+)
 async def unquarantine_container(container_id: str):
     """Remove container from quarantine"""
     docker_client = state.docker_client
@@ -356,8 +366,13 @@ async def unquarantine_container(container_id: str):
             raise HTTPException(status_code=404, detail="Container not found")
 
         info = await asyncio.to_thread(docker_client.get_container_info, container)
+        if not info:
+            raise HTTPException(status_code=500, detail="Unable to inspect container")
         container_name = info.get("name")
         recovery_id = info.get("recovery_id")
+        full_container_id = info.get("full_id")
+        if container_name is None or recovery_id is None or full_container_id is None:
+            raise HTTPException(status_code=500, detail="Unable to resolve container identifiers")
 
         # Remove from quarantine using recovery_id (matches how quarantine is stored)
         config_manager.unquarantine_container(recovery_id)
@@ -368,7 +383,7 @@ async def unquarantine_container(container_id: str):
         event = AutoHealEvent(
             timestamp=datetime.now(UTC),
             container_name=f"{container_name} ({recovery_id})",
-            container_id=info.get("full_id"),  # Store current ID for reference
+            container_id=full_container_id,  # Store current ID for reference
             event_type="unquarantine",
             restart_count=0,
             status="success",
@@ -378,13 +393,13 @@ async def unquarantine_container(container_id: str):
 
         # Send notification for quarantine event
         await state.notification_manager.send_event_notification(event)
-
-        return {
-            "status": "success",
-            "message": f"Container {container_name} removed from quarantine",
-        }
     except HTTPException:
         raise
     except Exception as e:
         logger.error("Error unquarantining container: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+    else:
+        return {
+            "status": "success",
+            "message": f"Container {container_name} removed from quarantine",
+        }

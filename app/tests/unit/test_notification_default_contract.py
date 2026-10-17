@@ -41,9 +41,9 @@ import pytest
 from app.api.routes.containers import unquarantine_container
 from app.config.config_manager import AutoHealEvent, NotificationService, config_manager
 from app.notifications.notification_manager import NotificationManager
-from app.tests.unit.conftest import make_container
+from app.tests.unit.conftest import after_backoff, make_container
 from app.tests.unit.test_engine_lifecycle import start_event
-from app.tests.unit.test_notification_manager import _FakeSession
+from app.tests.unit.test_notification_manager import _FakeSession, fake_session
 
 WEBHOOK_URL = "https://example.invalid/default-contract"
 
@@ -106,7 +106,7 @@ async def emit_one_event_of_each_type(engine, docker_client) -> None:
     # "restart": an unhealthy container below the restart threshold.
     container, info = make_container(name="restart-target", container_id=RESTART_ID)
     docker_client.add_container(container, info)
-    await engine._handle_container_restart(container, info, "unhealthy")
+    await after_backoff(engine, engine._handle_container_restart, container, info, "unhealthy")
 
     # "quarantine": the same path once the restart threshold is exceeded.
     container, info = make_container(name="quarantine-target", container_id=QUARANTINE_ID)
@@ -149,7 +149,7 @@ async def drain_notification_queue(manager: NotificationManager) -> None:
 
 
 def delivered_event_types(manager: NotificationManager) -> list:
-    return [call["json"]["event"]["type"] for call in manager._session.calls]
+    return [call["json"]["event"]["type"] for call in fake_session(manager).calls]
 
 
 @pytest.mark.asyncio
@@ -217,7 +217,7 @@ class TestDefaultNotificationContract:
         await emit_one_event_of_each_type(engine, docker_client)
         await drain_notification_queue(real_notification_manager)
 
-        assert real_notification_manager._session.calls == []
+        assert fake_session(real_notification_manager).calls == []
 
 
 @pytest.mark.asyncio
@@ -237,7 +237,7 @@ class TestDefaultNotificationPayloads:
 
         titles_by_type = {
             call["json"]["event"]["type"]: call["json"]["title"]
-            for call in real_notification_manager._session.calls
+            for call in fake_session(real_notification_manager).calls
         }
 
         assert titles_by_type["restart"] == "Container Restarted"
@@ -268,8 +268,8 @@ class TestDefaultNotificationPayloads:
         await emit_one_event_of_each_type(engine, docker_client)
         await drain_notification_queue(real_notification_manager)
 
-        assert len(real_notification_manager._session.calls) == 4
-        for call in real_notification_manager._session.calls:
+        assert len(fake_session(real_notification_manager).calls) == 4
+        for call in fake_session(real_notification_manager).calls:
             assert call["url"] == WEBHOOK_URL
             event = call["json"]["event"]
             assert event["container_name"].endswith("-target)")

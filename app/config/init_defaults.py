@@ -108,10 +108,11 @@ def init_data_file(file_path: Path, default_data: Any, description: str) -> bool
         with file_path.open("w") as f:
             json.dump(default_data, f, indent=2)
         logger.info("Created default %s at %s", description, file_path)
-        return True
     except Exception as e:
         logger.error("Failed to create %s at %s: %s", description, file_path, e)
         return False
+    else:
+        return True
 
 
 def initialize_defaults(data_dir: Path = Path("/data")) -> Path:

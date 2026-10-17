@@ -6,7 +6,7 @@ Monitors containers and performs auto-healing actions
 import asyncio
 import fnmatch
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from docker.models.containers import Container
 
@@ -20,6 +20,7 @@ from app.docker_client.docker_client_wrapper import (
     DockerClientWrapper,
     recovery_identifier,
 )
+from app.monitor.uptime_kuma_monitor import UptimeKumaMonitor
 from app.notifications.notification_manager import notification_manager
 
 logger = logging.getLogger(__name__)
@@ -42,8 +43,15 @@ class MonitoringEngine:
         self._event_task: asyncio.Task | None = None
         self._last_restart_times: dict[str, datetime] = {}
         self._backoff_delays: dict[str, int] = {}
+        self._next_allowed_restart: dict[str, datetime] = {}
+        # The container (by Docker ID) whose failure started each pending wait. Replicas
+        # sharing a recovery ID share the wait, so only its owner recovering may cancel
+        # it. A recreated container has a new ID, so it never inherits a predecessor's wait.
+        self._restart_wait_owner: dict[str, str | None] = {}
+        # Attached by the service after construction; None when Uptime Kuma is not set up.
+        self.uptime_kuma_monitor: UptimeKumaMonitor | None = None
 
-    def get_stable_identifier(self, info: dict) -> str:
+    def get_stable_identifier(self, info: dict) -> str | None:
         """
         Get stable identifier for a container with priority fallback.
 
@@ -61,7 +69,8 @@ class MonitoringEngine:
             info: Container information dict
 
         Returns:
-            Stable identifier string
+            Stable identifier string, or None if the container info carries no name
+            to fall back to
 
         Note:
             An empty ``monitoring.id`` label is returned as-is. Container
@@ -83,7 +92,7 @@ class MonitoringEngine:
         # Priority 3: Container name (fallback)
         return info.get("name")
 
-    def get_recovery_identifier(self, info: dict) -> str:
+    def get_recovery_identifier(self, info: dict) -> str | None:
         """
         Get the key for a container's restart count, cooldown, backoff and quarantine.
 
@@ -96,9 +105,29 @@ class MonitoringEngine:
             info: Container information dict
 
         Returns:
-            Recovery identifier string
+            Recovery identifier string, or None if there is no stable identifier
         """
         return recovery_identifier(self.get_stable_identifier(info), info.get("labels", {}))
+
+    def _container_identifiers(self, info: dict) -> tuple[str, str, str] | None:
+        """
+        Full ID, name and recovery ID of a container, or None if any is missing.
+
+        ``get_container_info`` returns an empty dict when inspection fails, so the
+        identifiers cannot be assumed present.
+
+        Args:
+            info: Container information dict
+
+        Returns:
+            Tuple of (container_id, container_name, recovery_id), or None
+        """
+        container_id = info.get("full_id")
+        container_name = info.get("name")
+        recovery_id = self.get_recovery_identifier(info)
+        if not container_id or not container_name or recovery_id is None:
+            return None
+        return container_id, container_name, recovery_id
 
     @staticmethod
     def _auto_monitor_stable_id(labels: dict, container_name: str) -> str:
@@ -210,6 +239,19 @@ class MonitoringEngine:
                 self.docker_client.list_containers, all_containers=True
             )
 
+            # A wait belongs to the container that started it; drop those that are gone.
+            # list_containers returns [] when the Docker call fails, which says nothing
+            # about whether the containers still exist.
+            if containers:
+                listed_ids = {container.id for container in containers}
+                abandoned = [
+                    recovery_id
+                    for recovery_id, owner in self._restart_wait_owner.items()
+                    if owner not in listed_ids
+                ]
+                for recovery_id in abandoned:
+                    self._clear_restart_wait(recovery_id)
+
             for container in containers:
                 try:
                     await self._check_single_container(container)
@@ -239,10 +281,19 @@ class MonitoringEngine:
 
         # Check if container should be monitored
         if not self.should_monitor_container(container, info):
+            # No longer monitored: a wait it started would otherwise linger
+            self._clear_restart_waits_owned_by(container_id)
             return
 
         # Check if container is quarantined (by recovery ID, name, or ID for backwards compatibility)
-        recovery_id = self.get_recovery_identifier(info)
+        identifiers = self._container_identifiers(info)
+        if identifiers is None:
+            logger.warning(
+                "Skipping container with incomplete identifiers: %s",
+                container_name or container_id,
+            )
+            return
+        container_id, container_name, recovery_id = identifiers
         quarantine_id = None
         if config_manager.is_quarantined(recovery_id):
             quarantine_id = recovery_id
@@ -279,6 +330,24 @@ class MonitoringEngine:
 
         if needs_restart:
             await self._handle_container_restart(container, info, reason)
+        elif self._restart_wait_owner.get(recovery_id) == container_id:
+            # Recovered on its own: drop the restart it was waiting out its backoff for
+            self._clear_restart_wait(recovery_id)
+
+    def _clear_restart_waits_owned_by(self, container_id: str | None) -> None:
+        """Forget every restart wait that the given container (by Docker ID) started"""
+        owned = [
+            recovery_id
+            for recovery_id, owner in self._restart_wait_owner.items()
+            if owner == container_id
+        ]
+        for recovery_id in owned:
+            self._clear_restart_wait(recovery_id)
+
+    def _clear_restart_wait(self, recovery_id: str) -> None:
+        """Forget the restart wait recorded for a recovery ID, and who it belongs to"""
+        self._next_allowed_restart.pop(recovery_id, None)
+        self._restart_wait_owner.pop(recovery_id, None)
 
     def should_monitor_container(self, container: Container, info: dict) -> bool:
         """
@@ -337,14 +406,14 @@ class MonitoringEngine:
 
         # Check blacklist names
         for pattern in config.filters.blacklist_names:
-            if fnmatch.fnmatch(container_name, pattern):
+            if container_name is not None and fnmatch.fnmatch(container_name, pattern):
                 return False
 
         # Check whitelist names (if specified, must match at least one)
         if config.filters.whitelist_names:
             matched = False
             for pattern in config.filters.whitelist_names:
-                if fnmatch.fnmatch(container_name, pattern):
+                if container_name is not None and fnmatch.fnmatch(container_name, pattern):
                     matched = True
                     break
             if not matched:
@@ -425,11 +494,12 @@ class MonitoringEngine:
             container_name = info.get("name")
 
             # Check custom health checks (by stable_id, name, then ID for backwards compatibility)
-            custom_hc = config_manager.get_custom_health_check(stable_id)
-            if not custom_hc:
-                custom_hc = config_manager.get_custom_health_check(container_name)
-            if not custom_hc:
-                custom_hc = config_manager.get_custom_health_check(container_id)
+            custom_hc = None
+            for key in (stable_id, container_name, container_id):
+                if key is not None:
+                    custom_hc = config_manager.get_custom_health_check(key)
+                    if custom_hc:
+                        break
             if custom_hc:
                 health_ok = await self._perform_custom_health_check(container, custom_hc)
                 if not health_ok:
@@ -443,7 +513,7 @@ class MonitoringEngine:
                     return True, "Docker health check reports unhealthy"
 
         # Check Uptime-Kuma monitor status (if configured and enabled)
-        if hasattr(self, "uptime_kuma_monitor") and self.uptime_kuma_monitor:
+        if self.uptime_kuma_monitor and stable_id is not None:
             if await self.uptime_kuma_monitor.should_restart_from_uptime_kuma(stable_id):
                 return True, "Uptime-Kuma monitor reports DOWN"
 
@@ -490,10 +560,11 @@ class MonitoringEngine:
                 )
                 return status == "healthy" if status else True  # Assume healthy if no check
             logger.warning("Unknown health check type: %s", check_type)
-            return True
         except Exception as e:
             logger.error("Error performing health check: %s", e)
             return False
+        else:
+            return True
 
     async def _auto_unquarantine_container(
         self,
@@ -517,7 +588,10 @@ class MonitoringEngine:
             # Also clear the restart count so it starts fresh
             config_manager.clear_restart_history(recovery_id)
 
-            # Reset backoff delays
+            # Reset backoff delays; a wait started by another replica sharing this
+            # recovery ID is still valid
+            if self._restart_wait_owner.get(recovery_id) == container_id:
+                self._clear_restart_wait(recovery_id)
             if recovery_id in self._backoff_delays:
                 config = config_manager.get_config()
                 self._backoff_delays[recovery_id] = config.restart.backoff.initial_seconds
@@ -562,7 +636,14 @@ class MonitoringEngine:
 
         # Get recovery identifier: the stable identifier (handles auto-generated names,
         # compose services, explicit IDs), made per replica for scaled Compose services
-        recovery_id = self.get_recovery_identifier(info)
+        identifiers = self._container_identifiers(info)
+        if identifiers is None:
+            logger.warning(
+                "Not restarting container with incomplete identifiers: %s",
+                container_name or container_id,
+            )
+            return
+        container_id, container_name, recovery_id = identifiers
         labels = info.get("labels", {})
 
         # Use STABLE IDENTIFIER as primary (persists across container recreations)
@@ -624,21 +705,14 @@ class MonitoringEngine:
             return
 
         # Apply backoff if enabled (using recovery_id)
-        if config.restart.backoff.enabled:
-            backoff_delay = self._backoff_delays.get(
-                recovery_id, config.restart.backoff.initial_seconds
-            )
-            logger.debug(
-                "Applying backoff delay of %ss for %s (recovery_id: %s)",
-                backoff_delay,
-                container_name,
-                recovery_id,
-            )
-            await asyncio.sleep(backoff_delay)
+        if config.restart.backoff.enabled and not self._restart_wait_elapsed(
+            recovery_id, container_id, container_name, config
+        ):
+            return
 
-            # Update backoff for next time
-            next_backoff = int(backoff_delay * config.restart.backoff.multiplier)
-            self._backoff_delays[recovery_id] = next_backoff
+        # The restart goes ahead now, so no wait is pending (backoff may also have been
+        # disabled while one was)
+        self._clear_restart_wait(recovery_id)
 
         # Perform restart
         logger.info(
@@ -682,6 +756,58 @@ class MonitoringEngine:
                 container_name,
                 recovery_id,
             )
+
+    def _restart_wait_elapsed(
+        self,
+        recovery_id: str,
+        container_id: str | None,
+        container_name: str | None,
+        config: AutoHealConfig,
+    ) -> bool:
+        """
+        Apply the restart backoff for a container that needs restarting
+
+        The wait is recorded as a timestamp and checked on later cycles, never slept
+        inline, so one container's backoff cannot stall the monitoring of the others.
+
+        Args:
+            recovery_id: Recovery identifier the wait is recorded under
+            container_id: Docker ID of the container, recorded as the owner of a new wait
+            container_name: Container name, for logging
+            config: Current configuration
+
+        Returns:
+            True if the restart may go ahead now. False if a wait was just scheduled
+            or the existing one has not run out yet.
+        """
+        now = datetime.now(UTC)
+        next_allowed = self._next_allowed_restart.get(recovery_id)
+        backoff_delay = self._backoff_delays.get(
+            recovery_id, config.restart.backoff.initial_seconds
+        )
+        if next_allowed is None:
+            logger.debug(
+                "Applying backoff delay of %ss for %s (recovery_id: %s)",
+                backoff_delay,
+                container_name,
+                recovery_id,
+            )
+            self._next_allowed_restart[recovery_id] = now + timedelta(seconds=backoff_delay)
+            self._restart_wait_owner[recovery_id] = container_id
+            return False
+        if now < next_allowed:
+            logger.debug(
+                "Container %s (recovery_id: %s) waiting out restart backoff (%.1fs left)",
+                container_name,
+                recovery_id,
+                (next_allowed - now).total_seconds(),
+            )
+            return False
+
+        # Update backoff for next time
+        next_backoff = int(backoff_delay * config.restart.backoff.multiplier)
+        self._backoff_delays[recovery_id] = next_backoff
+        return True
 
     async def _send_alert(self, event: AutoHealEvent) -> None:
         """
@@ -839,8 +965,10 @@ class MonitoringEngine:
                     # Get container info including labels
                     info = await asyncio.to_thread(self.docker_client.get_container_info, container)
 
-                    if not info:
+                    identifiers = self._container_identifiers(info)
+                    if identifiers is None:
                         continue
+                    container_id, container_name, _recovery_id = identifiers
 
                     labels = info.get("labels", {})
 
@@ -852,9 +980,9 @@ class MonitoringEngine:
                     try:
                         event_obj = self._auto_monitor_container(
                             config,
-                            stable_id=self._auto_monitor_stable_id(labels, info.get("name")),
-                            container_id=info.get("full_id"),
-                            container_name=info.get("name"),
+                            stable_id=self._auto_monitor_stable_id(labels, container_name),
+                            container_id=container_id,
+                            container_name=container_name,
                             startup=True,
                             label=label,
                         )

@@ -37,10 +37,11 @@ async def update_config(config: AutoHealConfig):
     """Update configuration"""
     try:
         config_manager.update_config(config)
-        return {"status": "success", "message": "Configuration updated"}
     except Exception as e:
         logger.error("Error updating config: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+    else:
+        return {"status": "success", "message": "Configuration updated"}
 
 
 @router.put("/api/config/monitor")
@@ -50,10 +51,11 @@ async def update_monitor_config(monitor_config: MonitorConfig):
         config = config_manager.get_config()
         config.monitor = monitor_config
         config_manager.update_config(config)
-        return {"status": "success", "message": "Monitor configuration updated"}
     except Exception as e:
         logger.error("Error updating monitor config: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+    else:
+        return {"status": "success", "message": "Monitor configuration updated"}
 
 
 @router.put("/api/config/restart")
@@ -63,10 +65,11 @@ async def update_restart_config(restart_config: RestartConfig):
         config = config_manager.get_config()
         config.restart = restart_config
         config_manager.update_config(config)
-        return {"status": "success", "message": "Restart configuration updated"}
     except Exception as e:
         logger.error("Error updating restart config: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+    else:
+        return {"status": "success", "message": "Restart configuration updated"}
 
 
 @router.get("/api/config/export")
@@ -95,11 +98,11 @@ async def import_config(file: UploadFile = File(...)):
         config_json = content.decode("utf-8")
 
         config_manager.import_config(config_json)
-
-        return {"status": "success", "message": "Configuration imported successfully"}
     except Exception as e:
         logger.error("Error importing config: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+    else:
+        return {"status": "success", "message": "Configuration imported successfully"}
 
 
 @router.put("/api/config/observability")
@@ -140,8 +143,8 @@ async def update_observability_config(observability_config: dict):
             config.observability.log_format = observability_config["log_format"]
 
         config_manager.update_config(config)
-
-        return {"status": "success", "message": "Observability configuration updated"}
     except Exception as e:
         logger.exception("Error updating observability config: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+    else:
+        return {"status": "success", "message": "Observability configuration updated"}
