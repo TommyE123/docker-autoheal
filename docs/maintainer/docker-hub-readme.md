@@ -143,8 +143,9 @@ docker logs -f docker-autoheal
 **Won't start?** Verify the Docker socket is accessible and ports 3131/9090 are free.
 
 **Container quarantined?** It exceeded the configured restart threshold. View it in the
-Web UI, fix the underlying issue, and it will auto-unquarantine once healthy — or
-unquarantine it manually from the UI or `POST /api/containers/{id}/unquarantine`.
+Web UI, fix the underlying issue, and it will auto-unquarantine once it has stayed
+healthy for 3 consecutive checks and has been up for at least 3 monitoring intervals —
+or unquarantine it manually from the UI or `POST /api/containers/{id}/unquarantine`.
 
 Full troubleshooting guide:
 [docs/user/troubleshooting.md](https://github.com/TommyE123/docker-autoheal/blob/main/docs/user/troubleshooting.md)
