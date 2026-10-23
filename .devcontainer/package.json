@@ -3,7 +3,7 @@
   "private": true,
   "description": "Development-only linters used by MegaLinter",
   "devDependencies": {
-    "@ls-lint/ls-lint": "2.3.1",
+    "@ls-lint/ls-lint": "2.3.2",
     "@prantlf/jsonlint": "17.0.1",
     "@secretlint/secretlint-rule-preset-recommend": "13.0.7",
     "htmlhint": "1.9.2",
