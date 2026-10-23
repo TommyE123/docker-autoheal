@@ -1,0 +1,90 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    "customManagers:dockerfileVersions",
+    "group:vite",
+    "group:vitestMonorepo"
+  ],
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/bower_components/**",
+    ".github/workflows/issue-triage.lock.yml",
+    "**/.mise/locks/**"
+  ],
+  "description": "Dependency-update policy for docker-autoheal. Renovate creates and maintains dependency PRs. Patch updates are automerged once required checks pass; all other updates require manual review and merge. See docs/maintainer/dependency-management.md for the full explanation.",
+  "timezone": "Europe/London",
+  "internalChecksFilter": "strict",
+  "forkProcessing": "enabled",
+  "platformAutomerge": false,
+  "rebaseWhen": "behind-base-branch",
+  "semanticCommits": "enabled",
+  "semanticCommitType": "chore",
+  "prConcurrentLimit": 15,
+  "prHourlyLimit": 5,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["* 0-3 * * 6"],
+    "automerge": false
+  },
+  "packageRules": [
+    {
+      "description": "Keep automerge disabled by default for all dependency updates. A later, narrower rule enables it only for eligible patch updates. See docs/maintainer/dependency-management.md.",
+      "matchPackageNames": ["*"],
+      "automerge": false,
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Coordinate major upgrades of the interdependent frontend build and test toolchain in one PR, so lockfile generation sees compatible Vite, Vitest and plugin majors together. Patch and minor updates keep their normal grouping.",
+      "matchManagers": ["npm"],
+      "matchFileNames": ["frontend/package.json"],
+      "matchPackageNames": [
+        "vite",
+        "@vitejs/plugin-react",
+        "vitest",
+        "@vitest/coverage-v8"
+      ],
+      "matchUpdateTypes": ["major"],
+      "groupName": "frontend Vite/Vitest toolchain (major)",
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Automerge patch updates once all required CI checks pass, including 0.x dependencies. Minor and major updates keep automerge disabled. Relies on GitHub required status checks; see docs/maintainer/dependency-management.md.",
+      "matchUpdateTypes": ["patch"],
+      "automerge": true
+    },
+    {
+      "description": "Label Renovate patch updates.",
+      "matchUpdateTypes": ["patch"],
+      "addLabels": ["renovate:patch"]
+    },
+    {
+      "description": "Label Renovate minor updates.",
+      "matchUpdateTypes": ["minor"],
+      "addLabels": ["renovate:minor"]
+    },
+    {
+      "description": "Label Renovate major updates.",
+      "matchUpdateTypes": ["major"],
+      "addLabels": ["renovate:major"]
+    },
+    {
+      "description": "Label Renovate digest updates.",
+      "matchUpdateTypes": ["digest", "pin"],
+      "addLabels": ["renovate:digest"]
+    },
+    {
+      "description": "Pin Docker image tags to an immutable SHA256 digest as well as their human-readable tag/version where the registry supports digests.",
+      "matchDatasources": ["docker"],
+      "pinDigests": true
+    },
+    {
+      "description": "tommye123/docker-autoheal is this project's own published image, not a third-party dependency. Renovate should not manage it.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["tommye123/docker-autoheal"],
+      "enabled": false,
+      "minimumReleaseAge": null
+    }
+  ]
+}

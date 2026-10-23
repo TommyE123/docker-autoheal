@@ -1,0 +1,40 @@
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/
+
+# Runtime data (config, events, integration credentials); mounted, never built in
+data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+
+# Config exports
+autoheal-config-*.json
+
+.git
+
+# Prevent host Node modules being copied into the Docker build context
+frontend/node_modules/

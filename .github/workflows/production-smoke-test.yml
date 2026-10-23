@@ -1,0 +1,239 @@
+name: Production Smoke Test
+
+# A reusable workflow invoked as a job from docker-build.yml (see the
+# smoke-test job there), not a standalone trigger: workflow_run only fires
+# using the workflow file already on the default branch, so it could never
+# run for the PR that introduces this file. Running as a job in the same
+# pull_request-triggered run avoids that.
+#
+# It tests the linux/amd64 image that docker-build.yml's build-amd64 job built from this
+# commit and handed over as an artifact (no registry, no secrets), so it runs the same
+# way for pull requests from forks. In order: the container startup, health,
+# Docker-connectivity and default-configuration checks, and then the full tagged
+# Playwright UI E2E suite (frontend/e2e-ui), which includes a real auto-heal restart.
+# Any failing step fails this job.
+on:
+  workflow_call:
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: false
+      DOCKERHUB_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    name: Production container smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+
+    steps:
+      # Docker Hub credentials go in a throwaway config directory, so the step that removes
+      # them (below) has one exact path to delete before PR-built code runs.
+      - name: Use a throwaway Docker config
+        run: |
+          mkdir -p "${RUNNER_TEMP}/docker-config"
+          echo "DOCKER_CONFIG=${RUNNER_TEMP}/docker-config" >> "${GITHUB_ENV}"
+          # The runner image ships its own ~/.docker/config.json, which is not ours to
+          # remove. Record it so the removal step can prove the login never touched it
+          # (a missing file hashes as empty on both sides, so it still compares equal).
+          echo "DEFAULT_DOCKER_CONFIG_SHA=$(cat "${HOME}/.docker/config.json" 2>/dev/null | sha256sum)" >> "${GITHUB_ENV}"
+
+      # Authenticated pulls avoid Docker Hub's anonymous rate limit (429). Best effort: if the
+      # login itself fails (a Docker Hub outage), carry on with anonymous pulls. Repo secrets are
+      # not available to fork or Dependabot runs, which skip this step.
+      - name: Login to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        continue-on-error: true
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Download the built image
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: docker-image-amd64
+          path: ${{ runner.temp }}/image
+
+      - name: Load the built image
+        run: docker load --input "${RUNNER_TEMP}/image/image.tar"
+
+      # The suite's fixtures only create containers for an instance that monitors
+      # autoheal.dev=true, and several tests change the app's configuration and event log.
+      # So the image runs as a throwaway instance. It starts with no config, which proves
+      # the image's default configuration (autoheal=true) loads, and is then switched to
+      # autoheal.dev=true over the API before the suite runs.
+      #
+      # The suite creates containers on this runner's Docker daemon, and the built image
+      # itself is given that daemon's socket (full control of it, :ro or not). That is only
+      # acceptable on an ephemeral GitHub-hosted VM; run.sh additionally refuses to start
+      # unless Docker is this machine's own local daemon (no DOCKER_HOST/DOCKER_CONTEXT,
+      # a dockerd process, daemon name equal to the hostname).
+      - name: Require an ephemeral GitHub-hosted runner for the UI E2E suite
+        run: |
+          if [ "${RUNNER_ENVIRONMENT:-}" != "github-hosted" ]; then
+            echo "::error::UI E2E creates containers on the runner's Docker daemon and only runs on GitHub-hosted runners (RUNNER_ENVIRONMENT='${RUNNER_ENVIRONMENT:-}')"
+            exit 1
+          fi
+
+      # Pull the test containers' image once, before Playwright starts its parallel workers, so
+      # they do not all race to pull it from Docker Hub (a 500 or a rate limit there failed
+      # tests on their first attempt). Try the Google mirror first, then Docker Hub, with
+      # retries. Keep the tag in step with IMAGE in frontend/e2e-ui/docker.js.
+      - name: Pre-pull the test container image
+        run: |
+          image=alpine:3.22
+          for attempt in 1 2 3 4 5; do
+            if docker pull "mirror.gcr.io/library/${image}" && docker tag "mirror.gcr.io/library/${image}" "${image}"; then
+              exit 0
+            fi
+            if docker pull "${image}"; then
+              exit 0
+            fi
+            echo "Pull attempt ${attempt} failed; retrying"
+            sleep $((attempt * 5))
+          done
+          echo "::error::Could not pull ${image} from the mirror or Docker Hub"
+          exit 1
+
+      # Docker Hub credentials are only needed for the pulls above. The image started next
+      # gets the runner's Docker socket, and mounting it :ro does not limit the API: it can
+      # create containers and bind-mount the host, so delete them first. The login action's
+      # post-job logout is harmless once the directory is gone.
+      - name: Remove Docker Hub credentials before running the built image
+        run: |
+          rm -rf "${DOCKER_CONFIG}"
+          if [ -e "${DOCKER_CONFIG}" ] \
+            || [ "$(cat "${HOME}/.docker/config.json" 2>/dev/null | sha256sum)" != "${DEFAULT_DOCKER_CONFIG_SHA}" ]; then
+            echo "::error::Docker Hub credentials are still on the runner"
+            exit 1
+          fi
+
+      - name: Start the image for the UI E2E suite
+        run: |
+          docker run -d --name autoheal-ui-e2e \
+            -v /var/run/docker.sock:/var/run/docker.sock:ro \
+            -p 3132:3131 \
+            -e PYTHONUNBUFFERED=1 \
+            --label autoheal.dev=false \
+            autoheal-test:amd64
+          echo "UI E2E instance image: $(docker inspect --format '{{.Config.Image}} ({{.Image}})' autoheal-ui-e2e)"
+
+      - name: Wait for the service to become ready
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -sf http://localhost:3132/health >/dev/null; then
+              echo "Service is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Auto-Heal service did not become ready within the timeout"
+          exit 1
+
+      - name: Verify the application can communicate with Docker
+        # /api/status returns HTTP 200 even when Docker is unreachable
+        # (docker_connected: false) rather than failing the request, so the
+        # field itself - not just the HTTP status - has to be checked.
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -sf http://localhost:3132/api/status | jq -e '.docker_connected == true' >/dev/null 2>&1; then
+              echo "Application is connected to Docker"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Application never reported a successful Docker connection"
+          exit 1
+
+      - name: Verify the default monitor configuration
+        run: |
+          curl -sf http://localhost:3132/api/config \
+            | jq -e '.monitor.label_key == "autoheal" and .monitor.label_value == "true"' >/dev/null \
+            || { echo "::error::The image's default monitor label is not autoheal=true"; exit 1; }
+          echo "Default monitor label is autoheal=true"
+
+      # Same API the suite's configuration tests use; only the label changes.
+      - name: Switch the instance to monitor autoheal.dev=true
+        run: |
+          body="$(curl -sf http://localhost:3132/api/config | jq -c '.monitor | .label_key = "autoheal.dev"')"
+          curl -sf -X PUT http://localhost:3132/api/config/monitor \
+            -H "Content-Type: application/json" -d "$body" >/dev/null
+          # The suite's own fixtures re-check the label before every test; failing here
+          # first gives a clearer message.
+          curl -sf http://localhost:3132/api/config \
+            | jq -e '.monitor.label_key == "autoheal.dev" and .monitor.label_value == "true"' >/dev/null \
+            || { echo "::error::Instance does not monitor autoheal.dev=true after the switch"; exit 1; }
+          echo "Instance monitors autoheal.dev=true"
+
+      - name: Check out the UI E2E tests
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: frontend
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install UI E2E dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Chromium and its system dependencies
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      # UI_E2E_BASE_URL makes run.sh use this running instance instead of starting the
+      # dev stack. It always runs the full suite. run.sh exits 3
+      # when the environment cannot be used and 1 when a test fails.
+      - name: Run the full UI E2E suite against the built image
+        env:
+          UI_E2E_BASE_URL: http://localhost:3132
+        run: |
+          status=0
+          bash frontend/e2e-ui/run.sh full headless || status=$?
+          if [ "$status" -eq 1 ]; then
+            echo "::error::UI E2E tests failed; see the Playwright report artifact"
+          fi
+          exit "$status"
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ui-e2e-report
+          path: |
+            frontend/playwright-report-ui/
+            frontend/test-results-ui/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          echo "--- docker ps -a ---"
+          docker ps -a
+          echo "--- autoheal-ui-e2e logs ---"
+          docker logs autoheal-ui-e2e || true
+          echo "--- autoheal-ui-e2e inspect ---"
+          docker inspect autoheal-ui-e2e || true
+          if docker logs autoheal-ui-e2e 2>&1 | grep -qi "http+docker\|Not supported URL scheme"; then
+            echo "::error::Confirmed known Docker SDK/requests 'http+docker' transport failure (see PR #61)"
+          fi
+
+      - name: Clean up
+        if: always()
+        run: |
+          docker rm -f autoheal-ui-e2e 2>/dev/null || true
+          # Containers the UI E2E suite labels, if its own teardown did not run.
+          docker ps -aq --filter label=autoheal.e2e.run | xargs -r docker rm -f || true

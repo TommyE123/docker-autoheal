@@ -1,0 +1,170 @@
+# Docker Auto-Heal Service
+
+[![Unit Tests](https://github.com/TommyE123/docker-autoheal/actions/workflows/tests.yml/badge.svg)](https://github.com/TommyE123/docker-autoheal/actions/workflows/tests.yml)
+[![Test Coverage](https://img.shields.io/codecov/c/github/TommyE123/docker-autoheal?branch=main&label=Test%20Coverage)](https://codecov.io/gh/TommyE123/docker-autoheal)
+[![Mutation score](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FTommyE123%2Fdocker-autoheal%2Fmain%2F.github%2Fbadges%2Fmutation.json)](docs/developer/mutation-testing.md)
+[![Docker Hub Pulls](https://img.shields.io/docker/pulls/tommye123/docker-autoheal?label=Docker%20Hub%20Pulls)](https://hub.docker.com/r/tommye123/docker-autoheal)
+[![GHCR Pulls](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fghcr-badge.elias.eu.org%2Fapi%2FTommyE123%2Fdocker-autoheal&query=downloadCount&label=GHCR%20Pulls)](https://github.com/users/TommyE123/packages/container/package/docker-autoheal)
+[![Docker Image Size](https://img.shields.io/docker/image-size/tommye123/docker-autoheal/latest?label=Docker%20Image%20Size)](https://hub.docker.com/r/tommye123/docker-autoheal)
+[![GitHub Release](https://img.shields.io/github/v/release/TommyE123/docker-autoheal?sort=semver&label=GitHub%20Release)](https://github.com/TommyE123/docker-autoheal/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+Docker Auto-Heal watches your Docker containers and restarts the ones that fail or go
+unhealthy, so you don't have to. It runs as a single container with a web dashboard, a
+REST API, and Prometheus metrics.
+
+## Why use it
+
+- **Automatic recovery** — containers that exit with an error or fail their health check
+  are restarted for you, with cooldowns and exponential backoff so a broken container
+  doesn't restart in a tight loop.
+- **Quarantine for flapping containers** — a container that keeps failing past a
+  configurable threshold is quarantined (auto-healing paused for it) and automatically
+  un-quarantined once it recovers.
+- **No YAML to hand-write** — enable monitoring with a single Docker label, or manage it
+  entirely from the web UI.
+- **Custom health checks** — beyond Docker's native `HEALTHCHECK`, you can define HTTP,
+  TCP, or exec-based checks per container.
+- **Observability built in** — a Prometheus metrics endpoint, an event log of every
+  restart/quarantine decision, and optional notifications to Discord, Slack, Telegram,
+  ntfy, Gotify, Pushover, or a generic webhook.
+
+### Project status
+
+Docker Auto-Heal is under active development. The core monitoring/restart engine, web
+UI, REST API, and notification system are implemented and covered by an automated test
+suite (see [Unit Tests workflow](.github/workflows/tests.yml)). Configuration is stored
+on disk in `/data` and managed through the web UI or the REST API — there are currently
+no environment-variable settings for tuning monitoring behavior (see
+[Configuration](docs/user/configuration.md)).
+
+## Quick Start
+
+Run the service with the Docker socket mounted so it can see and manage your containers:
+
+```bash
+docker run -d \
+  --name docker-autoheal \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  -v ./data:/data \
+  -p 3131:3131 \
+  -p 9090:9090 \
+  --restart unless-stopped \
+  tommye123/docker-autoheal:latest
+```
+
+Images are also published to GitHub Container Registry as
+`ghcr.io/tommye123/docker-autoheal:latest` if you prefer GHCR over Docker Hub.
+
+Or with Docker Compose:
+
+```yaml
+services:
+  autoheal:
+    image: tommye123/docker-autoheal:latest
+    container_name: docker-autoheal
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./data:/data
+    ports:
+      - "3131:3131"  # Web UI
+      - "9090:9090"  # Prometheus metrics
+    labels:
+      - "autoheal=false"  # keeps the monitor unselected under the default label-based
+                          # selection; see docs/user/labels.md if you enable include_all
+```
+
+```bash
+docker compose up -d
+```
+
+Open **<http://localhost:3131>** — that's the dashboard. Docker Auto-Heal is now running
+and ready to monitor containers.
+
+For a from-scratch walkthrough (requirements, verifying the socket mount, testing with a
+sample container), see [Installation](docs/user/installation.md).
+
+## Enabling Auto-Healing for a Container
+
+Add the `autoheal` label to any container you want monitored:
+
+```yaml
+services:
+  webapp:
+    image: nginx:alpine
+    labels:
+      autoheal: "true"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+```
+
+Docker Auto-Heal picks up labelled containers automatically — both containers that are
+already running when it starts, and new ones as they start. A container's Docker
+`healthcheck` (if it has one) determines when Auto-Heal considers it unhealthy; without a
+health check, Auto-Heal still restarts the container if it exits with a non-zero code.
+You can also select containers to monitor from the web UI without adding a label at all.
+
+See [Labels](docs/user/labels.md) and [Health Checks](docs/user/health-checks.md) for the
+full picture, including restart policy, cooldowns, and quarantine behavior.
+
+## Web UI
+
+The dashboard at `http://<host>:3131` shows every container's status, lets you toggle
+auto-healing per container, view the event log, edit configuration, and manage custom
+health checks and notifications — see [Usage](docs/user/usage.md).
+
+Interactive API documentation (Swagger UI) is available at `http://<host>:3131/docs`.
+
+## Metrics
+
+Prometheus metrics are exposed on a separate port (`9090` by default) at `/metrics`:
+
+```bash
+curl http://localhost:9090/metrics
+```
+
+See [Monitoring & Metrics](docs/user/monitoring-and-metrics.md) for the full metric list.
+
+## Troubleshooting
+
+**Container not being monitored?** Check it has the `autoheal=true` label (unless you
+enabled "monitor all containers"), isn't in the excluded list, and check the Events tab
+in the UI for the monitoring decision.
+
+**Service won't start?** Confirm the Docker socket is mounted and readable, and that
+ports 3131 and 9090 are free.
+
+For more, see the full [Troubleshooting guide](docs/user/troubleshooting.md).
+
+## Documentation
+
+| For users                                                   | For developers                                           | For maintainers                                                   |
+|-------------------------------------------------------------|----------------------------------------------------------|-------------------------------------------------------------------|
+| [Installation](docs/user/installation.md)                   | [Development setup](docs/developer/development-setup.md) | [Dependency management](docs/maintainer/dependency-management.md) |
+| [Configuration](docs/user/configuration.md)                 | [Architecture](docs/developer/architecture.md)           | [Publishing](docs/maintainer/publishing.md)                       |
+| [Usage](docs/user/usage.md)                                 | [Project structure](docs/developer/project-structure.md) | [Release process](docs/maintainer/release-process.md)             |
+| [Labels](docs/user/labels.md)                               | [Frontend development](docs/developer/frontend.md)       |                                                                   |
+| [Health checks](docs/user/health-checks.md)                 | [Testing](docs/developer/testing.md)                     |                                                                   |
+| [Monitoring & metrics](docs/user/monitoring-and-metrics.md) |                                                          |                                                                   |
+| [Notifications](docs/user/notifications.md)                 |                                                          |                                                                   |
+| [Maintenance mode](docs/user/maintenance-mode.md)           |                                                          |                                                                   |
+| [Troubleshooting](docs/user/troubleshooting.md)             |                                                          |                                                                   |
+| [Migration](docs/user/migration.md)                         |                                                          |                                                                   |
+
+The full documentation index, including historical/superseded documents, is in
+[docs/index.md](docs/index.md).
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) to get set up, and
+[docs/developer/](docs/developer/) for architecture and project structure.
+
+## License
+
+[MIT](LICENSE)
+
+This project was originally created by [@satya-sovan](https://github.com/satya-sovan). Thank you to the original author for making the project available as open source.

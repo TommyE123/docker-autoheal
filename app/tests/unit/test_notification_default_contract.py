@@ -1,0 +1,277 @@
+"""
+Integration test for the engine/API -> NotificationManager event-type contract
+under the *shipped default* ``NotificationsConfig``.
+
+``MonitoringEngine`` (and one API endpoint) emit ``AutoHealEvent`` values, and
+``NotificationsConfig.event_filters`` plus ``NotificationManager``'s title map
+decide what happens to them. The two sides are joined only by bare event-type
+strings, and nothing else in the suite checks them against each other: engine
+tests swap ``notification_manager`` for a ``MagicMock`` (see
+``mock_notification_manager`` in ``conftest.py``), and
+``test_notification_manager.py`` always supplies its own ``event_filters``.
+
+They pin the shipped default contract (see #100 and #235):
+
+* The defaults are ``restart``, ``quarantine``, ``auto_unquarantine`` and
+  ``auto_monitor``.
+* ``unquarantine`` is a manual action and is not notified by default.
+* ``health_check_failed`` is never emitted (a failed custom health check
+  surfaces as ``restart``), so it is not in the defaults.
+* ``auto_unquarantine`` has an explicit title, and the generic title fallback
+  has no leading space.
+
+Integration boundary: real ``MonitoringEngine`` and real
+``NotificationManager``, wired together instead of one being mocked out. Only
+the outbound HTTP session is faked, reusing ``_FakeSession`` from
+``test_notification_manager.py``.
+
+``unquarantine`` is emitted by ``app/api/routes/containers.py``, not by the
+engine, so it is
+driven through that endpoint coroutine directly (the pattern
+``test_api.py`` already uses - no HTTP client, no Docker daemon) rather than by
+hand-building the event. Hand-building it would pin nothing: the whole point of
+scenario 2 is to catch a future rename on either side of the contract, and a
+locally constructed event can never drift from itself.
+"""
+
+from datetime import UTC, datetime
+
+import pytest
+
+from app.api.routes.containers import unquarantine_container
+from app.config.config_manager import AutoHealEvent, NotificationService, config_manager
+from app.notifications.notification_manager import NotificationManager
+from app.tests.unit.conftest import after_backoff, make_container
+from app.tests.unit.test_engine_lifecycle import start_event
+from app.tests.unit.test_notification_manager import _FakeSession, fake_session
+
+WEBHOOK_URL = "https://example.invalid/default-contract"
+
+# The shipped default, asserted rather than imported so that changing it is a
+# deliberate act that breaks this test.
+DEFAULT_EVENT_FILTERS = ["restart", "quarantine", "auto_unquarantine", "auto_monitor"]
+
+RESTART_ID = "1" * 64
+QUARANTINE_ID = "2" * 64
+AUTO_UNQUARANTINE_ID = "3" * 64
+AUTO_MONITOR_ID = "4" * 64
+UNQUARANTINE_ID = "5" * 64
+
+
+@pytest.fixture
+def real_notification_manager(monkeypatch, docker_client) -> NotificationManager:
+    """
+    A real ``NotificationManager`` wired into both event producers.
+
+    Overrides the autouse ``mock_notification_manager`` fixture for the engine
+    and patches the API module's singleton, so events travel the real
+    ``send_event_notification`` -> ``_should_notify_for_event`` ->
+    ``_process_notification`` -> ``_format_notification`` path. Only
+    ``_session`` is faked, so no outbound request is ever attempted.
+    """
+    manager = NotificationManager()
+    manager._session = _FakeSession()
+    monkeypatch.setattr("app.monitor.monitoring_engine.notification_manager", manager)
+    monkeypatch.setattr("app.api.state.notification_manager", manager)
+    monkeypatch.setattr("app.api.state.docker_client", docker_client)
+    return manager
+
+
+def enable_notifications_with_default_filters():
+    """
+    Enable notifications and add one webhook service, leaving ``event_filters``
+    untouched at its shipped default.
+    """
+    config = config_manager.get_config()
+    config.notifications.enabled = True
+    config.notifications.services = [
+        NotificationService(
+            name="Default Contract Webhook",
+            type="webhook",
+            enabled=True,
+            url=WEBHOOK_URL,
+        )
+    ]
+    config_manager.update_config(config)
+
+
+async def emit_one_event_of_each_type(engine, docker_client) -> None:
+    """
+    Drive the real producers to emit exactly one event of every type the
+    codebase actually emits.
+
+    A separate container per event type keeps the engine's per-``stable_id``
+    cooldown and backoff state from interfering between steps.
+    """
+    # "restart": an unhealthy container below the restart threshold.
+    container, info = make_container(name="restart-target", container_id=RESTART_ID)
+    docker_client.add_container(container, info)
+    await after_backoff(engine, engine._handle_container_restart, container, info, "unhealthy")
+
+    # "quarantine": the same path once the restart threshold is exceeded.
+    container, info = make_container(name="quarantine-target", container_id=QUARANTINE_ID)
+    docker_client.add_container(container, info)
+    for _ in range(3):  # default restart.max_restarts
+        config_manager.record_restart("quarantine-target")
+    await engine._handle_container_restart(container, info, "unhealthy")
+
+    # "auto_unquarantine": a quarantined container found healthy again.
+    container, info = make_container(
+        name="auto-unquarantine-target",
+        container_id=AUTO_UNQUARANTINE_ID,
+        status="running",
+    )
+    docker_client.add_container(container, info)
+    config_manager.quarantine_container("auto-unquarantine-target")
+    await engine._check_single_container(container)
+
+    # "auto_monitor": a labelled container starting while the engine runs.
+    container, info = make_container(name="auto-monitor-target", container_id=AUTO_MONITOR_ID)
+    docker_client.add_container(container, info)
+    await engine._process_container_start_event(start_event(container.id, "auto-monitor-target"))
+
+    # "unquarantine": user-initiated, emitted by the API rather than the engine.
+    container, info = make_container(name="unquarantine-target", container_id=UNQUARANTINE_ID)
+    docker_client.add_container(container, info)
+    config_manager.quarantine_container("unquarantine-target")
+    await unquarantine_container(UNQUARANTINE_ID)
+
+
+async def drain_notification_queue(manager: NotificationManager) -> None:
+    """
+    Process everything ``send_event_notification`` queued.
+
+    Driving ``_process_notification`` directly rather than starting the
+    background worker keeps the test deterministic (no sleeping, no races).
+    """
+    while not manager._notification_queue.empty():
+        await manager._process_notification(manager._notification_queue.get_nowait())
+
+
+def delivered_event_types(manager: NotificationManager) -> list:
+    return [call["json"]["event"]["type"] for call in fake_session(manager).calls]
+
+
+@pytest.mark.asyncio
+class TestDefaultNotificationContract:
+    """
+    Scenario 1 of #100: which real events actually reach the wire under the
+    default configuration.
+    """
+
+    async def test_default_event_filters_are_the_shipped_defaults(self):
+        """Guard: the rest of this module is only meaningful against the default."""
+        assert config_manager.get_config().notifications.event_filters == DEFAULT_EVENT_FILTERS
+
+    async def test_every_emitted_event_type_is_covered(
+        self, engine, docker_client, real_notification_manager
+    ):
+        """Guard: the drive helper really does produce one of each event type."""
+        enable_notifications_with_default_filters()
+
+        await emit_one_event_of_each_type(engine, docker_client)
+
+        assert [event.event_type for event in config_manager.get_events()] == [
+            "restart",
+            "quarantine",
+            "auto_unquarantine",
+            "auto_monitor",
+            "unquarantine",
+        ]
+
+    async def test_four_of_five_event_types_notify_by_default(
+        self, engine, docker_client, real_notification_manager
+    ):
+        """``unquarantine`` is user-initiated, so it is not notified by default."""
+        enable_notifications_with_default_filters()
+
+        await emit_one_event_of_each_type(engine, docker_client)
+        await drain_notification_queue(real_notification_manager)
+
+        assert delivered_event_types(real_notification_manager) == [
+            "restart",
+            "quarantine",
+            "auto_unquarantine",
+            "auto_monitor",
+        ]
+
+    async def test_health_check_failed_is_not_a_default_filter(
+        self, engine, docker_client, real_notification_manager
+    ):
+        """``health_check_failed`` is never emitted, so it is not in the defaults."""
+        enable_notifications_with_default_filters()
+
+        await emit_one_event_of_each_type(engine, docker_client)
+
+        assert "health_check_failed" not in DEFAULT_EVENT_FILTERS
+        assert "health_check_failed" not in config_manager.get_config().notifications.event_filters
+        emitted = {event.event_type for event in config_manager.get_events()}
+        assert "health_check_failed" not in emitted
+
+    async def test_nothing_is_delivered_while_notifications_are_disabled(
+        self, engine, docker_client, real_notification_manager
+    ):
+        """The default ``notifications.enabled`` is False, so the default is silence."""
+        assert config_manager.get_config().notifications.enabled is False
+
+        await emit_one_event_of_each_type(engine, docker_client)
+        await drain_notification_queue(real_notification_manager)
+
+        assert fake_session(real_notification_manager).calls == []
+
+
+@pytest.mark.asyncio
+class TestDefaultNotificationPayloads:
+    """
+    Scenario 2 of #100: the payloads that do go out are well-formed, so a
+    rename on either side of the contract breaks a test.
+    """
+
+    async def test_delivered_payload_titles_match_the_event_types(
+        self, engine, docker_client, real_notification_manager
+    ):
+        enable_notifications_with_default_filters()
+
+        await emit_one_event_of_each_type(engine, docker_client)
+        await drain_notification_queue(real_notification_manager)
+
+        titles_by_type = {
+            call["json"]["event"]["type"]: call["json"]["title"]
+            for call in fake_session(real_notification_manager).calls
+        }
+
+        assert titles_by_type["restart"] == "Container Restarted"
+        assert titles_by_type["quarantine"] == "Container Quarantined"
+        assert titles_by_type["auto_unquarantine"] == "Container Auto-Unquarantined"
+        assert titles_by_type["auto_monitor"] == "Container Auto-Monitored"
+
+    async def test_generic_title_fallback_has_no_leading_space(self, real_notification_manager):
+        event = AutoHealEvent(
+            timestamp=datetime.now(UTC),
+            container_id="a" * 64,
+            container_name="fallback-target",
+            event_type="some_new_event",
+            restart_count=0,
+            status="success",
+            message="m",
+        )
+
+        title, _, _ = real_notification_manager._format_notification(event)
+
+        assert title == "Some New Event"
+
+    async def test_delivered_payloads_carry_the_container_and_url(
+        self, engine, docker_client, real_notification_manager
+    ):
+        enable_notifications_with_default_filters()
+
+        await emit_one_event_of_each_type(engine, docker_client)
+        await drain_notification_queue(real_notification_manager)
+
+        assert len(fake_session(real_notification_manager).calls) == 4
+        for call in fake_session(real_notification_manager).calls:
+            assert call["url"] == WEBHOOK_URL
+            event = call["json"]["event"]
+            assert event["container_name"].endswith("-target)")
+            assert event["container_id"] is not None
+            assert call["json"]["message"].startswith("**Container:**")

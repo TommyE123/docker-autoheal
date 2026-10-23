@@ -1,0 +1,36 @@
+services:
+  autoheal:
+    # This is our own published image (built and published by
+    # .github/workflows/release-please.yml), not a third-party dependency, kept on :latest
+    # so users who copy this file always deploy our newest release. `docker compose up
+    # --build` builds it from this checkout instead.
+    image: tommye123/docker-autoheal:latest
+    build: .
+    container_name: docker-autoheal
+    restart: unless-stopped
+
+    # Mount Docker socket to access Docker API
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./data:/data # Persistent data storage (config, events, logs)
+
+    # Port mappings
+    ports:
+      - "3131:3131" # Web UI (React)
+      - "9090:9090" # Prometheus metrics
+
+    # Environment variables (optional, can be configured via UI)
+    environment:
+      - PYTHONUNBUFFERED=1
+
+    # Labels for auto-heal (exclude itself from monitoring)
+    labels:
+      - "autoheal=false"
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3131/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

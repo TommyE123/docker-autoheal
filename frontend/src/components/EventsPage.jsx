@@ -1,0 +1,338 @@
+import { useState, useEffect, useRef, useId } from "react";
+import {
+  Card,
+  Button,
+  Spinner,
+  Badge,
+  Alert,
+  Modal,
+  Form,
+} from "react-bootstrap";
+import { getEvents, clearEvents, getContainers } from "../services/api";
+import { EVENT_TYPES } from "../constants/eventTypes";
+import { format } from "date-fns";
+
+function EventsPage() {
+  const id = useId();
+  const confirmationTitleId = `${id}-confirm-clear-events-title`;
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [alert, setAlert] = useState(null);
+  const [eventsError, setEventsError] = useState(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [eventType, setEventType] = useState("");
+  const [container, setContainer] = useState("");
+  const [limit, setLimit] = useState(50);
+  const [containers, setContainers] = useState([]);
+
+  const latestRequestId = useRef(0);
+
+  const filtersActive = eventType !== "" || container !== "";
+
+  const fetchEvents = async () => {
+    // Only the most recently issued request may update state, so a slow
+    // response for an earlier selection cannot overwrite newer results.
+    const requestId = ++latestRequestId.current;
+    try {
+      const response = await getEvents(limit, { eventType, container });
+
+      if (requestId === latestRequestId.current) {
+        setEvents(response.data);
+        setEventsError(null);
+      }
+    } catch (error) {
+      console.error("Failed to load events:", error);
+
+      if (requestId === latestRequestId.current) {
+        setEventsError("Failed to load events. Please try again.");
+      }
+    } finally {
+      if (requestId === latestRequestId.current) {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleClearEventsClick = () => {
+    setShowConfirmModal(true);
+  };
+
+  const handleCancelClear = () => {
+    setShowConfirmModal(false);
+  };
+
+  const handleConfirmClear = async () => {
+    setShowConfirmModal(false);
+
+    try {
+      await clearEvents();
+      setEvents([]);
+      setAlert({
+        type: "success",
+        message: "All events cleared successfully!",
+      });
+      setTimeout(() => setAlert(null), 3000);
+    } catch (error) {
+      console.error("Failed to clear events:", error);
+      setAlert({
+        type: "danger",
+        message: "Failed to clear events. Please try again.",
+      });
+      setTimeout(() => setAlert(null), 5000);
+    }
+  };
+
+  useEffect(() => {
+    const loadContainers = async () => {
+      try {
+        const response = await getContainers(true);
+        setContainers(response.data);
+      } catch (error) {
+        console.error("Failed to load containers:", error);
+      }
+    };
+    loadContainers();
+  }, []);
+
+  const handleClearFilters = () => {
+    setEventType("");
+    setContainer("");
+  };
+
+  useEffect(() => {
+    // Invalidate any in-flight request for the previous selection right away,
+    // since the fetch below is deferred and may not have started yet.
+    latestRequestId.current += 1;
+
+    // Deferred so the initial load does not set state synchronously in the effect
+    const initialLoad = setTimeout(fetchEvents, 0);
+
+    // Auto-refresh every 5 seconds
+    const interval = setInterval(fetchEvents, 5000);
+
+    // Handle visibility change to refresh immediately when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchEvents();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearTimeout(initialLoad);
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventType, container, limit]);
+
+  const getEventVariant = (status) => {
+    const variants = {
+      success: "success",
+      failure: "danger",
+      quarantined: "warning",
+    };
+    return variants[status] || "secondary";
+  };
+
+  const getEventIcon = (eventType) => {
+    const icons = {
+      restart: "bi-arrow-clockwise",
+      quarantine: "bi-lock",
+      health_check_failed: "bi-exclamation-triangle",
+    };
+    return icons[eventType] || "bi-info-circle";
+  };
+
+  if (loading) {
+    return (
+      <div className="text-center py-5">
+        <Spinner animation="border" variant="primary" />
+        <div className="mt-2">Loading events...</div>
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <Card.Header className="d-flex justify-content-between align-items-center">
+        <h5 className="mb-0">
+          <i className="bi bi-clock-history me-2"></i>
+          Event Log
+        </h5>
+        <div className="d-flex align-items-center flex-wrap gap-2">
+          <Form.Select
+            size="sm"
+            aria-label="Event Type"
+            style={{ width: "auto" }}
+            value={eventType}
+            onChange={(e) => setEventType(e.target.value)}
+          >
+            <option value="">All event types</option>
+            {EVENT_TYPES.map((type) => (
+              <option key={type.value} value={type.value}>
+                {type.label}
+              </option>
+            ))}
+          </Form.Select>
+          <Form.Select
+            size="sm"
+            aria-label="Container"
+            style={{ width: "auto" }}
+            value={container}
+            onChange={(e) => setContainer(e.target.value)}
+          >
+            <option value="">All containers</option>
+            {containers.map((c) => (
+              <option key={c.id} value={c.name}>
+                {c.name}
+              </option>
+            ))}
+          </Form.Select>
+          <Form.Select
+            size="sm"
+            aria-label="Limit"
+            style={{ width: "auto" }}
+            value={limit}
+            onChange={(e) => setLimit(Number(e.target.value))}
+          >
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+          </Form.Select>
+          <Button variant="primary" size="sm" onClick={fetchEvents}>
+            <i className="bi bi-arrow-clockwise me-1"></i>
+            Refresh
+          </Button>
+          {filtersActive && (
+            <Button
+              variant="outline-secondary"
+              size="sm"
+              onClick={handleClearFilters}
+            >
+              <i className="bi bi-funnel me-1"></i>
+              Clear Filters
+            </Button>
+          )}
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={handleClearEventsClick}
+            disabled={events.length === 0}
+          >
+            <i className="bi bi-trash me-1"></i>
+            Clear All
+          </Button>
+        </div>
+      </Card.Header>
+
+      <Card.Body style={{ maxHeight: "600px", overflowY: "auto" }}>
+        {eventsError && (
+          <Alert variant="danger" className="mb-3">
+            {eventsError}
+          </Alert>
+        )}
+
+        {alert && (
+          <Alert
+            variant={alert.type}
+            dismissible
+            onClose={() => setAlert(null)}
+            className="alert-floating mb-3"
+          >
+            {alert.message}
+          </Alert>
+        )}
+        {events.length === 0 ? (
+          eventsError ? null : (
+            <div className="text-center py-4 text-muted">
+              No events recorded yet
+            </div>
+          )
+        ) : (
+          <div className="event-list">
+            {[...events].reverse().map((event, index) => (
+              <div
+                key={index}
+                className={`event-item border-start border-${getEventVariant(event.status)} border-4 p-3 mb-3 bg-light rounded`}
+              >
+                <div className="d-flex justify-content-between align-items-start mb-2">
+                  <div>
+                    <h6 className="mb-1">
+                      <i
+                        className={`bi ${getEventIcon(event.event_type)} me-2`}
+                      ></i>
+                      {event.container_name}
+                    </h6>
+                    <small className="text-muted">
+                      {format(new Date(event.timestamp), "PPpp")}
+                    </small>
+                  </div>
+                  <div className="text-end">
+                    <Badge bg="secondary" className="me-1">
+                      {event.event_type}
+                    </Badge>
+                    <Badge bg={getEventVariant(event.status)}>
+                      {event.status}
+                    </Badge>
+                    <div className="mt-1">
+                      <Badge bg="primary">
+                        Restarts: {event.restart_count}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <strong>Message:</strong> {event.message}
+                </div>
+                <div className="mt-1 small text-muted">
+                  <strong>Container ID:</strong>{" "}
+                  <code>{event.container_id}</code>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card.Body>
+
+      {/* Confirmation Modal */}
+      <Modal
+        show={showConfirmModal}
+        onHide={handleCancelClear}
+        centered
+        aria-labelledby={confirmationTitleId}
+      >
+        <Modal.Header closeButton>
+          <Modal.Title id={confirmationTitleId}>
+            <i className="bi bi-exclamation-triangle text-warning me-2"></i>
+            Confirm Clear Events
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="mb-0">
+            Are you sure you want to clear all events? This action cannot be
+            undone.
+          </p>
+          <p className="text-muted small mt-2 mb-0">
+            <i className="bi bi-info-circle me-1"></i>
+            {events.length} event{events.length !== 1 ? "s" : ""} will be
+            permanently deleted.
+          </p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCancelClear}>
+            <i className="bi bi-x-circle me-1"></i>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={handleConfirmClear}>
+            <i className="bi bi-trash me-1"></i>
+            Clear All Events
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    </Card>
+  );
+}
+
+export default EventsPage;

@@ -1,0 +1,289 @@
+"""
+Uptime-Kuma monitoring service that provides container health status from Uptime Kuma
+This module only handles Uptime Kuma-specific operations (SOLID principles):
+- Uptime Kuma API communication
+- Monitor status retrieval
+- Mapping configuration
+- Providing health status to monitoring engine
+
+Core functionality (restarts, quarantine, events, etc.) is delegated to MonitoringEngine
+"""
+
+import asyncio
+import logging
+from collections import Counter
+
+from app.config.config_manager import config_manager
+from app.uptime_kuma.uptime_kuma_client import UptimeKumaClient
+
+logger = logging.getLogger(__name__)
+
+
+class UptimeKumaMonitor:
+    """
+    Uptime-Kuma integration service
+    Provides container health status from Uptime Kuma monitors
+    Does NOT perform core actions - only reports status to MonitoringEngine
+    """
+
+    def __init__(self) -> None:
+        """Initialize Uptime-Kuma monitor"""
+        self.client: UptimeKumaClient | None = None
+        self._running = False
+        self._task: asyncio.Task | None = None
+        self._monitor_cache: dict[str, dict] = {}  # Cache monitor IDs by friendly name
+        self._container_status_cache: dict[str, int] = {}  # Cache of stable_id -> status
+        self._container_status_mapping_cache: dict[
+            str, str
+        ] = {}  # stable_id -> source monitor name
+        # (stable_id, monitor name) mappings already warned about as ambiguous
+        self._ambiguous_mappings: set[tuple[str, str]] = set()
+
+    async def start(self) -> None:
+        """Start Uptime-Kuma monitoring"""
+        try:
+            config = config_manager.get_config()
+
+            if not config.uptime_kuma.enabled:
+                logger.info("Uptime-Kuma integration is disabled - configure it via UI to enable")
+                return
+
+            if not config.uptime_kuma.server_url or not config.uptime_kuma.api_token:
+                logger.info(
+                    "Uptime-Kuma integration not configured yet - visit http://localhost:3131/config to set up"
+                )
+                return
+
+            self.client = UptimeKumaClient(
+                config.uptime_kuma.server_url,
+                config.uptime_kuma.api_token,  # password (API key or user password)
+                config.uptime_kuma.username,  # username (optional, empty for API key)
+            )
+
+            # Test connection
+            logger.info(
+                "Testing connection to Uptime-Kuma at %s...",
+                config.uptime_kuma.server_url,
+            )
+            if not await self.client.connect():
+                logger.warning("Cannot connect to Uptime-Kuma at %s", config.uptime_kuma.server_url)
+                logger.info(
+                    "Uptime-Kuma monitoring will remain disabled until connection is successful"
+                )
+                return
+
+            logger.info("Uptime-Kuma connection successful")
+
+            # Build monitor cache
+            await self._refresh_monitor_cache()
+
+            # Start monitoring loop
+            self._running = True
+            self._task = asyncio.create_task(self._monitoring_loop())
+        except Exception as e:
+            logger.warning("Failed to start Uptime-Kuma monitor: %s", e)
+            logger.info(
+                "Uptime-Kuma integration is optional - the service will continue without it"
+            )
+
+    async def stop(self) -> None:
+        """Stop Uptime-Kuma monitoring"""
+        logger.info("Stopping Uptime-Kuma monitor...")
+        self._running = False
+
+        if self._task:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass  # Expected during shutdown
+            except Exception as e:
+                logger.warning("Error stopping Uptime-Kuma task: %s", e)
+
+        logger.info("Uptime-Kuma monitoring stopped")
+
+    async def _refresh_monitor_cache(self) -> None:
+        """Refresh cache of monitor IDs by friendly name"""
+        if not self.client:
+            return
+
+        monitors = await self.client.get_all_monitors() or []
+        self._monitor_cache = {m["friendly_name"]: m for m in monitors}
+        logger.info("Cached %s Uptime-Kuma monitors", len(self._monitor_cache))
+
+    async def _monitoring_loop(self) -> None:
+        """Main monitoring loop - check Uptime-Kuma statuses and cache them in sync with container checks"""
+        config = config_manager.get_config()
+        interval = config.monitor.interval_seconds
+        offset = int(interval * 0.2)  # Refresh 20% before container check
+
+        # Calculate the next container check time
+        next_check = asyncio.get_event_loop().time() + interval
+
+        while self._running:
+            try:
+                # Sleep until (next_check - offset)
+                now = asyncio.get_event_loop().time()
+                sleep_time = max(0, (next_check - offset) - now)
+                await asyncio.sleep(sleep_time)
+
+                await self._update_status_cache()
+
+                # Schedule next check
+                next_check += interval
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error("Error in Uptime-Kuma monitoring loop: %s", e)
+                # On error, resync to next interval
+                next_check = asyncio.get_event_loop().time() + interval
+
+    def _require_client(self) -> UptimeKumaClient:
+        """Return the client, failing loudly if the monitor has not been started."""
+        if self.client is None:
+            raise RuntimeError("Uptime-Kuma client not initialized")
+        return self.client
+
+    async def _update_status_cache(self) -> None:
+        """Update cache of container health statuses from Uptime-Kuma monitors"""
+        config = config_manager.get_config()
+
+        if not config.uptime_kuma_mappings:
+            self._container_status_cache.clear()
+            self._container_status_mapping_cache.clear()
+            return
+
+        try:
+            # Fetch /metrics once per refresh and reuse it for every mapped container,
+            # instead of re-fetching the full endpoint once per mapping (see #94)
+            monitors = await self._require_client().get_all_monitors()
+        except Exception as e:
+            logger.error("Error fetching Uptime-Kuma monitor statuses: %s", e)
+            monitors = None
+
+        if monitors is None:
+            # The fetch failed (the client already logged why): keep the cached statuses
+            # only when the mapping that produced each status is still configured.
+            # A successful empty list is a valid refresh and falls through to pruning below; only None (failed fetch) takes this branch.
+            configured_mappings = {
+                (mapping.container_id, mapping.monitor_friendly_name)
+                for mapping in config.uptime_kuma_mappings
+            }
+            for container_id in list(self._container_status_cache):
+                source_mapping = self._container_status_mapping_cache.get(container_id)
+                if (
+                    source_mapping is None
+                    or (container_id, source_mapping) not in configured_mappings
+                ):
+                    self._drop_cached_status(container_id)
+            return
+
+        # Uptime-Kuma allows several monitors to share a friendly name, and mappings
+        # identify a monitor only by that name. A name reported more than once is
+        # ambiguous: picking either monitor's status could restart a container based
+        # on a monitor that is not its own, so such a name yields no status at all.
+        status_by_name = {m["friendly_name"]: m["status"] for m in monitors}
+        monitor_count_by_name = Counter(m["friendly_name"] for m in monitors)
+        ambiguous_mappings: set[tuple[str, str]] = set()
+        # A container can have several mappings. If any of them is ambiguous, none
+        # of them may set its status, whatever order the mappings are stored in.
+        ambiguous_containers = {
+            mapping.container_id
+            for mapping in config.uptime_kuma_mappings
+            if monitor_count_by_name[mapping.monitor_friendly_name] > 1
+        }
+
+        refreshed_ids: set[str] = set()
+
+        for mapping in config.uptime_kuma_mappings:
+            mapping_key = (mapping.container_id, mapping.monitor_friendly_name)
+            monitor_count = monitor_count_by_name[mapping.monitor_friendly_name]
+            if monitor_count > 1:
+                # Identical mapping entries share a key, so warn at most once per refresh.
+                already_seen = mapping_key in ambiguous_mappings
+                ambiguous_mappings.add(mapping_key)
+                # The status is refreshed once per mapped container check, so warn
+                # once per mapping until the name is unique again, not on every refresh.
+                if not already_seen and mapping_key not in self._ambiguous_mappings:
+                    logger.warning(
+                        "Uptime-Kuma monitor name '%s' mapped to %s matches %d monitors - "
+                        "ignoring its status because the name is ambiguous, so it will not "
+                        "trigger an automatic restart",
+                        mapping.monitor_friendly_name,
+                        mapping.container_id,
+                        monitor_count,
+                    )
+                # Drop any status cached while the name was unique, so it cannot
+                # keep driving a restart decision.
+                self._drop_cached_status(mapping.container_id)
+                continue
+            if mapping.container_id in ambiguous_containers:
+                continue
+
+            status = status_by_name.get(mapping.monitor_friendly_name)
+
+            if status is None:
+                logger.debug(
+                    "Monitor '%s' not found or could not fetch status",
+                    mapping.monitor_friendly_name,
+                )
+                continue
+
+            # Cache the status (0=down, 1=up, 2=pending, 3=maintenance)
+            # mapping.container_id now stores stable_id
+            self._container_status_cache[mapping.container_id] = status
+            self._container_status_mapping_cache[mapping.container_id] = (
+                mapping.monitor_friendly_name
+            )
+            refreshed_ids.add(mapping.container_id)
+
+            logger.debug(
+                "Cached status for %s: %s (monitor: %s)",
+                mapping.container_id,
+                status,
+                mapping.monitor_friendly_name,
+            )
+
+        # Drop statuses that were not refreshed (monitor vanished or container no
+        # longer mapped) so a stale DOWN cannot keep triggering restarts. Done after
+        # the loop so a container with several mappings keeps any status that is
+        # still present.
+        for container_id in list(self._container_status_cache):
+            if container_id not in refreshed_ids:
+                self._drop_cached_status(container_id)
+
+        self._ambiguous_mappings = ambiguous_mappings
+
+    def _drop_cached_status(self, container_id: str) -> None:
+        self._container_status_cache.pop(container_id, None)
+        self._container_status_mapping_cache.pop(container_id, None)
+
+    def get_container_status(self, stable_id: str) -> int | None:
+        return self._container_status_cache.get(stable_id)
+
+    def is_container_mapped(self, stable_id: str) -> bool:
+        config = config_manager.get_config()
+        if not config.uptime_kuma_mappings:
+            return False
+
+        return any(mapping.container_id == stable_id for mapping in config.uptime_kuma_mappings)
+
+    async def should_restart_from_uptime_kuma(self, stable_id: str) -> bool:
+        config = config_manager.get_config()
+
+        # Check if auto-restart on down is enabled
+        if not config.uptime_kuma.auto_restart_on_down:
+            return False
+
+        # Check if container is mapped
+        if not self.is_container_mapped(stable_id):
+            return False
+
+        # Update cache (async)
+        await self._update_status_cache()
+
+        # Check monitor status
+        status = self.get_container_status(stable_id)
+
+        # Status 0 = down
+        return status == 0

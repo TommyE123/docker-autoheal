@@ -1,0 +1,24 @@
+misconfigurations:
+  - id: DS-0002
+    paths:
+      - Dockerfile
+      - .devcontainer/Dockerfile
+    statement: "Non-root user deferred, see issue #19"
+
+  - id: DS-0026
+    paths:
+      - .devcontainer/Dockerfile
+    statement: "Devcontainer health check is not required for this development-only image"
+
+vulnerabilities:
+  - id: CVE-2026-59951
+    paths:
+      - ".mise/locks/pypi-semgrep/**/uv.lock"
+    statement: "Dev-only semgrep CLI pins mcp==1.29.0; flaw affects Streamable HTTP servers, which we never run. Remove once semgrep pins mcp>=1.30.0, see issue #596"
+    expired_at: 2026-12-16
+
+  - id: CVE-2026-114603
+    paths:
+      - ".mise/locks/pypi-semgrep/**/uv.lock"
+    statement: "Dev-only semgrep CLI pins opentelemetry-api~=1.37.0; flaw affects servers parsing incoming tracestate, which we never run. Remove once semgrep allows >=1.45.1, see issue #596"
+    expired_at: 2026-12-16

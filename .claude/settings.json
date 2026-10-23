@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(gh pr merge:*)",
+      "Bash(git push origin main:*)",
+      "Bash(git push upstream main:*)",
+      "Bash(git commit --no-verify:*)",
+      "Bash(git push --no-verify:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push --force-with-lease:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push --force*)",
+      "Bash(git push --force-with-lease=*)",
+      "Bash(git push * --force:*)",
+      "Bash(git push * --force-with-lease:*)",
+      "Bash(git push * -f:*)",
+      "Bash(git push * --force*)",
+      "Bash(git push * --force-with-lease=*)"
+    ],
+    "ask": ["Bash(git reset --hard:*)"],
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)"
+    ]
+  }
+}

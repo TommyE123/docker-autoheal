@@ -1,0 +1,36 @@
+name: Sync issue labels
+
+# One-off/manual synchronisation of the issue-classification label taxonomy
+# defined in .github/labels.yml. Not run on every issue event - see
+# .github/workflows/issue-triage.md (a GitHub Agentic Workflow) for the
+# per-issue classification workflow that this label set supports.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sync-labels:
+    name: Sync labels.yml to GitHub
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout labels config
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            .github/labels.yml
+          sparse-checkout-cone-mode: false
+
+      # Creates/updates the kind:*, area:*, status:* labels by exact name
+      # only - labels.yml intentionally has no `aliases`, since renaming an
+      # existing label is a repository-wide operation that would also touch
+      # any pull request carrying that label. Moving existing issues onto
+      # this taxonomy is done manually.
+      - name: Sync labels
+        uses: EndBug/label-sync@52074158190acb45f3077f9099fea818aa43f97a # v2.3.3
+        with:
+          config-file: .github/labels.yml
+          delete-other-labels: false
+          token: ${{ secrets.GITHUB_TOKEN }}

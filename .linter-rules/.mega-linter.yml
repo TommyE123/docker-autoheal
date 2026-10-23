@@ -1,0 +1,124 @@
+# Configuration file for MegaLinter
+# See all available variables at https://megalinter.io/latest/configuration/ and in linters documentation
+
+DISABLE:
+  - ANSIBLE
+  - COPYPASTE
+  - GRAPHQL
+  - JSX
+  - KUBERNETES
+  - SALESFORCE
+  - SQL
+  - SPELL
+  - SWIFT
+  - TSX
+  - TYPESCRIPT
+
+DISABLE_LINTERS:
+  - CSS_BIOME
+  - JAVASCRIPT_STANDARD
+  - JSON_BIOME
+  - JSON_NPM_PACKAGE_JSON_LINT
+  - JAVASCRIPT_BIOME
+  - MARKDOWN_RUMDL
+  - PYTHON_BLACK
+  - PYTHON_FLAKE8
+  - PYTHON_ISORT
+  - PYTHON_MYPY
+  - PYTHON_PYLINT
+  - REPOSITORY_GRYPE
+  - REPOSITORY_SYFT
+
+DISABLE_ERRORS_LINTERS:
+  - ACTION_ZIZMOR
+  - PYTHON_RUFF
+  - REPOSITORY_OSV_SCANNER
+
+# ---------------------------------------------------------------------------
+# Global MegaLinter configuration
+# ---------------------------------------------------------------------------
+
+FILTER_REGEX_EXCLUDE: '(^|/)\.github/workflows/issue-triage\.lock\.yml$'
+FLAVOR_SUGGESTIONS: false
+LINTER_RULES_PATH: .linter-rules
+FORMATTERS_DISABLE_ERRORS: false
+GITHUB_STATUS_REPORTER: true
+SHOW_ELAPSED_TIME: true
+VALIDATE_ALL_CODEBASE: true
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+
+PYTHON_DEFAULT_STYLE: ruff
+
+PYTHON_PYRIGHT_PRE_COMMANDS:
+  - command: pip install --no-cache-dir -r requirements-dev.txt
+    cwd: workspace
+    continue_if_failed: false
+
+# ---------------------------------------------------------------------------
+# JavaScript / JSX
+# ---------------------------------------------------------------------------
+
+JAVASCRIPT_DEFAULT_STYLE: prettier
+
+# Only the frontend has JavaScript/JSX, and eslint.config.js's flat config
+# needs project-local packages (e.g. @eslint-react/eslint-plugin) resolved from
+# frontend/node_modules rather than MegaLinter's own bundled npm install.
+JAVASCRIPT_ES_CLI_EXECUTABLE: ["frontend/node_modules/.bin/eslint"]
+JAVASCRIPT_ES_CONFIG_FILE: "frontend/eslint.config.js"
+JAVASCRIPT_ES_FILE_EXTENSIONS: [".js", ".jsx"]
+JAVASCRIPT_ES_FILTER_REGEX_INCLUDE: "frontend/"
+JAVASCRIPT_ES_PRE_COMMANDS:
+  # NODE_ENV=development forces npm to install devDependencies (eslint and
+  # its plugins) even though MegaLinter's image sets NODE_ENV=production.
+  - command: NODE_ENV=development npm ci --prefix frontend
+    cwd: workspace
+    continue_if_failed: false
+
+JAVASCRIPT_PRETTIER_FILE_EXTENSIONS: [".js", ".jsx", ".css"]
+JAVASCRIPT_PRETTIER_FILTER_REGEX_INCLUDE: "frontend/"
+
+# ---------------------------------------------------------------------------
+# Markdown
+# ---------------------------------------------------------------------------
+
+MARKDOWN_MARKDOWNLINT_CONFIG_FILE: ".markdownlint.jsonc"
+
+# ---------------------------------------------------------------------------
+# YAML
+# ---------------------------------------------------------------------------
+
+YAML_YAMLLINT_ARGUMENTS: "--strict"
+
+# ---------------------------------------------------------------------------
+# Dockerfile
+# ---------------------------------------------------------------------------
+
+DOCKERFILE_HADOLINT_FILE_NAMES_REGEX: ["Dockerfile(\\..+)?"]
+
+# ---------------------------------------------------------------------------
+# Security
+# ---------------------------------------------------------------------------
+
+ACTION_ZIZMOR_UNSECURED_ENV_VARIABLES:
+  - GITHUB_TOKEN
+
+REPOSITORY_TRIVY_CONFIG_FILE: .trivy.yaml
+
+REPOSITORY_SEMGREP_ARGUMENTS:
+  [
+    "--exclude",
+    ".github/workflows/issue-triage.lock.yml",
+    "--exclude",
+    "Dockerfile*",
+  ]
+REPOSITORY_SEMGREP_RULESETS:
+  - p/command-injection
+  - p/docker-compose
+  - p/insecure-transport
+  - p/javascript
+  - p/owasp-top-ten
+  - p/python
+  - p/react

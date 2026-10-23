@@ -1,0 +1,107 @@
+# Project Structure
+
+```text
+docker-autoheal/
+├── app/                          # Python application package
+│   ├── main.py                   # Entry point: wires everything together, starts the API + monitoring loop
+│   ├── api/
+│   │   ├── api.py                # FastAPI setup and router registration (UI catch-all last)
+│   │   ├── state.py              # Shared Docker/monitoring/notification state + init_api()
+│   │   ├── models.py             # Shared Pydantic request/response models
+│   │   └── routes/               # Per-domain API routers
+│   ├── config/
+│   │   ├── config_manager.py     # Pydantic config models + thread-safe JSON persistence
+│   │   └── init_defaults.py      # Writes default config.json/events.json/etc. on first run
+│   ├── docker_client/
+│   │   └── docker_client_wrapper.py  # Thin wrapper around the `docker` SDK
+│   ├── monitor/
+│   │   ├── monitoring_engine.py  # Core monitoring loop, restart/backoff/quarantine logic
+│   │   └── uptime_kuma_monitor.py
+│   ├── notifications/
+│   │   └── notification_manager.py   # Async notification dispatch (Discord/Slack/Telegram/ntfy/Gotify/Pushover/webhook)
+│   ├── uptime_kuma/
+│   │   └── uptime_kuma_client.py     # HTTP/websocket client for the Uptime Kuma API
+│   ├── models/, services/, utils/    # Currently near-empty; reserved for future growth
+│   └── tests/
+│       ├── unit/                 # Automated unit test suite (see docs/developer/testing.md)
+│       └── integration/          # Marked integration suite; needs a real Docker daemon,
+│                                  # not run by a plain `pytest` and not run in CI
+│
+├── frontend/                     # React UI (Vite)
+│   ├── src/
+│   │   ├── components/           # Page and feature components
+│   │   ├── services/api.js       # Axios client for the backend API
+│   │   ├── hooks/
+│   │   └── styles/
+│   ├── package.json
+│   └── vite.config.js
+│
+├── docs/
+│   ├── user/                     # End-user documentation
+│   ├── developer/                # This section
+│   ├── maintainer/               # Repository maintenance documentation
+│   └── historical/                # Superseded documents, kept for context
+│
+├── .devcontainer/                # Dev Container definition (see docs/developer/development-setup.md)
+│   ├── devcontainer.json         # Build, features, mounts, ports, VS Code customisations
+│   ├── devcontainer-lock.json    # Pinned digests for the Dev Container features
+│   ├── Dockerfile                # Pinned Python base image plus the mise binary
+│   ├── post-create.sh            # Installs dependencies and tooling on container creation
+│   ├── verify-isolation.sh       # Proves the inner Docker daemon is isolated and Autoheal recovers a probe
+│   ├── prepare-volumes.sh        # Makes the cache, `gh` and mise volumes writable by the container user
+│   └── package.json              # Pinned npm-based linters used by the local tasks
+│
+├── mise.toml / mise.lock         # Pinned developer CLI tools, installed by mise (with .mise/locks/)
+│
+├── requirements.txt              # Runtime Python dependencies
+├── requirements-dev.txt          # Test dependencies (pytest, coverage, mutmut)
+├── pytest.ini / .coveragerc
+├── pyproject.toml                # Mutmut configuration only
+├── mutation.sh                   # Mutation-testing entry point (see docs/developer/mutation-testing.md)
+├── Dockerfile                    # Multi-stage build: Node (frontend) → Python (backend)
+├── docker-compose.yml            # Runs the published image; `up --build` builds from this checkout
+└── docker-compose.dev.yml        # Override: distinct name, ports and data dir for the dev stack (isolated in the Dev Container)
+```
+
+There are no root-level Python test/verification scripts — the manual scripts that used
+to live there were converted into the `app/tests/unit/` and `app/tests/integration/`
+suites (see [Testing](testing.md#legacy-script-triage) for what happened to each one).
+
+## Module responsibilities
+
+- **`app/main.py`** — process entry point: logging setup, Docker client and monitoring
+  engine construction, Prometheus metrics server startup, signal handling, and running
+  the FastAPI server and monitoring engine concurrently via `asyncio.gather`.
+- **`app/api/api.py`** — FastAPI app construction (static asset mount) and wiring
+  each router from `app/api/routes/` into the app; holds no endpoints itself.
+- **`app/api/state.py`** — the shared `docker_client`/`monitoring_engine` instances every
+  route module reads, plus `init_api()`.
+- **`app/api/routes/`** — every HTTP endpoint, one module per domain: containers,
+  maintenance mode, configuration, health checks, events, Uptime Kuma integration,
+  notifications, health/status, and UI/PWA static file serving (including the catch-all
+  route for client-side routing).
+- **`app/config/config_manager.py`** — the single source of truth for configuration and
+  persisted state (events, quarantine, maintenance mode, restart counts). All reads/writes
+  go through a `ConfigManager` singleton guarded by a lock.
+- **`app/docker_client/docker_client_wrapper.py`** — all direct interaction with the
+  `docker` SDK: listing containers, restarting/stopping them, HTTP/TCP/exec health checks,
+  and reading Docker's native health status.
+- **`app/monitor/monitoring_engine.py`** — the core auto-healing logic described in
+  [Architecture](architecture.md).
+- **`app/notifications/notification_manager.py`** — async, queue-based notification
+  delivery to external services.
+- **`app/uptime_kuma/`** and **`app/monitor/uptime_kuma_monitor.py`** — the optional
+  Uptime Kuma integration.
+
+## Running things from this layout
+
+```bash
+python -m app.main      # run the backend
+pytest                  # unit test suite (app/tests/unit, per pytest.ini)
+```
+
+## See also
+
+- [Architecture](architecture.md)
+- [Testing](testing.md)
+- [Frontend Development](frontend.md)

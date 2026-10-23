@@ -1,0 +1,247 @@
+# Mutation testing
+
+Coverage tells you which lines the tests execute. Mutation testing tells you whether the
+tests would notice if those lines changed: [Mutmut](https://mutmut.readthedocs.io/) makes
+small changes to the production code (a "mutant", e.g. `>=` becomes `>`), runs the unit
+tests against each one, and reports whether any test failed (the mutant was **killed**) or
+all of them still passed (the mutant **survived**).
+
+CI treats it as informational. It is not part of `pytest`, is not a required check, and
+has no score threshold, so a low score never fails the workflow. It is complementary to
+the coverage reported to Codecov and is deliberately kept out of it.
+
+The maintainer still treats a drop in the mutation score as blocking. When the workflow
+runs on a pull request, compare its score with the baseline in
+`.github/badges/mutation.json` and strengthen the tests rather than merge a drop, unless
+the maintainer agrees. The baseline is a badge value refreshed by a separate workflow, so
+it can lag behind `main`.
+
+## Running it locally
+
+Mutmut needs `fork`, so run it on Linux or macOS (on Windows, use WSL). Use the same
+Python version as the `Dockerfile`.
+
+```bash
+pip install -r requirements-dev.txt        # already done in the Dev Container
+
+./mutation.sh                              # full run: a few minutes on 4 vCPUs
+./mutation.sh "app.uptime_kuma.matching*"  # focused run on a subset of mutants
+```
+
+In VS Code (including the Dev Container, which installs `requirements-dev.txt`) the
+**Autoheal: Run Mutation Testing** task runs the full `./mutation.sh`. CI runs the same
+script.
+
+`mutation.sh` deletes `mutants/` and then runs `mutmut run`, so every run starts clean.
+It finishes by printing the mutants that were not killed. `mutants/` is git-ignored.
+
+### Why every run starts clean
+
+Mutmut caches verdicts in `mutants/` and does not invalidate them when a test is added or
+an existing test is edited: a plain `mutmut run` after changing a test can report the old
+survivors. Starting from an empty `mutants/` is the only way to be sure a result reflects
+the current tests. If you call `mutmut` directly instead of `mutation.sh`, delete
+`mutants/` first (or name the mutants you want re-evaluated, e.g.
+`mutmut run "app.uptime_kuma.matching*"`).
+
+A focused run leaves every other mutant as `not checked`, and `mutmut export-cicd-stats`
+counts those in its total, so its score is only meaningful after a full run.
+
+## Inspecting results
+
+All of these work with Mutmut alone. Run them from the repository root after a run:
+
+```bash
+mutmut results                # survivors, timeouts and mutants with no tests
+mutmut results --all true     # every mutant, including killed
+mutmut show <mutant-name>     # the diff for one mutant, e.g. app.uptime_kuma.matching.x_normalize_name__mutmut_1
+mutmut tests-for-mutant <mutant-name>
+mutmut browse                 # interactive browser
+mutmut export-cicd-stats      # writes mutants/mutmut-cicd-stats.json
+```
+
+A mutant name is `<module>.<function>__mutmut_<n>`. The number is positional, so it
+changes when the surrounding code changes: compare survivors between runs by file,
+function and the changed text, not by name.
+
+## CI run
+
+`.github/workflows/mutation-testing.yml` runs the same `./mutation.sh`, always the full
+suite. It runs:
+
+- automatically on pull requests to `main` that change
+  `app/**/*.py` (production code or tests), `requirements-dev.txt` (it pins Mutmut and
+  pytest), `pyproject.toml`, `mutation.sh`, the `Dockerfile` (which sets the Python
+  version) or the workflow itself; documentation-only and other unrelated changes, and
+  runtime dependency bumps in `requirements.txt`, do not run it. Release Please pull
+  requests (branches starting `release-please--`, which only bump the version in
+  `app/api/api.py`) are skipped, and pushes to `main` do not run it: the badge comes from
+  the updater, not from a run on `main`;
+- manually, from the Actions tab (**Mutation Testing** -> **Run
+  workflow**).
+
+A run takes about 4-5 minutes on a GitHub-hosted runner (235-327 s per job over eight
+successful runs, of which 214-279 s is the mutation step).
+
+The workflow:
+
+- installs `requirements-dev.txt` on the Python version the `Dockerfile` uses;
+- starts from an empty `mutants/` (and never caches it);
+- is grouped by ref: a new push to a pull request cancels that PR's in-progress run, while manual runs are never cancelled once running (a newer run can still replace one that is only queued);
+- is informational: it is not a required check, has no score threshold, and must not be
+  made one.
+
+The README badge shows the mutation score stored in `.github/badges/mutation.json`, a
+small Shields endpoint file on `main`. `mutmut badge` generates it from the exported
+stats; nothing calculates the score by hand. The job summary's **Detected** figure and
+the pull request comment use that same score. It is informational only: the run succeeds
+whatever the score, so no threshold is implied, and it is not a gate.
+
+The file is **not** updated by pull requests. A full `./mutation.sh` run leaves it alone
+unless `UPDATE_MUTATION_BADGE=1` is set, so ordinary local and pull request runs never
+modify it, and the badge keeps showing the last committed score between refreshes.
+
+The `Update Mutation Results` workflow (`.github/workflows/update-mutation-results.yml`)
+refreshes it:
+
+- It runs on every push to `main` and on `workflow_dispatch`, with no GitHub `schedule`. A
+  dispatch can come from the Actions tab or an external scheduler (cron-job.org); the
+  caller's token is configured outside the repository. It always checks out and tests
+  `main`; a dispatch against any other ref fails immediately with an error. The score is
+  computed from the current `main` commit, independent of any pull request mutation run.
+- To avoid a loop, the `push` trigger uses `paths-ignore: .github/badges/mutation.json`, so the
+  updater's own badge-only merge does not start another run. A push that changes any other
+  file (including a mixed push with the badge file) still runs. Release Please release merges
+  (`chore(main): release ...`) are skipped; `workflow_dispatch` always runs.
+- It runs the same full `./mutation.sh` with `UPDATE_MUTATION_BADGE=1`, then compares the
+  new score with the one tracked on `main`. The result is tied to the exact `main` commit
+  that was tested; if `main` has moved by the time the run finishes (other than by
+  badge-only commits, such as this workflow's own merged PR), nothing is published
+  or closed and the workflow must be run again.
+- It then hands the tracked file to
+  [`peter-evans/create-pull-request`](https://github.com/peter-evans/create-pull-request)
+  (pinned by commit SHA), which owns the branch and PR lifecycle:
+  - On a change it commits only `.github/badges/mutation.json` to
+    `chore/update-mutation-results` and opens a pull request to `main`, or updates the one
+    already open. The title (and so the squash-merge commit subject) is always
+    `mutation: update mutation score badge`. If the score dropped, the PR body starts with a
+    warning. A drop never fails the workflow.
+  - With no change it creates nothing, and closes (and deletes the branch of) an update PR
+    left open by an earlier run, because the result has caught up.
+- Before enabling auto-merge it checks that the PR changes only the badge file, and the
+  merge request is bound to the exact commit the action pushed, so it fails if the head
+  changes in between.
+- Its `GITHUB_TOKEN` is read-only. Writes use the `BADGE_PUSH_TOKEN` repository secret, a
+  fine-grained personal access token with **Contents** and **Pull requests**: read and
+  write, which only the pull request and auto-merge steps are given. A push or PR made
+  with `GITHUB_TOKEN` would not start the PR's other checks.
+
+### Why the updater PR auto-merges
+
+The updater is scheduled externally (cron-job.org) shortly before Release Please runs. Its
+PR exists only to persist the generated result safely on `main`, so the workflow enables
+auto-merge (squash) on it and GitHub merges it once the required PR checks pass. No
+approval is required for it. A change in the score is informational: a drop is warned
+about in the PR body but is not a release blocker, does not fail the workflow and does not
+stop the PR merging or delay Release Please. This needs **Allow auto-merge** enabled in
+the repository settings.
+
+### Mutation runs and the updater PR
+
+The Mutation Testing workflow runs on source and test pull requests according to its path
+filters, which do not include `.github/badges/mutation.json`. The updater workflow runs the
+full mutation process itself against `main`, and its PR carries only the resulting JSON, so
+that PR does not trigger another full mutation run. That avoids running the 4-5 minute
+mutation job again for a badge-only change. The frontend tests, Docker build and smoke tests, and
+MegaLinter also skip such a PR (a `changes` job calling `.github/workflows/badge-only-check.yml`,
+which reports it badge-only only when the badge file is the sole changed file). The required
+`unit-tests` check still runs but, instead of the test suite, only runs
+`.github/scripts/validate-badge.sh`, which fails on a missing or malformed badge file. Any PR that
+changes another file, or where detection fails, runs everything.
+
+On a pull request from this repository, a short comment shows this PR's score next to the
+score tracked on `main`, with the change. It is one comment per PR, found by a hidden
+marker and edited in place on every run rather than added to. Only a separate job holds
+the write token for it; fork PRs get no comment (the job summary still has the numbers).
+It is informational and never blocks a merge.
+
+Find results on the workflow run page (for a pull request, the **Mutmut**
+check's details link):
+
+- the **job summary** shows the counts and the score;
+- the **`mutation-results`** artifact contains `mutation-results.txt` (survivors, timeouts
+  and no-test mutants), `mutmut-cicd-stats.json`, and the `mutants/` tree with Mutmut's
+  per-file `.meta` verdicts.
+
+To browse a CI run with `mutmut show` or `mutmut browse`, download the artifact into
+`mutants/` at the repository root (e.g. `gh run download <run-id> -n mutation-results -D mutants`)
+and use the commands above.
+
+## Targeted run: API server smoke test ([#412](https://github.com/TommyE123/docker-autoheal/issues/412))
+
+`app/tests/unit/test_main_api_server_smoke.py` is part of the normal unit suite and the
+mutation run (Mutmut ignores only the repository-file tests `test_release_please_workflow.py`
+and `test_dev_stack_files.py`). It runs the real
+`app.main.run_api_server()` against a real Uvicorn server. The code it exercises is mutated as
+follows (focused runs; the verdicts are valid because `mutation.sh` starts from an empty
+`mutants/`):
+
+```bash
+./mutation.sh "app.main.x_run_api_server*"   # 18 mutants: all killed
+./mutation.sh "app.api*"                     # all mutants killed, none survive
+```
+
+- `run_api_server`: every mutant is killed (by the smoke test and the mocked
+  `test_main_lifecycle.py::TestRunApiServer`).
+- The smoke test requests only `/health` and `/api/status`. Those handlers are decorated, so
+  Mutmut does not mutate them (see [Known limitations](#known-limitations)).
+- `app/api/routes/ui.py` initially had 33 survivors (static-file serving and the fallback
+  page). They were killed by tests added to `test_static_file_serving.py`: exact fallback
+  page and error details, `utf-8` encoding, media-type defaults, subdirectory and directory
+  path handling, and the success and error log messages. No equivalent mutants remain
+  undocumented: `"utf-8"` vs `"UTF-8"` is behaviourally equivalent but the test pins the
+  exact spelling.
+
+## Reading the score
+
+The score is `(killed + timeout) / generated`. A timeout counts as detected: a mutant that
+makes the code hang was noticed. It is only comparable between runs with the same
+configuration, scope and Mutmut version. Read the list of survivors first, and treat the
+percentage as a trend. Survivors on statements the suite executes are the useful ones; many
+of the rest are noise (log messages, string literals, cosmetic constants).
+
+## Configuration
+
+`pyproject.toml` contains only a `[tool.mutmut]` table; `pytest.ini` and `.coveragerc`
+still own test and coverage settings. Every non-default setting has a reason from the
+Phase 1 evaluation in [#333](https://github.com/TommyE123/docker-autoheal/issues/333):
+
+| Setting                              | Why                                                                                                                                                                                                            |
+|--------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `source_paths = ["app"]`             | Required: Mutmut's automatic detection fails for this repository's directory name.                                                                                                                             |
+| `do_not_mutate`                      | Without `app/tests/*` Mutmut mutates the tests themselves (about 13.6k extra mutants, including the integration suite). `.coveragerc` omits it too.                                                            |
+| `pytest_add_cli_args_test_selection` | `test_release_please_workflow.py` and `test_dev_stack_files.py` read `.github/`, `.vscode/` and Compose files that do not exist inside `mutants/` and abort stats collection. They import nothing from `app/`. |
+
+Deliberately left at Mutmut's defaults:
+
+- `mutate_only_covered_lines`: Phase 1 measured no runtime benefit, and leaving it off
+  keeps mutants in code the tests never run visible as `no tests`.
+- `process_isolation` (fork): `forkserver` gave identical verdicts but was about 47%
+  slower.
+- `max_stack_depth`: it crashes stats collection in this repository.
+- No `# pragma: no mutate` and no other exclusions: survivors, including noisy ones such
+  as log calls, stay visible.
+
+Integration tests are not part of the mutation run. Their fixtures skip when a
+prerequisite is missing, and a skipped test cannot kill a mutant.
+
+## Known limitations
+
+- **Decorated functions are not mutated.** Mutmut skips any function with a decorator other
+  than a lone `@staticmethod`/`@classmethod`. That is 50 of 182 production functions in
+  the Phase 1 measurement, including every FastAPI route handler, so the score says nothing
+  about the HTTP API layer. This is a documented limitation, not something the workflow
+  works around; see #333 for the follow-up discussion.
+- Mutmut has no operator that removes an `await`; missing awaits are a linter/type-checker
+  concern.
+- Stale state: see [Why every run starts clean](#why-every-run-starts-clean).

@@ -1,0 +1,1258 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, waitFor, within, act } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+
+vi.mock("../services/api", () => ({
+  getNotificationsConfig: vi.fn(),
+  updateNotificationsConfig: vi.fn(),
+  addNotificationService: vi.fn(),
+  updateNotificationService: vi.fn(),
+  deleteNotificationService: vi.fn(),
+  testNotificationService: vi.fn(),
+  testUnsavedNotificationService: vi.fn(),
+}));
+
+import {
+  getNotificationsConfig,
+  updateNotificationsConfig,
+  addNotificationService,
+  updateNotificationService,
+  deleteNotificationService,
+  testNotificationService,
+  testUnsavedNotificationService,
+} from "../services/api";
+import NotificationsPage from "./NotificationsPage";
+
+const config = {
+  enabled: false,
+  event_filters: [],
+  services: [],
+};
+
+const configWithServices = {
+  enabled: true,
+  event_filters: [],
+  services: [
+    {
+      name: "My Webhook",
+      type: "webhook",
+      enabled: true,
+      url: "https://example.com/webhook",
+    },
+    {
+      name: "Disabled Slack",
+      type: "slack",
+      enabled: false,
+      url: "https://hooks.slack.com/services/x",
+    },
+  ],
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe("NotificationsPage", () => {
+  it("shows the current enabled/disabled state after loading", async () => {
+    getNotificationsConfig.mockResolvedValue({ data: config });
+
+    render(<NotificationsPage />);
+
+    expect(
+      await screen.findByText(/notifications are disabled/i),
+    ).toBeInTheDocument();
+  });
+
+  it("toggles notifications on when the switch is clicked", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({ data: config });
+    updateNotificationsConfig.mockResolvedValue({});
+
+    render(<NotificationsPage />);
+
+    await screen.findByText(/notifications are disabled/i);
+    expect(screen.getByText("Disabled", { exact: true })).toBeInTheDocument();
+    const notificationSwitch = screen.getByRole("checkbox", {
+      name: "Notification System",
+      exact: true,
+    });
+
+    await user.click(notificationSwitch);
+
+    await waitFor(() =>
+      expect(updateNotificationsConfig).toHaveBeenCalledWith({ enabled: true }),
+    );
+    expect(screen.getByText("Enabled", { exact: true })).toBeInTheDocument();
+    expect(notificationSwitch).toHaveAccessibleName("Notification System");
+  });
+
+  it("toggles notifications when the visible status label is clicked", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({ data: config });
+    updateNotificationsConfig.mockResolvedValue({});
+
+    render(<NotificationsPage />);
+    await screen.findByText(/notifications are disabled/i);
+
+    await user.click(screen.getByText("Disabled", { exact: true }));
+
+    expect(
+      screen.getByRole("checkbox", {
+        name: "Notification System",
+        exact: true,
+      }),
+    ).toBeChecked();
+    await waitFor(() =>
+      expect(updateNotificationsConfig).toHaveBeenCalledWith({ enabled: true }),
+    );
+  });
+
+  it("clears the pending alert timer when unmounted", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({ data: config });
+    updateNotificationsConfig.mockResolvedValue({});
+
+    const { unmount } = render(<NotificationsPage />);
+    await screen.findByText(/notifications are disabled/i);
+    await user.click(
+      screen.getByRole("checkbox", { name: "Notification System" }),
+    );
+    await screen.findByText(/notifications enabled/i);
+
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+    unmount();
+
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+    clearTimeoutSpy.mockRestore();
+  });
+
+  it("shows a message when no notification services are configured", async () => {
+    getNotificationsConfig.mockResolvedValue({ data: config });
+
+    render(<NotificationsPage />);
+
+    expect(
+      await screen.findByText(/no notification services configured/i),
+    ).toBeInTheDocument();
+  });
+
+  it("quotes the Add Service button name in the empty-state message", async () => {
+    getNotificationsConfig.mockResolvedValue({ data: config });
+
+    render(<NotificationsPage />);
+
+    expect(
+      await screen.findByText(
+        'No notification services configured. Click "Add Service" to get started.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("loads the configuration exactly once on mount", async () => {
+    getNotificationsConfig.mockResolvedValue({ data: config });
+
+    render(<NotificationsPage />);
+    await screen.findByText(/notifications are disabled/i);
+    await act(async () => {});
+
+    expect(getNotificationsConfig).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows an alert when loading the configuration fails", async () => {
+    getNotificationsConfig.mockRejectedValue(new Error("network error"));
+
+    render(<NotificationsPage />);
+
+    expect(
+      await screen.findByText(/failed to load notifications configuration/i),
+    ).toBeInTheDocument();
+  });
+
+  it("lists configured services with their type and status", async () => {
+    getNotificationsConfig.mockResolvedValue({ data: configWithServices });
+
+    render(<NotificationsPage />);
+
+    expect(await screen.findByText("My Webhook")).toBeInTheDocument();
+    expect(screen.getByText("Disabled Slack")).toBeInTheDocument();
+
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("Enabled")).toBeInTheDocument();
+    expect(within(table).getByText("Disabled")).toBeInTheDocument();
+  });
+
+  it("adds a new service successfully", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({ data: config });
+    addNotificationService.mockResolvedValue({});
+
+    render(<NotificationsPage />);
+
+    await screen.findByText(/notifications are disabled/i);
+
+    await user.click(screen.getByRole("button", { name: /add service/i }));
+
+    const dialog = await screen.findByRole("dialog", {
+      name: "Add Notification Service",
+    });
+    expect(within(dialog).getByLabelText("Service Name *")).toHaveAttribute(
+      "placeholder",
+      "My notification service",
+    );
+    expect(within(dialog).getByLabelText("Service Type *")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Enabled")).toBeInTheDocument();
+
+    await user.type(
+      within(dialog).getByLabelText("Service Name *"),
+      "New Webhook",
+    );
+    await user.type(
+      within(dialog).getByLabelText("Webhook URL *"),
+      "https://example.com/hook",
+    );
+
+    getNotificationsConfig.mockResolvedValue({
+      data: {
+        ...config,
+        services: [{ name: "New Webhook", type: "webhook", enabled: true }],
+      },
+    });
+
+    await user.click(screen.getByRole("button", { name: /^add service$/i }));
+
+    await waitFor(() =>
+      expect(addNotificationService).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "New Webhook",
+          type: "webhook",
+          url: "https://example.com/hook",
+        }),
+      ),
+    );
+    expect(
+      await screen.findByText(/notification service added successfully/i),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("New Webhook")).toBeInTheDocument();
+  });
+
+  it("disables the add button while required fields are missing", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({ data: config });
+
+    render(<NotificationsPage />);
+
+    await screen.findByText(/notifications are disabled/i);
+
+    await user.click(screen.getByRole("button", { name: /add service/i }));
+
+    expect(
+      screen.getByRole("button", { name: /^add service$/i }),
+    ).toBeDisabled();
+  });
+
+  describe("Test button in the Add/Edit dialog", () => {
+    const openAddDialog = async (user) => {
+      getNotificationsConfig.mockResolvedValue({ data: config });
+      render(<NotificationsPage />);
+      await screen.findByText(/notifications are disabled/i);
+      await user.click(screen.getByRole("button", { name: /add service/i }));
+      return screen.findByRole("dialog", { name: "Add Notification Service" });
+    };
+
+    const fillWebhook = async (user, dialog) => {
+      await user.type(
+        within(dialog).getByLabelText("Service Name *"),
+        "Draft Webhook",
+      );
+      await user.type(
+        within(dialog).getByLabelText("Webhook URL *"),
+        "https://example.com/hook",
+      );
+    };
+
+    it("is disabled until the required fields are filled", async () => {
+      const user = userEvent.setup();
+      const dialog = await openAddDialog(user);
+      const testButton = within(dialog).getByRole("button", { name: "Test" });
+
+      expect(testButton).toBeDisabled();
+
+      await fillWebhook(user, dialog);
+
+      expect(testButton).toBeEnabled();
+    });
+
+    it("tests the unsaved form values and shows success in the dialog", async () => {
+      const user = userEvent.setup();
+      testUnsavedNotificationService.mockResolvedValue({});
+      const dialog = await openAddDialog(user);
+      await fillWebhook(user, dialog);
+
+      await user.click(within(dialog).getByRole("button", { name: "Test" }));
+
+      await waitFor(() =>
+        expect(testUnsavedNotificationService).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: "Draft Webhook",
+            type: "webhook",
+            url: "https://example.com/hook",
+          }),
+        ),
+      );
+      expect(
+        await within(dialog).findByText(/test notification sent successfully/i),
+      ).toBeInTheDocument();
+      expect(addNotificationService).not.toHaveBeenCalled();
+      expect(testNotificationService).not.toHaveBeenCalled();
+    });
+
+    it("shows the failure detail in the dialog", async () => {
+      const user = userEvent.setup();
+      testUnsavedNotificationService.mockRejectedValue({
+        response: { data: { detail: "Test send failed" } },
+      });
+      const dialog = await openAddDialog(user);
+      await fillWebhook(user, dialog);
+
+      await user.click(within(dialog).getByRole("button", { name: "Test" }));
+
+      expect(
+        await within(dialog).findByText(/test send failed/i),
+      ).toBeInTheDocument();
+      expect(addNotificationService).not.toHaveBeenCalled();
+    });
+
+    it("falls back to a generic message when the failure detail is not a string", async () => {
+      const user = userEvent.setup();
+      testUnsavedNotificationService.mockRejectedValue({
+        response: { data: { detail: [{ loc: ["body", "name"], msg: "x" }] } },
+      });
+      const dialog = await openAddDialog(user);
+      await fillWebhook(user, dialog);
+
+      await user.click(within(dialog).getByRole("button", { name: "Test" }));
+
+      expect(
+        await within(dialog).findByText(/failed to send test notification/i),
+      ).toBeInTheDocument();
+    });
+
+    it("falls back to a generic message when the error has no response", async () => {
+      const user = userEvent.setup();
+      testUnsavedNotificationService.mockRejectedValue(new Error("offline"));
+      const dialog = await openAddDialog(user);
+      await fillWebhook(user, dialog);
+
+      await user.click(within(dialog).getByRole("button", { name: "Test" }));
+
+      expect(
+        await within(dialog).findByText(/failed to send test notification/i),
+      ).toBeInTheDocument();
+    });
+
+    it("disables Test and Add while a test is pending, and the result can be dismissed", async () => {
+      const user = userEvent.setup();
+      let resolveTest;
+      testUnsavedNotificationService.mockReturnValue(
+        new Promise((resolve) => {
+          resolveTest = resolve;
+        }),
+      );
+      const dialog = await openAddDialog(user);
+      await fillWebhook(user, dialog);
+
+      await user.click(within(dialog).getByRole("button", { name: "Test" }));
+
+      expect(
+        within(dialog).getByRole("button", { name: /testing/i }),
+      ).toBeDisabled();
+      expect(
+        within(dialog).getByRole("button", { name: /^add service$/i }),
+      ).toBeDisabled();
+
+      resolveTest({});
+      expect(
+        await within(dialog).findByText(/test notification sent successfully/i),
+      ).toBeInTheDocument();
+
+      await user.click(
+        within(within(dialog).getByRole("alert")).getByRole("button", {
+          name: /close/i,
+        }),
+      );
+      expect(
+        within(dialog).queryByText(/test notification sent successfully/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it("sends stored headers and omits empty or unknown-type fields", async () => {
+      const user = userEvent.setup();
+      getNotificationsConfig.mockResolvedValue({
+        data: {
+          ...configWithServices,
+          services: [
+            {
+              name: "Hooked",
+              type: "webhook",
+              enabled: true,
+              url: "https://example.com/hook",
+              headers: { "X-Token": "abc" },
+              username: "",
+            },
+            { name: "Legacy", type: "legacy", enabled: true, url: "x" },
+          ],
+        },
+      });
+      testUnsavedNotificationService.mockResolvedValue({});
+      render(<NotificationsPage />);
+      await screen.findByText("Hooked");
+
+      await user.click(screen.getByRole("button", { name: /edit hooked/i }));
+      let dialog = await screen.findByRole("dialog");
+      await user.click(within(dialog).getByRole("button", { name: "Test" }));
+      await waitFor(() =>
+        expect(testUnsavedNotificationService).toHaveBeenLastCalledWith({
+          name: "Hooked",
+          type: "webhook",
+          enabled: true,
+          url: "https://example.com/hook",
+          headers: { "X-Token": "abc" },
+        }),
+      );
+      await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+      await user.click(screen.getByRole("button", { name: /edit legacy/i }));
+      dialog = await screen.findByRole("dialog");
+      await user.click(within(dialog).getByRole("button", { name: "Test" }));
+      await waitFor(() =>
+        expect(testUnsavedNotificationService).toHaveBeenLastCalledWith({
+          name: "Legacy",
+          type: "legacy",
+          enabled: true,
+        }),
+      );
+    });
+
+    it.each([
+      ["succeeds", (resolve) => resolve({})],
+      ["fails", (_resolve, reject) => reject(new Error("late"))],
+    ])(
+      "ignores a test result that %s after the dialog was closed and reopened",
+      async (_name, settle) => {
+        const user = userEvent.setup();
+        let resolveTest;
+        let rejectTest;
+        testUnsavedNotificationService.mockReturnValue(
+          new Promise((resolve, reject) => {
+            resolveTest = resolve;
+            rejectTest = reject;
+          }),
+        );
+        let dialog = await openAddDialog(user);
+        await fillWebhook(user, dialog);
+        await user.click(within(dialog).getByRole("button", { name: "Test" }));
+        await user.click(
+          within(dialog).getByRole("button", { name: "Cancel" }),
+        );
+        await waitFor(() =>
+          expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+        );
+        await user.click(screen.getByRole("button", { name: /add service/i }));
+        dialog = await screen.findByRole("dialog", {
+          name: "Add Notification Service",
+        });
+        await fillWebhook(user, dialog);
+
+        await act(async () => {
+          settle(resolveTest, rejectTest);
+        });
+
+        expect(within(dialog).queryByRole("alert")).not.toBeInTheDocument();
+        expect(
+          within(dialog).getByRole("button", { name: "Test" }),
+        ).toBeEnabled();
+      },
+    );
+
+    it("works in edit mode using the stored values", async () => {
+      const user = userEvent.setup();
+      getNotificationsConfig.mockResolvedValue({ data: configWithServices });
+      testUnsavedNotificationService.mockResolvedValue({});
+      render(<NotificationsPage />);
+      await screen.findByText("My Webhook");
+
+      await user.click(
+        screen.getByRole("button", { name: /edit my webhook/i }),
+      );
+      const dialog = await screen.findByRole("dialog", {
+        name: "Edit Notification Service",
+      });
+      await user.click(within(dialog).getByRole("button", { name: "Test" }));
+
+      await waitFor(() =>
+        expect(testUnsavedNotificationService).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: "My Webhook",
+            url: "https://example.com/webhook",
+          }),
+        ),
+      );
+    });
+  });
+
+  it("shows an alert when adding a service fails", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({ data: config });
+    addNotificationService.mockRejectedValue({
+      response: { data: { detail: "Service already exists" } },
+    });
+
+    render(<NotificationsPage />);
+
+    await screen.findByText(/notifications are disabled/i);
+
+    await user.click(screen.getByRole("button", { name: /add service/i }));
+
+    await user.type(screen.getByLabelText("Service Name *"), "New Webhook");
+    await user.type(
+      screen.getByLabelText("Webhook URL *"),
+      "https://example.com/hook",
+    );
+
+    await user.click(screen.getByRole("button", { name: /^add service$/i }));
+
+    await waitFor(() =>
+      expect(addNotificationService).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "New Webhook",
+          type: "webhook",
+          url: "https://example.com/hook",
+        }),
+      ),
+    );
+    expect(
+      await screen.findByText(/service already exists/i),
+    ).toBeInTheDocument();
+  });
+
+  // Issue #264 fix: the Add/Update button is now also gated on the selected
+  // service type's own required field(s), not just the name.
+  it("keeps the add button disabled until the type-specific required field is filled in", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({ data: config });
+    addNotificationService.mockResolvedValue({});
+
+    render(<NotificationsPage />);
+
+    await screen.findByText(/notifications are disabled/i);
+
+    await user.click(screen.getByRole("button", { name: /add service/i }));
+
+    await user.type(
+      screen.getByLabelText("Service Name *"),
+      "Incomplete Webhook",
+    );
+
+    const addButton = screen.getByRole("button", { name: /^add service$/i });
+    // Name is filled in, but the webhook type's required URL is still empty.
+    expect(addButton).toBeDisabled();
+
+    await user.type(
+      screen.getByLabelText("Webhook URL *"),
+      "https://example.com/hook",
+    );
+
+    expect(addButton).toBeEnabled();
+
+    await user.click(addButton);
+
+    await waitFor(() =>
+      expect(addNotificationService).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Incomplete Webhook",
+          type: "webhook",
+          url: "https://example.com/hook",
+        }),
+      ),
+    );
+    expect(
+      await screen.findByText(/notification service added successfully/i),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the add button disabled for a telegram service missing bot_token/chat_id", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({ data: config });
+
+    render(<NotificationsPage />);
+
+    await screen.findByText(/notifications are disabled/i);
+
+    await user.click(screen.getByRole("button", { name: /add service/i }));
+    await user.type(
+      screen.getByLabelText("Service Name *"),
+      "Incomplete Telegram",
+    );
+    await user.selectOptions(
+      screen.getByLabelText("Service Type *"),
+      "telegram",
+    );
+
+    const addButton = screen.getByRole("button", { name: /^add service$/i });
+    expect(addButton).toBeDisabled();
+
+    const botTokenInput = screen.getByLabelText("Bot Token *");
+    await user.type(botTokenInput, "   ");
+    expect(addButton).toBeDisabled();
+
+    await user.clear(botTokenInput);
+    await user.type(botTokenInput, "123:abc");
+    expect(addButton).toBeDisabled();
+
+    expect(screen.getByLabelText("Chat ID *")).toHaveAttribute(
+      "placeholder",
+      "123456789",
+    );
+    await user.type(screen.getByLabelText("Chat ID *"), "456");
+    expect(addButton).toBeEnabled();
+  });
+
+  // Guards against a new entry in the service type dropdown being added without a
+  // matching REQUIRED_FIELDS_BY_TYPE entry, which would silently fall back to
+  // validating the name only.
+  it("keeps the add button disabled for every service type when only the name is filled in", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({ data: config });
+
+    render(<NotificationsPage />);
+
+    await screen.findByText(/notifications are disabled/i);
+
+    await user.click(screen.getByRole("button", { name: /add service/i }));
+    await user.type(screen.getByLabelText("Service Name *"), "Name Only");
+
+    const typeSelect = screen.getByLabelText("Service Type *");
+    const serviceTypes = Array.from(
+      typeSelect.options,
+      (option) => option.value,
+    );
+    expect(serviceTypes.length).toBeGreaterThan(0);
+
+    const addButton = screen.getByRole("button", { name: /^add service$/i });
+    for (const serviceType of serviceTypes) {
+      await user.selectOptions(typeSelect, serviceType);
+      expect(
+        addButton,
+        `service type "${serviceType}" has no required-field validation`,
+      ).toBeDisabled();
+    }
+  });
+
+  it("keeps the update button disabled for an existing service whose required field is null", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({
+      data: {
+        ...configWithServices,
+        services: [
+          { name: "Legacy Webhook", type: "webhook", enabled: true, url: null },
+        ],
+      },
+    });
+
+    render(<NotificationsPage />);
+
+    await screen.findByText("Legacy Webhook");
+
+    await user.click(
+      screen.getByRole("button", { name: "Edit Legacy Webhook" }),
+    );
+
+    const updateButton = screen.getByRole("button", {
+      name: /update service/i,
+    });
+    expect(updateButton).toBeDisabled();
+
+    await user.type(
+      screen.getByLabelText("Webhook URL *"),
+      "https://example.com/hook",
+    );
+
+    expect(updateButton).toBeEnabled();
+  });
+
+  it("falls back to name-only validation for a service of an unrecognised type", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({
+      data: {
+        ...configWithServices,
+        services: [
+          { name: "Future Service", type: "carrier-pigeon", enabled: true },
+        ],
+      },
+    });
+
+    render(<NotificationsPage />);
+
+    await screen.findByText("Future Service");
+
+    await user.click(
+      screen.getByRole("button", { name: "Edit Future Service" }),
+    );
+
+    expect(
+      screen.getByRole("button", { name: /update service/i }),
+    ).toBeEnabled();
+  });
+
+  it("edits an existing service successfully", async () => {
+    const user = userEvent.setup();
+    const configAfterEdit = {
+      ...configWithServices,
+      services: configWithServices.services.map((service) =>
+        service.name === "My Webhook"
+          ? { ...service, url: "https://example.com/updated" }
+          : service,
+      ),
+    };
+    getNotificationsConfig
+      .mockResolvedValueOnce({ data: configWithServices })
+      .mockResolvedValueOnce({ data: configAfterEdit });
+    updateNotificationService.mockResolvedValue({});
+
+    render(<NotificationsPage />);
+
+    await screen.findByText("My Webhook");
+
+    await user.click(screen.getByRole("button", { name: "Edit My Webhook" }));
+
+    const urlInput = screen.getByDisplayValue("https://example.com/webhook");
+    await user.clear(urlInput);
+    await user.type(urlInput, "https://example.com/updated");
+
+    await user.click(screen.getByRole("button", { name: /update service/i }));
+
+    await waitFor(() =>
+      expect(updateNotificationService).toHaveBeenCalledWith(
+        "My Webhook",
+        expect.objectContaining({ url: "https://example.com/updated" }),
+      ),
+    );
+    expect(
+      await screen.findByText(/notification service updated successfully/i),
+    ).toBeInTheDocument();
+
+    // The service list only shows name/type/status, so reopen the edit
+    // modal to prove the refetched config actually carries the new URL
+    // rather than the save handler having silently no-opped.
+    await user.click(screen.getByRole("button", { name: "Edit My Webhook" }));
+    expect(
+      await screen.findByDisplayValue("https://example.com/updated"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows an alert when updating a service fails", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({ data: configWithServices });
+    updateNotificationService.mockRejectedValue({
+      response: { data: { detail: "Service update rejected" } },
+    });
+
+    render(<NotificationsPage />);
+
+    await screen.findByText("My Webhook");
+
+    await user.click(screen.getByRole("button", { name: "Edit My Webhook" }));
+    await user.click(screen.getByRole("button", { name: /update service/i }));
+
+    expect(
+      await screen.findByText(/service update rejected/i),
+    ).toBeInTheDocument();
+  });
+
+  it("enables a disabled service", async () => {
+    const user = userEvent.setup();
+    const configAfterEnable = {
+      ...configWithServices,
+      services: configWithServices.services.map((service) =>
+        service.name === "Disabled Slack"
+          ? { ...service, enabled: true }
+          : service,
+      ),
+    };
+    getNotificationsConfig
+      .mockResolvedValueOnce({ data: configWithServices })
+      .mockResolvedValueOnce({ data: configAfterEnable });
+    updateNotificationService.mockResolvedValue({});
+
+    render(<NotificationsPage />);
+
+    await screen.findByText("Disabled Slack");
+
+    await user.click(
+      screen.getByRole("button", { name: "Edit Disabled Slack" }),
+    );
+
+    const modal = screen.getByRole("dialog", {
+      name: "Edit Notification Service",
+    });
+    await user.click(within(modal).getByLabelText("Enabled"));
+    await user.click(screen.getByRole("button", { name: /update service/i }));
+
+    await waitFor(() =>
+      expect(updateNotificationService).toHaveBeenCalledWith(
+        "Disabled Slack",
+        expect.objectContaining({ enabled: true }),
+      ),
+    );
+
+    const row = screen.getByText("Disabled Slack").closest("tr");
+    await waitFor(() =>
+      expect(within(row).getByText("Enabled")).toBeInTheDocument(),
+    );
+  });
+
+  it("disables an enabled service", async () => {
+    const user = userEvent.setup();
+    const configAfterDisable = {
+      ...configWithServices,
+      services: configWithServices.services.map((service) =>
+        service.name === "My Webhook"
+          ? { ...service, enabled: false }
+          : service,
+      ),
+    };
+    getNotificationsConfig
+      .mockResolvedValueOnce({ data: configWithServices })
+      .mockResolvedValueOnce({ data: configAfterDisable });
+    updateNotificationService.mockResolvedValue({});
+
+    render(<NotificationsPage />);
+
+    await screen.findByText("My Webhook");
+
+    await user.click(screen.getByRole("button", { name: "Edit My Webhook" }));
+
+    const modal = screen.getByRole("dialog", {
+      name: "Edit Notification Service",
+    });
+    await user.click(within(modal).getByLabelText("Enabled"));
+    await user.click(screen.getByRole("button", { name: /update service/i }));
+
+    await waitFor(() =>
+      expect(updateNotificationService).toHaveBeenCalledWith(
+        "My Webhook",
+        expect.objectContaining({ enabled: false }),
+      ),
+    );
+    expect(
+      await screen.findByText(/notification service updated successfully/i),
+    ).toBeInTheDocument();
+
+    const row = screen.getByText("My Webhook").closest("tr");
+    await waitFor(() =>
+      expect(within(row).getByText("Disabled")).toBeInTheDocument(),
+    );
+  });
+
+  it("deletes a service after confirming", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const configAfterDelete = {
+      ...configWithServices,
+      services: configWithServices.services.filter(
+        (service) => service.name !== "My Webhook",
+      ),
+    };
+    getNotificationsConfig
+      .mockResolvedValueOnce({ data: configWithServices })
+      .mockResolvedValueOnce({ data: configAfterDelete });
+    deleteNotificationService.mockResolvedValue({});
+
+    render(<NotificationsPage />);
+
+    await screen.findByText("My Webhook");
+
+    await user.click(screen.getByRole("button", { name: "Delete My Webhook" }));
+
+    await waitFor(() =>
+      expect(deleteNotificationService).toHaveBeenCalledWith("My Webhook"),
+    );
+    expect(
+      await screen.findByText(/notification service deleted successfully/i),
+    ).toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(screen.queryByText("My Webhook")).not.toBeInTheDocument(),
+    );
+
+    confirmSpy.mockRestore();
+  });
+
+  it("does not delete a service when the confirmation is cancelled", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    getNotificationsConfig.mockResolvedValue({ data: configWithServices });
+
+    render(<NotificationsPage />);
+
+    await screen.findByText("My Webhook");
+
+    await user.click(screen.getByRole("button", { name: "Delete My Webhook" }));
+
+    expect(deleteNotificationService).not.toHaveBeenCalled();
+
+    confirmSpy.mockRestore();
+  });
+
+  it("shows an alert when deleting a service fails", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    getNotificationsConfig.mockResolvedValue({ data: configWithServices });
+    deleteNotificationService.mockRejectedValue(new Error("delete failed"));
+
+    render(<NotificationsPage />);
+
+    await screen.findByText("My Webhook");
+
+    await user.click(screen.getByRole("button", { name: "Delete My Webhook" }));
+
+    expect(
+      await screen.findByText(/failed to delete notification service/i),
+    ).toBeInTheDocument();
+
+    confirmSpy.mockRestore();
+  });
+
+  it("tests a notification service and shows a success alert", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({ data: configWithServices });
+    testNotificationService.mockResolvedValue({});
+
+    render(<NotificationsPage />);
+
+    await screen.findByText("My Webhook");
+
+    await user.click(screen.getByRole("button", { name: "Test My Webhook" }));
+
+    await waitFor(() =>
+      expect(testNotificationService).toHaveBeenCalledWith("My Webhook"),
+    );
+    expect(
+      await screen.findByText(/test notification sent to "my webhook"/i),
+    ).toBeInTheDocument();
+  });
+
+  it("updates the Test button accessible name while the test is pending", async () => {
+    const user = userEvent.setup();
+    let resolveTest;
+    getNotificationsConfig.mockResolvedValue({ data: configWithServices });
+    testNotificationService.mockReturnValue(
+      new Promise((resolve) => {
+        resolveTest = resolve;
+      }),
+    );
+
+    render(<NotificationsPage />);
+    await screen.findByText("My Webhook");
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "Test My Webhook",
+        exact: true,
+      }),
+    );
+
+    const testingButton = screen.getByRole("button", {
+      name: "Testing My Webhook",
+      exact: true,
+    });
+    expect(testingButton).toBeDisabled();
+
+    resolveTest({});
+    expect(
+      await screen.findByText(/test notification sent to "my webhook"/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Test My Webhook",
+        exact: true,
+      }),
+    ).toBeEnabled();
+  });
+
+  it("shows an alert when testing a notification service fails", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({ data: configWithServices });
+    testNotificationService.mockRejectedValue({
+      response: { data: { detail: "Test send failed" } },
+    });
+
+    render(<NotificationsPage />);
+
+    await screen.findByText("My Webhook");
+
+    await user.click(screen.getByRole("button", { name: "Test My Webhook" }));
+
+    expect(await screen.findByText(/test send failed/i)).toBeInTheDocument();
+  });
+
+  it("shows an alert and leaves the state unchanged when toggling notifications fails", async () => {
+    const user = userEvent.setup();
+    getNotificationsConfig.mockResolvedValue({ data: config });
+    updateNotificationsConfig.mockRejectedValue(new Error("nope"));
+
+    render(<NotificationsPage />);
+
+    await screen.findByText(/notifications are disabled/i);
+    await user.click(
+      screen.getByRole("checkbox", { name: "Notification System" }),
+    );
+
+    expect(
+      await screen.findByText(/failed to update notifications/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/notifications are disabled/i)).toBeInTheDocument();
+  });
+
+  describe("event filters", () => {
+    it("explains that all events notify when no filter is selected", async () => {
+      getNotificationsConfig.mockResolvedValue({ data: config });
+
+      render(<NotificationsPage />);
+
+      expect(
+        await screen.findByText(
+          /no filters selected - all events will trigger notifications/i,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("adds an event type to the filters when its badge is clicked", async () => {
+      const user = userEvent.setup();
+      getNotificationsConfig.mockResolvedValue({
+        data: { ...config, event_filters: ["restart"] },
+      });
+      updateNotificationsConfig.mockResolvedValue({});
+
+      render(<NotificationsPage />);
+
+      await user.click(await screen.findByText("Container Quarantine"));
+
+      await waitFor(() =>
+        expect(updateNotificationsConfig).toHaveBeenCalledWith({
+          event_filters: ["restart", "quarantine"],
+        }),
+      );
+      expect(
+        await screen.findByText(/event filters updated/i),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/container quarantine ✓/i)).toBeInTheDocument();
+      expect(
+        screen.queryByText(/no filters selected/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it("removes an already selected event type from the filters", async () => {
+      const user = userEvent.setup();
+      getNotificationsConfig.mockResolvedValue({
+        data: { ...config, event_filters: ["restart", "quarantine"] },
+      });
+      updateNotificationsConfig.mockResolvedValue({});
+
+      render(<NotificationsPage />);
+
+      await user.click(await screen.findByText(/container restart/i));
+
+      await waitFor(() =>
+        expect(updateNotificationsConfig).toHaveBeenCalledWith({
+          event_filters: ["quarantine"],
+        }),
+      );
+    });
+
+    it("shows an alert and keeps the previous filters when updating fails", async () => {
+      const user = userEvent.setup();
+      getNotificationsConfig.mockResolvedValue({ data: config });
+      updateNotificationsConfig.mockRejectedValue(new Error("nope"));
+
+      render(<NotificationsPage />);
+
+      await user.click(await screen.findByText("Auto Monitor"));
+
+      expect(
+        await screen.findByText(/failed to update event filters/i),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/auto monitor ✓/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("type-specific service payloads", () => {
+    async function openAddModal(type, name) {
+      const user = userEvent.setup();
+      getNotificationsConfig.mockResolvedValue({ data: config });
+      addNotificationService.mockResolvedValue({});
+
+      render(<NotificationsPage />);
+      await screen.findByText(/notifications are disabled/i);
+
+      await user.click(screen.getByRole("button", { name: /add service/i }));
+      await user.type(screen.getByLabelText("Service Name *"), name);
+      await user.selectOptions(screen.getByLabelText("Service Type *"), type);
+      return user;
+    }
+
+    async function submitAndGetPayload(user) {
+      await user.click(screen.getByRole("button", { name: /^add service$/i }));
+      await waitFor(() =>
+        expect(addNotificationService).toHaveBeenCalledTimes(1),
+      );
+      return addNotificationService.mock.calls[0][0];
+    }
+
+    it("sends the url and optional username for a discord service", async () => {
+      const user = await openAddModal("discord", "Discord");
+      await user.type(
+        screen.getByLabelText("Discord Webhook URL *"),
+        "https://discord.com/api/webhooks/1",
+      );
+      await user.type(
+        screen.getByLabelText("Username (optional)"),
+        "autoheal-bot",
+      );
+
+      expect(await submitAndGetPayload(user)).toEqual({
+        name: "Discord",
+        type: "discord",
+        enabled: true,
+        url: "https://discord.com/api/webhooks/1",
+        username: "autoheal-bot",
+      });
+    });
+
+    it("sends only the url for a slack service", async () => {
+      const user = await openAddModal("slack", "Slack");
+      await user.type(
+        screen.getByLabelText("Slack Webhook URL *"),
+        "https://hooks.slack.com/services/x",
+      );
+
+      expect(await submitAndGetPayload(user)).toEqual({
+        name: "Slack",
+        type: "slack",
+        enabled: true,
+        url: "https://hooks.slack.com/services/x",
+      });
+    });
+
+    it("sends the bot token and chat id for a telegram service", async () => {
+      const user = await openAddModal("telegram", "Telegram");
+      await user.type(screen.getByLabelText("Bot Token *"), "123:abc");
+      await user.type(screen.getByLabelText("Chat ID *"), "456");
+
+      expect(await submitAndGetPayload(user)).toEqual({
+        name: "Telegram",
+        type: "telegram",
+        enabled: true,
+        bot_token: "123:abc",
+        chat_id: "456",
+      });
+    });
+
+    it("sends the topic and optional credentials for an ntfy service", async () => {
+      const user = await openAddModal("ntfy", "Ntfy");
+      await user.type(screen.getByLabelText("Topic *"), "alerts");
+      await user.type(
+        screen.getByLabelText("Server URL (optional)"),
+        "https://ntfy.example.com",
+      );
+      await user.type(screen.getByLabelText("Username (optional)"), "me");
+      await user.type(screen.getByLabelText("Password (optional)"), "secret");
+
+      expect(await submitAndGetPayload(user)).toEqual({
+        name: "Ntfy",
+        type: "ntfy",
+        enabled: true,
+        topic: "alerts",
+        server_url: "https://ntfy.example.com",
+        username: "me",
+        password: "secret",
+      });
+    });
+
+    it("sends the access token for an ntfy service", async () => {
+      const user = await openAddModal("ntfy", "Ntfy");
+      await user.type(screen.getByLabelText("Topic *"), "alerts");
+      await user.type(
+        screen.getByLabelText("Access token (optional)"),
+        "tk_secret",
+      );
+
+      expect(await submitAndGetPayload(user)).toEqual({
+        name: "Ntfy",
+        type: "ntfy",
+        enabled: true,
+        topic: "alerts",
+        access_token: "tk_secret",
+      });
+    });
+
+    it("does not log the access token when saving an ntfy service fails", async () => {
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      const user = await openAddModal("ntfy", "Ntfy");
+      // Axios errors keep the request configuration, including the serialised body.
+      addNotificationService.mockRejectedValue(
+        Object.assign(new Error("Request failed with status code 500"), {
+          config: { data: JSON.stringify({ access_token: "tk_leak_check" }) },
+          response: { status: 500, data: { detail: "Server error" } },
+        }),
+      );
+      await user.type(screen.getByLabelText("Topic *"), "alerts");
+      await user.type(
+        screen.getByLabelText("Access token (optional)"),
+        "tk_leak_check",
+      );
+
+      await user.click(screen.getByRole("button", { name: /^add service$/i }));
+
+      expect(await screen.findByText("Server error")).toBeInTheDocument();
+      expect(consoleError).toHaveBeenCalled();
+      expect(JSON.stringify(consoleError.mock.calls)).not.toContain(
+        "tk_leak_check",
+      );
+      consoleError.mockRestore();
+    });
+
+    it("sends the server url and app token for a gotify service", async () => {
+      const user = await openAddModal("gotify", "Gotify");
+      await user.type(
+        screen.getByLabelText("Server URL *"),
+        "https://gotify.local",
+      );
+      await user.type(screen.getByLabelText("App Token *"), "apptok");
+
+      expect(await submitAndGetPayload(user)).toEqual({
+        name: "Gotify",
+        type: "gotify",
+        enabled: true,
+        server_url: "https://gotify.local",
+        app_token: "apptok",
+      });
+    });
+
+    it("sends the user key and api token for a pushover service", async () => {
+      const user = await openAddModal("pushover", "Pushover");
+      await user.type(screen.getByLabelText("User Key *"), "ukey");
+      await user.type(screen.getByLabelText("API Token *"), "atok");
+
+      expect(await submitAndGetPayload(user)).toEqual({
+        name: "Pushover",
+        type: "pushover",
+        enabled: true,
+        user_key: "ukey",
+        api_token: "atok",
+      });
+    });
+  });
+});
