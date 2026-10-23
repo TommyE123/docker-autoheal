@@ -31,17 +31,15 @@ Release PR when you're ready to ship.
 
 ## Existing release history
 
-The project's real release history (`v2.0.0` through `v2.0.16`) predates Release Please and is
-preserved, not restarted. `release-please-config.json` sets `bootstrap-sha` to the commit
-tagged `v2.0.16`, so Release Please's first Release PR only proposed a bump from `2.0.16`
-onward, using commits merged after that point. `.release-please-manifest.json` and `version.txt`
-record the current version (read them rather than this page) and Release Please maintains both
-on every release.
+This repository starts from a single initial import commit at version `2.3.0`. Earlier tags
+and releases are not part of this repository. `release-please-config.json` sets
+`bootstrap-sha` to that initial import commit, so Release Please only proposes a bump from
+`2.3.0` onward, using commits merged after the import. `.release-please-manifest.json` and
+`version.txt` record the current version (read them rather than this page) and Release Please
+maintains both on every release.
 
-The repository also has a legacy bare `v2` tag from before this project used per-commit SemVer
-tags. Release Please's own tag parser only recognises `vMAJOR.MINOR.PATCH`-shaped tags; a bare
-`v2` doesn't match and is ignored automatically — no special exclusion configuration was needed
-or added.
+Release Please's own tag parser only recognises `vMAJOR.MINOR.PATCH`-shaped tags, so any other
+tag shape is ignored automatically.
 
 ## What's automated vs. manual
 

@@ -22,13 +22,13 @@ AUTO_MERGE_WORKFLOW = (
 ).read_text(encoding="utf-8")
 
 
-def test_config_bootstraps_from_the_last_real_release_commit():
+def test_config_bootstraps_from_the_initial_import_commit():
     config = json.loads((REPO_ROOT / "release-please-config.json").read_text())
 
-    # This is the commit tagged v2.0.16 - the actual last production release.
-    # Bootstrapping here (not at the repo's first commit) stops release-please
-    # from treating years of existing history as unreleased changes.
-    assert config["bootstrap-sha"] == "437dd523de66735bedf72d1e90d325fde88fff46"
+    # This is the repository's initial import commit, at version 2.3.0.
+    # Bootstrapping here stops release-please from treating that import as an
+    # unreleased change.
+    assert config["bootstrap-sha"] == "b73516ce24472171f4279f126e57fca5f82235cd"
     assert config["packages"]["."]["release-type"] == "simple"
 
     # Release notes live on GitHub Releases, not a committed CHANGELOG.md.
