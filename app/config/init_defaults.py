@@ -47,7 +47,7 @@ def get_default_config() -> dict[str, Any]:
         },
         "ui": {
             "enable": True,
-            "listen_address": "0.0.0.0",
+            "listen_address": "0.0.0.0",  # noqa: S104 - the container must listen on all interfaces
             "listen_port": 3131,
             "allow_export_json": True,
             "allow_import_json": True,

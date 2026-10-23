@@ -46,8 +46,9 @@ def _run_bootstrap(data_dir: Path, config_text: str | None):
     script = script.replace("exec python -m app.main", "echo STARTED")
     script = script.replace("python - <<", f"{sys.executable} - <<")
     script = script.replace("/data", str(data_dir))
-    return subprocess.run(
-        ["sh", "-c", script],
+    # Runs the repo's own bootstrap script; nothing here is untrusted input.
+    return subprocess.run(  # noqa: S603
+        ["sh", "-c", script],  # noqa: S607 - test is skipped when sh is missing
         cwd=data_dir if data_dir.exists() else data_dir.parent,
         env={"PATH": "/usr/bin:/bin", "PYTHONPATH": str(REPO_ROOT)},
         capture_output=True,

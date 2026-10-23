@@ -453,8 +453,8 @@ class NotificationManager:
         service: Any,
         title: str,
         message: str,
-        event: AutoHealEvent,
-        priority: NotificationPriority,
+        event: AutoHealEvent,  # noqa: ARG002 - senders share one signature
+        priority: NotificationPriority,  # noqa: ARG002 - senders share one signature
     ) -> bool:
         """Send Slack webhook notification"""
         if not service.url:
@@ -492,8 +492,8 @@ class NotificationManager:
         service: Any,
         title: str,
         message: str,
-        event: AutoHealEvent,
-        priority: NotificationPriority,
+        event: AutoHealEvent,  # noqa: ARG002 - senders share one signature
+        priority: NotificationPriority,  # noqa: ARG002 - senders share one signature
     ) -> bool:
         """Send Telegram notification"""
         if not service.bot_token or not service.chat_id:
@@ -545,7 +545,7 @@ class NotificationManager:
         service: Any,
         title: str,
         message: str,
-        event: AutoHealEvent,
+        event: AutoHealEvent,  # noqa: ARG002 - senders share one signature
         priority: NotificationPriority,
     ) -> bool:
         """Send ntfy.sh notification"""
@@ -609,7 +609,7 @@ class NotificationManager:
         service: Any,
         title: str,
         message: str,
-        event: AutoHealEvent,
+        event: AutoHealEvent,  # noqa: ARG002 - senders share one signature
         priority: NotificationPriority,
     ) -> bool:
         """Send Gotify notification"""
@@ -661,7 +661,7 @@ class NotificationManager:
         service: Any,
         title: str,
         message: str,
-        event: AutoHealEvent,
+        event: AutoHealEvent,  # noqa: ARG002 - senders share one signature
         priority: NotificationPriority,
     ) -> bool:
         """Send Pushover notification"""
