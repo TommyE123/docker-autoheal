@@ -6,14 +6,42 @@ together monitoring selection, quarantine handling, health evaluation and
 restarts.
 """
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from app.config.config_manager import config_manager
-from app.tests.unit.conftest import INCOMPLETE_INFO_CASES, after_backoff, make_container
+from app.monitor.monitoring_engine import QUARANTINE_STABLE_CHECKS, MonitoringEngine
+from app.tests.unit.conftest import (
+    INCOMPLETE_INFO_CASES,
+    after_backoff,
+    make_container,
+    until_stable,
+)
 
 
 def event_types() -> list:
     return [event.event_type for event in config_manager.get_events()]
+
+
+class TestUptimeSeconds:
+    """Docker ``StartedAt`` parsing behind the quarantine uptime guard."""
+
+    def test_docker_nanosecond_timestamp_is_parsed(self):
+        started = (datetime.now(UTC) - timedelta(seconds=120)).strftime("%Y-%m-%dT%H:%M:%S")
+
+        uptime = MonitoringEngine._uptime_seconds(f"{started}.123456789Z")
+
+        assert uptime == pytest.approx(120, abs=5)
+
+    def test_timestamp_without_timezone_is_read_as_utc(self):
+        started = (datetime.now(UTC) - timedelta(seconds=60)).strftime("%Y-%m-%dT%H:%M:%S")
+
+        assert MonitoringEngine._uptime_seconds(started) == pytest.approx(60, abs=5)
+
+    @pytest.mark.parametrize("started_at", ["", "not-a-date", "0001-01-01T00:00:00Z"])
+    def test_unusable_or_zero_timestamp_has_no_uptime(self, started_at):
+        assert MonitoringEngine._uptime_seconds(started_at) is None
 
 
 @pytest.mark.asyncio
@@ -92,10 +120,27 @@ class TestQuarantinedContainerChecks:
         docker_client.add_container(container, info)
         config_manager.quarantine_container("web")
 
-        await engine._check_single_container(container)
+        await until_stable(engine._check_containers)
 
         assert config_manager.is_quarantined("web") is True
         assert docker_client.restart_calls == []
+
+    async def test_unhealthy_check_in_the_middle_of_a_streak_resets_it(
+        self, engine, docker_client, update_config
+    ):
+        update_config(lambda c: setattr(c.restart, "mode", "both"))
+        container, info = make_container(name="web", status="running", health={"status": "healthy"})
+        docker_client.add_container(container, info)
+        config_manager.quarantine_container("web")
+        for _ in range(QUARANTINE_STABLE_CHECKS - 1):
+            await engine._check_containers()
+
+        docker_client._info[container.id] = {**info, "health": {"status": "unhealthy"}}
+        await engine._check_containers()
+        docker_client._info[container.id] = info
+        await engine._check_containers()
+
+        assert config_manager.is_quarantined("web") is True
 
     async def test_recovered_container_is_auto_unquarantined(self, engine, docker_client):
         container, info = make_container(name="web", status="running")
@@ -104,12 +149,288 @@ class TestQuarantinedContainerChecks:
         config_manager.record_restart("web")
         engine._backoff_delays["web"] = 320
 
-        await engine._check_single_container(container)
+        await until_stable(engine._check_containers)
 
         assert config_manager.is_quarantined("web") is False
         assert config_manager.get_restart_count("web", 600) == 0
         assert engine._backoff_delays["web"] == 10  # reset to initial_seconds
         assert event_types() == ["auto_unquarantine"]
+
+    async def test_single_running_check_does_not_unquarantine(self, engine, docker_client):
+        """A crash-looping container is running between crashes; one snapshot is not recovery."""
+        container, info = make_container(name="web", status="running")
+        docker_client.add_container(container, info)
+        config_manager.quarantine_container("web")
+        config_manager.record_restart("web")
+
+        await engine._check_single_container(container)
+
+        assert config_manager.is_quarantined("web") is True
+        assert config_manager.get_restart_count("web", 600) == 1
+        assert event_types() == []
+
+    async def test_unquarantine_needs_consecutive_healthy_checks(self, engine, docker_client):
+        container, info = make_container(name="web", status="running")
+        docker_client.add_container(container, info)
+        config_manager.quarantine_container("web")
+
+        await until_stable(engine._check_containers)
+        assert config_manager.is_quarantined("web") is False
+
+        config_manager.quarantine_container("web")
+        for _ in range(QUARANTINE_STABLE_CHECKS - 1):
+            await engine._check_containers()
+        assert config_manager.is_quarantined("web") is True
+
+    async def test_crash_between_checks_resets_the_streak(self, engine, docker_client):
+        container, info = make_container(name="web", status="running")
+        docker_client.add_container(container, info)
+        config_manager.quarantine_container("web")
+        for _ in range(QUARANTINE_STABLE_CHECKS - 1):
+            await engine._check_containers()
+
+        docker_client._info[container.id] = {
+            **info,
+            "state": {"Status": "exited", "ExitCode": 1},
+        }
+        await engine._check_containers()
+        docker_client._info[container.id] = info
+        await engine._check_containers()
+
+        assert config_manager.is_quarantined("web") is True
+
+    async def test_restart_between_checks_resets_the_streak(self, engine, docker_client):
+        """Running at every check, but a new run each time: StartedAt changes."""
+        container, info = make_container(name="web", status="running")
+        docker_client.add_container(container, info)
+        config_manager.quarantine_container("web")
+
+        for run in range(QUARANTINE_STABLE_CHECKS + 1):
+            docker_client._info[container.id] = {
+                **info,
+                "started_at": f"2024-01-01T00:00:0{run}Z",
+            }
+            await engine._check_containers()
+
+        assert config_manager.is_quarantined("web") is True
+
+    @pytest.mark.parametrize("started_at", ["", "not-a-date", "0001-01-01T00:00:00Z"])
+    async def test_unusable_started_at_keeps_quarantine_and_records_no_streak(
+        self, engine, docker_client, started_at
+    ):
+        container, info = make_container(name="web", status="running")
+        info["started_at"] = started_at
+        docker_client.add_container(container, info)
+        config_manager.quarantine_container("web")
+
+        await until_stable(engine._check_containers)
+
+        assert config_manager.is_quarantined("web") is True
+        assert engine._quarantine_streaks == {}
+
+    async def test_short_uptime_blocks_unquarantine(self, engine, docker_client):
+        """Enough consecutive checks are not enough when the current run is young."""
+        container, info = make_container(name="web", status="running")
+        info["started_at"] = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        docker_client.add_container(container, info)
+        config_manager.quarantine_container("web")
+
+        await until_stable(engine._check_containers)
+
+        assert config_manager.is_quarantined("web") is True
+
+    async def test_uptime_is_measured_against_the_monitoring_interval(
+        self, engine, docker_client, update_config
+    ):
+        update_config(lambda c: setattr(c.monitor, "interval_seconds", 3600))
+        container, info = make_container(name="web", status="running")
+        info["started_at"] = (datetime.now(UTC) - timedelta(seconds=600)).isoformat()
+        docker_client.add_container(container, info)
+        config_manager.quarantine_container("web")
+
+        await until_stable(engine._check_containers)
+
+        assert config_manager.is_quarantined("web") is True
+
+    @pytest.mark.parametrize("mode", ["health", "both"])
+    async def test_docker_health_starting_is_not_recovered(
+        self, engine, docker_client, update_config, mode
+    ):
+        update_config(lambda c: setattr(c.restart, "mode", mode))
+        container, info = make_container(
+            name="web", status="running", health={"status": "starting"}
+        )
+        docker_client.add_container(container, info)
+        config_manager.quarantine_container("web")
+
+        await until_stable(engine._check_containers)
+
+        assert config_manager.is_quarantined("web") is True
+
+    async def test_docker_health_starting_is_ignored_in_on_failure_mode(
+        self, engine, docker_client, update_config
+    ):
+        update_config(lambda c: setattr(c.restart, "mode", "on-failure"))
+        container, info = make_container(
+            name="web", status="running", health={"status": "starting"}
+        )
+        docker_client.add_container(container, info)
+        config_manager.quarantine_container("web")
+
+        await until_stable(engine._check_containers)
+
+        assert config_manager.is_quarantined("web") is False
+
+    async def test_manual_release_then_requarantine_starts_a_fresh_streak(
+        self, engine, docker_client
+    ):
+        container, info = make_container(name="web", status="running")
+        docker_client.add_container(container, info)
+        config_manager.quarantine_container("web")
+        for _ in range(QUARANTINE_STABLE_CHECKS - 1):
+            await engine._check_containers()
+
+        config_manager.unquarantine_container("web")
+        await engine._check_containers()
+        config_manager.quarantine_container("web")
+        await engine._check_containers()
+
+        assert config_manager.is_quarantined("web") is True
+
+    async def test_streak_is_dropped_when_container_disappears(self, engine, docker_client):
+        container, info = make_container(name="web", status="running")
+        other, other_info = make_container(name="api", container_id="b" * 64, status="running")
+        docker_client.add_container(container, info)
+        docker_client.add_container(other, other_info)
+        config_manager.quarantine_container("web")
+        await engine._check_containers()
+        assert container.id in engine._quarantine_streaks
+
+        docker_client.remove_container(container)
+        await engine._check_containers()
+        await engine._check_containers()
+
+        assert engine._quarantine_streaks == {}
+
+    async def test_maintenance_mode_gap_resets_the_streak(self, engine, docker_client):
+        container, info = make_container(name="web", status="running")
+        docker_client.add_container(container, info)
+        config_manager.quarantine_container("web")
+        for _ in range(QUARANTINE_STABLE_CHECKS - 1):
+            await engine._check_containers()
+
+        config_manager.enable_maintenance_mode()
+        await engine._check_containers()
+        config_manager.disable_maintenance_mode()
+        await engine._check_containers()
+
+        assert config_manager.is_quarantined("web") is True
+
+    async def _quarantined_web_with_two_healthy_cycles(self, engine, docker_client):
+        container, info = make_container(name="web", status="running")
+        docker_client.add_container(container, info)
+        config_manager.quarantine_container("web")
+        for _ in range(QUARANTINE_STABLE_CHECKS - 1):
+            await engine._check_containers()
+        assert container.id in engine._quarantine_streaks
+        return container, info
+
+    async def _assert_fresh_streak_is_needed(self, engine):
+        """One healthy cycle after the gap must not release; a fresh full streak must"""
+        await engine._check_containers()
+        assert config_manager.is_quarantined("web") is True
+        for _ in range(QUARANTINE_STABLE_CHECKS - 1):
+            await engine._check_containers()
+        assert config_manager.is_quarantined("web") is False
+
+    async def test_starting_health_mid_streak_resets_it(self, engine, docker_client, update_config):
+        update_config(lambda c: setattr(c.restart, "mode", "both"))
+        container, info = await self._quarantined_web_with_two_healthy_cycles(engine, docker_client)
+
+        docker_client._info[container.id] = {**info, "health": {"status": "starting"}}
+        await engine._check_containers()
+        docker_client._info[container.id] = info
+
+        await self._assert_fresh_streak_is_needed(engine)
+
+    async def test_unusable_started_at_mid_streak_resets_it(self, engine, docker_client):
+        container, info = await self._quarantined_web_with_two_healthy_cycles(engine, docker_client)
+
+        docker_client._info[container.id] = {**info, "started_at": ""}
+        await engine._check_containers()
+        docker_client._info[container.id] = info
+
+        await self._assert_fresh_streak_is_needed(engine)
+
+    async def test_incomplete_container_info_mid_streak_resets_it(self, engine, docker_client):
+        container, info = await self._quarantined_web_with_two_healthy_cycles(engine, docker_client)
+
+        docker_client._info[container.id] = {k: v for k, v in info.items() if k != "full_id"}
+        await engine._check_containers()
+        docker_client._info[container.id] = info
+
+        await self._assert_fresh_streak_is_needed(engine)
+
+    async def test_failed_listing_resets_the_streak(self, engine, docker_client, monkeypatch):
+        await self._quarantined_web_with_two_healthy_cycles(engine, docker_client)
+        listing = docker_client.list_containers
+        monkeypatch.setattr(docker_client, "list_containers", lambda all_containers=False: [])
+        await engine._check_containers()
+        monkeypatch.setattr(docker_client, "list_containers", listing)
+
+        await self._assert_fresh_streak_is_needed(engine)
+
+    async def test_failed_reconnect_resets_the_streak(self, engine, docker_client):
+        await self._quarantined_web_with_two_healthy_cycles(engine, docker_client)
+        docker_client.connected = False
+        docker_client.reconnect_succeeds = False
+        await engine._check_containers()
+        docker_client.connected = True
+        docker_client.reconnect_succeeds = True
+
+        await self._assert_fresh_streak_is_needed(engine)
+
+    async def test_listing_error_resets_the_streak(self, engine, docker_client, monkeypatch):
+        await self._quarantined_web_with_two_healthy_cycles(engine, docker_client)
+        listing = docker_client.list_containers
+
+        def boom(all_containers=False):
+            raise RuntimeError("docker socket closed")
+
+        monkeypatch.setattr(docker_client, "list_containers", boom)
+        await engine._check_containers()
+        monkeypatch.setattr(docker_client, "list_containers", listing)
+
+        await self._assert_fresh_streak_is_needed(engine)
+
+    async def test_failed_check_of_a_container_resets_its_streak(
+        self, engine, docker_client, monkeypatch
+    ):
+        await self._quarantined_web_with_two_healthy_cycles(engine, docker_client)
+        inspect = docker_client.get_container_info
+
+        def boom(_container):
+            raise RuntimeError("inspect failed")
+
+        monkeypatch.setattr(docker_client, "get_container_info", boom)
+        await engine._check_containers()
+        monkeypatch.setattr(docker_client, "get_container_info", inspect)
+
+        await self._assert_fresh_streak_is_needed(engine)
+
+    async def test_unmonitored_gap_resets_the_streak(self, engine, docker_client):
+        container, info = make_container(name="web", status="running")
+        docker_client.add_container(container, info)
+        config_manager.quarantine_container("web")
+        for _ in range(QUARANTINE_STABLE_CHECKS - 1):
+            await engine._check_containers()
+
+        docker_client._info[container.id] = {**info, "labels": {"autoheal": "false"}}
+        await engine._check_containers()
+        docker_client._info[container.id] = info
+        await engine._check_containers()
+
+        assert config_manager.is_quarantined("web") is True
 
     async def test_auto_unquarantine_sends_notification(
         self, engine, docker_client, mock_notification_manager
@@ -118,7 +439,7 @@ class TestQuarantinedContainerChecks:
         docker_client.add_container(container, info)
         config_manager.quarantine_container("web")
 
-        await engine._check_single_container(container)
+        await until_stable(engine._check_containers)
 
         mock_notification_manager.send_event_notification.assert_awaited_once()
 
@@ -138,7 +459,7 @@ class TestQuarantinedContainerChecks:
         docker_client.add_container(container, info)
         config_manager.quarantine_container("stack-web-1")
 
-        await engine._check_single_container(container)
+        await until_stable(engine._check_containers)
 
         assert config_manager.is_quarantined("stack-web-1") is False
         assert event_types() == ["auto_unquarantine"]
@@ -148,7 +469,7 @@ class TestQuarantinedContainerChecks:
         docker_client.add_container(container, info)
         config_manager.quarantine_container("e" * 64)
 
-        await engine._check_single_container(container)
+        await until_stable(engine._check_containers)
 
         assert config_manager.is_quarantined("e" * 64) is False
 
@@ -289,13 +610,17 @@ class TestAutoUnquarantineFailure:
         docker_client.add_container(container, info)
         config_manager.quarantine_container("web")
 
+        attempts = []
+
         def boom(_container_id):
+            attempts.append(_container_id)
             raise RuntimeError("could not write quarantine file")
 
         monkeypatch.setattr(config_manager, "unquarantine_container", boom)
 
-        await engine._check_single_container(container)
+        await until_stable(engine._check_containers)
 
+        assert attempts == ["web"]
         assert config_manager.is_quarantined("web") is True
         assert config_manager.get_events() == []
 

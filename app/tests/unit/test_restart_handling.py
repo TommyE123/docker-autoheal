@@ -13,7 +13,12 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.config.config_manager import config_manager
-from app.tests.unit.conftest import INCOMPLETE_INFO_CASES, after_backoff, make_container
+from app.tests.unit.conftest import (
+    INCOMPLETE_INFO_CASES,
+    after_backoff,
+    make_container,
+    until_stable,
+)
 
 
 def events_of_type(event_type: str) -> list:
@@ -470,7 +475,7 @@ class TestRestartBackoff:
             "state": {"Status": "running", "ExitCode": 0},
         }
 
-        await engine._check_single_container(container)
+        await until_stable(engine._check_containers)
 
         assert config_manager.is_quarantined("web") is False
         assert "web" not in engine._next_allowed_restart

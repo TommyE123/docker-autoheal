@@ -103,9 +103,14 @@ and `DELETE /api/healthchecks/{id}`.
    trying to restart it until you intervene, or until it becomes healthy on its own (see
    below).
 4. **Auto-unquarantine** — on every monitoring cycle, Auto-Heal re-checks quarantined
-   containers. If a quarantined container is running and passes its health check(s), it's
-   automatically removed from quarantine and its restart count is reset. You can also
-   un-quarantine manually from the UI or `POST /api/containers/{id}/unquarantine`.
+   containers. One that has been running and passing its health check(s) for 3
+   consecutive checks of the same run, and has been up for at least 3 monitoring
+   intervals, is removed from quarantine and its restart count reset. A single healthy
+   snapshot isn't enough, since a crash-looping container is running between crashes,
+   and Docker health `starting` doesn't count as healthy in the `health` and `both`
+   modes. The check count is kept in memory, so restarting Auto-Heal starts it again
+   from zero (the container stays quarantined meanwhile). You can also un-quarantine
+   manually from the UI or `POST /api/containers/{id}/unquarantine`.
 
 ## See also
 
