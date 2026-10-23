@@ -41,7 +41,7 @@ import pytest
 from app.api.routes.containers import unquarantine_container
 from app.config.config_manager import AutoHealEvent, NotificationService, config_manager
 from app.notifications.notification_manager import NotificationManager
-from app.tests.unit.conftest import after_backoff, make_container
+from app.tests.unit.conftest import after_backoff, make_container, until_stable
 from app.tests.unit.test_engine_lifecycle import start_event
 from app.tests.unit.test_notification_manager import _FakeSession, fake_session
 
@@ -123,7 +123,7 @@ async def emit_one_event_of_each_type(engine, docker_client) -> None:
     )
     docker_client.add_container(container, info)
     config_manager.quarantine_container("auto-unquarantine-target")
-    await engine._check_single_container(container)
+    await until_stable(engine._check_single_container, container)
 
     # "auto_monitor": a labelled container starting while the engine runs.
     container, info = make_container(name="auto-monitor-target", container_id=AUTO_MONITOR_ID)

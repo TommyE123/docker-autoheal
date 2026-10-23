@@ -10,6 +10,9 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
+from app.monitor.monitoring_engine import QUARANTINE_STABLE_CHECKS
+from app.tests.unit.conftest import until_stable
+
 
 class TestAutoUnquarantine:
     """Tests for auto-unquarantine feature"""
@@ -143,6 +146,7 @@ class TestAutoUnquarantine:
             "name": "test-container",
             "state": {"Status": "running"},
             "health": {"status": "healthy"},
+            "started_at": "2024-01-01T00:00:00Z",
             "labels": {},
         }
 
@@ -169,7 +173,8 @@ class TestAutoUnquarantine:
             mock_config.is_maintenance_mode.return_value = False
             mock_config.is_quarantined.side_effect = lambda x: x == "test_stable_id"
             mock_config.get_config.return_value = Mock(
-                restart=Mock(mode="health", backoff=Mock(initial_seconds=10))
+                restart=Mock(mode="health", backoff=Mock(initial_seconds=10)),
+                monitor=Mock(interval_seconds=30),
             )
             mock_config.get_custom_health_check.return_value = None
             mock_config.unquarantine_container = Mock()
@@ -177,11 +182,11 @@ class TestAutoUnquarantine:
             mock_config.add_event = Mock()
             mock_notif.send_event_notification = AsyncMock()
 
-            # Call check single container
-            await engine._check_single_container(mock_container)
+            # Healthy for the required number of consecutive checks
+            await until_stable(engine._check_single_container, mock_container)
 
-            # Verify _evaluate_container_health was called (reused existing method)
-            engine._evaluate_container_health.assert_called_once()
+            # Verify _evaluate_container_health was called on every check
+            assert engine._evaluate_container_health.await_count == QUARANTINE_STABLE_CHECKS
 
             # Verify unquarantine was called (container was healthy)
             mock_config.unquarantine_container.assert_called_once_with("test_stable_id")
@@ -207,6 +212,7 @@ class TestAutoUnquarantine:
             "name": "test-container",
             "state": {"Status": "running"},
             "health": {"status": "unhealthy"},
+            "started_at": "2024-01-01T00:00:00Z",
             "labels": {},
         }
 
@@ -234,15 +240,15 @@ class TestAutoUnquarantine:
             # Setup: container is quarantined
             mock_config.is_maintenance_mode.return_value = False
             mock_config.is_quarantined.side_effect = lambda x: x == "test_stable_id"
-            mock_config.get_config.return_value = Mock()
+            mock_config.get_config.return_value = Mock(monitor=Mock(interval_seconds=30))
             mock_config.unquarantine_container = Mock()
             mock_notif.send_event_notification = AsyncMock()
 
-            # Call check single container
-            await engine._check_single_container(mock_container)
+            # Enough checks that a healthy container would have been released
+            await until_stable(engine._check_single_container, mock_container)
 
-            # Verify _evaluate_container_health was called
-            engine._evaluate_container_health.assert_called_once()
+            # Verify _evaluate_container_health was called on every check
+            assert engine._evaluate_container_health.await_count == QUARANTINE_STABLE_CHECKS
 
             # Verify unquarantine was NOT called (container is still unhealthy)
             mock_config.unquarantine_container.assert_not_called()

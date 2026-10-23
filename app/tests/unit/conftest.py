@@ -40,7 +40,7 @@ from app.docker_client.docker_client_wrapper import (
     DockerClientWrapper,
     recovery_identifier,
 )
-from app.monitor.monitoring_engine import MonitoringEngine
+from app.monitor.monitoring_engine import QUARANTINE_STABLE_CHECKS, MonitoringEngine
 
 # ---------------------------------------------------------------------------
 # Fakes
@@ -153,6 +153,12 @@ async def after_backoff(engine: MonitoringEngine, action, *args) -> None:
         elapsed = datetime.now(UTC) - timedelta(seconds=1)
         for recovery_id in engine._next_allowed_restart:
             engine._next_allowed_restart[recovery_id] = elapsed
+        await action(*args)
+
+
+async def until_stable(action, *args) -> None:
+    """Run ``action`` once per healthy check a quarantined container needs to be released."""
+    for _ in range(QUARANTINE_STABLE_CHECKS):
         await action(*args)
 
 

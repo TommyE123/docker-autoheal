@@ -52,7 +52,8 @@ automatically. That almost always means the container has a real, recurring prob
 1. Check the container's own logs to find the underlying failure.
 2. View it in the **Containers** tab (marked quarantined) or `GET /api/containers`.
 3. Fix the underlying issue.
-4. It will auto-unquarantine on its own once it's healthy again, or you can un-quarantine
+4. It will auto-unquarantine on its own once it has stayed healthy for 3 consecutive
+   checks and has been up for at least 3 monitoring intervals, or you can un-quarantine
    manually from the UI or `POST /api/containers/{id}/unquarantine`.
 
 If containers are being quarantined too aggressively, increase `cooldown_seconds` or
