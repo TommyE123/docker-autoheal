@@ -221,13 +221,40 @@ class TestRoutingThroughTheAsgiApp:
         assert b"<html" not in body.lower()
 
     async def test_docs_paths_are_not_swallowed_by_the_catch_all(self):
-        status, body, headers = await _request("GET", "/openapi.json")
+        status, body, headers = await _request("GET", "/api/openapi.json")
 
         assert status == 200
         assert headers["content-type"].startswith("application/json")
         # The version served to API consumers is the declared app version, which
         # test_release_please_workflow.py ties to the Release Please manifest.
         assert json.loads(body)["info"]["version"] == app.version
+
+
+@pytest.mark.asyncio
+class TestDocsUrls:
+    async def test_swagger_ui_is_served_under_api(self):
+        status, body, headers = await _request("GET", "/api/docs")
+
+        assert status == 200
+        assert headers["content-type"].startswith("text/html")
+        assert b"/api/openapi.json" in body
+
+    async def test_redoc_is_served_under_api(self):
+        status, body, headers = await _request("GET", "/api/redoc")
+
+        assert status == 200
+        assert headers["content-type"].startswith("text/html")
+        assert b"/api/openapi.json" in body
+
+    @pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
+    async def test_legacy_docs_paths_are_gone(self, path):
+        # No redirect and no docs/schema: these now fall through to the SPA
+        # catch-all (or a 404 for the .json path), never to the API docs.
+        status, body, _ = await _request("GET", path)
+
+        assert status in {200, 404}
+        assert b"swagger" not in body.lower()
+        assert b'"openapi"' not in body
 
 
 @pytest.mark.asyncio

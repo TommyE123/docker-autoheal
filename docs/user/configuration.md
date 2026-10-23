@@ -1,9 +1,10 @@
 # Configuration
 
-Docker Auto-Heal has **no environment-variable configuration**. All settings live in
-`/data/config.json` and can be changed through the web UI, the REST API, or by editing
-the file directly (the service reloads it on restart). Sensible defaults are written to
-`/data/config.json` the first time the service starts.
+Application settings live in `/data/config.json` and can be changed through the web UI,
+the REST API, or by editing the file directly (the service reloads it on restart).
+Sensible defaults are written to `/data/config.json` the first time the service starts.
+The only environment variables that change behaviour are the optional API-key settings
+described under [API authentication](#api-authentication).
 
 > If you've seen older documentation or blog posts referencing environment variables like
 > `AUTOHEAL_INTERVAL` or `AUTOHEAL_LOG_LEVEL` — those do not exist in the current
@@ -31,6 +32,61 @@ curl -X PUT http://localhost:3131/api/config/monitor \
 **Export/import:** the Configuration tab has Export (downloads the current config as
 JSON) and Import (uploads a JSON file to replace it) — useful for backups or moving
 configuration between environments.
+
+## API authentication
+
+Authentication is **optional and disabled by default**. With no key configured the API and
+UI behave exactly as before, and nothing needs to change on upgrade.
+
+> **Security:** without a key, anyone who can reach port 3131 can restart containers,
+> change configuration and read events. Leave authentication disabled only when the port
+> is reachable by trusted clients alone (for example bound to localhost or behind a
+> trusted network or reverse proxy).
+
+Set one of these to require a key:
+
+| Variable                | Description                                                                   |
+|-------------------------|-------------------------------------------------------------------------------|
+| `AUTOHEAL_API_KEY`      | The API key. Prefer the file variant for anything beyond local testing.       |
+| `AUTOHEAL_API_KEY_FILE` | Path to a file containing the key (for Docker secrets). Wins if both are set. |
+
+Surrounding whitespace is stripped. If either variable is set but unusable (the file is
+missing, unreadable or empty, or the variable is empty) the service **refuses to start**
+rather than running unauthenticated.
+
+```yaml
+services:
+  autoheal:
+    environment:
+      - AUTOHEAL_API_KEY_FILE=/run/secrets/autoheal_api_key
+    secrets:
+      - autoheal_api_key
+
+secrets:
+  autoheal_api_key:
+    file: ./autoheal_api_key.txt # contains the key; keep it out of version control
+```
+
+When a key is set, send it in the `X-API-Key` header. `/api` and every path under it require
+it, including `/api/docs`, `/api/redoc` and `/api/openapi.json`; a missing or wrong key gets
+`401 Unauthorized`. That includes paths that do not exist, so an unknown `/api/` path returns
+`401` rather than `404` when authentication is enabled. `/health` and the UI's static pages stay public.
+
+```bash
+curl -H "X-API-Key: $AUTOHEAL_API_KEY" http://localhost:3131/api/status
+```
+
+**Web UI:** when the API answers `401` the UI asks for the key once. It is kept in that
+browser tab's session storage only (never in the page bundle), and is sent with every API
+request. Use the **API Key** item in the navigation bar to replace or clear it. Cancelling
+the prompt stops it re-appearing until you reload or use that item.
+
+**API docs:** a browser cannot add a custom header when you open `/api/docs`, so with
+authentication enabled that page returns `401`. Either fetch the schema with the header
+(`curl -H "X-API-Key: …" …/api/openapi.json`), or put a reverse proxy in front that injects
+the `X-API-Key` header for trusted users.
+
+The key is never logged; the startup log only says whether authentication is enabled.
 
 ## Configuration reference
 

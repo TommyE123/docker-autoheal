@@ -634,7 +634,7 @@ class TestUiUrl:
         log = await self._start_and_capture_log(self._config(), caplog)
 
         assert "Web UI available at http://192.0.2.10:3132" in log
-        assert "API documentation available at http://192.0.2.10:3132/docs" in log
+        assert "API documentation available at http://192.0.2.10:3132/api/docs" in log
         assert "0.0.0.0" not in log
 
     def test_public_port_is_the_trimmed_value_or_none(self, monkeypatch):
@@ -658,7 +658,10 @@ class TestUiUrl:
         log = await self._start_and_capture_log(self._config(), caplog)
 
         assert "Web UI published on host port 3132 (container port 3131)" in log
-        assert "API documentation published on host port 3132 at /docs (container port 3131)" in log
+        assert (
+            "API documentation published on host port 3132 at /api/docs (container port 3131)"
+            in log
+        )
         assert "0.0.0.0" not in log
         assert "http://" not in log
         assert "listening on" not in log
@@ -673,7 +676,7 @@ class TestUiUrl:
         log = await self._start_and_capture_log(self._config(), caplog)
 
         assert "Web UI listening on 0.0.0.0:3131" in log
-        assert "API documentation listening on 0.0.0.0:3131/docs" in log
+        assert "API documentation listening on 0.0.0.0:3131/api/docs" in log
         assert "http://0.0.0.0" not in log
         assert "available at" not in log
 
@@ -798,6 +801,24 @@ class TestMain:
             assert main_module.service is fake_service
             fake_service.run.assert_awaited_once()
             fake_service.stop.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_main_refuses_to_start_on_unusable_api_key_configuration(
+        self, monkeypatch, tmp_path
+    ):
+        monkeypatch.setenv("AUTOHEAL_API_KEY_FILE", str(tmp_path / "missing"))
+
+        with (
+            patch("app.main.signal.signal"),
+            patch("app.main.AutoHealService") as service_cls,
+            patch("app.main.run_api_server", new=AsyncMock()) as run_api,
+            pytest.raises(SystemExit) as exit_info,
+        ):
+            await main_module.main()
+
+        assert exit_info.value.code == 1
+        service_cls.assert_not_called()
+        run_api.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_main_stops_service_in_finally_if_still_running(self):

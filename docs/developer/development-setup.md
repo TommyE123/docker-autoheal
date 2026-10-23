@@ -239,7 +239,7 @@ remove that project's containers and networks. `-p` takes precedence over both.
 
 The dev override sets the address shown in the startup logs to `localhost` and the published
 port, so the logs print `Web UI available at http://localhost:3132` and
-`API documentation available at http://localhost:3132/docs`. The application cannot know which
+`API documentation available at http://localhost:3132/api/docs`. The application cannot know which
 address anything else uses to reach it, so the override supplies this default (`AUTOHEAL_DEV_HOST`
 overrides it, see below). With no host supplied, the app does not print a URL: it logs the
 published port when `AUTOHEAL_PUBLIC_PORT` is set, otherwise just the listen address (for

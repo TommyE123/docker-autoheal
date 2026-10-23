@@ -17,6 +17,10 @@ vi.mock("./services/api", () => ({
   restartContainer: vi.fn(),
   unquarantineContainer: vi.fn(),
   getContainerDetails: vi.fn(),
+  getApiKey: vi.fn(() => null),
+  setApiKey: vi.fn(),
+  clearApiKey: vi.fn(),
+  onUnauthorized: vi.fn(),
 }));
 
 vi.mock("./components/Dashboard", () => ({
@@ -174,7 +178,7 @@ describe("App routing", () => {
     ).toHaveAttribute("href", "/config");
 
     const docsLink = screen.getByRole("link", { name: /api docs/i });
-    expect(docsLink).toHaveAttribute("href", "/docs");
+    expect(docsLink).toHaveAttribute("href", "/api/docs");
     expect(docsLink).toHaveAttribute("target", "_blank");
   });
 
