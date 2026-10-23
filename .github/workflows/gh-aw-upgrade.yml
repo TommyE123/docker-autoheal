@@ -49,9 +49,8 @@ jobs:
           curl -fsSL -o "$RUNNER_TEMP/install-gh-aw.sh" https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh
           bash "$RUNNER_TEMP/install-gh-aw.sh"
 
-      # `gh aw upgrade` generates a Copilot skill file this repo does not keep
-      # (the engine is gemini, not copilot); it is removed if present. Nothing
-      # is branched, committed or pushed here. Only the files gh-aw manages are staged (the
+      # `gh aw upgrade` generates a skill file this repo does not keep; it is
+      # removed if present. Nothing is branched, committed or pushed here. Only the files gh-aw manages are staged (the
       # gh-aw actions lock, workflow sources it applies codemods to, and
       # compiled lock files); any other change, including a new generated
       # artefact, fails the job.
