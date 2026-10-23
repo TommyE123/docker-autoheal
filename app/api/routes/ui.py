@@ -23,7 +23,7 @@ def serve_react_app() -> HTMLResponse:
             content="<h1>Docker Auto-Heal Service</h1>"
             "<p>React UI not found. Please build the frontend first:</p>"
             "<pre>cd frontend && npm install && npm run build</pre>"
-            "<p>API documentation is available at <a href='/docs'>/docs</a></p>"
+            "<p>API documentation is available at <a href='/api/docs'>/api/docs</a></p>"
         )
 
 
@@ -172,7 +172,7 @@ async def serve_favicon() -> FileResponse:
 # ==================== React Router Catch-All ====================
 
 # Patterns to exclude from React Router catch-all
-EXCLUDED_PATH_PREFIXES = {"api/", "docs", "redoc", "openapi.json", "assets/", "static/"}
+EXCLUDED_PATH_PREFIXES = {"api/", "assets/", "static/"}
 
 EXCLUDED_FILE_PATTERNS = {
     "manifest.json",

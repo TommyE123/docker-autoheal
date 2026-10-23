@@ -15,6 +15,7 @@ import uvicorn
 from prometheus_client import Counter, Gauge, start_http_server
 
 from app.api.api import app, init_api
+from app.api.auth import ApiKeyConfigError, configure_api_auth
 from app.config.config_manager import AutoHealConfig, config_manager
 from app.docker_client.docker_client_wrapper import DockerClientWrapper
 from app.monitor.monitoring_engine import MonitoringEngine
@@ -178,7 +179,7 @@ class AutoHealService:
             public_port = get_public_port()
             if ui_url:
                 logger.info("Web UI available at %s", ui_url)
-                logger.info("API documentation available at %s/docs", ui_url)
+                logger.info("API documentation available at %s/api/docs", ui_url)
             elif public_port:
                 container_port = config.ui.listen_port
                 logger.info(
@@ -187,14 +188,14 @@ class AutoHealService:
                     container_port,
                 )
                 logger.info(
-                    "API documentation published on host port %s at /docs (container port %s)",
+                    "API documentation published on host port %s at /api/docs (container port %s)",
                     public_port,
                     container_port,
                 )
             else:
                 listen = f"{config.ui.listen_address}:{config.ui.listen_port}"
                 logger.info("Web UI listening on %s", listen)
-                logger.info("API documentation listening on %s/docs", listen)
+                logger.info("API documentation listening on %s/api/docs", listen)
 
         except (Exception, asyncio.CancelledError) as e:
             # CancelledError is a BaseException; clean up on cancellation too, then re-raise.
@@ -324,6 +325,14 @@ async def main() -> None:
     # Register signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
+
+    # Fail closed: a configured-but-unusable API key must stop startup, never
+    # fall back to running unauthenticated.
+    try:
+        configure_api_auth()
+    except ApiKeyConfigError as e:
+        logger.critical("Refusing to start: %s", e)
+        sys.exit(1)
 
     # Create service instance
     service = AutoHealService()

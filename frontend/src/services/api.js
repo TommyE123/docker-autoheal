@@ -12,6 +12,68 @@ const api = axios.create({
   },
 });
 
+// Optional API-key authentication. The server key is never in the bundle: the user
+// enters it when the API answers 401, and it lives only in this tab's sessionStorage.
+const API_KEY_STORAGE = "autoheal_api_key";
+const API_KEY_HEADER = "X-API-Key";
+
+// The key as set or cleared during this page load, which wins over sessionStorage so a
+// write that storage rejects (blocked, full) cannot leave an older stored key in use.
+// undefined: not touched this page load, so read storage. null: cleared.
+let memoryApiKey;
+
+export const getApiKey = () => {
+  if (memoryApiKey !== undefined) return memoryApiKey;
+  try {
+    return sessionStorage.getItem(API_KEY_STORAGE);
+  } catch {
+    return null;
+  }
+};
+// Returns true when the key was persisted and so survives a reload.
+export const setApiKey = (key) => {
+  memoryApiKey = key;
+  try {
+    sessionStorage.setItem(API_KEY_STORAGE, key);
+    return true;
+  } catch {
+    return false;
+  }
+};
+// Returns true when storage no longer holds the key, so a reload will not bring it back.
+export const clearApiKey = () => {
+  memoryApiKey = null;
+  try {
+    sessionStorage.removeItem(API_KEY_STORAGE);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+let unauthorizedHandler = null;
+export const onUnauthorized = (handler) => {
+  unauthorizedHandler = handler;
+  return () => {
+    if (unauthorizedHandler === handler) unauthorizedHandler = null;
+  };
+};
+
+export const attachApiKey = (config) => {
+  const key = getApiKey();
+  if (key) config.headers[API_KEY_HEADER] = key;
+  return config;
+};
+export const notifyUnauthorized = (error) => {
+  if (error?.response?.status === 401 && unauthorizedHandler) {
+    unauthorizedHandler();
+  }
+  return Promise.reject(error);
+};
+
+api.interceptors.request.use(attachApiKey);
+api.interceptors.response.use((response) => response, notifyUnauthorized);
+
 // System Status
 export const getSystemStatus = () => api.get("/status");
 export const getHealth = () => axios.get("/health");

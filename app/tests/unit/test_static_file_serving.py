@@ -308,7 +308,7 @@ def test_serve_react_app_fallback_page_is_exact(tmp_path, monkeypatch):
         "<h1>Docker Auto-Heal Service</h1>"
         "<p>React UI not found. Please build the frontend first:</p>"
         "<pre>cd frontend && npm install && npm run build</pre>"
-        "<p>API documentation is available at <a href='/docs'>/docs</a></p>"
+        "<p>API documentation is available at <a href='/api/docs'>/api/docs</a></p>"
     )
 
 

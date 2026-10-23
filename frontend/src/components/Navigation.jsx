@@ -1,7 +1,8 @@
 import { Navbar, Nav, Container, Badge } from "react-bootstrap";
 import { Link, useLocation } from "react-router-dom";
+import { getApiKey } from "../services/api";
 
-function Navigation({ systemStatus }) {
+function Navigation({ systemStatus, onApiKeyClick }) {
   const location = useLocation();
 
   const isActive = (path) => location.pathname === path;
@@ -54,10 +55,17 @@ function Navigation({ systemStatus }) {
               Configuration
             </Nav.Link>
 
-            <Nav.Link href="/docs" target="_blank">
+            <Nav.Link href="/api/docs" target="_blank">
               <i className="bi bi-book me-1"></i>
               API Docs
             </Nav.Link>
+
+            {getApiKey() && onApiKeyClick && (
+              <Nav.Link as="button" type="button" onClick={onApiKeyClick}>
+                <i className="bi bi-key me-1"></i>
+                <span>API Key</span>
+              </Nav.Link>
+            )}
           </Nav>
 
           <Nav>
