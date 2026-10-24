@@ -46,7 +46,7 @@ def _run_bootstrap(data_dir: Path, config_text: str | None):
     script = script.replace("exec python -m app.main", "echo STARTED")
     script = script.replace("python - <<", f"{sys.executable} - <<")
     script = script.replace("/data", str(data_dir))
-    # Runs the repo's own bootstrap script; only temp paths are substituted into it.
+    # Runs the repo's own bootstrap script with the test interpreter and temp paths substituted.
     return subprocess.run(  # noqa: S603
         ["sh", "-c", script],  # noqa: S607 - PATH is fixed to /usr/bin:/bin below
         cwd=data_dir if data_dir.exists() else data_dir.parent,
