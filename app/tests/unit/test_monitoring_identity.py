@@ -142,6 +142,12 @@ class TestShouldMonitorContainer:
 
         assert engine.should_monitor_container(container, info) is False
 
+    def test_blacklist_label_leaves_non_matching_containers_monitored(self, engine, update_config):
+        container, info = make_container(labels={"autoheal": "true", "tier": "prod"})
+        update_config(lambda c: c.filters.blacklist_labels.append({"tier": "batch"}))
+
+        assert engine.should_monitor_container(container, info) is True
+
     def test_whitelist_label_requires_a_match(self, engine, update_config):
         matching, matching_info = make_container(
             name="web", labels={"autoheal": "true", "tier": "prod"}

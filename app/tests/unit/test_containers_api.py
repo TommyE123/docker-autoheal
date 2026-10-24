@@ -26,7 +26,12 @@ from app.api.routes.containers import (
     unquarantine_container,
     update_container_selection,
 )
-from app.config.config_manager import AutoHealEvent, UptimeKumaMapping, config_manager
+from app.config.config_manager import (
+    AutoHealEvent,
+    HealthCheckConfig,
+    UptimeKumaMapping,
+    config_manager,
+)
 from app.tests.unit.conftest import make_container
 
 
@@ -139,6 +144,39 @@ class TestListContainers:
         assert result[0].uptime_kuma_status is None
         assert result[0].uptime_kuma_monitor_name is None
 
+    async def test_reports_unmonitored_when_monitoring_engine_is_missing(
+        self, wired_api, monkeypatch
+    ):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web")
+        docker_client.add_container(container, info)
+        monkeypatch.setattr("app.api.state.monitoring_engine", None)
+
+        result = await list_containers()
+
+        assert result[0].monitored is False
+
+    async def test_leaves_monitor_name_empty_when_mappings_are_for_other_containers(
+        self, wired_api
+    ):
+        docker_client, engine = wired_api
+        container, info = make_container(name="web")
+        docker_client.add_container(container, info)
+        config = config_manager.get_config()
+        config.uptime_kuma.enabled = True
+        config.uptime_kuma_mappings = [
+            UptimeKumaMapping(container_id="other", monitor_friendly_name="Other Monitor")
+        ]
+        config_manager.update_config(config)
+        engine.uptime_kuma_monitor = MagicMock()
+        engine.uptime_kuma_monitor.is_container_mapped.return_value = True
+        engine.uptime_kuma_monitor.get_container_status.return_value = 1
+
+        result = await list_containers()
+
+        assert result[0].uptime_kuma_status == 1
+        assert result[0].uptime_kuma_monitor_name is None
+
     async def test_skips_containers_docker_could_not_inspect(self, wired_api):
         docker_client, _engine = wired_api
         # Registered with the client but with no info recorded, mirroring a
@@ -183,6 +221,63 @@ class TestGetContainerDetails:
         assert details["monitored"] is True
         assert details["quarantined"] is False
         assert details["total_restart_count"] == 0
+
+    async def test_reports_unmonitored_when_monitoring_engine_is_missing(
+        self, wired_api, monkeypatch
+    ):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+        monkeypatch.setattr("app.api.state.monitoring_engine", None)
+
+        details = await get_container_details("a" * 64)
+
+        assert details["monitored"] is False
+
+    @pytest.mark.parametrize("key", ["web", "a" * 64])
+    async def test_custom_health_check_is_found_by_name_or_full_id(self, wired_api, key):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id=key, check_type="tcp", tcp_port=80)
+        )
+
+        details = await get_container_details("a" * 64)
+
+        assert details["custom_health_check"].container_id == key
+
+    async def test_custom_health_check_is_found_by_stable_id(self, wired_api):
+        docker_client, _engine = wired_api
+        container, info = make_container(
+            name="web", container_id="a" * 64, labels={"monitoring.id": "stable"}
+        )
+        docker_client.add_container(container, info)
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="stable", check_type="tcp", tcp_port=80)
+        )
+
+        details = await get_container_details("a" * 64)
+
+        assert details["custom_health_check"].container_id == "stable"
+
+    async def test_custom_health_check_lookup_prefers_stable_id_then_name_then_full_id(
+        self, wired_api
+    ):
+        docker_client, _engine = wired_api
+        container, info = make_container(
+            name="web", container_id="a" * 64, labels={"monitoring.id": "stable"}
+        )
+        docker_client.add_container(container, info)
+        for key in ("a" * 64, "web", "stable"):
+            config_manager.add_custom_health_check(
+                HealthCheckConfig(container_id=key, check_type="tcp", tcp_port=80)
+            )
+
+        for expected in ("stable", "web", "a" * 64):
+            details = await get_container_details("a" * 64)
+            assert details["custom_health_check"].container_id == expected
+            config_manager.remove_custom_health_check(expected)
 
     async def test_uninspectable_container_returns_500(self, wired_api):
         docker_client, _engine = wired_api
@@ -259,6 +354,56 @@ class TestUpdateContainerSelection:
         updated = config_manager.get_config()
         assert "web" in updated.containers.selected
         assert "web" not in updated.containers.excluded
+
+    async def test_enabling_an_already_selected_container_is_idempotent(self, wired_api):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+        config = config_manager.get_config()
+        config.containers.selected = ["web"]
+        config_manager.update_config(config)
+
+        await update_container_selection(
+            ContainerSelectionRequest(container_ids=["a" * 64], enabled=True)
+        )
+
+        assert config_manager.get_config().containers.selected == ["web"]
+
+    async def test_disabling_an_already_excluded_container_is_idempotent(self, wired_api):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+        config = config_manager.get_config()
+        config.containers.excluded = ["web"]
+        config_manager.update_config(config)
+
+        await update_container_selection(
+            ContainerSelectionRequest(container_ids=["a" * 64], enabled=False)
+        )
+
+        assert config_manager.get_config().containers.excluded == ["web"]
+
+    async def test_selecting_an_unresolved_container_twice_keeps_one_entry(self, wired_api):
+        config = config_manager.get_config()
+        config.containers.selected = ["ghost"]
+        config_manager.update_config(config)
+
+        await update_container_selection(
+            ContainerSelectionRequest(container_ids=["ghost"], enabled=True)
+        )
+
+        assert config_manager.get_config().containers.selected == ["ghost"]
+
+    async def test_excluding_an_unresolved_container_twice_keeps_one_entry(self, wired_api):
+        config = config_manager.get_config()
+        config.containers.excluded = ["ghost"]
+        config_manager.update_config(config)
+
+        await update_container_selection(
+            ContainerSelectionRequest(container_ids=["ghost"], enabled=False)
+        )
+
+        assert config_manager.get_config().containers.excluded == ["ghost"]
 
     async def test_disabling_adds_to_excluded_and_clears_selection(self, wired_api):
         docker_client, _engine = wired_api
