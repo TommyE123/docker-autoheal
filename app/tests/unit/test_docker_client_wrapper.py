@@ -79,6 +79,21 @@ class TestConnection:
 
         assert wrapper.is_connected() is False
 
+    def test_is_connected_is_false_without_a_client(self, wrapper):
+        wrapper._client = None
+
+        assert wrapper.is_connected() is False
+
+    def test_close_closes_the_sdk_client(self, wrapper, sdk_client):
+        wrapper.close()
+
+        sdk_client.close.assert_called_once_with()
+
+    def test_close_without_a_client_is_a_no_op(self, wrapper):
+        wrapper._client = None
+
+        wrapper.close()
+
     def test_reconnect_reports_failure(self, wrapper):
         with patch(
             "app.docker_client.docker_client_wrapper.docker.DockerClient",
@@ -223,6 +238,16 @@ class TestListingAndLookup:
 
         assert wrapper.list_containers(all_containers=True) == [container]
         sdk_client.containers.list.assert_called_once_with(all=True)
+
+    def test_list_containers_does_not_reconnect_while_the_daemon_is_reachable(
+        self, wrapper, sdk_client
+    ):
+        sdk_client.containers.list.side_effect = docker.errors.APIError("transient")
+
+        with patch.object(wrapper, "reconnect") as reconnect:
+            assert wrapper.list_containers() == []
+
+        reconnect.assert_not_called()
 
     def test_list_containers_returns_empty_list_on_failure(self, wrapper, sdk_client):
         sdk_client.containers.list.side_effect = docker.errors.APIError("daemon gone")
@@ -638,6 +663,17 @@ class TestTcpHealth:
             assert wrapper.check_tcp_health(container, port=8080) is False
 
         mock_socket_cls.assert_not_called()
+
+    def test_http_health_check_fails_when_container_has_no_ip_address(self, wrapper):
+        container = make_sdk_container()
+        container.attrs["NetworkSettings"] = {
+            "Networks": {"a": {"IPAddress": ""}, "b": {"IPAddress": None}}
+        }
+
+        with patch("app.docker_client.docker_client_wrapper.requests.get") as mock_get:
+            assert wrapper.check_http_health(container, "http://localhost:80/health") is False
+
+        mock_get.assert_not_called()
 
     def test_tcp_health_check_fails_when_container_disappears_during_inspection(self, wrapper):
         container = make_sdk_container()
