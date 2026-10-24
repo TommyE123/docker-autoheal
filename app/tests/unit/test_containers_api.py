@@ -261,6 +261,24 @@ class TestGetContainerDetails:
 
         assert details["custom_health_check"].container_id == "stable"
 
+    async def test_custom_health_check_lookup_prefers_stable_id_then_name_then_full_id(
+        self, wired_api
+    ):
+        docker_client, _engine = wired_api
+        container, info = make_container(
+            name="web", container_id="a" * 64, labels={"monitoring.id": "stable"}
+        )
+        docker_client.add_container(container, info)
+        for key in ("a" * 64, "web", "stable"):
+            config_manager.add_custom_health_check(
+                HealthCheckConfig(container_id=key, check_type="tcp", tcp_port=80)
+            )
+
+        for expected in ("stable", "web", "a" * 64):
+            details = await get_container_details("a" * 64)
+            assert details["custom_health_check"].container_id == expected
+            config_manager.remove_custom_health_check(expected)
+
     async def test_uninspectable_container_returns_500(self, wired_api):
         docker_client, _engine = wired_api
         container, _info = make_container(name="web", container_id="a" * 64)

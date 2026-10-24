@@ -257,8 +257,9 @@ class TestResetToDefaults:
         reset_to_defaults(tmp_path)
 
         assert (tmp_path / "config.json").is_dir()
-        assert json.loads((tmp_path / "events.json").read_text()) == []
-        assert (tmp_path / "maintenance.json").exists()
+        assert json.loads((tmp_path / "events.json").read_text()) == get_default_events()
+        assert json.loads((tmp_path / "quarantine.json").read_text()) == get_default_quarantine()
+        assert json.loads((tmp_path / "maintenance.json").read_text()) == get_default_maintenance()
 
 
 class TestCliMain:
