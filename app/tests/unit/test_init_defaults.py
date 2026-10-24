@@ -246,8 +246,8 @@ class TestResetToDefaults:
         reset_to_defaults(tmp_path)
 
         assert json.loads((tmp_path / "config.json").read_text()) == get_default_config()
-        assert json.loads((tmp_path / "events.json").read_text()) == []
-        assert json.loads((tmp_path / "quarantine.json").read_text()) == []
+        assert json.loads((tmp_path / "events.json").read_text()) == get_default_events()
+        assert json.loads((tmp_path / "quarantine.json").read_text()) == get_default_quarantine()
         assert json.loads((tmp_path / "maintenance.json").read_text()) == get_default_maintenance()
 
     def test_write_errors_do_not_stop_remaining_files(self, tmp_path):
