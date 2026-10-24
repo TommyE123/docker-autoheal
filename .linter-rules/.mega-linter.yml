@@ -105,6 +105,17 @@ DOCKERFILE_HADOLINT_FILE_NAMES_REGEX: ["Dockerfile(\\..+)?"]
 ACTION_ZIZMOR_UNSECURED_ENV_VARIABLES:
   - GITHUB_TOKEN
 
+ACTION_ZIZMOR_ARGUMENTS:
+  - "--pedantic"
+  - "--min-severity"
+  - "informational"
+  - "--min-confidence"
+  - "low"
+  - "--format"
+  - "plain"
+  - "--no-progress"
+  - "--no-ignores"
+
 REPOSITORY_TRIVY_CONFIG_FILE: .trivy.yaml
 
 REPOSITORY_SEMGREP_ARGUMENTS:
