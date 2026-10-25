@@ -242,8 +242,19 @@ def test_weekly_workflow_delegates_to_native_auto_merge_only():
 
 
 def test_weekly_workflow_uses_least_privilege_permissions():
-    assert "pull-requests: write" in AUTO_MERGE_WORKFLOW
-    assert "contents: write" not in AUTO_MERGE_WORKFLOW
+    # gh authenticates with the RELEASE_PLEASE_TOKEN PAT, so neither the
+    # workflow nor the job needs any GITHUB_TOKEN permission.
+    assert AUTO_MERGE_WORKFLOW.count("permissions: {}") == 2
+    assert ": write" not in AUTO_MERGE_WORKFLOW
+
+
+def test_release_please_job_holds_no_github_token_permissions():
+    # The action authenticates with the RELEASE_PLEASE_TOKEN PAT, so the
+    # job grants the default token nothing.
+    job = WORKFLOW.split("  release-please:\n", 1)[1].split("  docker-release:\n", 1)[0]
+    assert "permissions: {}" in job
+    assert ": write" not in job
+    assert "token: ${{ secrets.RELEASE_PLEASE_TOKEN }}" in job
 
 
 def test_weekly_workflow_enables_auto_merge_with_the_non_default_token():
