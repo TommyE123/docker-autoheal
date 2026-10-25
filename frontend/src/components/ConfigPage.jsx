@@ -77,6 +77,10 @@ function ConfigPage() {
   const fetchConfig = useCallback(async () => {
     try {
       const response = await getConfig();
+      const { monitor, restart, observability } = response.data ?? {};
+      if (!monitor || !restart || !observability) {
+        throw new Error("Configuration response is missing required sections");
+      }
       setConfig(response.data);
 
       // Load Uptime Kuma data if enabled
