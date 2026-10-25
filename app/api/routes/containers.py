@@ -89,7 +89,7 @@ async def list_containers(include_stopped: bool = False):
             elif uptime_kuma_enabled and not uptime_kuma_monitor:
                 # Uptime-Kuma integration enabled but monitor not initialized
                 uptime_kuma_status = 4  # Indicate unknown status
-            elif not uptime_kuma_enabled:
+            else:
                 uptime_kuma_status = 5  # Integration disabled
 
             container_info = ContainerInfo(
