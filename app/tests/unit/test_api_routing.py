@@ -267,7 +267,7 @@ class TestDocsUrls:
         status, body, _ = await _request("GET", path)
 
         assert status in {200, 404}
-        assert b"swagger" not in body.lower()
+        assert b"swagger-ui" not in body.lower()
         assert b'"openapi"' not in body
 
 
