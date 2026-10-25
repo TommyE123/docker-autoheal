@@ -16,6 +16,8 @@ name: Weekly Release Please auto-merge
 on:
   workflow_dispatch:
 
+permissions: {}
+
 concurrency:
   group: release-please-auto-merge
   cancel-in-progress: false
@@ -26,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      pull-requests: write
+      pull-requests: write # Enables auto-merge on the Release Please PR
 
     env:
       # The default GITHUB_TOKEN is deliberately not used here: GitHub can

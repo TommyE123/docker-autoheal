@@ -1,6 +1,6 @@
 name: Greetings
 
-permissions: read-all
+permissions: {}
 
 on: # zizmor: ignore[dangerous-triggers] - Needed to greet fork PRs.
   pull_request_target:
@@ -15,8 +15,8 @@ jobs:
     name: Greet first-time contributors
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write
-      issues: write
+      pull-requests: write # Post the welcome comment on a first pull request
+      issues: write # Post the welcome comment on a first issue
     steps:
       - name: First Interaction
         uses: actions/first-interaction@1c4688942c71f71d4f5502a26ea67c331730fa4d # v3.1.0
