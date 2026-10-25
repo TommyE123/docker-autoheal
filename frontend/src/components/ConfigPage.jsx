@@ -26,6 +26,8 @@ const isObject = (value) =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 // Field types the page reads from each section of the configuration response.
+// Keep in sync with MonitorSettings, RestartPolicySettings,
+// ObservabilitySettings and useConfigValidation.
 const requiredFieldTypes = {
   monitor: {
     interval_seconds: "number",
@@ -62,6 +64,7 @@ const isValidConfig = (data) =>
   hasValidFields(data.monitor, requiredFieldTypes.monitor) &&
   hasValidFields(data.restart, requiredFieldTypes.restart) &&
   hasValidFields(data.restart.backoff, requiredFieldTypes["restart.backoff"]) &&
+  // max_seconds is optional: absent or null means no cap (see useConfigValidation)
   (data.restart.backoff.max_seconds == null ||
     typeof data.restart.backoff.max_seconds === "number") &&
   hasValidFields(data.observability, requiredFieldTypes.observability);
