@@ -232,6 +232,17 @@ describe("ConfigPage", () => {
         await screen.findByText(/failed to load configuration/i),
       ).toBeInTheDocument();
     });
+
+    it("shows a failure message instead of crashing when the configuration is missing required sections", async () => {
+      getConfig.mockResolvedValue({ data: {} });
+
+      render(<ConfigPage />);
+
+      expect(
+        await screen.findByText(/failed to load configuration/i),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Monitor Settings")).not.toBeInTheDocument();
+    });
   });
 
   describe("editing settings before saving", () => {
