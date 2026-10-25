@@ -1,6 +1,6 @@
 """
 Notification Manager - Handles sending notifications to various services
-Supports: Webhook, Discord, Slack, Telegram, Email, Ntfy, Gotify, Pushover
+Supports: Webhook, Discord, Slack, Telegram, Ntfy, Gotify, Pushover
 """
 
 import asyncio
@@ -69,7 +69,6 @@ class NotificationType(StrEnum):
     DISCORD = "discord"
     SLACK = "slack"
     TELEGRAM = "telegram"
-    EMAIL = "email"
     NTFY = "ntfy"
     GOTIFY = "gotify"
     PUSHOVER = "pushover"

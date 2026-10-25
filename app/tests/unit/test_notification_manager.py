@@ -756,6 +756,22 @@ async def test_test_notification_reports_failure_for_unsupported_type(
 
 
 @pytest.mark.asyncio
+async def test_test_notification_reports_failure_for_removed_email_type(
+    isolated_config_manager, manager
+):
+    """Email was never implemented and is no longer a supported type; nothing is sent."""
+    _configure_service(
+        isolated_config_manager,
+        NotificationService(name="Mail", type="email", enabled=True),
+    )
+
+    result = await manager.test_notification("Mail")
+
+    assert result == {"success": False, "message": "Unsupported notification type: email"}
+    assert fake_session(manager).calls == []
+
+
+@pytest.mark.asyncio
 async def test_notification_worker_recovers_after_processing_error(
     monkeypatch, isolated_config_manager, manager
 ):
