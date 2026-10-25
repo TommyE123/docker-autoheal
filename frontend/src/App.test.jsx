@@ -171,6 +171,36 @@ describe("App error, toast and refresh handling", () => {
     );
   });
 
+  it("enables maintenance mode and shows the modal when the enter button is pressed", async () => {
+    getSystemStatus
+      .mockResolvedValueOnce({ data: activeStatus })
+      .mockResolvedValue({
+        data: {
+          ...activeStatus,
+          maintenance_mode: true,
+          maintenance_start_time: new Date().toISOString(),
+        },
+      });
+    enableMaintenanceMode.mockResolvedValue({});
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={["/containers"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    await user.click(
+      await screen.findByRole("button", { name: /Enter Maintenance Mode/ }),
+    );
+
+    expect(enableMaintenanceMode).toHaveBeenCalledTimes(1);
+    expect(disableMaintenanceMode).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText("Maintenance Mode Active"),
+    ).toBeInTheDocument();
+  });
+
   it("disables maintenance mode and closes the modal when its exit button is pressed", async () => {
     const maintenanceStatus = {
       data: {
