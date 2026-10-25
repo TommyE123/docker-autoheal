@@ -248,15 +248,19 @@ class TestDocsUrls:
         assert headers["content-type"].startswith("text/html")
         assert b"/api/openapi.json" in body
 
-    @pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
-    async def test_legacy_docs_paths_are_gone(self, path):
-        # No redirect and no docs/schema: these now fall through to the SPA
-        # catch-all (or a 404 for the .json path), never to the API docs.
+    @pytest.mark.parametrize("path", ["/docs", "/redoc"])
+    async def test_legacy_docs_pages_fall_through_to_the_ui(self, path):
+        # No redirect and no docs: these are now ordinary unknown paths, so they get
+        # exactly what any other unknown non-API path gets.
         status, body, _ = await _request("GET", path)
+        expected_status, expected_body, _ = await _request("GET", "/not-a-real-page")
 
-        assert status in {200, 404}
-        assert b"swagger-ui" not in body.lower()
-        assert b'"openapi"' not in body
+        assert (status, body) == (expected_status, expected_body)
+
+    async def test_legacy_schema_path_is_gone(self):
+        status, _, _ = await _request("GET", "/openapi.json")
+
+        assert status == 404
 
 
 @pytest.mark.asyncio
