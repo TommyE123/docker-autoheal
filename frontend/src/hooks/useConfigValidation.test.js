@@ -12,6 +12,26 @@ const baseConfig = {
 };
 
 describe("useConfigValidation", () => {
+  it.each([
+    [2, "Very short monitoring interval"],
+    [600, "Very long monitoring interval"],
+  ])(
+    "warns about a monitoring interval of %ss",
+    (intervalSeconds, expectedMessage) => {
+      const config = {
+        ...baseConfig,
+        monitor: { interval_seconds: intervalSeconds },
+      };
+      const { validateTimingConfiguration } = useConfigValidation(config);
+
+      const result = validateTimingConfiguration();
+
+      expect(result.isValid).toBe(false);
+      expect(result.errors.some((e) => e.includes(expectedMessage))).toBe(true);
+      expect(result.suggestions.length).toBeGreaterThan(0);
+    },
+  );
+
   it("reports no errors for a well-formed configuration", () => {
     const { validateTimingConfiguration } = useConfigValidation(baseConfig);
 
