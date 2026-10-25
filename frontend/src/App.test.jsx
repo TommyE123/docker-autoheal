@@ -141,14 +141,17 @@ describe("App error, toast and refresh handling", () => {
     );
   });
 
-  it("disables maintenance mode when the modal's exit button is pressed", async () => {
-    getSystemStatus.mockResolvedValue({
+  it("disables maintenance mode and closes the modal when its exit button is pressed", async () => {
+    const maintenanceStatus = {
       data: {
         ...activeStatus,
         maintenance_mode: true,
         maintenance_start_time: new Date().toISOString(),
       },
-    });
+    };
+    getSystemStatus
+      .mockResolvedValueOnce(maintenanceStatus)
+      .mockResolvedValue({ data: activeStatus });
     disableMaintenanceMode.mockResolvedValue({});
     const user = userEvent.setup();
 
@@ -164,6 +167,11 @@ describe("App error, toast and refresh handling", () => {
 
     expect(disableMaintenanceMode).toHaveBeenCalledTimes(1);
     expect(enableMaintenanceMode).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(
+        screen.queryByText("Maintenance Mode Active"),
+      ).not.toBeInTheDocument(),
+    );
   });
 
   it("refreshes status when the tab becomes visible, but not when it is hidden", async () => {

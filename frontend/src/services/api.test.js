@@ -268,6 +268,36 @@ describe("api endpoint wrappers", () => {
       "post",
       ["/notifications/test/discord"],
     ],
+    [
+      "getContainers",
+      () => api.getContainers(true),
+      "get",
+      ["/containers", { params: { include_stopped: true } }],
+    ],
+    [
+      "updateContainerSelection",
+      () => api.updateContainerSelection(["abc"], true),
+      "post",
+      ["/containers/select", { container_ids: ["abc"], enabled: true }],
+    ],
+    [
+      "getEvents",
+      () => api.getEvents(10, { eventType: "restart" }),
+      "get",
+      ["/events", { params: { limit: 10, event_type: "restart" } }],
+    ],
+    [
+      "deleteNotificationService",
+      () => api.deleteNotificationService("discord"),
+      "delete",
+      ["/notifications/services/discord"],
+    ],
+    [
+      "testUnsavedNotificationService",
+      () => api.testUnsavedNotificationService(config),
+      "post",
+      ["/notifications/test", config],
+    ],
   ])("%s calls the expected endpoint", (_name, call, method, expectedArgs) => {
     call();
     expect(mockInstance[method]).toHaveBeenCalledWith(...expectedArgs);
