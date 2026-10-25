@@ -113,6 +113,36 @@ describe("App error, toast and refresh handling", () => {
     expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
   });
 
+  it("recovers from a failed status request on the next refresh", async () => {
+    getSystemStatus
+      .mockRejectedValueOnce(new Error("Network Error"))
+      .mockResolvedValue({ data: activeStatus });
+
+    render(
+      <MemoryRouter initialEntries={["/containers"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() =>
+      expect(consoleError).toHaveBeenCalledWith(
+        "Failed to fetch system status:",
+        expect.any(Error),
+      ),
+    );
+    await act(async () => {});
+    expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
+
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      value: false,
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    expect(await screen.findByText("Dashboard")).toBeInTheDocument();
+    expect(getSystemStatus).toHaveBeenCalledTimes(2);
+  });
+
   it("shows an error toast when enabling maintenance mode fails, and closes it", async () => {
     getSystemStatus.mockResolvedValue({ data: activeStatus });
     enableMaintenanceMode.mockRejectedValue(new Error("500"));
