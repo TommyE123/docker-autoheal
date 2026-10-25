@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Container, Toast, ToastContainer } from "react-bootstrap";
 import Navigation from "./components/Navigation";
@@ -8,15 +8,10 @@ import EventsPage from "./components/EventsPage";
 import ConfigPage from "./components/ConfigPage";
 import NotificationsPage from "./components/NotificationsPage";
 import MaintenanceModal from "./components/MaintenanceModal";
-import ApiKeyModal from "./components/ApiKeyModal";
 import {
   getSystemStatus,
   enableMaintenanceMode,
   disableMaintenanceMode,
-  getApiKey,
-  setApiKey,
-  clearApiKey,
-  onUnauthorized,
 } from "./services/api";
 
 function App() {
@@ -24,58 +19,6 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
   const [errorToast, setErrorToast] = useState({ show: false, message: "" });
-  const [apiKeyPrompt, setApiKeyPrompt] = useState({
-    show: false,
-    rejected: false,
-  });
-  // Once the user cancels, background polling must not keep re-opening the prompt.
-  const apiKeyPromptDismissed = useRef(false);
-
-  // Bumped to remount the routed pages so they refetch without a full reload.
-  const [dataVersion, setDataVersion] = useState(0);
-
-  // The pages reload after the key changes so every view refetches with it. If
-  // storage rejected the change, a reload would restore the older stored key, so the
-  // in-memory key is used and the pages refetch without one.
-  const refetchWithoutReload = () => {
-    apiKeyPromptDismissed.current = false;
-    setApiKeyPrompt({ show: false, rejected: false });
-    setDataVersion((version) => version + 1);
-    void fetchSystemStatus();
-  };
-  const handleApiKeySubmit = (key) => {
-    if (setApiKey(key)) {
-      window.location.reload();
-      return;
-    }
-    refetchWithoutReload();
-  };
-  const handleApiKeyClear = () => {
-    if (clearApiKey()) {
-      window.location.reload();
-      return;
-    }
-    refetchWithoutReload();
-  };
-  const handleApiKeyCancel = () => {
-    apiKeyPromptDismissed.current = true;
-    setApiKeyPrompt({ show: false, rejected: false });
-  };
-  const openApiKeyPrompt = () => {
-    apiKeyPromptDismissed.current = false;
-    setApiKeyPrompt({ show: true, rejected: false });
-  };
-
-  useEffect(
-    () =>
-      onUnauthorized(() => {
-        if (apiKeyPromptDismissed.current) return;
-        setApiKeyPrompt((prev) =>
-          prev.show ? prev : { show: true, rejected: Boolean(getApiKey()) },
-        );
-      }),
-    [],
-  );
 
   const fetchSystemStatus = async () => {
     try {
@@ -138,13 +81,9 @@ function App() {
 
   return (
     <div className="app">
-      <Navigation
-        systemStatus={systemStatus}
-        onApiKeyClick={openApiKeyPrompt}
-      />
+      <Navigation systemStatus={systemStatus} />
 
       <Container
-        key={dataVersion}
         fluid
         className="py-4"
         style={{
@@ -180,15 +119,6 @@ function App() {
         show={showMaintenanceModal}
         startTime={systemStatus?.maintenance_start_time}
         onDismiss={handleDismissMaintenanceModal}
-      />
-
-      <ApiKeyModal
-        show={apiKeyPrompt.show}
-        rejected={apiKeyPrompt.rejected}
-        hasKey={Boolean(getApiKey())}
-        onSubmit={handleApiKeySubmit}
-        onClear={handleApiKeyClear}
-        onCancel={handleApiKeyCancel}
       />
 
       {/* Error Toast Notification */}

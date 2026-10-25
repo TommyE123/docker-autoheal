@@ -12,64 +12,27 @@ modules). This module owns app construction and wiring each router in.
 
 import logging
 
-from fastapi import Depends, FastAPI, Request
-from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.api.auth import OPENAPI_URL, REDOC_URL, SWAGGER_URL, api_key_enabled, require_api_key
 from app.api.state import init_api  # noqa: F401  (re-exported for app/main.py)
 
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app. FastAPI's built-in docs routes are disabled and re-registered
-# below under /api/ (see app/api/auth.py for why the docs pages themselves are not key-gated).
+# Initialize FastAPI app. The API documentation lives under /api/, with the rest of the API.
 app = FastAPI(
     title="Docker Auto-Heal Service",
     description="Automated container monitoring and healing service",
     version="2.4.0",  # x-release-please-version
-    docs_url=None,
-    redoc_url=None,
-    openapi_url=None,
-    dependencies=[Depends(require_api_key)],
+    docs_url="/api/swagger",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
 )
-
-
-@app.get(OPENAPI_URL, include_in_schema=False)
-async def openapi_schema() -> dict:
-    """OpenAPI schema (open, like the docs pages that load it)."""
-    return app.openapi()
-
-
-def _schema_url(request: Request) -> str:
-    """Schema URL as the browser reaches it, behind a prefix-adding reverse proxy too."""
-    return request.scope.get("root_path", "").rstrip("/") + OPENAPI_URL
-
-
-@app.get(SWAGGER_URL, include_in_schema=False, response_class=HTMLResponse)
-async def swagger_ui(request: Request) -> HTMLResponse:
-    """
-    Swagger UI. Without an API key it is a read-only reference: Try it out is switched off
-    (an empty supportedSubmitMethods), so it only offers to send calls when a key can
-    protect them, entered through Authorize.
-    """
-    return get_swagger_ui_html(
-        openapi_url=_schema_url(request),
-        title=f"{app.title} - Swagger UI",
-        swagger_ui_parameters=None if api_key_enabled() else {"supportedSubmitMethods": []},
-    )
-
-
-@app.get(REDOC_URL, include_in_schema=False, response_class=HTMLResponse)
-async def redoc_ui(request: Request) -> HTMLResponse:
-    """ReDoc: a read-only reference page, so it never sends calls."""
-    return get_redoc_html(openapi_url=_schema_url(request), title=f"{app.title} - ReDoc")
-
 
 # No CORS middleware: the bundled UI is served by this same app (and the Vite
 # dev server proxies /api and /health), so every legitimate browser request is
 # same-origin. Granting cross-origin access would only let other websites drive
-# this API from a user's browser.
+# this unauthenticated API from a user's browser.
 
 # Mount static files for React build - MUST be done early
 try:

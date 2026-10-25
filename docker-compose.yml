@@ -22,9 +22,6 @@ services:
     # Environment variables (optional, can be configured via UI)
     environment:
       - PYTHONUNBUFFERED=1
-      # Optional: require an API key (header X-API-Key) for /api/*. Disabled when unset.
-      # See docs/user/configuration.md#api-authentication
-      # - AUTOHEAL_API_KEY_FILE=/run/secrets/autoheal_api_key
 
     # Labels for auto-heal (exclude itself from monitoring)
     labels:

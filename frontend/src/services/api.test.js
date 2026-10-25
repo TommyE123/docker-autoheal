@@ -1,14 +1,10 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockInstance = vi.hoisted(() => ({
   get: vi.fn(),
   post: vi.fn(),
   put: vi.fn(),
   delete: vi.fn(),
-  interceptors: {
-    request: { use: vi.fn() },
-    response: { use: vi.fn() },
-  },
 }));
 
 vi.mock("axios", () => ({
@@ -25,10 +21,6 @@ import * as api from "./api";
 // history before each test (clearMocks defaults to true), so capture the
 // config here rather than asserting on axios.create inside the test.
 const createConfig = axios.create.mock.calls[0]?.[0];
-const requestInterceptor =
-  mockInstance.interceptors.request.use.mock.calls[0]?.[0];
-const [responseOk, responseError] =
-  mockInstance.interceptors.response.use.mock.calls[0] ?? [];
 
 beforeEach(() => {
   mockInstance.get.mockClear();
@@ -124,200 +116,5 @@ describe("api service", () => {
       "/notifications/test",
       service,
     );
-  });
-});
-
-describe("API key handling", () => {
-  beforeEach(() => {
-    sessionStorage.clear();
-  });
-
-  it("sends no X-API-Key header when no key is stored", () => {
-    const config = requestInterceptor({ headers: {} });
-
-    expect(config.headers).not.toHaveProperty("X-API-Key");
-  });
-
-  it("sends the stored key as X-API-Key", () => {
-    api.setApiKey("abc");
-
-    const config = requestInterceptor({ headers: {} });
-
-    expect(config.headers["X-API-Key"]).toBe("abc");
-  });
-
-  it("stops sending the key once cleared", () => {
-    api.setApiKey("abc");
-    api.clearApiKey();
-
-    expect(api.getApiKey()).toBeNull();
-    expect(requestInterceptor({ headers: {} }).headers).not.toHaveProperty(
-      "X-API-Key",
-    );
-  });
-
-  it("passes successful responses through untouched", () => {
-    const response = { status: 200 };
-
-    expect(responseOk(response)).toBe(response);
-  });
-
-  it("notifies the handler on a 401 and still rejects", async () => {
-    const handler = vi.fn();
-    const off = api.onUnauthorized(handler);
-    const error = { response: { status: 401 } };
-
-    await expect(responseError(error)).rejects.toBe(error);
-    expect(handler).toHaveBeenCalledTimes(1);
-
-    off();
-    await expect(responseError(error)).rejects.toBe(error);
-    expect(handler).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not notify for other errors", async () => {
-    const handler = vi.fn();
-    const off = api.onUnauthorized(handler);
-
-    await expect(responseError({ response: { status: 500 } })).rejects.toEqual({
-      response: { status: 500 },
-    });
-    await expect(responseError(new Error("network"))).rejects.toThrow();
-    expect(handler).not.toHaveBeenCalled();
-    off();
-  });
-
-  it("keeps a newer handler when an older one unsubscribes late", async () => {
-    const first = vi.fn();
-    const second = vi.fn();
-    const offFirst = api.onUnauthorized(first);
-    const offSecond = api.onUnauthorized(second);
-
-    offFirst();
-    await expect(
-      responseError({ response: { status: 401 } }),
-    ).rejects.toBeDefined();
-
-    expect(first).not.toHaveBeenCalled();
-    expect(second).toHaveBeenCalledTimes(1);
-    offSecond();
-  });
-
-  it("reports whether the key was persisted", () => {
-    expect(api.setApiKey("abc")).toBe(true);
-    expect(sessionStorage.getItem("autoheal_api_key")).toBe("abc");
-  });
-
-  describe("when sessionStorage is unavailable", () => {
-    beforeEach(() => {
-      vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-        throw new Error("blocked");
-      });
-      vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-        throw new Error("blocked");
-      });
-      vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
-        throw new Error("blocked");
-      });
-    });
-
-    afterEach(() => {
-      api.clearApiKey();
-      vi.restoreAllMocks();
-    });
-
-    it("keeps the key in memory and says it was not persisted", () => {
-      expect(api.setApiKey("mem")).toBe(false);
-
-      expect(api.getApiKey()).toBe("mem");
-      expect(requestInterceptor({ headers: {} }).headers["X-API-Key"]).toBe(
-        "mem",
-      );
-    });
-
-    it("forgets the in-memory key when cleared", () => {
-      api.setApiKey("mem");
-
-      api.clearApiKey();
-
-      expect(api.getApiKey()).toBeNull();
-    });
-  });
-
-  describe("when storage rejects a change but still holds an older key", () => {
-    beforeEach(() => {
-      sessionStorage.setItem("autoheal_api_key", "old");
-    });
-
-    afterEach(() => {
-      vi.restoreAllMocks();
-      api.clearApiKey();
-    });
-
-    it("sends the replacement key, not the stale stored one", () => {
-      vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-        throw new Error("quota");
-      });
-
-      expect(api.setApiKey("new")).toBe(false);
-
-      expect(api.getApiKey()).toBe("new");
-      expect(requestInterceptor({ headers: {} }).headers["X-API-Key"]).toBe(
-        "new",
-      );
-    });
-
-    it("stops sending a key that could not be removed from storage", () => {
-      vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
-        throw new Error("blocked");
-      });
-
-      expect(api.clearApiKey()).toBe(false);
-
-      expect(api.getApiKey()).toBeNull();
-      expect(requestInterceptor({ headers: {} }).headers).not.toHaveProperty(
-        "X-API-Key",
-      );
-    });
-
-    it("reports a clear that storage accepted", () => {
-      expect(api.clearApiKey()).toBe(true);
-      expect(sessionStorage.getItem("autoheal_api_key")).toBeNull();
-    });
-  });
-
-  describe("after a reload (a fresh module)", () => {
-    afterEach(() => {
-      sessionStorage.clear();
-    });
-
-    it("reads the key persisted by the previous page load", async () => {
-      sessionStorage.setItem("autoheal_api_key", "persisted");
-      vi.resetModules();
-
-      const fresh = await import("./api");
-
-      expect(fresh.getApiKey()).toBe("persisted");
-    });
-
-    it("has no key when storage cannot be read on load", async () => {
-      vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-        throw new Error("blocked");
-      });
-      vi.resetModules();
-
-      const fresh = await import("./api");
-
-      expect(fresh.getApiKey()).toBeNull();
-      vi.restoreAllMocks();
-    });
-
-    it("has no key when nothing was persisted", async () => {
-      vi.resetModules();
-
-      const fresh = await import("./api");
-
-      expect(fresh.getApiKey()).toBeNull();
-    });
   });
 });

@@ -13,17 +13,12 @@ restructuring of the codebase (flat files → the current `app/` package layout)
 [Project restructuring](../historical/project-restructuring.md) if you're curious, but it has
 no bearing on how you run or upgrade Docker Auto-Heal today.
 
-## API documentation URLs and optional API key
+## API documentation URLs
 
 The interactive API documentation moved from `/docs`, `/redoc` and `/openapi.json` to
 `/api/swagger`, `/api/redoc` and `/api/openapi.json`. The old paths are removed without a
 redirect, so update bookmarks, scripts and any reverse-proxy rules that referenced them. The
-pages are a developer tool: the web UI menu no longer links to them, and Swagger's **Try it
-out** is switched off until an API key is set.
-
-API-key authentication was added as an opt-in feature. Nothing changes for existing
-installations unless you set `AUTOHEAL_API_KEY` or `AUTOHEAL_API_KEY_FILE`; see
-[API authentication](configuration.md#api-authentication).
+pages are a developer tool, so the web UI menu no longer links to them.
 
 ## See also
 

@@ -22,7 +22,6 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from fastapi.routing import APIRoute
 
-from app.api import auth
 from app.api.api import app
 from app.api.routes import (
     config,
@@ -233,7 +232,7 @@ class TestRoutingThroughTheAsgiApp:
 
 @pytest.mark.asyncio
 class TestDocsUrls:
-    """Swagger UI, ReDoc and the schema are served under /api, with or without an API key."""
+    """Swagger UI, ReDoc and the schema are served under /api."""
 
     async def test_swagger_ui_is_served_under_api(self):
         status, body, headers = await _request("GET", "/api/swagger")
@@ -248,17 +247,6 @@ class TestDocsUrls:
         assert status == 200
         assert headers["content-type"].startswith("text/html")
         assert b"/api/openapi.json" in body
-
-    async def test_swagger_try_it_out_needs_an_api_key(self, monkeypatch):
-        off = b'"supportedSubmitMethods": []'
-
-        monkeypatch.setattr(auth._state, "key", None)
-        _, without_key, _ = await _request("GET", "/api/swagger")
-        monkeypatch.setattr(auth._state, "key", b"try-it-out-key")
-        _, with_key, _ = await _request("GET", "/api/swagger")
-
-        assert off in without_key
-        assert off not in with_key
 
     @pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
     async def test_legacy_docs_paths_are_gone(self, path):

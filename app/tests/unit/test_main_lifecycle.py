@@ -803,24 +803,6 @@ class TestMain:
             fake_service.stop.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_main_refuses_to_start_on_unusable_api_key_configuration(
-        self, monkeypatch, tmp_path
-    ):
-        monkeypatch.setenv("AUTOHEAL_API_KEY_FILE", str(tmp_path / "missing"))
-
-        with (
-            patch("app.main.signal.signal"),
-            patch("app.main.AutoHealService") as service_cls,
-            patch("app.main.run_api_server", new=AsyncMock()) as run_api,
-            pytest.raises(SystemExit) as exit_info,
-        ):
-            await main_module.main()
-
-        assert exit_info.value.code == 1
-        service_cls.assert_not_called()
-        run_api.assert_not_called()
-
-    @pytest.mark.asyncio
     async def test_main_stops_service_in_finally_if_still_running(self):
         fake_service = MagicMock()
         fake_service.run = AsyncMock()

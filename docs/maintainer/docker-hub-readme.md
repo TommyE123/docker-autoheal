@@ -61,7 +61,7 @@ docker run -d \
 - Prometheus metrics on a dedicated port
 - Notifications to Discord, Slack, Telegram, ntfy, Gotify, Pushover, or a generic webhook
 - All configuration and state stored in `/data`, editable through the web UI, the REST
-  API, or `config.json` directly — **no environment-variable settings for monitoring behavior** (only the optional `AUTOHEAL_API_KEY` / `AUTOHEAL_API_KEY_FILE` for API authentication)
+  API, or `config.json` directly — **there are no environment-variable settings**
 
 ## Enabling auto-healing
 
@@ -118,8 +118,7 @@ curl http://localhost:9090/metrics
 # Service health
 curl http://localhost:3131/health
 
-# Interactive API docs for developers (Swagger UI; ReDoc at /api/redoc).
-# Swagger's "Try it out" needs AUTOHEAL_API_KEY or AUTOHEAL_API_KEY_FILE to be set.
+# Interactive API docs for developers (Swagger UI; ReDoc at /api/redoc)
 http://localhost:3131/api/swagger
 ```
 
@@ -157,11 +156,8 @@ This service requires read-only Docker socket access, which is a significant pri
 Recommended for production:
 
 - Mount the socket read-only (`:ro`, as shown above)
-- Set `AUTOHEAL_API_KEY_FILE` (or `AUTOHEAL_API_KEY`) to require an `X-API-Key` header on
-  every `/api/` path except the API documentation pages (`/api/swagger`, `/api/redoc` and
-  `/api/openapi.json`); the UI shell, static assets and `/health` also stay public. Put the
-  service behind a reverse proxy with TLS if exposing it beyond a trusted network — the key
-  is otherwise sent in clear text
+- Put the web UI behind a reverse proxy with authentication and TLS if exposing it beyond
+  a trusted network — Auto-Heal does not implement its own authentication
 - Restrict access to the Prometheus metrics port similarly
 - Keep regular configuration backups (export from the UI)
 

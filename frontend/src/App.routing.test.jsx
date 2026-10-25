@@ -17,10 +17,6 @@ vi.mock("./services/api", () => ({
   restartContainer: vi.fn(),
   unquarantineContainer: vi.fn(),
   getContainerDetails: vi.fn(),
-  getApiKey: vi.fn(() => null),
-  setApiKey: vi.fn(),
-  clearApiKey: vi.fn(),
-  onUnauthorized: vi.fn(),
 }));
 
 vi.mock("./components/Dashboard", () => ({
