@@ -7,9 +7,8 @@ import asyncio
 import fnmatch
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import Any, Protocol
-
-from docker.models.containers import Container
+from http import HTTPStatus
+from typing import TYPE_CHECKING, Any, Protocol
 
 from app.config.config_manager import (
     AutoHealConfig,
@@ -18,8 +17,12 @@ from app.config.config_manager import (
     config_manager,
 )
 from app.docker_client.docker_client_wrapper import recovery_identifier
-from app.monitor.uptime_kuma_monitor import UptimeKumaMonitor
 from app.notifications.notification_manager import notification_manager
+
+if TYPE_CHECKING:
+    from docker.models.containers import Container
+
+    from app.monitor.uptime_kuma_monitor import UptimeKumaMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -715,9 +718,12 @@ class MonitoringEngine:
                     return True, "Docker health check reports unhealthy"
 
         # Check Uptime-Kuma monitor status (if configured and enabled)
-        if self.uptime_kuma_monitor and stable_id is not None:
-            if await self.uptime_kuma_monitor.should_restart_from_uptime_kuma(stable_id):
-                return True, "Uptime-Kuma monitor reports DOWN"
+        if (
+            self.uptime_kuma_monitor
+            and stable_id is not None
+            and await self.uptime_kuma_monitor.should_restart_from_uptime_kuma(stable_id)
+        ):
+            return True, "Uptime-Kuma monitor reports DOWN"
 
         return False, ""
 
@@ -859,7 +865,6 @@ class MonitoringEngine:
             )
             return
         container_id, container_name, recovery_id = identifiers
-        labels = info.get("labels", {})
 
         # Use STABLE IDENTIFIER as primary (persists across container recreations)
         # This solves:
@@ -1053,7 +1058,7 @@ class MonitoringEngine:
 
             response = await asyncio.to_thread(requests.post, webhook_url, json=payload, timeout=5)
 
-            if response.status_code == 200:
+            if response.status_code == HTTPStatus.OK:
                 logger.info("Alert sent successfully for %s", event.container_name)
             else:
                 logger.warning("Alert webhook returned status %s", response.status_code)
