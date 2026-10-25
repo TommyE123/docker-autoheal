@@ -833,6 +833,25 @@ class TestMain:
             await main_module.main()  # must not raise
 
     @pytest.mark.asyncio
+    async def test_main_logs_keyboard_interrupt_and_stops_the_service(self, caplog):
+        fake_service = MagicMock()
+        fake_service.run = MagicMock(return_value=None)
+        fake_service.stop = AsyncMock()
+        fake_service.running = True
+
+        with (
+            patch("app.main.signal.signal"),
+            patch("app.main.AutoHealService", return_value=fake_service),
+            patch("app.main.run_api_server", new=MagicMock(return_value=None)),
+            patch("app.main.asyncio.gather", side_effect=KeyboardInterrupt),
+            caplog.at_level("INFO", logger="app.main"),
+        ):
+            await main_module.main()  # must not raise
+
+        assert "Received keyboard interrupt" in caplog.text
+        fake_service.stop.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_main_stops_service_after_generic_exception_from_gather(self):
         fake_service = MagicMock()
         fake_service.run = MagicMock(return_value=None)

@@ -160,6 +160,18 @@ class TestNotificationServiceCrud:
         assert exc_info.value.status_code == 400
         assert len(config_manager.get_config().notifications.services) == 1
 
+    async def test_add_notification_service_with_a_different_existing_name(self):
+        await add_notification_service(
+            {"name": "Webhook", "type": "webhook", "url": "https://example.invalid/hook"}
+        )
+
+        await add_notification_service(
+            {"name": "Slack", "type": "slack", "url": "https://example.invalid/slack"}
+        )
+
+        names = [s.name for s in config_manager.get_config().notifications.services]
+        assert names == ["Webhook", "Slack"]
+
     async def test_add_notification_service_invalid_payload_returns_500(self):
         with pytest.raises(HTTPException) as exc_info:
             await add_notification_service({"name": "Missing Type"})
@@ -204,6 +216,23 @@ class TestNotificationServiceCrud:
         )
 
         assert result["service"]["name"] == "Renamed webhook"
+
+    async def test_update_notification_service_skips_non_matching_services(self):
+        await add_notification_service(
+            {"name": "Webhook", "type": "webhook", "url": "https://example.invalid/hook"}
+        )
+        await add_notification_service(
+            {"name": "Slack", "type": "slack", "url": "https://example.invalid/slack"}
+        )
+
+        result = await update_notification_service(
+            "Slack", {"type": "slack", "url": "https://example.invalid/new"}
+        )
+
+        assert result["service"]["url"] == "https://example.invalid/new"
+        services = config_manager.get_config().notifications.services
+        assert services[0].url == "https://example.invalid/hook"
+        assert services[1].url == "https://example.invalid/new"
 
     async def test_update_notification_service_unknown_name_returns_404(self):
         with pytest.raises(HTTPException) as exc_info:
