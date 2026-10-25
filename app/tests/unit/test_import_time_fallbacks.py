@@ -17,6 +17,7 @@ from unittest.mock import MagicMock
 
 import prometheus_client
 import pytest
+from fastapi import FastAPI
 
 # runpy warns that the module is already imported; running a copy is the point here.
 pytestmark = pytest.mark.filterwarnings("ignore:.*found in sys.modules:RuntimeWarning")
@@ -52,12 +53,17 @@ def test_main_falls_back_to_local_log_dir_when_data_is_not_writable(sandboxed_im
 
 
 def test_main_entry_point_runs_the_service(sandboxed_import, monkeypatch):
-    run = MagicMock(side_effect=lambda coroutine: coroutine.close())
-    monkeypatch.setattr(asyncio, "run", run)
+    started = []
+
+    def fake_run(coroutine):
+        started.append(coroutine.cr_code.co_name)
+        coroutine.close()
+
+    monkeypatch.setattr(asyncio, "run", fake_run)
 
     runpy.run_module("app.main", run_name="__main__")
 
-    run.assert_called_once()
+    assert started == ["main"]
 
 
 def test_api_survives_a_missing_assets_directory(sandboxed_import, caplog):
@@ -76,3 +82,17 @@ def test_api_mounts_the_assets_directory_when_present(sandboxed_import, caplog):
     assert "Static assets mounted" in caplog.text
     assert "Assets directory not found" not in caplog.text
     assert any(getattr(route, "path", None) == "/assets" for route in namespace["app"].routes)
+
+
+def test_api_survives_a_static_assets_mount_failure(sandboxed_import, monkeypatch, caplog):
+    (sandboxed_import / "static" / "assets").mkdir(parents=True)
+
+    def fail_mount(self, path, app, name=None):
+        raise RuntimeError("mount failed")
+
+    monkeypatch.setattr(FastAPI, "mount", fail_mount)
+
+    with caplog.at_level(logging.WARNING, logger="app.api.api"):
+        runpy.run_module("app.api.api", run_name="app_api_mount_failure")
+
+    assert "Assets directory not found: mount failed" in caplog.text

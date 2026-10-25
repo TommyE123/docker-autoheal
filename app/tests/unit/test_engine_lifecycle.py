@@ -1094,18 +1094,26 @@ class TestEventListenerLoop:
     async def test_thread_stops_reading_events_once_shutdown_is_requested(
         self, engine, docker_client, monkeypatch
     ):
+        import queue
         import threading
 
         stopped = threading.Event()
-        reached_after_shutdown = []
+        first_event = start_event("a" * 64, "web")
+        late_event = start_event("b" * 64, "late")
+        queued = []
+
+        class RecordingQueue(queue.Queue):
+            def put(self, item, block=True, timeout=None):
+                queued.append(item)
+                super().put(item, block, timeout)
 
         def event_stream():
-            yield start_event("a" * 64, "web")
+            yield first_event
             stopped.wait(timeout=5)
-            yield start_event("b" * 64, "late")
-            reached_after_shutdown.append(1)
+            yield late_event
 
         docker_client.events = event_stream()
+        monkeypatch.setattr(queue, "Queue", RecordingQueue)
 
         threads = []
         real_thread = threading.Thread
@@ -1129,7 +1137,7 @@ class TestEventListenerLoop:
         thread.join(timeout=5)
 
         assert not thread.is_alive()
-        assert reached_after_shutdown == []
+        assert queued == [first_event]
 
     async def test_idle_queue_yields_briefly_before_polling_again(
         self, engine, docker_client, monkeypatch, recorded_sleeps
