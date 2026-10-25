@@ -225,13 +225,9 @@ def should_serve_react_app(path: str) -> bool:
     if any(pattern in path for pattern in EXCLUDED_PATH_PATTERNS):
         return False
 
-    # Check if path has a static file extension
+    # Serve the React app unless the path has a static file extension
     path_lower = path.lower()
-    if any(path_lower.endswith(ext) for ext in STATIC_FILE_EXTENSIONS):
-        return False
-
-    # If none of the exclusions match, serve React app
-    return True
+    return not any(path_lower.endswith(ext) for ext in STATIC_FILE_EXTENSIONS)
 
 
 # Catch-all route for React Router - must be at the end

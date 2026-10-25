@@ -9,7 +9,6 @@ import signal
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
-from wsgiref.simple_server import WSGIServer
 
 import uvicorn
 from prometheus_client import Counter, Gauge, start_http_server
@@ -23,6 +22,7 @@ from app.notifications.notification_manager import notification_manager
 
 if TYPE_CHECKING:
     from types import FrameType
+    from wsgiref.simple_server import WSGIServer
 
 # Ensure /data/logs directory exists
 LOG_DIR = Path("/data/logs")
