@@ -9,7 +9,7 @@ on:
 
 permissions:
   contents: read
-  issues: write
+  issues: write # Creates and updates labels
 
 jobs:
   sync-labels:
@@ -22,6 +22,7 @@ jobs:
           sparse-checkout: |
             .github/labels.yml
           sparse-checkout-cone-mode: false
+          persist-credentials: false
 
       # Creates/updates the kind:*, area:*, status:* labels by exact name
       # only - labels.yml intentionally has no `aliases`, since renaming an
