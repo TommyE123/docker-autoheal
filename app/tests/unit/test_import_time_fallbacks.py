@@ -63,7 +63,8 @@ def test_main_entry_point_runs_the_service(sandboxed_import, monkeypatch):
 
     runpy.run_module("app.main", run_name="__main__")
 
-    assert started == ["main"]
+    # mutmut wraps functions in a trampoline, so the name differs in mutation runs.
+    assert started in (["main"], ["_trampoline_wrapper"])
 
 
 def test_api_survives_a_missing_assets_directory(sandboxed_import, caplog):
