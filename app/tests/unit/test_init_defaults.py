@@ -4,15 +4,21 @@ Tests the automatic creation of default configuration files
 """
 
 import json
+import runpy
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 
+import pytest
+
+from app.config import init_defaults
 from app.config.init_defaults import (
     get_default_config,
     get_default_events,
     get_default_maintenance,
     get_default_quarantine,
+    init_data_file,
     initialize_defaults,
     reset_to_defaults,
 )
@@ -184,3 +190,124 @@ class TestInitDefaults:
         # Check that JSON is indented (not minified)
         assert "\n" in content  # Has newlines
         assert "  " in content  # Has indentation
+
+
+class TestInitDataFile:
+    """Test init_data_file edge cases"""
+
+    def test_existing_file_returns_false(self, tmp_path):
+        target = tmp_path / "existing.json"
+        target.write_text("{}")
+
+        assert init_data_file(target, {"a": 1}, "existing") is False
+        assert target.read_text() == "{}"
+
+    def test_write_failure_returns_false(self, tmp_path, monkeypatch):
+        def fail_dump(*args, **kwargs):
+            raise OSError("disk full")
+
+        monkeypatch.setattr(init_defaults.json, "dump", fail_dump)
+
+        assert init_data_file(tmp_path / "new.json", {"a": 1}, "new") is False
+
+
+class TestInitializeDefaultsFallback:
+    """Test directory creation failure handling"""
+
+    def test_falls_back_to_local_data_dir(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        unwritable = tmp_path / "blocker" / "data"
+        (tmp_path / "blocker").write_text("a file, not a directory")
+
+        result = initialize_defaults(unwritable)
+
+        assert result == Path("./data")
+        assert (tmp_path / "data" / "config.json").exists()
+
+    def test_logs_dir_failure_is_not_fatal(self, tmp_path):
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        (data_dir / "logs").write_text("a file, not a directory")
+
+        result = initialize_defaults(data_dir)
+
+        assert result == data_dir
+        assert (data_dir / "config.json").exists()
+
+
+class TestResetToDefaults:
+    """Test reset_to_defaults edge cases"""
+
+    def test_overwrites_every_file(self, tmp_path):
+        names = ["config.json", "events.json", "quarantine.json", "maintenance.json"]
+        for name in names:
+            (tmp_path / name).write_text('"stale"')
+
+        reset_to_defaults(tmp_path)
+
+        assert json.loads((tmp_path / "config.json").read_text()) == get_default_config()
+        assert json.loads((tmp_path / "events.json").read_text()) == get_default_events()
+        assert json.loads((tmp_path / "quarantine.json").read_text()) == get_default_quarantine()
+        assert json.loads((tmp_path / "maintenance.json").read_text()) == get_default_maintenance()
+
+    def test_write_errors_do_not_stop_remaining_files(self, tmp_path):
+        # A directory named config.json makes opening it for writing fail.
+        (tmp_path / "config.json").mkdir()
+
+        reset_to_defaults(tmp_path)
+
+        assert (tmp_path / "config.json").is_dir()
+        assert json.loads((tmp_path / "events.json").read_text()) == get_default_events()
+        assert json.loads((tmp_path / "quarantine.json").read_text()) == get_default_quarantine()
+        assert json.loads((tmp_path / "maintenance.json").read_text()) == get_default_maintenance()
+
+
+class TestCliMain:
+    """Test the ``python -m app.config.init_defaults`` entry point"""
+
+    def _run(self, monkeypatch, *args):
+        monkeypatch.setattr(sys, "argv", ["init_defaults", *args])
+        # Drop the cached module so runpy does not warn about re-execution.
+        monkeypatch.delitem(sys.modules, "app.config.init_defaults", raising=False)
+        runpy.run_module("app.config.init_defaults", run_name="__main__")
+
+    def test_initialize(self, tmp_path, monkeypatch, capsys):
+        target = tmp_path / "cli"
+
+        self._run(monkeypatch, "--data-dir", str(target))
+
+        assert "Initialization complete!" in capsys.readouterr().out
+        assert (target / "config.json").exists()
+
+    @pytest.mark.parametrize("answer", ["yes", "YES"])
+    def test_reset_confirmed(self, tmp_path, monkeypatch, capsys, answer):
+        (tmp_path / "events.json").write_text('["stale"]')
+        monkeypatch.setattr("builtins.input", lambda _prompt: answer)
+
+        self._run(monkeypatch, "--reset", "--data-dir", str(tmp_path))
+
+        assert "Reset complete!" in capsys.readouterr().out
+        assert json.loads((tmp_path / "events.json").read_text()) == []
+
+    def test_reset_cancelled(self, tmp_path, monkeypatch, capsys):
+        (tmp_path / "events.json").write_text('["stale"]')
+        monkeypatch.setattr("builtins.input", lambda _prompt: "no")
+
+        self._run(monkeypatch, "--reset", "--data-dir", str(tmp_path))
+
+        assert "Reset cancelled." in capsys.readouterr().out
+        assert json.loads((tmp_path / "events.json").read_text()) == ["stale"]
+
+
+class TestInitializeDefaultsIdempotent:
+    """Test repeated initialization"""
+
+    def test_second_run_creates_nothing(self, tmp_path, caplog):
+        initialize_defaults(tmp_path)
+        before = {p.name: p.read_text() for p in tmp_path.glob("*.json")}
+
+        with caplog.at_level("INFO", logger=init_defaults.logger.name):
+            initialize_defaults(tmp_path)
+
+        assert {p.name: p.read_text() for p in tmp_path.glob("*.json")} == before
+        assert "no initialization needed" in caplog.text

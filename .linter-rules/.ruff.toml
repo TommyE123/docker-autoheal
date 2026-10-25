@@ -96,6 +96,12 @@ known-first-party = ["app"]
 # Revisit alongside the select-level deferrals above.
 "**/tests/**" = ["ANN", "S101", "SLF001", "PLR2004", "ARG001", "ARG002", "ARG005", "S105", "S106"]
 
+# S104 (binding to all interfaces) stays active for the rest of the tests. In
+# these two files "0.0.0.0" is only a mocked `ui.listen_address` or an assertion
+# string, never a real bind.
+"app/tests/unit/test_main_lifecycle.py" = ["S104"]
+"app/tests/unit/test_prometheus_start.py" = ["S104"]
+
 # FastAPI turns a route handler's return annotation into a response model, so
 # annotating handlers would change validation and serialisation; see
 # docs/developer/type-annotations.md.

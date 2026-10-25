@@ -70,7 +70,7 @@ def test_utc_aware_timestamp_is_accepted():
 def test_naive_timestamp_is_rejected():
     with pytest.raises(ValidationError, match="timezone-aware UTC"):
         AutoHealEvent(
-            timestamp=datetime(2024, 1, 1, 12, 0, 0),
+            timestamp=datetime(2024, 1, 1, 12, 0, 0),  # noqa: DTZ001 - naive on purpose, it must be rejected
             container_id="test-container",
             container_name="test-container",
             event_type="restart",

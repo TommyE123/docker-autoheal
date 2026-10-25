@@ -49,13 +49,11 @@ jobs:
           curl -fsSL -o "$RUNNER_TEMP/install-gh-aw.sh" https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh
           bash "$RUNNER_TEMP/install-gh-aw.sh"
 
-      # `gh aw upgrade` unconditionally generates three files this repo does
-      # not keep (the engine is gemini, not copilot). They must all be present:
-      # if gh-aw stops generating one, fail so this cleanup gets reviewed
-      # rather than silently going stale. Nothing is branched, committed or
-      # pushed here. Only the files gh-aw manages are staged (the gh-aw
-      # actions lock, workflow sources it applies codemods to, and compiled
-      # lock files); any other change fails the job.
+      # `gh aw upgrade` generates a skill file this repo does not keep; it is
+      # removed if present. Nothing is branched, committed or pushed here. Only the files gh-aw manages are staged (the
+      # gh-aw actions lock, workflow sources it applies codemods to, and
+      # compiled lock files); any other change, including a new generated
+      # artefact, fails the job.
       - name: Upgrade gh-aw and drop unwanted artefacts
         id: upgrade
         if: steps.existing.outputs.pr == ''
@@ -68,20 +66,7 @@ jobs:
           echo "gh-aw $version"
           gh aw upgrade
 
-          unwanted=(
-            .github/agents/agentic-workflows.md
-            .github/workflows/copilot-setup-steps.yml
-            .github/skills/agentic-workflows/SKILL.md
-          )
-          missing=0
-          for f in "${unwanted[@]}"; do
-            if [ ! -e "$f" ]; then
-              echo "::error::gh-aw did not generate $f. gh-aw may have stopped generating its Copilot artefacts; review and remove this cleanup."
-              missing=1
-            fi
-          done
-          [ "$missing" -eq 0 ] || exit 1
-          rm -- "${unwanted[@]}"
+          rm -f -- .github/skills/agentic-workflows/SKILL.md
 
           git add -- .github/aw '.github/workflows/*.md' '.github/workflows/*.lock.yml'
           unexpected=$(git diff --name-only; git ls-files --others --exclude-standard)

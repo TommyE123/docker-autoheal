@@ -1742,6 +1742,30 @@ async def test_send_pushover_status_zero_with_http_200_is_failure(
 
 
 @pytest.mark.asyncio
+async def test_send_pushover_non_json_body_with_http_200_is_failure(
+    isolated_config_manager, manager: NotificationManager
+):
+    class _PushoverHtmlResponse(_FakeResponse):
+        async def json(self, content_type=None) -> Any:
+            raise ValueError("not json")
+
+    class _PushoverHtmlSession(_FakeSession):
+        def post(self, url, **kwargs):
+            self.calls.append({"url": url, **kwargs})
+            return _PushoverHtmlResponse(200)
+
+    manager._session = _PushoverHtmlSession()
+    service = _SERVICES_BY_LABEL["Pushover"]
+    _configure_service(isolated_config_manager, service)
+
+    delivered = await manager._send_pushover(
+        service, "title", "message", _make_event("restart"), NotificationPriority.NORMAL
+    )
+
+    assert delivered is False
+
+
+@pytest.mark.asyncio
 async def test_send_webhook_redirect_is_failure_and_not_followed(
     isolated_config_manager, manager: NotificationManager
 ):

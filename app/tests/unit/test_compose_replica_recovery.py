@@ -18,7 +18,7 @@ from app.api.routes.containers import (
 )
 from app.config.config_manager import config_manager
 from app.docker_client.docker_client_wrapper import recovery_identifier
-from app.tests.unit.conftest import after_backoff, make_container
+from app.tests.unit.conftest import after_backoff, make_container, until_stable
 
 COMPOSE = {
     "com.docker.compose.project": "myapp",
@@ -268,7 +268,7 @@ class TestReplicasRecoverIndependently:
         (a, a_info), (b, _b_info) = two_replicas
         await quarantine(engine, a, a_info)
 
-        await after_backoff(engine, engine._check_single_container, b)
+        await after_backoff(engine, until_stable, engine._check_single_container, b)
 
         assert config_manager.is_quarantined("compose:myapp:web#1")
         assert config_manager.get_total_restart_count("compose:myapp:web#1") == 3
@@ -289,7 +289,7 @@ class TestReplicasRecoverIndependently:
         b_info["state"] = {"Status": "running", "ExitCode": 0}
         docker_client._info[b.id] = b_info
 
-        await after_backoff(engine, engine._check_single_container, b)
+        await after_backoff(engine, until_stable, engine._check_single_container, b)
 
         assert not config_manager.is_quarantined("compose:myapp:web#2")
         assert config_manager.get_total_restart_count("compose:myapp:web#2") == 0
@@ -448,7 +448,7 @@ class TestExplicitMonitoringIdIsShared:
         docker_client.add_container(well, well_info)
         config_manager.quarantine_container(well.name)  # keyed by container name
 
-        await engine._check_containers()
+        await until_stable(engine._check_containers)
 
         assert not config_manager.is_quarantined(well.name)  # the sibling was released
         assert "monitoring.id:shared-web" in engine._next_allowed_restart
