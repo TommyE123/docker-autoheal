@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import ApiKeyModal from "./ApiKeyModal";
 
@@ -30,11 +30,12 @@ describe("ApiKeyModal", () => {
     expect(screen.getByRole("button", { name: "Save key" })).toBeDisabled();
   });
 
-  it("does not submit a whitespace-only key", async () => {
+  it("ignores a whitespace-only key submitted past the disabled button", async () => {
     const user = userEvent.setup();
     const { onSubmit } = setup();
 
-    await user.type(screen.getByLabelText("API key"), "   {Enter}");
+    await user.type(screen.getByLabelText("API key"), "   ");
+    fireEvent.submit(screen.getByLabelText("API key").closest("form"));
 
     expect(onSubmit).not.toHaveBeenCalled();
   });
