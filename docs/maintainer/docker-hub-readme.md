@@ -118,7 +118,8 @@ curl http://localhost:9090/metrics
 # Service health
 curl http://localhost:3131/health
 
-# Interactive API docs (Swagger UI; ReDoc at /api/redoc)
+# Interactive API docs for developers (Swagger UI; ReDoc at /api/redoc).
+# Only available when AUTOHEAL_API_KEY or AUTOHEAL_API_KEY_FILE is set.
 http://localhost:3131/api/docs
 ```
 

@@ -6,6 +6,7 @@ Requests go through the real ASGI app with a tiny in-process caller (see
 is driven through the environment so the real startup path is exercised.
 """
 
+import json
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -18,8 +19,10 @@ if TYPE_CHECKING:
     from collections.abc import MutableMapping
 
 KEY = "test-key-not-a-real-secret"
-PROTECTED = ["/api/maintenance/status", "/api/docs", "/api/redoc", "/api/openapi.json"]
+PROTECTED = ["/api/maintenance/status", "/api/status", "/api/events"]
 PROTECTED_WITH_ROOT = [*PROTECTED, "/api", "/api/"]
+# The docs are open (a browser cannot send the key header) but only exist when a key is set.
+DOCS = ["/api/docs", "/api/redoc", "/api/openapi.json"]
 
 
 async def _request(
@@ -79,10 +82,17 @@ class TestAuthDisabled:
         assert auth.configure_api_auth() is False
 
     @pytest.mark.parametrize("path", PROTECTED)
-    async def test_api_and_docs_are_open(self, path):
+    async def test_api_is_open(self, path):
         status, _, _ = await _request(path)
 
         assert status == 200
+
+    @pytest.mark.parametrize("path", DOCS)
+    async def test_docs_do_not_exist_without_a_key(self, path):
+        status, body, _ = await _request(path)
+
+        assert status == 404
+        assert b"swagger" not in body.lower()
 
     async def test_health_is_open(self):
         status, _, _ = await _request("/health")
@@ -132,6 +142,24 @@ class TestAuthEnabled:
 
         assert status == 401
 
+    @pytest.mark.parametrize("path", DOCS)
+    async def test_docs_load_without_the_key_header(self, path):
+        # A browser cannot add a header when you open a page, so the docs are not key-gated.
+        status, _, _ = await _request(path)
+
+        assert status == 200
+
+    @pytest.mark.parametrize("path", DOCS)
+    async def test_docs_load_under_a_root_path_too(self, path):
+        status, _, _ = await _request(f"/autoheal{path}", root_path="/autoheal")
+
+        assert status == 200
+
+    async def test_a_trailing_slash_docs_path_is_not_exempt(self):
+        status, _, _ = await _request("/api/docs/")
+
+        assert status == 401
+
     async def test_non_ascii_key_is_401_not_an_error(self):
         status, _, _ = await _request("/api/maintenance/status", {"X-API-Key": "kéy"})
 
@@ -159,10 +187,21 @@ class TestAuthEnabled:
         assert status == 200
         assert headers["content-type"].startswith("text/html")
 
-    async def test_openapi_schema_declares_the_api_key_header(self):
-        _, body, _ = await _request("/api/openapi.json", {"X-API-Key": KEY})
+    async def test_openapi_schema_declares_the_api_key_scheme_for_swagger_authorize(self):
+        # Swagger UI's Authorize button is built from this scheme; every operation needs it.
+        _, body, _ = await _request("/api/openapi.json")
+        schema = json.loads(body)
 
-        assert b"X-API-Key" in body
+        assert schema["components"]["securitySchemes"]["APIKeyHeader"] == {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-API-Key",
+        }
+        assert all(
+            operation.get("security")
+            for path_item in schema["paths"].values()
+            for operation in path_item.values()
+        )
         assert KEY.encode() not in body
 
 
@@ -290,6 +329,10 @@ class TestRoutePath:
             ("/api", True),
             ("/api/", True),
             ("/api/status", True),
+            ("/api/docs", False),
+            ("/api/redoc", False),
+            ("/api/openapi.json", False),
+            ("/api/docs/", True),
             ("/apix", False),
             ("/apiary/status", False),
             ("/", False),

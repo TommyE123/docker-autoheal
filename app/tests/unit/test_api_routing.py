@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from fastapi.routing import APIRoute
 
+from app.api import auth
 from app.api.api import app
 from app.api.routes import (
     config,
@@ -220,7 +221,9 @@ class TestRoutingThroughTheAsgiApp:
         assert status == 404
         assert b"<html" not in body.lower()
 
-    async def test_docs_paths_are_not_swallowed_by_the_catch_all(self):
+    async def test_docs_paths_are_not_swallowed_by_the_catch_all(self, monkeypatch):
+        monkeypatch.setattr(auth._state, "key", b"docs-need-a-key")
+
         status, body, headers = await _request("GET", "/api/openapi.json")
 
         assert status == 200
@@ -232,6 +235,13 @@ class TestRoutingThroughTheAsgiApp:
 
 @pytest.mark.asyncio
 class TestDocsUrls:
+    """The API docs are a developer tool: served under /api only when an API key is set."""
+
+    @pytest.fixture
+    def docs_enabled(self, monkeypatch):
+        monkeypatch.setattr(auth._state, "key", b"docs-need-a-key")
+
+    @pytest.mark.usefixtures("docs_enabled")
     async def test_swagger_ui_is_served_under_api(self):
         status, body, headers = await _request("GET", "/api/docs")
 
@@ -239,12 +249,22 @@ class TestDocsUrls:
         assert headers["content-type"].startswith("text/html")
         assert b"/api/openapi.json" in body
 
+    @pytest.mark.usefixtures("docs_enabled")
     async def test_redoc_is_served_under_api(self):
         status, body, headers = await _request("GET", "/api/redoc")
 
         assert status == 200
         assert headers["content-type"].startswith("text/html")
         assert b"/api/openapi.json" in body
+
+    @pytest.mark.parametrize("path", ["/api/docs", "/api/redoc", "/api/openapi.json"])
+    async def test_docs_are_404_without_an_api_key(self, path, monkeypatch):
+        monkeypatch.setattr(auth._state, "key", None)
+
+        status, body, _ = await _request("GET", path)
+
+        assert status == 404
+        assert b"swagger" not in body.lower()
 
     @pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
     async def test_legacy_docs_paths_are_gone(self, path):

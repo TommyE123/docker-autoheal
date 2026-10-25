@@ -68,9 +68,10 @@ secrets:
 ```
 
 When a key is set, send it in the `X-API-Key` header. `/api` and every path under it require
-it, including `/api/docs`, `/api/redoc` and `/api/openapi.json`; a missing or wrong key gets
+it, except the API documentation pages described below; a missing or wrong key gets
 `401 Unauthorized`. That includes paths that do not exist, so an unknown `/api/` path returns
-`401` rather than `404` when authentication is enabled. `/health` and the UI's static pages stay public.
+`401` rather than `404` when authentication is enabled. `/health` and the UI's static pages
+stay public.
 
 ```bash
 curl -H "X-API-Key: $AUTOHEAL_API_KEY" http://localhost:3131/api/status
@@ -81,10 +82,13 @@ browser tab's session storage only (never in the page bundle), and is sent with 
 request. Use the **API Key** item in the navigation bar to replace or clear it. Cancelling
 the prompt stops it re-appearing until you reload or use that item.
 
-**API docs:** a browser cannot add a custom header when you open `/api/docs`, so with
-authentication enabled that page returns `401`. Either fetch the schema with the header
-(`curl -H "X-API-Key: …" …/api/openapi.json`), or put a reverse proxy in front that injects
-the `X-API-Key` header for trusted users.
+**API docs (for developers):** `/api/docs` (Swagger UI), `/api/redoc` (ReDoc) and
+`/api/openapi.json` (the machine-readable schema) exist **only when an API key is set**.
+Without one they return `404`, and the web UI does not link to them. Once a key is set they
+open in a browser without the header, because a browser cannot send a custom header when you
+type an address. In Swagger UI click **Authorize** and paste the key, so **Try it out**
+requests carry it. The pages and the schema list the available endpoints but do not run
+anything: every call still needs the key, and anyone who can reach the port can read the list.
 
 The key is never logged; the startup log only says whether authentication is enabled.
 

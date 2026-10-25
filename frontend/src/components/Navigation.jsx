@@ -55,11 +55,6 @@ function Navigation({ systemStatus, onApiKeyClick }) {
               Configuration
             </Nav.Link>
 
-            <Nav.Link href="/api/docs" target="_blank">
-              <i className="bi bi-book me-1"></i>
-              API Docs
-            </Nav.Link>
-
             {getApiKey() && onApiKeyClick && (
               <Nav.Link as="button" type="button" onClick={onApiKeyClick}>
                 <i className="bi bi-key me-1"></i>

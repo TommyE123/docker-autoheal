@@ -153,7 +153,7 @@ describe("App routing", () => {
     },
   );
 
-  it("renders nav link hrefs for each route and the external API docs link", async () => {
+  it("renders nav link hrefs for each route, with no API docs link", async () => {
     render(
       <MemoryRouter initialEntries={["/containers"]}>
         <App />
@@ -177,9 +177,10 @@ describe("App routing", () => {
       screen.getByRole("link", { name: /configuration/i }),
     ).toHaveAttribute("href", "/config");
 
-    const docsLink = screen.getByRole("link", { name: /api docs/i });
-    expect(docsLink).toHaveAttribute("href", "/api/docs");
-    expect(docsLink).toHaveAttribute("target", "_blank");
+    // The API docs are a developer tool, reached by address, not from the main menu.
+    expect(
+      screen.queryByRole("link", { name: /api docs/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("redirects '/' to /containers using replace, so back navigation skips it", async () => {

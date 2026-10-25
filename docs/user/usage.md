@@ -63,8 +63,9 @@ notification. See [Notifications](notifications.md).
 
 ## REST API
 
-Everything the UI does is backed by a REST API under `/api`. Interactive, always-current
-documentation is available at:
+Everything the UI does is backed by a REST API under `/api`. For developers, interactive,
+always-current documentation is available at the addresses below, **once an API key is set**
+(without one they return `404`):
 
 ```text
 http://localhost:3131/api/docs      # Swagger UI
@@ -75,8 +76,9 @@ http://localhost:3131/api/openapi.json
 The documentation used to live at `/docs`, `/redoc` and `/openapi.json`. Those paths no
 longer exist and do not redirect — update any bookmarks or scripts.
 
-If you set an API key, every `/api/` path needs it. See
-[API authentication](configuration.md#api-authentication).
+If you set an API key, every `/api` path needs it, except these documentation pages, which
+open in a browser; in Swagger UI use **Authorize** to give it the key before **Try it out**.
+See [API authentication](configuration.md#api-authentication).
 
 A few endpoints you're likely to use directly:
 

@@ -12,19 +12,18 @@ modules). This module owns app construction and wiring each router in.
 
 import logging
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api.auth import require_api_key
+from app.api.auth import DOCS_URL, OPENAPI_URL, REDOC_URL, api_key_enabled, require_api_key
 from app.api.state import init_api  # noqa: F401  (re-exported for app/main.py)
 
 logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app. FastAPI's built-in docs routes are disabled and re-registered
-# below under /api/ so the app-level API-key dependency applies to them too (the
-# built-in routes bypass dependencies).
+# below under /api/, and only answer when an API key is configured (see app/api/auth.py).
 app = FastAPI(
     title="Docker Auto-Heal Service",
     description="Automated container monitoring and healing service",
@@ -35,26 +34,31 @@ app = FastAPI(
     dependencies=[Depends(require_api_key)],
 )
 
-DOCS_URL = "/api/docs"
-REDOC_URL = "/api/redoc"
-OPENAPI_URL = "/api/openapi.json"
+
+def _require_docs_enabled() -> None:
+    """The API docs are a developer tool: they only exist when an API key is configured."""
+    if not api_key_enabled():
+        raise HTTPException(status_code=404, detail="Not Found")
 
 
 @app.get(OPENAPI_URL, include_in_schema=False)
 async def openapi_schema() -> dict:
-    """OpenAPI schema (protected by the API key when one is configured)."""
+    """OpenAPI schema (served only when an API key is configured)."""
+    _require_docs_enabled()
     return app.openapi()
 
 
 @app.get(DOCS_URL, include_in_schema=False, response_class=HTMLResponse)
 async def swagger_ui() -> HTMLResponse:
-    """Swagger UI (protected by the API key when one is configured)."""
+    """Swagger UI (served only when an API key is configured)."""
+    _require_docs_enabled()
     return get_swagger_ui_html(openapi_url=OPENAPI_URL, title=f"{app.title} - Swagger UI")
 
 
 @app.get(REDOC_URL, include_in_schema=False, response_class=HTMLResponse)
 async def redoc_ui() -> HTMLResponse:
-    """ReDoc (protected by the API key when one is configured)."""
+    """ReDoc (served only when an API key is configured)."""
+    _require_docs_enabled()
     return get_redoc_html(openapi_url=OPENAPI_URL, title=f"{app.title} - ReDoc")
 
 

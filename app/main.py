@@ -15,7 +15,7 @@ import uvicorn
 from prometheus_client import Counter, Gauge, start_http_server
 
 from app.api.api import app, init_api
-from app.api.auth import ApiKeyConfigError, configure_api_auth
+from app.api.auth import ApiKeyConfigError, api_key_enabled, configure_api_auth
 from app.config.config_manager import AutoHealConfig, config_manager
 from app.docker_client.docker_client_wrapper import DockerClientWrapper
 from app.monitor.monitoring_engine import MonitoringEngine
@@ -179,23 +179,17 @@ class AutoHealService:
             public_port = get_public_port()
             if ui_url:
                 logger.info("Web UI available at %s", ui_url)
-                logger.info("API documentation available at %s/api/docs", ui_url)
             elif public_port:
-                container_port = config.ui.listen_port
                 logger.info(
                     "Web UI published on host port %s (container port %s)",
                     public_port,
-                    container_port,
-                )
-                logger.info(
-                    "API documentation published on host port %s at /api/docs (container port %s)",
-                    public_port,
-                    container_port,
+                    config.ui.listen_port,
                 )
             else:
-                listen = f"{config.ui.listen_address}:{config.ui.listen_port}"
-                logger.info("Web UI listening on %s", listen)
-                logger.info("API documentation listening on %s/api/docs", listen)
+                logger.info(
+                    "Web UI listening on %s:%s", config.ui.listen_address, config.ui.listen_port
+                )
+            log_api_docs_location(config, ui_url, public_port)
 
         except (Exception, asyncio.CancelledError) as e:
             # CancelledError is a BaseException; clean up on cancellation too, then re-raise.
@@ -291,6 +285,32 @@ def get_ui_url(config: AutoHealConfig) -> str | None:
     if not host:
         return None
     return f"http://{host}:{get_public_port() or config.ui.listen_port}"
+
+
+def log_api_docs_location(
+    config: AutoHealConfig, ui_url: str | None, public_port: str | None
+) -> None:
+    """
+    Log where the API documentation is, but only when it exists.
+
+    The docs are a developer tool and are only served when an API key is configured.
+    """
+    if not api_key_enabled():
+        return
+    if ui_url:
+        logger.info("API documentation available at %s/api/docs", ui_url)
+    elif public_port:
+        logger.info(
+            "API documentation published on host port %s at /api/docs (container port %s)",
+            public_port,
+            config.ui.listen_port,
+        )
+    else:
+        logger.info(
+            "API documentation listening on %s:%s/api/docs",
+            config.ui.listen_address,
+            config.ui.listen_port,
+        )
 
 
 def signal_handler(signum: int, _frame: FrameType | None) -> None:
