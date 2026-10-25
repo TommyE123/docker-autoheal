@@ -671,16 +671,26 @@ describe("EventsPage", () => {
     });
   });
 
-  it("does not refetch on visibilitychange while the tab is hidden", async () => {
+  it("refetches on visibilitychange only while the tab is visible", async () => {
     getEvents.mockResolvedValue({ data: sampleEvents });
     render(<EventsPage />);
     await screen.findByText("web-app");
+    const hidden = vi.spyOn(document, "hidden", "get");
     const callsBefore = getEvents.mock.calls.length;
-    const hidden = vi.spyOn(document, "hidden", "get").mockReturnValue(true);
 
-    document.dispatchEvent(new Event("visibilitychange"));
+    try {
+      hidden.mockReturnValue(false);
+      document.dispatchEvent(new Event("visibilitychange"));
+      await waitFor(() =>
+        expect(getEvents).toHaveBeenCalledTimes(callsBefore + 1),
+      );
 
-    expect(getEvents).toHaveBeenCalledTimes(callsBefore);
-    hidden.mockRestore();
+      hidden.mockReturnValue(true);
+      document.dispatchEvent(new Event("visibilitychange"));
+      await act(async () => {});
+      expect(getEvents).toHaveBeenCalledTimes(callsBefore + 1);
+    } finally {
+      hidden.mockRestore();
+    }
   });
 });

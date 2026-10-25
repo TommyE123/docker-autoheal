@@ -617,7 +617,7 @@ describe("ContainersPage", () => {
       );
     });
 
-    it("shows N/A when the container has no exit code", async () => {
+    it("shows N/A when the exit code is 0", async () => {
       const user = userEvent.setup();
       getContainers.mockResolvedValue({ data: containers });
       getContainerDetails.mockResolvedValue({
