@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
@@ -109,6 +109,7 @@ describe("App error, toast and refresh handling", () => {
         expect.any(Error),
       ),
     );
+    await act(async () => {});
     expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
   });
 
@@ -189,6 +190,8 @@ describe("App error, toast and refresh handling", () => {
       value: false,
     });
     document.dispatchEvent(new Event("visibilitychange"));
-    expect(getSystemStatus).toHaveBeenCalledTimes(callsBefore + 1);
+    await waitFor(() =>
+      expect(getSystemStatus).toHaveBeenCalledTimes(callsBefore + 1),
+    );
   });
 });
