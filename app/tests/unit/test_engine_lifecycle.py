@@ -900,6 +900,40 @@ class TestMonitorLoop:
 
         assert engine._running is False
 
+    async def test_stop_cancels_tasks_that_are_still_pending(self, engine):
+        async def forever():
+            await asyncio.Event().wait()
+
+        engine._running = True
+        engine._task = asyncio.create_task(forever())
+        engine._event_task = asyncio.create_task(forever())
+        await asyncio.sleep(0)
+
+        await engine.stop()
+
+        assert engine._task.cancelled()
+        assert engine._event_task.cancelled()
+
+    async def test_stop_without_background_tasks(self, engine, caplog):
+        engine._running = True
+        engine._task = None
+        engine._event_task = None
+
+        with caplog.at_level("INFO"):
+            await engine.stop()
+
+        assert engine._running is False
+        assert "Monitoring engine stopped" in caplog.text
+
+    async def test_cancelled_monitor_loop_exits_cleanly(self, engine, monkeypatch):
+        async def cancelled_check():
+            raise asyncio.CancelledError
+
+        monkeypatch.setattr(engine, "_check_containers", cancelled_check)
+        engine._running = True
+
+        await engine._monitor_loop()
+
 
 @pytest.mark.asyncio
 class TestEventListenerLoop:
@@ -1056,6 +1090,90 @@ class TestEventListenerLoop:
         await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
 
         assert attempts == [1]
+
+    async def test_thread_stops_reading_events_once_shutdown_is_requested(
+        self, engine, docker_client, monkeypatch
+    ):
+        import threading
+
+        stopped = threading.Event()
+        reached_after_shutdown = []
+
+        def event_stream():
+            yield start_event("a" * 64, "web")
+            stopped.wait(timeout=5)
+            yield start_event("b" * 64, "late")
+            reached_after_shutdown.append(1)
+
+        docker_client.events = event_stream()
+
+        async def fake_process(received):
+            engine._running = False
+            stopped.set()
+
+        monkeypatch.setattr(engine, "_process_container_start_event", fake_process)
+        engine._running = True
+
+        await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
+        [thread] = [t for t in threading.enumerate() if t.name == "docker-events"]
+        thread.join(timeout=5)
+
+        assert not thread.is_alive()
+        assert reached_after_shutdown == []
+
+    async def test_idle_queue_yields_briefly_before_polling_again(
+        self, engine, docker_client, monkeypatch, recorded_sleeps
+    ):
+        import queue
+        import threading
+
+        release = threading.Event()
+
+        def event_stream():
+            release.wait(timeout=5)
+            return iter(())
+
+        class EmptyQueue(queue.Queue):
+            def get(self, block=True, timeout=None):
+                raise queue.Empty
+
+        async def stop_after_idle_sleep(delay, *args, **kwargs):
+            recorded_sleeps.append(delay)
+            engine._running = False
+
+        docker_client.events = event_stream
+        monkeypatch.setattr(queue, "Queue", EmptyQueue)
+        monkeypatch.setattr(asyncio, "sleep", stop_after_idle_sleep)
+        engine._running = True
+
+        try:
+            await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
+        finally:
+            release.set()
+
+        assert recorded_sleeps == [0.1]
+
+    async def test_cancelling_the_listener_ends_the_loop(self, engine, docker_client, monkeypatch):
+        import threading
+
+        release = threading.Event()
+
+        def event_stream():
+            yield start_event("a" * 64, "web")
+            release.wait(timeout=5)
+
+        async def cancelled_process(received):
+            raise asyncio.CancelledError
+
+        docker_client.events = event_stream()
+        monkeypatch.setattr(engine, "_process_container_start_event", cancelled_process)
+        engine._running = True
+
+        try:
+            await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
+        finally:
+            engine._running = False
+            release.set()
 
 
 DEV_LABEL = "autoheal.dev"
