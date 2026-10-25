@@ -63,12 +63,17 @@ notification. See [Notifications](notifications.md).
 
 ## REST API
 
-Everything the UI does is backed by a REST API under `/api`. Interactive, always-current
-documentation (Swagger UI) is available at:
+Everything the UI does is backed by a REST API under `/api`. For developers, interactive,
+always-current documentation is available at:
 
 ```text
-http://localhost:3131/docs
+http://localhost:3131/api/swagger   # Swagger UI
+http://localhost:3131/api/redoc     # ReDoc
+http://localhost:3131/api/openapi.json
 ```
+
+The documentation used to live at `/docs`, `/redoc` and `/openapi.json`. Those paths no
+longer exist and do not redirect — update any bookmarks or scripts.
 
 A few endpoints you're likely to use directly:
 

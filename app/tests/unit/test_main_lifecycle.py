@@ -634,7 +634,7 @@ class TestUiUrl:
         log = await self._start_and_capture_log(self._config(), caplog)
 
         assert "Web UI available at http://192.0.2.10:3132" in log
-        assert "API documentation available at http://192.0.2.10:3132/docs" in log
+        assert "API documentation available at http://192.0.2.10:3132/api/swagger" in log
         assert "0.0.0.0" not in log
 
     def test_public_port_is_the_trimmed_value_or_none(self, monkeypatch):
@@ -658,7 +658,10 @@ class TestUiUrl:
         log = await self._start_and_capture_log(self._config(), caplog)
 
         assert "Web UI published on host port 3132 (container port 3131)" in log
-        assert "API documentation published on host port 3132 at /docs (container port 3131)" in log
+        assert (
+            "API documentation published on host port 3132 at /api/swagger (container port 3131)"
+            in log
+        )
         assert "0.0.0.0" not in log
         assert "http://" not in log
         assert "listening on" not in log
@@ -673,7 +676,7 @@ class TestUiUrl:
         log = await self._start_and_capture_log(self._config(), caplog)
 
         assert "Web UI listening on 0.0.0.0:3131" in log
-        assert "API documentation listening on 0.0.0.0:3131/docs" in log
+        assert "API documentation listening on 0.0.0.0:3131/api/swagger" in log
         assert "http://0.0.0.0" not in log
         assert "available at" not in log
 

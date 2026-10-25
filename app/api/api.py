@@ -19,11 +19,14 @@ from app.api.state import init_api  # noqa: F401  (re-exported for app/main.py)
 
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app
+# Initialize FastAPI app. The API documentation lives under /api/, with the rest of the API.
 app = FastAPI(
     title="Docker Auto-Heal Service",
     description="Automated container monitoring and healing service",
     version="2.4.0",  # x-release-please-version
+    docs_url="/api/swagger",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
 )
 
 # No CORS middleware: the bundled UI is served by this same app (and the Vite

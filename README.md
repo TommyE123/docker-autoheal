@@ -117,7 +117,8 @@ The dashboard at `http://<host>:3131` shows every container's status, lets you t
 auto-healing per container, view the event log, edit configuration, and manage custom
 health checks and notifications — see [Usage](docs/user/usage.md).
 
-Interactive API documentation (Swagger UI) is available at `http://<host>:3131/docs`.
+For developers, interactive API documentation is available at `http://<host>:3131/api/swagger`
+(Swagger UI), `/api/redoc` (ReDoc) and `/api/openapi.json` (the schema).
 
 ## Metrics
 

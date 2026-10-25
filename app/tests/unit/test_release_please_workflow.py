@@ -127,7 +127,7 @@ def test_api_version_is_bumped_by_release_please_and_matches_the_manifest():
 
     # Release Please only rewrites a file listed in extra-files, and only on
     # lines carrying the x-release-please-version annotation. Both halves are
-    # needed, or the version shown in /docs and /openapi.json silently goes
+    # needed, or the version shown in /api/swagger and /api/openapi.json silently goes
     # stale again at the next release.
     assert "app/api/api.py" in config["packages"]["."]["extra-files"]
 

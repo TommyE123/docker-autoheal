@@ -178,7 +178,7 @@ class AutoHealService:
             public_port = get_public_port()
             if ui_url:
                 logger.info("Web UI available at %s", ui_url)
-                logger.info("API documentation available at %s/docs", ui_url)
+                logger.info("API documentation available at %s/api/swagger", ui_url)
             elif public_port:
                 container_port = config.ui.listen_port
                 logger.info(
@@ -187,14 +187,14 @@ class AutoHealService:
                     container_port,
                 )
                 logger.info(
-                    "API documentation published on host port %s at /docs (container port %s)",
+                    "API documentation published on host port %s at /api/swagger (container port %s)",
                     public_port,
                     container_port,
                 )
             else:
                 listen = f"{config.ui.listen_address}:{config.ui.listen_port}"
                 logger.info("Web UI listening on %s", listen)
-                logger.info("API documentation listening on %s/docs", listen)
+                logger.info("API documentation listening on %s/api/swagger", listen)
 
         except (Exception, asyncio.CancelledError) as e:
             # CancelledError is a BaseException; clean up on cancellation too, then re-raise.

@@ -118,8 +118,8 @@ curl http://localhost:9090/metrics
 # Service health
 curl http://localhost:3131/health
 
-# Interactive API docs (Swagger UI)
-http://localhost:3131/docs
+# Interactive API docs for developers (Swagger UI; ReDoc at /api/redoc)
+http://localhost:3131/api/swagger
 ```
 
 ```bash

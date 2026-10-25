@@ -53,11 +53,6 @@ function Navigation({ systemStatus }) {
               <i className="bi bi-gear me-1"></i>
               Configuration
             </Nav.Link>
-
-            <Nav.Link href="/docs" target="_blank">
-              <i className="bi bi-book me-1"></i>
-              API Docs
-            </Nav.Link>
           </Nav>
 
           <Nav>
