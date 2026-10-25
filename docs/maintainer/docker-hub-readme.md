@@ -158,7 +158,8 @@ Recommended for production:
 
 - Mount the socket read-only (`:ro`, as shown above)
 - Set `AUTOHEAL_API_KEY_FILE` (or `AUTOHEAL_API_KEY`) to require an `X-API-Key` header on
-  every `/api/` path (the UI shell, static assets and `/health` stay public), and put the
+  every `/api/` path except the API documentation pages (`/api/swagger`, `/api/redoc` and
+  `/api/openapi.json`); the UI shell, static assets and `/health` also stay public. Put the
   service behind a reverse proxy with TLS if exposing it beyond a trusted network — the key
   is otherwise sent in clear text
 - Restrict access to the Prometheus metrics port similarly

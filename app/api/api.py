@@ -12,7 +12,7 @@ modules). This module owns app construction and wiring each router in.
 
 import logging
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -41,24 +41,29 @@ async def openapi_schema() -> dict:
     return app.openapi()
 
 
+def _schema_url(request: Request) -> str:
+    """Schema URL as the browser reaches it, behind a prefix-adding reverse proxy too."""
+    return request.scope.get("root_path", "").rstrip("/") + OPENAPI_URL
+
+
 @app.get(SWAGGER_URL, include_in_schema=False, response_class=HTMLResponse)
-async def swagger_ui() -> HTMLResponse:
+async def swagger_ui(request: Request) -> HTMLResponse:
     """
     Swagger UI. Without an API key it is a read-only reference: Try it out is switched off
     (an empty supportedSubmitMethods), so it only offers to send calls when a key can
     protect them, entered through Authorize.
     """
     return get_swagger_ui_html(
-        openapi_url=OPENAPI_URL,
+        openapi_url=_schema_url(request),
         title=f"{app.title} - Swagger UI",
         swagger_ui_parameters=None if api_key_enabled() else {"supportedSubmitMethods": []},
     )
 
 
 @app.get(REDOC_URL, include_in_schema=False, response_class=HTMLResponse)
-async def redoc_ui() -> HTMLResponse:
+async def redoc_ui(request: Request) -> HTMLResponse:
     """ReDoc: a read-only reference page, so it never sends calls."""
-    return get_redoc_html(openapi_url=OPENAPI_URL, title=f"{app.title} - ReDoc")
+    return get_redoc_html(openapi_url=_schema_url(request), title=f"{app.title} - ReDoc")
 
 
 # No CORS middleware: the bundled UI is served by this same app (and the Vite

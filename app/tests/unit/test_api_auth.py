@@ -11,9 +11,10 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from starlette.requests import Request
 
 from app.api import auth
-from app.api.api import app
+from app.api.api import _schema_url, app
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
@@ -161,6 +162,30 @@ class TestAuthEnabled:
         status, _, _ = await _request(f"/autoheal{path}", root_path="/autoheal")
 
         assert status == 200
+
+    @pytest.mark.parametrize("page", ["/api/swagger", "/api/redoc"])
+    async def test_docs_fetch_the_schema_through_the_proxy_prefix(self, page):
+        # Behind a prefix-adding reverse proxy the browser must request the schema
+        # under that prefix, not at the site root.
+        _, body, _ = await _request(f"/autoheal{page}", root_path="/autoheal")
+
+        assert b"/autoheal/api/openapi.json" in body
+
+    @pytest.mark.parametrize(
+        ("root_path", "expected"),
+        [("", "/api/openapi.json"), ("/", "/api/openapi.json"), ("/a/", "/a/api/openapi.json")],
+    )
+    def test_schema_url_has_no_doubled_slash(self, root_path, expected):
+        assert (
+            _schema_url(Request({"type": "http", "root_path": root_path, "headers": []}))
+            == expected
+        )
+
+    async def test_docs_fetch_the_schema_from_the_root_without_a_prefix(self):
+        _, body, _ = await _request("/api/swagger")
+
+        assert b"/api/openapi.json" in body
+        assert b"/autoheal" not in body
 
     async def test_swagger_offers_try_it_out_when_a_key_is_set(self):
         _, body, _ = await _request("/api/swagger")
