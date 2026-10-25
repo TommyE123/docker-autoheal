@@ -243,6 +243,22 @@ describe("ConfigPage", () => {
       ).toBeInTheDocument();
       expect(screen.queryByText("Monitor Settings")).not.toBeInTheDocument();
     });
+
+    it.each(["monitor", "restart", "observability"])(
+      "shows a failure message when the configuration has no %s section",
+      async (missingSection) => {
+        const partialConfig = { ...config };
+        delete partialConfig[missingSection];
+        getConfig.mockResolvedValue({ data: partialConfig });
+
+        render(<ConfigPage />);
+
+        expect(
+          await screen.findByText(/failed to load configuration/i),
+        ).toBeInTheDocument();
+        expect(screen.queryByText("Monitor Settings")).not.toBeInTheDocument();
+      },
+    );
   });
 
   describe("editing settings before saving", () => {
