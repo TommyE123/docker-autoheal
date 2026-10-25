@@ -24,9 +24,9 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write # Creates the tag and GitHub Release
-      issues: write # Labels the Release PR
-      pull-requests: write # Opens and updates the Release PR
+      contents: write # Not used by the tag/release step: the action authenticates with the RELEASE_PLEASE_TOKEN PAT, not GITHUB_TOKEN; kept so the job's permissions are unchanged
+      issues: write # Not used by the labelling step: the action authenticates with the RELEASE_PLEASE_TOKEN PAT, not GITHUB_TOKEN; kept so the job's permissions are unchanged
+      pull-requests: write # Not used by the Release PR step: the action authenticates with the RELEASE_PLEASE_TOKEN PAT, not GITHUB_TOKEN; kept so the job's permissions are unchanged
 
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
