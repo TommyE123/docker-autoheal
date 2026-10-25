@@ -1107,6 +1107,16 @@ class TestEventListenerLoop:
 
         docker_client.events = event_stream()
 
+        threads = []
+        real_thread = threading.Thread
+
+        def capture_thread(*args, **kwargs):
+            thread = real_thread(*args, **kwargs)
+            threads.append(thread)
+            return thread
+
+        monkeypatch.setattr(threading, "Thread", capture_thread)
+
         async def fake_process(received):
             engine._running = False
             stopped.set()
@@ -1115,7 +1125,7 @@ class TestEventListenerLoop:
         engine._running = True
 
         await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
-        [thread] = [t for t in threading.enumerate() if t.name == "docker-events"]
+        [thread] = threads
         thread.join(timeout=5)
 
         assert not thread.is_alive()
