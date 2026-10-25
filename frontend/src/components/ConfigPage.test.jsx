@@ -297,6 +297,8 @@ describe("ConfigPage", () => {
         }),
       ],
       ["a non-object section", { ...config, monitor: "oops" }],
+      ["an array section", { ...config, restart: [] }],
+      ["a null response body", null],
     ])("shows a failure message for %s", async (_label, data) => {
       getConfig.mockResolvedValue({ data });
 
@@ -307,17 +309,35 @@ describe("ConfigPage", () => {
       ).toBeInTheDocument();
     });
 
-    it("still loads when backoff max_seconds is null", async () => {
+    it.each([null, 300])(
+      "still loads when backoff max_seconds is %j",
+      async (maxSeconds) => {
+        getConfig.mockResolvedValue({
+          data: withValue("restart", "backoff", {
+            ...config.restart.backoff,
+            max_seconds: maxSeconds,
+          }),
+        });
+
+        render(<ConfigPage />);
+
+        expect(await screen.findByText("Monitor Settings")).toBeInTheDocument();
+      },
+    );
+
+    it("shows a failure message when backoff max_seconds is not a number", async () => {
       getConfig.mockResolvedValue({
         data: withValue("restart", "backoff", {
           ...config.restart.backoff,
-          max_seconds: null,
+          max_seconds: "300",
         }),
       });
 
       render(<ConfigPage />);
 
-      expect(await screen.findByText("Monitor Settings")).toBeInTheDocument();
+      expect(
+        await screen.findByText(/failed to load configuration/i),
+      ).toBeInTheDocument();
     });
   });
 
