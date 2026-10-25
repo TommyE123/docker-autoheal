@@ -20,7 +20,7 @@ jobs:
   changes:
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: read # Needed by badge-only-check.yml to list the pull request's changed files
     uses: ./.github/workflows/badge-only-check.yml
 
   megalinter:
@@ -34,9 +34,9 @@ jobs:
     # own report artifact, never to commit, push, or open a PR.
     permissions:
       contents: read
-      issues: write
-      pull-requests: write
-      statuses: write
+      issues: write # MegaLinter posts its report comment
+      pull-requests: write # MegaLinter posts its report comment
+      statuses: write # Publishes the MegaLinter commit status
 
     steps:
       # Free runner disk space for MegaLinter. Security scanners such as Trivy
