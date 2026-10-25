@@ -30,6 +30,15 @@ describe("ApiKeyModal", () => {
     expect(screen.getByRole("button", { name: "Save key" })).toBeDisabled();
   });
 
+  it("does not submit a whitespace-only key", async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = setup();
+
+    await user.type(screen.getByLabelText("API key"), "   {Enter}");
+
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it("explains a rejected key", () => {
     setup({ rejected: true });
 

@@ -187,6 +187,22 @@ describe("API key handling", () => {
     off();
   });
 
+  it("keeps a newer handler when an older one unsubscribes late", async () => {
+    const first = vi.fn();
+    const second = vi.fn();
+    const offFirst = api.onUnauthorized(first);
+    const offSecond = api.onUnauthorized(second);
+
+    offFirst();
+    await expect(
+      responseError({ response: { status: 401 } }),
+    ).rejects.toBeDefined();
+
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledTimes(1);
+    offSecond();
+  });
+
   it("reports whether the key was persisted", () => {
     expect(api.setApiKey("abc")).toBe(true);
     expect(sessionStorage.getItem("autoheal_api_key")).toBe("abc");
@@ -282,6 +298,18 @@ describe("API key handling", () => {
       const fresh = await import("./api");
 
       expect(fresh.getApiKey()).toBe("persisted");
+    });
+
+    it("has no key when storage cannot be read on load", async () => {
+      vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+        throw new Error("blocked");
+      });
+      vi.resetModules();
+
+      const fresh = await import("./api");
+
+      expect(fresh.getApiKey()).toBeNull();
+      vi.restoreAllMocks();
     });
 
     it("has no key when nothing was persisted", async () => {

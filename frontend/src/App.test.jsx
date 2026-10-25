@@ -118,6 +118,18 @@ describe("App", () => {
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
 
+    it("keeps the open prompt as it was when another 401 arrives", async () => {
+      const on401 = await renderApp();
+      act(() => on401());
+      await screen.findByRole("dialog", { name: "API key required" });
+
+      getApiKey.mockReturnValue("stale");
+      act(() => on401());
+
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      getApiKey.mockReturnValue(null);
+    });
+
     it("says the key was rejected when one was already stored", async () => {
       getApiKey.mockReturnValue("stale");
       const on401 = await renderApp();
