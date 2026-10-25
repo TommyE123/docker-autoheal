@@ -15,7 +15,7 @@ import uvicorn
 from prometheus_client import Counter, Gauge, start_http_server
 
 from app.api.api import app, init_api
-from app.api.auth import ApiKeyConfigError, api_key_enabled, configure_api_auth
+from app.api.auth import ApiKeyConfigError, configure_api_auth
 from app.config.config_manager import AutoHealConfig, config_manager
 from app.docker_client.docker_client_wrapper import DockerClientWrapper
 from app.monitor.monitoring_engine import MonitoringEngine
@@ -290,24 +290,18 @@ def get_ui_url(config: AutoHealConfig) -> str | None:
 def log_api_docs_location(
     config: AutoHealConfig, ui_url: str | None, public_port: str | None
 ) -> None:
-    """
-    Log where the API documentation is, but only when it exists.
-
-    The docs are a developer tool and are only served when an API key is configured.
-    """
-    if not api_key_enabled():
-        return
+    """Log where the API documentation (Swagger UI) is, matching how the Web UI is reported."""
     if ui_url:
-        logger.info("API documentation available at %s/api/docs", ui_url)
+        logger.info("API documentation available at %s/api/swagger", ui_url)
     elif public_port:
         logger.info(
-            "API documentation published on host port %s at /api/docs (container port %s)",
+            "API documentation published on host port %s at /api/swagger (container port %s)",
             public_port,
             config.ui.listen_port,
         )
     else:
         logger.info(
-            "API documentation listening on %s:%s/api/docs",
+            "API documentation listening on %s:%s/api/swagger",
             config.ui.listen_address,
             config.ui.listen_port,
         )

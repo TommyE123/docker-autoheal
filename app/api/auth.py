@@ -5,11 +5,11 @@ Authentication is opt-in. With neither ``AUTOHEAL_API_KEY`` nor
 ``AUTOHEAL_API_KEY_FILE`` set the API stays unauthenticated, exactly as before.
 With a key configured, every ``/api`` path requires a matching ``X-API-Key`` header,
 except the three API documentation paths (Swagger UI, ReDoc and the OpenAPI schema).
-Those only exist when a key is configured (they are a developer tool, so without a key
-they return 404), and they are not key-gated because a browser cannot send a custom
-header when you open a page: Swagger UI's Authorize button takes the key, and the calls
-made from it are then protected like any other. ``/health``, the UI shell and its static
-assets stay public so the UI can load and prompt for a key.
+Those are not key-gated because a browser cannot send a custom header when you open a
+page. They are a read-only reference unless a key is configured: Swagger UI only offers
+"Try it out" then, its Authorize button takes the key, and the calls made from it are
+protected like any other. ``/health``, the UI shell and its static assets stay public so
+the UI can load and prompt for a key.
 
 A configuration that names a key but cannot supply one (unreadable or empty file,
 empty variable) raises ``ApiKeyConfigError`` rather than silently running
@@ -35,10 +35,10 @@ API_KEY_FILE_ENV = "AUTOHEAL_API_KEY_FILE"
 API_KEY_HEADER = "X-API-Key"
 PROTECTED_PATH = "/api"
 
-DOCS_URL = "/api/docs"
+SWAGGER_URL = "/api/swagger"
 REDOC_URL = "/api/redoc"
 OPENAPI_URL = "/api/openapi.json"
-DOCS_PATHS = frozenset({DOCS_URL, REDOC_URL, OPENAPI_URL})
+DOCS_PATHS = frozenset({SWAGGER_URL, REDOC_URL, OPENAPI_URL})
 
 _api_key_header = APIKeyHeader(name=API_KEY_HEADER, auto_error=False)
 
@@ -117,7 +117,7 @@ def _route_path(scope: Mapping[str, Any]) -> str:
 
 
 def api_key_enabled() -> bool:
-    """True when an API key is configured, which is also when the API docs are served."""
+    """True when an API key is configured, which is also when Swagger UI offers Try it out."""
     return _state.key is not None
 
 
@@ -126,7 +126,7 @@ def _is_protected(path: str) -> bool:
     ``/api`` itself and everything under it except the docs pages.
 
     Look-alikes such as ``/apix`` are not under ``/api``. The docs pages are left open so a
-    browser can load them; whether they exist at all is decided by the docs routes.
+    browser can load them; the calls made from them are protected like any other.
     """
     if path in DOCS_PATHS:
         return False

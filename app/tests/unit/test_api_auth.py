@@ -21,8 +21,10 @@ if TYPE_CHECKING:
 KEY = "test-key-not-a-real-secret"
 PROTECTED = ["/api/maintenance/status", "/api/status", "/api/events"]
 PROTECTED_WITH_ROOT = [*PROTECTED, "/api", "/api/"]
-# The docs are open (a browser cannot send the key header) but only exist when a key is set.
-DOCS = ["/api/docs", "/api/redoc", "/api/openapi.json"]
+# The docs are open (a browser cannot send the key header when you open a page).
+DOCS = ["/api/swagger", "/api/redoc", "/api/openapi.json"]
+# Swagger UI's setting that turns Try it out off for every method.
+TRY_IT_OUT_OFF = b'"supportedSubmitMethods": []'
 
 
 async def _request(
@@ -88,11 +90,16 @@ class TestAuthDisabled:
         assert status == 200
 
     @pytest.mark.parametrize("path", DOCS)
-    async def test_docs_do_not_exist_without_a_key(self, path):
-        status, body, _ = await _request(path)
+    async def test_docs_are_served_without_a_key(self, path):
+        status, _, _ = await _request(path)
 
-        assert status == 404
-        assert b"swagger" not in body.lower()
+        assert status == 200
+
+    async def test_swagger_is_a_read_only_reference_without_a_key(self):
+        # No key means nothing protects the calls, so Try it out is switched off.
+        _, body, _ = await _request("/api/swagger")
+
+        assert TRY_IT_OUT_OFF in body
 
     async def test_health_is_open(self):
         status, _, _ = await _request("/health")
@@ -155,8 +162,13 @@ class TestAuthEnabled:
 
         assert status == 200
 
+    async def test_swagger_offers_try_it_out_when_a_key_is_set(self):
+        _, body, _ = await _request("/api/swagger")
+
+        assert TRY_IT_OUT_OFF not in body
+
     async def test_a_trailing_slash_docs_path_is_not_exempt(self):
-        status, _, _ = await _request("/api/docs/")
+        status, _, _ = await _request("/api/swagger/")
 
         assert status == 401
 
@@ -329,10 +341,10 @@ class TestRoutePath:
             ("/api", True),
             ("/api/", True),
             ("/api/status", True),
-            ("/api/docs", False),
+            ("/api/swagger", False),
             ("/api/redoc", False),
             ("/api/openapi.json", False),
-            ("/api/docs/", True),
+            ("/api/swagger/", True),
             ("/apix", False),
             ("/apiary/status", False),
             ("/", False),

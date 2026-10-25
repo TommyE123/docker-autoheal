@@ -221,9 +221,7 @@ class TestRoutingThroughTheAsgiApp:
         assert status == 404
         assert b"<html" not in body.lower()
 
-    async def test_docs_paths_are_not_swallowed_by_the_catch_all(self, monkeypatch):
-        monkeypatch.setattr(auth._state, "key", b"docs-need-a-key")
-
+    async def test_docs_paths_are_not_swallowed_by_the_catch_all(self):
         status, body, headers = await _request("GET", "/api/openapi.json")
 
         assert status == 200
@@ -235,21 +233,15 @@ class TestRoutingThroughTheAsgiApp:
 
 @pytest.mark.asyncio
 class TestDocsUrls:
-    """The API docs are a developer tool: served under /api only when an API key is set."""
+    """Swagger UI, ReDoc and the schema are served under /api, with or without an API key."""
 
-    @pytest.fixture
-    def docs_enabled(self, monkeypatch):
-        monkeypatch.setattr(auth._state, "key", b"docs-need-a-key")
-
-    @pytest.mark.usefixtures("docs_enabled")
     async def test_swagger_ui_is_served_under_api(self):
-        status, body, headers = await _request("GET", "/api/docs")
+        status, body, headers = await _request("GET", "/api/swagger")
 
         assert status == 200
         assert headers["content-type"].startswith("text/html")
         assert b"/api/openapi.json" in body
 
-    @pytest.mark.usefixtures("docs_enabled")
     async def test_redoc_is_served_under_api(self):
         status, body, headers = await _request("GET", "/api/redoc")
 
@@ -257,14 +249,16 @@ class TestDocsUrls:
         assert headers["content-type"].startswith("text/html")
         assert b"/api/openapi.json" in body
 
-    @pytest.mark.parametrize("path", ["/api/docs", "/api/redoc", "/api/openapi.json"])
-    async def test_docs_are_404_without_an_api_key(self, path, monkeypatch):
+    async def test_swagger_try_it_out_needs_an_api_key(self, monkeypatch):
+        off = b'"supportedSubmitMethods": []'
+
         monkeypatch.setattr(auth._state, "key", None)
+        _, without_key, _ = await _request("GET", "/api/swagger")
+        monkeypatch.setattr(auth._state, "key", b"try-it-out-key")
+        _, with_key, _ = await _request("GET", "/api/swagger")
 
-        status, body, _ = await _request("GET", path)
-
-        assert status == 404
-        assert b"swagger" not in body.lower()
+        assert off in without_key
+        assert off not in with_key
 
     @pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json"])
     async def test_legacy_docs_paths_are_gone(self, path):

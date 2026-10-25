@@ -16,10 +16,10 @@ no bearing on how you run or upgrade Docker Auto-Heal today.
 ## API documentation URLs and optional API key
 
 The interactive API documentation moved from `/docs`, `/redoc` and `/openapi.json` to
-`/api/docs`, `/api/redoc` and `/api/openapi.json`. The old paths are removed without a
+`/api/swagger`, `/api/redoc` and `/api/openapi.json`. The old paths are removed without a
 redirect, so update bookmarks, scripts and any reverse-proxy rules that referenced them. The
-new pages are a developer tool: they only exist when an API key is set (otherwise they return
-`404`), and the web UI menu no longer links to them.
+pages are a developer tool: the web UI menu no longer links to them, and Swagger's **Try it
+out** is switched off until an API key is set.
 
 API-key authentication was added as an opt-in feature. Nothing changes for existing
 installations unless you set `AUTOHEAL_API_KEY` or `AUTOHEAL_API_KEY_FILE`; see

@@ -119,8 +119,8 @@ curl http://localhost:9090/metrics
 curl http://localhost:3131/health
 
 # Interactive API docs for developers (Swagger UI; ReDoc at /api/redoc).
-# Only available when AUTOHEAL_API_KEY or AUTOHEAL_API_KEY_FILE is set.
-http://localhost:3131/api/docs
+# Swagger's "Try it out" needs AUTOHEAL_API_KEY or AUTOHEAL_API_KEY_FILE to be set.
+http://localhost:3131/api/swagger
 ```
 
 ```bash

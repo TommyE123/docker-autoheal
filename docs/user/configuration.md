@@ -82,13 +82,14 @@ browser tab's session storage only (never in the page bundle), and is sent with 
 request. Use the **API Key** item in the navigation bar to replace or clear it. Cancelling
 the prompt stops it re-appearing until you reload or use that item.
 
-**API docs (for developers):** `/api/docs` (Swagger UI), `/api/redoc` (ReDoc) and
-`/api/openapi.json` (the machine-readable schema) exist **only when an API key is set**.
-Without one they return `404`, and the web UI does not link to them. Once a key is set they
-open in a browser without the header, because a browser cannot send a custom header when you
-type an address. In Swagger UI click **Authorize** and paste the key, so **Try it out**
-requests carry it. The pages and the schema list the available endpoints but do not run
-anything: every call still needs the key, and anyone who can reach the port can read the list.
+**API docs (for developers):** `/api/swagger` (Swagger UI), `/api/redoc` (ReDoc) and
+`/api/openapi.json` (the machine-readable schema) are always available and open in a browser
+without the header, because a browser cannot send a custom header when you type an address.
+The web UI does not link to them. Without an API key, Swagger UI is a read-only reference:
+**Try it out** is switched off. Once a key is set, click **Authorize** in Swagger UI and
+paste the key, and **Try it out** sends it with each call. The pages and the schema list the
+available endpoints but do not run anything themselves: every call still needs the key, and
+anyone who can reach the port can read the list.
 
 The key is never logged; the startup log only says whether authentication is enabled.
 
