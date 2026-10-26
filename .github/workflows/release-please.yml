@@ -24,9 +24,9 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write
-      issues: write
-      pull-requests: write
+      contents: write # Not used by the tag/release step: the action authenticates with the RELEASE_PLEASE_TOKEN PAT, not GITHUB_TOKEN; kept so the job's permissions are unchanged
+      issues: write # Not used by the labelling step: the action authenticates with the RELEASE_PLEASE_TOKEN PAT, not GITHUB_TOKEN; kept so the job's permissions are unchanged
+      pull-requests: write # Not used by the Release PR step: the action authenticates with the RELEASE_PLEASE_TOKEN PAT, not GITHUB_TOKEN; kept so the job's permissions are unchanged
 
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
@@ -58,7 +58,7 @@ jobs:
 
     permissions:
       contents: read
-      packages: write
+      packages: write # Pushes the image to GitHub Container Registry
 
     steps:
       # Checkout the exact commit release-please just tagged (the default
@@ -138,7 +138,7 @@ jobs:
 
     permissions:
       contents: read
-      packages: write
+      packages: write # Pushes the image to GitHub Container Registry
 
     steps:
       - name: Checkout code
