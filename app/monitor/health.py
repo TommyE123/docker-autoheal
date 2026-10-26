@@ -28,7 +28,8 @@ class HealthEvaluator:
         """
         Initialize the evaluator
         Args:
-            docker_client: Docker client wrapper instance
+            docker_client: Docker client wrapper instance. The evaluator keeps this reference
+                for its lifetime, so it must be the same client the monitoring engine uses.
             uptime_kuma_monitor: Uptime Kuma monitor, or None when it is not set up
         """
         self.docker_client = docker_client
