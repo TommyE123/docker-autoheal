@@ -14,6 +14,7 @@ from app.config.config_manager import (
     MonitorConfig,
     NotificationService,
     UptimeKumaMapping,
+    config_manager,
 )
 
 
@@ -679,3 +680,17 @@ def _reloaded(monkeypatch, manager):
     """Return a fresh ConfigManager reading ``manager``'s data directory from disk."""
     _redirect_manager_paths(monkeypatch, manager.DATA_DIR)
     return ConfigManager()
+
+
+def test_loaders_return_empty_state_when_their_files_are_missing():
+    """With nothing on disk, events and quarantine are empty and maintenance stays off."""
+    assert not config_manager.EVENTS_FILE.exists()
+    assert not config_manager.QUARANTINE_FILE.exists()
+    assert not config_manager.MAINTENANCE_FILE.exists()
+
+    config_manager._load_maintenance_mode()
+
+    assert config_manager._load_events() == []
+    assert config_manager._load_quarantine() == set()
+    assert config_manager._maintenance_mode is False
+    assert config_manager._maintenance_start_time is None

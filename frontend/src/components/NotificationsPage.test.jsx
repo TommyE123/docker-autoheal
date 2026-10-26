@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -50,6 +50,10 @@ const configWithServices = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("NotificationsPage", () => {
@@ -1253,6 +1257,135 @@ describe("NotificationsPage", () => {
         user_key: "ukey",
         api_token: "atok",
       });
+    });
+  });
+
+  describe("alerts and fallbacks", () => {
+    const toggleOnAndOff = async (user) => {
+      getNotificationsConfig.mockResolvedValue({
+        data: { ...config, enabled: true },
+      });
+      updateNotificationsConfig.mockResolvedValue({});
+      render(<NotificationsPage />);
+      await screen.findByText(/notifications are enabled/i);
+      await user.click(
+        screen.getByRole("checkbox", { name: "Notification System" }),
+      );
+    };
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("reports when notifications are disabled", async () => {
+      const user = userEvent.setup();
+      await toggleOnAndOff(user);
+
+      expect(
+        await screen.findByText("Notifications disabled"),
+      ).toBeInTheDocument();
+      expect(updateNotificationsConfig).toHaveBeenCalledWith({
+        enabled: false,
+      });
+    });
+
+    it("closes the alert when its close button is clicked", async () => {
+      const user = userEvent.setup();
+      await toggleOnAndOff(user);
+      await screen.findByText("Notifications disabled");
+
+      await user.click(screen.getByRole("button", { name: /close alert/i }));
+
+      expect(
+        screen.queryByText("Notifications disabled"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("auto-dismisses the alert after 5 seconds", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      await toggleOnAndOff(user);
+      await screen.findByText("Notifications disabled");
+
+      act(() => {
+        vi.advanceTimersByTime(5001);
+      });
+
+      await waitFor(() =>
+        expect(
+          screen.queryByText("Notifications disabled"),
+        ).not.toBeInTheDocument(),
+      );
+    });
+
+    it("removes an already selected event type from the filters", async () => {
+      const user = userEvent.setup();
+      getNotificationsConfig.mockResolvedValue({
+        data: { ...config, event_filters: ["restart", "quarantine"] },
+      });
+      updateNotificationsConfig.mockResolvedValue({});
+
+      render(<NotificationsPage />);
+      await user.click(await screen.findByText(/container quarantine/i));
+
+      await waitFor(() =>
+        expect(updateNotificationsConfig).toHaveBeenCalledWith({
+          event_filters: ["restart"],
+        }),
+      );
+    });
+
+    it("treats a configuration without event_filters as having none selected", async () => {
+      const user = userEvent.setup();
+      getNotificationsConfig.mockResolvedValue({
+        data: { enabled: true, services: [] },
+      });
+      updateNotificationsConfig.mockResolvedValue({});
+
+      render(<NotificationsPage />);
+      await user.click(await screen.findByText("Container Quarantine"));
+
+      await waitFor(() =>
+        expect(updateNotificationsConfig).toHaveBeenCalledWith({
+          event_filters: ["quarantine"],
+        }),
+      );
+    });
+
+    it("falls back to a generic message when saving a service fails without a detail", async () => {
+      const user = userEvent.setup();
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      getNotificationsConfig.mockResolvedValue({ data: config });
+      addNotificationService.mockRejectedValue(new Error("boom"));
+
+      render(<NotificationsPage />);
+      await screen.findByText(/notifications are disabled/i);
+      await user.click(screen.getByRole("button", { name: /add service/i }));
+      await user.type(screen.getByLabelText("Service Name *"), "New Webhook");
+      await user.type(
+        screen.getByLabelText("Webhook URL *"),
+        "https://example.com/hook",
+      );
+      await user.click(screen.getByRole("button", { name: /^add service$/i }));
+
+      expect(
+        await screen.findByText("Failed to save notification service"),
+      ).toBeInTheDocument();
+    });
+
+    it("falls back to a generic message when testing a saved service fails without a detail", async () => {
+      const user = userEvent.setup();
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      getNotificationsConfig.mockResolvedValue({ data: configWithServices });
+      testNotificationService.mockRejectedValue(new Error("boom"));
+
+      render(<NotificationsPage />);
+      await screen.findByText("My Webhook");
+      await user.click(screen.getByRole("button", { name: "Test My Webhook" }));
+
+      expect(
+        await screen.findByText("Failed to send test notification"),
+      ).toBeInTheDocument();
     });
   });
 });

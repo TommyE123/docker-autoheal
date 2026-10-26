@@ -22,6 +22,53 @@ import ValidationModal from "./config/ValidationModal";
 import DisableUptimeKumaModal from "./config/DisableUptimeKumaModal";
 import DeleteMappingModal from "./config/DeleteMappingModal";
 
+const isObject = (value) =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+// Field types the page reads from each section of the configuration response.
+// Keep in sync with MonitorSettings, RestartPolicySettings,
+// ObservabilitySettings and useConfigValidation.
+const requiredFieldTypes = {
+  monitor: {
+    interval_seconds: "number",
+    label_key: "string",
+    label_value: "string",
+    include_all: "boolean",
+  },
+  restart: {
+    mode: "string",
+    cooldown_seconds: "number",
+    max_restarts: "number",
+    max_restarts_window_seconds: "number",
+    respect_manual_stop: "boolean",
+  },
+  "restart.backoff": {
+    enabled: "boolean",
+    initial_seconds: "number",
+    multiplier: "number",
+  },
+  observability: {
+    log_level: "string",
+    prometheus_enabled: "boolean",
+  },
+};
+
+const hasValidFields = (section, fieldTypes) =>
+  isObject(section) &&
+  Object.entries(fieldTypes).every(
+    ([field, type]) => typeof section[field] === type,
+  );
+
+const isValidConfig = (data) =>
+  isObject(data) &&
+  hasValidFields(data.monitor, requiredFieldTypes.monitor) &&
+  hasValidFields(data.restart, requiredFieldTypes.restart) &&
+  hasValidFields(data.restart.backoff, requiredFieldTypes["restart.backoff"]) &&
+  // max_seconds is optional: absent or null means no cap (see useConfigValidation)
+  (data.restart.backoff.max_seconds == null ||
+    typeof data.restart.backoff.max_seconds === "number") &&
+  hasValidFields(data.observability, requiredFieldTypes.observability);
+
 /**
  * ConfigPage Component
  * Main configuration page that orchestrates all configuration sections
@@ -77,9 +124,8 @@ function ConfigPage() {
   const fetchConfig = useCallback(async () => {
     try {
       const response = await getConfig();
-      const { monitor, restart, observability } = response.data ?? {};
-      if (!monitor || !restart || !observability) {
-        throw new Error("Configuration response is missing required sections");
+      if (!isValidConfig(response.data)) {
+        throw new Error("Configuration response has missing or invalid values");
       }
       setConfig(response.data);
 

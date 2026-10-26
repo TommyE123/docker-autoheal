@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -614,6 +614,71 @@ describe("ContainersPage", () => {
 
       await waitFor(() =>
         expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      );
+    });
+
+    it.each([
+      [0, "0"],
+      [null, "N/A"],
+      [undefined, "N/A"],
+    ])("shows exit code %s as %s", async (exitCode, expected) => {
+      const user = userEvent.setup();
+      getContainers.mockResolvedValue({ data: containers });
+      getContainerDetails.mockResolvedValue({
+        data: { ...details, exit_code: exitCode },
+      });
+
+      render(<ContainersPage />);
+      await user.click(await screen.findByText("web-app"));
+
+      const dialog = await screen.findByRole("dialog", {
+        name: "Container Details",
+      });
+      expect(
+        within(dialog).getByText("Exit Code:").nextSibling,
+      ).toHaveTextContent(expected);
+    });
+  });
+
+  describe("alert dismissal", () => {
+    const restartWebApp = async (user) => {
+      getContainers.mockResolvedValue({ data: containers });
+      restartContainer.mockResolvedValue({});
+      render(<ContainersPage />);
+      await screen.findByText("web-app");
+      await user.click(screen.getByRole("button", { name: "Restart web-app" }));
+      await user.click(screen.getByRole("button", { name: /^confirm$/i }));
+      await screen.findByText(/container "web-app" restarted/i);
+    };
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("closes the alert when its close button is clicked", async () => {
+      const user = userEvent.setup();
+      await restartWebApp(user);
+
+      await user.click(screen.getByRole("button", { name: /close alert/i }));
+
+      expect(
+        screen.queryByText(/container "web-app" restarted/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it("auto-dismisses the alert after 5 seconds", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      await restartWebApp(user);
+
+      act(() => {
+        vi.advanceTimersByTime(5001);
+      });
+
+      await waitFor(() =>
+        expect(
+          screen.queryByText(/container "web-app" restarted/i),
+        ).not.toBeInTheDocument(),
       );
     });
   });

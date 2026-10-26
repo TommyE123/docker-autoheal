@@ -9,10 +9,16 @@ on:
       - synchronize
 
 permissions:
-  pull-requests: read
+  pull-requests: read # Reads the pull request title
+
+# Only the latest title matters, so a newer run cancels the one in progress.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   validate-title:
+    name: validate-title
     runs-on: ubuntu-latest
 
     steps:

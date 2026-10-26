@@ -4,12 +4,10 @@ Monitors containers and performs auto-healing actions
 """
 
 import asyncio
-import fnmatch
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import Any, Protocol
-
-from docker.models.containers import Container
+from http import HTTPStatus
+from typing import TYPE_CHECKING, Any, Protocol
 
 from app.config.config_manager import (
     AutoHealConfig,
@@ -18,8 +16,14 @@ from app.config.config_manager import (
     config_manager,
 )
 from app.docker_client.docker_client_wrapper import recovery_identifier
-from app.monitor.uptime_kuma_monitor import UptimeKumaMonitor
+from app.monitor.health import HealthEvaluator
+from app.monitor.selection import should_monitor
 from app.notifications.notification_manager import notification_manager
+
+if TYPE_CHECKING:
+    from docker.models.containers import Container
+
+    from app.monitor.uptime_kuma_monitor import UptimeKumaMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -101,8 +105,20 @@ class MonitoringEngine:
         # _check_containers checks one container at a time and the update has no await, so
         # no lock is needed. Concurrent checks of one container would need one.
         self._quarantine_streaks: dict[str, tuple[str, int, int]] = {}
-        # Attached by the service after construction; None when Uptime Kuma is not set up.
-        self.uptime_kuma_monitor: UptimeKumaMonitor | None = None
+        self._health_evaluator = HealthEvaluator(docker_client)
+
+    @property
+    def uptime_kuma_monitor(self) -> UptimeKumaMonitor | None:
+        """
+        The Uptime Kuma monitor, or None when Uptime Kuma is not set up.
+
+        Attached by the service after construction. Health evaluation reads it.
+        """
+        return self._health_evaluator.uptime_kuma_monitor
+
+    @uptime_kuma_monitor.setter
+    def uptime_kuma_monitor(self, monitor: UptimeKumaMonitor | None) -> None:
+        self._health_evaluator.uptime_kuma_monitor = monitor
 
     def get_stable_identifier(self, info: dict) -> str | None:
         """
@@ -560,87 +576,8 @@ class MonitoringEngine:
         Returns:
             True if container should be monitored, False otherwise
         """
-        config = config_manager.get_config()
-        container_id = info.get("full_id")
-        short_id = info.get("id")  # Short ID (first 12 chars)
-        container_name = info.get("name")
-        labels = info.get("labels", {})
-
-        # Get stable identifier (handles all edge cases)
-        stable_id = self.get_stable_identifier(info)
-        compose_service = labels.get("com.docker.compose.service")
-
-        # Check explicit exclusion (check stable_id, compose service, name, and IDs)
-        if (
-            stable_id in config.containers.excluded
-            or container_id in config.containers.excluded
-            or short_id in config.containers.excluded
-            or container_name in config.containers.excluded
-            or (compose_service and compose_service in config.containers.excluded)
-        ):
-            return False
-
-        # Check explicit inclusion (check stable_id, compose service, name, and IDs)
-        if (
-            stable_id in config.containers.selected
-            or container_id in config.containers.selected
-            or short_id in config.containers.selected
-            or container_name in config.containers.selected
-            or (compose_service and compose_service in config.containers.selected)
-        ):
-            logger.debug(
-                "Container %s (stable_id: %s) explicitly selected for monitoring",
-                container_name,
-                stable_id,
-            )
-            return True
-
-        # Check include_all flag
-        if config.monitor.include_all:
-            pass  # Continue to filter checks
-        else:
-            # Check label filter
-            label_key = config.monitor.label_key
-            label_value = config.monitor.label_value
-
-            if label_key not in labels or labels[label_key] != label_value:
-                return False
-
-        # Check blacklist names
-        for pattern in config.filters.blacklist_names:
-            if container_name is not None and fnmatch.fnmatch(container_name, pattern):
-                return False
-
-        # Check whitelist names (if specified, must match at least one)
-        if config.filters.whitelist_names:
-            matched = False
-            for pattern in config.filters.whitelist_names:
-                if container_name is not None and fnmatch.fnmatch(container_name, pattern):
-                    matched = True
-                    break
-            if not matched:
-                return False
-
-        # Check blacklist labels
-        for label_filter in config.filters.blacklist_labels:
-            for key, value in label_filter.items():
-                if labels.get(key) == value:
-                    return False
-
-        # Check whitelist labels (if specified, must match at least one)
-        if config.filters.whitelist_labels:
-            matched = False
-            for label_filter in config.filters.whitelist_labels:
-                for key, value in label_filter.items():
-                    if labels.get(key) == value:
-                        matched = True
-                        break
-                if matched:
-                    break
-            if not matched:
-                return False
-
-        return True
+        del container  # Selection depends on ``info`` only; kept for the callers' signature.
+        return should_monitor(config_manager.get_config(), info, self.get_stable_identifier(info))
 
     async def _evaluate_container_health(
         self, container: Container, info: dict
@@ -653,73 +590,9 @@ class MonitoringEngine:
         Returns:
             Tuple of (needs_restart: bool, reason: str)
         """
-        config = config_manager.get_config()
-        restart_mode = config.restart.mode
-        container_id = info.get("full_id")
-
-        # Get stable identifier for all checks
-        stable_id = self.get_stable_identifier(info)
-
-        # Check exit status (for exited/stopped containers)
-        state = info.get("state", {})
-        status = state.get("Status", "").lower()
-
-        if status == "starting":
-            logger.debug(
-                "Container %s is still starting, skipping health evaluation",
-                info.get("name"),
-            )
-            return False, "Container is starting"
-
-        if status in ["exited", "stopped", "dead"]:
-            exit_code = state.get("ExitCode", 0)
-
-            # Check if we should restart based on mode
-            if restart_mode in ["on-failure", "both"]:
-                # If exit code is 0 (clean stop) and we respect manual stops, don't restart
-                if exit_code == 0 and config.restart.respect_manual_stop:
-                    logger.debug(
-                        "Container %s stopped cleanly (exit 0), respecting manual stop",
-                        info.get("name"),
-                    )
-                    return False, "Manual stop (exit 0)"
-
-                # For non-zero exit codes or if we don't respect manual stops, restart
-                if exit_code != 0:
-                    return True, f"Container exited with code {exit_code}"
-                # exit_code = 0 but respect_manual_stop = False
-                return True, "Container stopped (exit 0)"
-
-        # Check health status
-        if restart_mode in ["health", "both"]:
-            # Get stable identifier for health check lookup
-            container_name = info.get("name")
-
-            # Check custom health checks (by stable_id, name, then ID for backwards compatibility)
-            custom_hc = None
-            for key in (stable_id, container_name, container_id):
-                if key is not None:
-                    custom_hc = config_manager.get_custom_health_check(key)
-                    if custom_hc:
-                        break
-            if custom_hc:
-                health_ok = await self._perform_custom_health_check(container, custom_hc)
-                if not health_ok:
-                    return True, f"Custom health check failed ({custom_hc.check_type})"
-
-            # Then check Docker native health
-            health = info.get("health")
-            if health:
-                status = health.get("status")
-                if status == "unhealthy":
-                    return True, "Docker health check reports unhealthy"
-
-        # Check Uptime-Kuma monitor status (if configured and enabled)
-        if self.uptime_kuma_monitor and stable_id is not None:
-            if await self.uptime_kuma_monitor.should_restart_from_uptime_kuma(stable_id):
-                return True, "Uptime-Kuma monitor reports DOWN"
-
-        return False, ""
+        return await self._health_evaluator.evaluate(
+            container, info, self.get_stable_identifier(info)
+        )
 
     async def _perform_custom_health_check(
         self, container: Container, health_check: HealthCheckConfig
@@ -732,53 +605,7 @@ class MonitoringEngine:
         Returns:
             True if healthy, False otherwise
         """
-        check_type = health_check.check_type
-
-        try:
-            if check_type == "http":
-                # HealthCheckConfig does not require these for http checks; a missing
-                # value fails here and is reported as unhealthy by the handler below.
-                endpoint = health_check.http_endpoint
-                expected_status = health_check.http_expected_status
-                if endpoint is None or expected_status is None:
-                    raise ValueError("missing http_endpoint or http_expected_status")
-                return await asyncio.to_thread(
-                    self.docker_client.check_http_health,
-                    container,
-                    endpoint,
-                    expected_status,
-                    health_check.timeout_seconds,
-                )
-            if check_type == "tcp":
-                port = health_check.tcp_port
-                if port is None:
-                    raise ValueError("missing tcp_port")
-                return await asyncio.to_thread(
-                    self.docker_client.check_tcp_health,
-                    container,
-                    port,
-                    health_check.timeout_seconds,
-                )
-            if check_type == "exec":
-                command = health_check.exec_command
-                if command is None:
-                    raise ValueError("missing exec_command")
-                return await asyncio.to_thread(
-                    self.docker_client.check_exec_health,
-                    container,
-                    command,
-                )
-            if check_type == "docker":
-                status = await asyncio.to_thread(
-                    self.docker_client.get_docker_native_health, container
-                )
-                return status == "healthy" if status else True  # Assume healthy if no check
-            logger.warning("Unknown health check type: %s", check_type)
-        except Exception as e:
-            logger.error("Error performing health check: %s", e)
-            return False
-        else:
-            return True
+        return await self._health_evaluator.perform_custom_health_check(container, health_check)
 
     async def _auto_unquarantine_container(
         self,
@@ -859,7 +686,6 @@ class MonitoringEngine:
             )
             return
         container_id, container_name, recovery_id = identifiers
-        labels = info.get("labels", {})
 
         # Use STABLE IDENTIFIER as primary (persists across container recreations)
         # This solves:
@@ -1053,7 +879,7 @@ class MonitoringEngine:
 
             response = await asyncio.to_thread(requests.post, webhook_url, json=payload, timeout=5)
 
-            if response.status_code == 200:
+            if response.status_code == HTTPStatus.OK:
                 logger.info("Alert sent successfully for %s", event.container_name)
             else:
                 logger.warning("Alert webhook returned status %s", response.status_code)

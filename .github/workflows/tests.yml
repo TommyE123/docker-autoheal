@@ -10,18 +10,25 @@ on:
 permissions:
   contents: read
 
+# One run per ref. A new push to a pull request cancels that PR's in-progress run; runs on
+# main and manual runs are never cancelled once running.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # Skips the jobs below for the automated mutation badge PR (badge file only). If this job
   # itself fails, badge-only is empty and they run. See badge-only-check.yml.
   changes:
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: read # Needed by badge-only-check.yml to list the pull request's changed files
     uses: ./.github/workflows/badge-only-check.yml
 
   # Required check. Always runs: a badge-only PR only validates the badge file (a failure fails
   # the job); every other PR, and any PR whose detection failed, runs the full suite.
   unit-tests:
+    name: unit-tests
     needs: changes
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
@@ -87,6 +94,7 @@ jobs:
           retention-days: 7
 
   frontend-tests:
+    name: frontend-tests
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.badge-only != 'true' }}
     runs-on: ubuntu-latest

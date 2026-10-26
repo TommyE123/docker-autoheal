@@ -261,6 +261,86 @@ describe("ConfigPage", () => {
     );
   });
 
+  describe("malformed values inside present sections", () => {
+    const withValue = (section, field, value) => ({
+      ...config,
+      [section]: { ...config[section], [field]: value },
+    });
+
+    it.each([
+      ["monitor", "interval_seconds", "30"],
+      ["restart", "max_restarts", undefined],
+      ["observability", "log_level", 5],
+    ])(
+      "shows a failure message when %s.%s is %j",
+      async (section, field, value) => {
+        getConfig.mockResolvedValue({
+          data: withValue(section, field, value),
+        });
+
+        render(<ConfigPage />);
+
+        expect(
+          await screen.findByText(/failed to load configuration/i),
+        ).toBeInTheDocument();
+        expect(screen.queryByText("Monitor Settings")).not.toBeInTheDocument();
+      },
+    );
+
+    it.each([
+      ["a missing backoff object", withValue("restart", "backoff", undefined)],
+      [
+        "a non-numeric backoff multiplier",
+        withValue("restart", "backoff", {
+          ...config.restart.backoff,
+          multiplier: "2",
+        }),
+      ],
+      ["a non-object section", { ...config, monitor: "oops" }],
+      ["an array section", { ...config, restart: [] }],
+      ["a null response body", null],
+    ])("shows a failure message for %s", async (_label, data) => {
+      getConfig.mockResolvedValue({ data });
+
+      render(<ConfigPage />);
+
+      expect(
+        await screen.findByText(/failed to load configuration/i),
+      ).toBeInTheDocument();
+    });
+
+    it.each([null, 300])(
+      "still loads when backoff max_seconds is %j",
+      async (maxSeconds) => {
+        getConfig.mockResolvedValue({
+          data: withValue("restart", "backoff", {
+            ...config.restart.backoff,
+            max_seconds: maxSeconds,
+          }),
+        });
+
+        render(<ConfigPage />);
+
+        expect(await screen.findByText("Monitor Settings")).toBeInTheDocument();
+      },
+    );
+
+    it("shows a failure message when backoff max_seconds is not a number", async () => {
+      getConfig.mockResolvedValue({
+        data: withValue("restart", "backoff", {
+          ...config.restart.backoff,
+          max_seconds: "300",
+        }),
+      });
+
+      render(<ConfigPage />);
+
+      expect(
+        await screen.findByText(/failed to load configuration/i),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe("editing settings before saving", () => {
     it("saves the edited monitor interval", async () => {
       const user = userEvent.setup();
@@ -815,6 +895,105 @@ describe("ConfigPage", () => {
         await screen.findByText(/failed to delete mapping: server error/i),
       ).toBeInTheDocument();
     });
+  });
+
+  describe("restart policy validation", () => {
+    it("shows a validation modal instead of saving, and closes it again", async () => {
+      const user = userEvent.setup();
+      getConfig.mockResolvedValue({
+        data: {
+          ...config,
+          restart: { ...config.restart, max_restarts_window_seconds: 5 },
+        },
+      });
+
+      render(<ConfigPage />);
+      await screen.findByText("Monitor Settings");
+
+      await user.click(
+        screen.getByRole("button", { name: /save restart policy/i }),
+      );
+
+      expect(
+        await screen.findByText(/invalid restart policy configuration/i),
+      ).toBeInTheDocument();
+      expect(updateRestartConfig).not.toHaveBeenCalled();
+
+      await user.click(
+        screen.getByRole("button", { name: /close and adjust settings/i }),
+      );
+
+      await waitFor(() =>
+        expect(
+          screen.queryByText(/invalid restart policy configuration/i),
+        ).not.toBeInTheDocument(),
+      );
+    });
+  });
+
+  describe("edge cases", () => {
+    it("ignores an import change event that carries no file", async () => {
+      getConfig.mockResolvedValue({ data: config });
+
+      const { container } = render(<ConfigPage />);
+      await screen.findByText(/configuration export\/import/i);
+
+      fireEvent.change(container.querySelector("#importFile"), {
+        target: { files: [] },
+      });
+
+      expect(importConfig).not.toHaveBeenCalled();
+    });
+
+    it("shows the server-reported message when enabling is rejected", async () => {
+      const user = userEvent.setup();
+      getConfig.mockResolvedValue({ data: kumaReadyConfig });
+      api.post.mockImplementation((url) => {
+        if (url === "/uptime-kuma/test-connection") {
+          return Promise.resolve({ data: { success: true, monitor_count: 2 } });
+        }
+        if (url === "/uptime-kuma/enable") {
+          return Promise.resolve({
+            data: { success: false, message: "Kuma refused" },
+          });
+        }
+        return Promise.reject(new Error(`Unexpected POST ${url}`));
+      });
+
+      render(<ConfigPage />);
+      await user.click(
+        await screen.findByRole("button", { name: /test connection/i }),
+      );
+      await user.click(
+        await screen.findByRole("button", { name: /enable integration/i }),
+      );
+
+      expect(await screen.findByText("Kuma refused")).toBeInTheDocument();
+    });
+
+    it.each([
+      [
+        "a full container id",
+        [{ id: "abc123456", name: "web-app" }],
+        "web-app",
+      ],
+      ["an unknown container", [], "abc123"],
+    ])(
+      "names the mapped container in the delete confirmation for %s",
+      async (_label, knownContainers, expectedName) => {
+        const user = userEvent.setup();
+        getConfig.mockResolvedValue({ data: kumaEnabledConfig });
+        mockKumaGets({ monitors, mappings, containers: knownContainers });
+
+        render(<ConfigPage />);
+        await screen.findByText("Active");
+
+        await user.click(screen.getByRole("button", { name: /^delete$/i }));
+        const dialog = await screen.findByRole("dialog");
+
+        expect(within(dialog).getByText(expectedName)).toBeInTheDocument();
+      },
+    );
   });
 });
 

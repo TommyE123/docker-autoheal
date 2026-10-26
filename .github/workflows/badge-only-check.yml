@@ -14,11 +14,12 @@ permissions: {}
 
 jobs:
   detect:
+    name: detect
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: read # Lists the pull request's changed files through the API
     outputs:
       badge-only: ${{ steps.detect.outputs.badge-only }}
     steps:

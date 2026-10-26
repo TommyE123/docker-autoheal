@@ -15,7 +15,9 @@ docker-autoheal/
 │   ├── docker_client/
 │   │   └── docker_client_wrapper.py  # Thin wrapper around the `docker` SDK
 │   ├── monitor/
+│   │   ├── health.py             # Whether a container needs a restart (exit status, health checks)
 │   │   ├── monitoring_engine.py  # Core monitoring loop, restart/backoff/quarantine logic
+│   │   ├── selection.py          # Which containers are monitored (selected/excluded, labels, filters)
 │   │   └── uptime_kuma_monitor.py
 │   ├── notifications/
 │   │   └── notification_manager.py   # Async notification dispatch (Discord/Slack/Telegram/ntfy/Gotify/Pushover/webhook)
@@ -88,6 +90,11 @@ suites (see [Testing](testing.md#legacy-script-triage) for what happened to each
   and reading Docker's native health status.
 - **`app/monitor/monitoring_engine.py`** — the core auto-healing logic described in
   [Architecture](architecture.md).
+- **`app/monitor/health.py`** — `HealthEvaluator`, which decides from a container's exit status,
+  custom health checks, Docker's native health and the Uptime Kuma monitor whether it needs a
+  restart.
+- **`app/monitor/selection.py`** — the pure function that decides, from configuration and
+  container information, whether a container is monitored.
 - **`app/notifications/notification_manager.py`** — async, queue-based notification
   delivery to external services.
 - **`app/uptime_kuma/`** and **`app/monitor/uptime_kuma_monitor.py`** — the optional

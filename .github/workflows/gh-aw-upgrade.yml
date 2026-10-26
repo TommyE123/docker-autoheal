@@ -8,6 +8,11 @@ on: # yamllint disable-line rule:truthy
 
 permissions: {}
 
+# A second dispatch waits instead of racing the first to open the same upgrade PR.
+concurrency:
+  group: gh-aw-upgrade
+  cancel-in-progress: false
+
 jobs:
   upgrade:
     name: Upgrade gh-aw

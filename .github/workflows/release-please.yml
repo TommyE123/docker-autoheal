@@ -23,10 +23,10 @@ jobs:
     name: Release Please
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
+    # No GITHUB_TOKEN permissions: the action authenticates with the
+    # RELEASE_PLEASE_TOKEN PAT (explicit `token:` input below), so the
+    # default token is never used.
+    permissions: {}
 
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
@@ -58,7 +58,7 @@ jobs:
 
     permissions:
       contents: read
-      packages: write
+      packages: write # Pushes the image to GitHub Container Registry
 
     steps:
       # Checkout the exact commit release-please just tagged (the default
@@ -138,7 +138,7 @@ jobs:
 
     permissions:
       contents: read
-      packages: write
+      packages: write # Pushes the image to GitHub Container Registry
 
     steps:
       - name: Checkout code
