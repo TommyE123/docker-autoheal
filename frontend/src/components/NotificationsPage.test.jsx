@@ -52,6 +52,10 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("NotificationsPage", () => {
   it("shows the current enabled/disabled state after loading", async () => {
     getNotificationsConfig.mockResolvedValue({ data: config });
@@ -1271,7 +1275,6 @@ describe("NotificationsPage", () => {
 
     afterEach(() => {
       vi.useRealTimers();
-      vi.restoreAllMocks();
     });
 
     it("reports when notifications are disabled", async () => {

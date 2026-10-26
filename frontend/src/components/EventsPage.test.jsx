@@ -65,6 +65,10 @@ beforeEach(() => {
   getContainers.mockResolvedValue({ data: [] });
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("EventsPage", () => {
   it('shows a "no events" message when there are none', async () => {
     getEvents.mockResolvedValue({ data: [] });
@@ -588,7 +592,6 @@ describe("EventsPage", () => {
 
     afterEach(() => {
       vi.useRealTimers();
-      vi.restoreAllMocks();
     });
 
     it.each([
