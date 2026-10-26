@@ -11,8 +11,10 @@ directory:
 * ``isolated_config_manager`` points the global ``config_manager`` singleton at
   a per-test temporary directory and resets its in-memory state, so every test
   starts from the documented defaults.
-* ``mock_notification_manager`` replaces the global notification manager used
-  by the monitoring engine, so no HTTP requests are ever attempted.
+* ``mock_notification_manager`` replaces ``send_event_notification`` on the global
+  notification manager itself, so every module that imported it (the engine, the
+  API state, the service, and any added later) is covered and no HTTP request is
+  ever attempted.
 * ``recorded_sleeps`` replaces ``asyncio.sleep`` so any sleep is recorded rather
   than actually waited for, keeping tests fast and deterministic.
 """
@@ -41,6 +43,7 @@ from app.docker_client.docker_client_wrapper import (
     recovery_identifier,
 )
 from app.monitor.monitoring_engine import QUARANTINE_STABLE_CHECKS, MonitoringEngine
+from app.notifications.notification_manager import NotificationManager, notification_manager
 
 # ---------------------------------------------------------------------------
 # Fakes
@@ -386,15 +389,21 @@ def docker_client() -> FakeDockerClient:
 
 
 @pytest.fixture(autouse=True)
-def mock_notification_manager(monkeypatch) -> MagicMock:
-    """Replace the notification manager so no outbound requests are made."""
-    fake = MagicMock()
-    fake.send_event_notification = AsyncMock()
-    monkeypatch.setattr(
-        "app.monitor.monitoring_engine.notification_manager",
-        fake,
-    )
-    return fake
+def mock_notification_manager(monkeypatch) -> NotificationManager:
+    """
+    Stop the notification manager sending anything, and return it.
+
+    ``send_event_notification`` is replaced on the shared singleton itself rather than
+    on one module's reference to it, so a module that imports the singleton by name is
+    covered whichever module it lives in. Tests that need a real manager build their
+    own and patch the module names they exercise.
+
+    The replacement goes into the instance ``__dict__``: ``monkeypatch.setattr`` on an
+    instance would put the original bound method back on teardown and leave it shadowing
+    the class, so a later patch of the class method would not reach the singleton.
+    """
+    monkeypatch.setitem(vars(notification_manager), "send_event_notification", AsyncMock())
+    return notification_manager
 
 
 @pytest.fixture(autouse=True)
