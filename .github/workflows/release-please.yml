@@ -23,10 +23,10 @@ jobs:
     name: Release Please
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: write # Not used by the tag/release step: the action authenticates with the RELEASE_PLEASE_TOKEN PAT, not GITHUB_TOKEN; kept so the job's permissions are unchanged
-      issues: write # Not used by the labelling step: the action authenticates with the RELEASE_PLEASE_TOKEN PAT, not GITHUB_TOKEN; kept so the job's permissions are unchanged
-      pull-requests: write # Not used by the Release PR step: the action authenticates with the RELEASE_PLEASE_TOKEN PAT, not GITHUB_TOKEN; kept so the job's permissions are unchanged
+    # No GITHUB_TOKEN permissions: the action authenticates with the
+    # RELEASE_PLEASE_TOKEN PAT (explicit `token:` input below), so the
+    # default token is never used.
+    permissions: {}
 
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
