@@ -261,6 +261,86 @@ describe("ConfigPage", () => {
     );
   });
 
+  describe("malformed values inside present sections", () => {
+    const withValue = (section, field, value) => ({
+      ...config,
+      [section]: { ...config[section], [field]: value },
+    });
+
+    it.each([
+      ["monitor", "interval_seconds", "30"],
+      ["restart", "max_restarts", undefined],
+      ["observability", "log_level", 5],
+    ])(
+      "shows a failure message when %s.%s is %j",
+      async (section, field, value) => {
+        getConfig.mockResolvedValue({
+          data: withValue(section, field, value),
+        });
+
+        render(<ConfigPage />);
+
+        expect(
+          await screen.findByText(/failed to load configuration/i),
+        ).toBeInTheDocument();
+        expect(screen.queryByText("Monitor Settings")).not.toBeInTheDocument();
+      },
+    );
+
+    it.each([
+      ["a missing backoff object", withValue("restart", "backoff", undefined)],
+      [
+        "a non-numeric backoff multiplier",
+        withValue("restart", "backoff", {
+          ...config.restart.backoff,
+          multiplier: "2",
+        }),
+      ],
+      ["a non-object section", { ...config, monitor: "oops" }],
+      ["an array section", { ...config, restart: [] }],
+      ["a null response body", null],
+    ])("shows a failure message for %s", async (_label, data) => {
+      getConfig.mockResolvedValue({ data });
+
+      render(<ConfigPage />);
+
+      expect(
+        await screen.findByText(/failed to load configuration/i),
+      ).toBeInTheDocument();
+    });
+
+    it.each([null, 300])(
+      "still loads when backoff max_seconds is %j",
+      async (maxSeconds) => {
+        getConfig.mockResolvedValue({
+          data: withValue("restart", "backoff", {
+            ...config.restart.backoff,
+            max_seconds: maxSeconds,
+          }),
+        });
+
+        render(<ConfigPage />);
+
+        expect(await screen.findByText("Monitor Settings")).toBeInTheDocument();
+      },
+    );
+
+    it("shows a failure message when backoff max_seconds is not a number", async () => {
+      getConfig.mockResolvedValue({
+        data: withValue("restart", "backoff", {
+          ...config.restart.backoff,
+          max_seconds: "300",
+        }),
+      });
+
+      render(<ConfigPage />);
+
+      expect(
+        await screen.findByText(/failed to load configuration/i),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe("editing settings before saving", () => {
     it("saves the edited monitor interval", async () => {
       const user = userEvent.setup();
