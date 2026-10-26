@@ -16,6 +16,7 @@ from app.config.config_manager import (
     config_manager,
 )
 from app.docker_client.docker_client_wrapper import recovery_identifier
+from app.monitor.health import HealthEvaluator
 from app.monitor.selection import should_monitor
 from app.notifications.notification_manager import notification_manager
 
@@ -104,8 +105,20 @@ class MonitoringEngine:
         # _check_containers checks one container at a time and the update has no await, so
         # no lock is needed. Concurrent checks of one container would need one.
         self._quarantine_streaks: dict[str, tuple[str, int, int]] = {}
-        # Attached by the service after construction; None when Uptime Kuma is not set up.
-        self.uptime_kuma_monitor: UptimeKumaMonitor | None = None
+        self._health_evaluator = HealthEvaluator(docker_client)
+
+    @property
+    def uptime_kuma_monitor(self) -> UptimeKumaMonitor | None:
+        """
+        The Uptime Kuma monitor, or None when Uptime Kuma is not set up.
+
+        Attached by the service after construction. Health evaluation reads it.
+        """
+        return self._health_evaluator.uptime_kuma_monitor
+
+    @uptime_kuma_monitor.setter
+    def uptime_kuma_monitor(self, monitor: UptimeKumaMonitor | None) -> None:
+        self._health_evaluator.uptime_kuma_monitor = monitor
 
     def get_stable_identifier(self, info: dict) -> str | None:
         """
@@ -577,76 +590,9 @@ class MonitoringEngine:
         Returns:
             Tuple of (needs_restart: bool, reason: str)
         """
-        config = config_manager.get_config()
-        restart_mode = config.restart.mode
-        container_id = info.get("full_id")
-
-        # Get stable identifier for all checks
-        stable_id = self.get_stable_identifier(info)
-
-        # Check exit status (for exited/stopped containers)
-        state = info.get("state", {})
-        status = state.get("Status", "").lower()
-
-        if status == "starting":
-            logger.debug(
-                "Container %s is still starting, skipping health evaluation",
-                info.get("name"),
-            )
-            return False, "Container is starting"
-
-        if status in ["exited", "stopped", "dead"]:
-            exit_code = state.get("ExitCode", 0)
-
-            # Check if we should restart based on mode
-            if restart_mode in ["on-failure", "both"]:
-                # If exit code is 0 (clean stop) and we respect manual stops, don't restart
-                if exit_code == 0 and config.restart.respect_manual_stop:
-                    logger.debug(
-                        "Container %s stopped cleanly (exit 0), respecting manual stop",
-                        info.get("name"),
-                    )
-                    return False, "Manual stop (exit 0)"
-
-                # For non-zero exit codes or if we don't respect manual stops, restart
-                if exit_code != 0:
-                    return True, f"Container exited with code {exit_code}"
-                # exit_code = 0 but respect_manual_stop = False
-                return True, "Container stopped (exit 0)"
-
-        # Check health status
-        if restart_mode in ["health", "both"]:
-            # Get stable identifier for health check lookup
-            container_name = info.get("name")
-
-            # Check custom health checks (by stable_id, name, then ID for backwards compatibility)
-            custom_hc = None
-            for key in (stable_id, container_name, container_id):
-                if key is not None:
-                    custom_hc = config_manager.get_custom_health_check(key)
-                    if custom_hc:
-                        break
-            if custom_hc:
-                health_ok = await self._perform_custom_health_check(container, custom_hc)
-                if not health_ok:
-                    return True, f"Custom health check failed ({custom_hc.check_type})"
-
-            # Then check Docker native health
-            health = info.get("health")
-            if health:
-                status = health.get("status")
-                if status == "unhealthy":
-                    return True, "Docker health check reports unhealthy"
-
-        # Check Uptime-Kuma monitor status (if configured and enabled)
-        if (
-            self.uptime_kuma_monitor
-            and stable_id is not None
-            and await self.uptime_kuma_monitor.should_restart_from_uptime_kuma(stable_id)
-        ):
-            return True, "Uptime-Kuma monitor reports DOWN"
-
-        return False, ""
+        return await self._health_evaluator.evaluate(
+            container, info, self.get_stable_identifier(info)
+        )
 
     async def _perform_custom_health_check(
         self, container: Container, health_check: HealthCheckConfig
@@ -659,53 +605,7 @@ class MonitoringEngine:
         Returns:
             True if healthy, False otherwise
         """
-        check_type = health_check.check_type
-
-        try:
-            if check_type == "http":
-                # HealthCheckConfig does not require these for http checks; a missing
-                # value fails here and is reported as unhealthy by the handler below.
-                endpoint = health_check.http_endpoint
-                expected_status = health_check.http_expected_status
-                if endpoint is None or expected_status is None:
-                    raise ValueError("missing http_endpoint or http_expected_status")
-                return await asyncio.to_thread(
-                    self.docker_client.check_http_health,
-                    container,
-                    endpoint,
-                    expected_status,
-                    health_check.timeout_seconds,
-                )
-            if check_type == "tcp":
-                port = health_check.tcp_port
-                if port is None:
-                    raise ValueError("missing tcp_port")
-                return await asyncio.to_thread(
-                    self.docker_client.check_tcp_health,
-                    container,
-                    port,
-                    health_check.timeout_seconds,
-                )
-            if check_type == "exec":
-                command = health_check.exec_command
-                if command is None:
-                    raise ValueError("missing exec_command")
-                return await asyncio.to_thread(
-                    self.docker_client.check_exec_health,
-                    container,
-                    command,
-                )
-            if check_type == "docker":
-                status = await asyncio.to_thread(
-                    self.docker_client.get_docker_native_health, container
-                )
-                return status == "healthy" if status else True  # Assume healthy if no check
-            logger.warning("Unknown health check type: %s", check_type)
-        except Exception as e:
-            logger.error("Error performing health check: %s", e)
-            return False
-        else:
-            return True
+        return await self._health_evaluator.perform_custom_health_check(container, health_check)
 
     async def _auto_unquarantine_container(
         self,
