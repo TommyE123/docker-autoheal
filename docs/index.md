@@ -38,6 +38,7 @@ Repository maintenance: dependencies, publishing, and releases.
 - [Dependency management](maintainer/dependency-management.md)
 - [Publishing](maintainer/publishing.md)
 - [Release process](maintainer/release-process.md)
+- [Documentation drift detection](maintainer/docs-drift-detection.md)
 
 ## Historical
 
