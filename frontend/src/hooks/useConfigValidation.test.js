@@ -116,4 +116,26 @@ describe("useConfigValidation", () => {
 
     expect(result.isValid).toBe(true);
   });
+
+  it("warns, with a safety-margin suggestion, when backoff timing is very tight against the window", () => {
+    const config = {
+      monitor: { interval_seconds: 5 },
+      restart: {
+        cooldown_seconds: 10,
+        max_restarts: 3,
+        max_restarts_window_seconds: 75,
+        backoff: { enabled: true, initial_seconds: 5, multiplier: 2 },
+      },
+    };
+    const { validateTimingConfiguration } = useConfigValidation(config);
+
+    const result = validateTimingConfiguration();
+
+    expect(result.errors).toEqual([
+      expect.stringContaining("Exponential backoff timing is very tight"),
+    ]);
+    expect(
+      result.suggestions.some((s) => s.includes("increasing window to 104s")),
+    ).toBe(true);
+  });
 });
