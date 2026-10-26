@@ -6,12 +6,22 @@ cover what the evaluator owns on its own: the Uptime Kuma dependency it is given
 stable identifier the engine passes in.
 """
 
+from typing import TYPE_CHECKING, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from app.monitor.health import HealthEvaluator
 from app.tests.unit.conftest import make_container
+
+if TYPE_CHECKING:
+    from docker.models.containers import Container
+
+
+def web_container() -> tuple[Container, dict]:
+    """A ``(container, info)`` pair typed for the evaluator, which takes a real ``Container``"""
+    container, info = make_container(name="web")
+    return cast("Container", container), info
 
 
 def kuma_reporting_down() -> MagicMock:
@@ -25,7 +35,7 @@ class TestUptimeKumaDependency:
     async def test_constructor_argument_is_consulted(self, docker_client):
         monitor = kuma_reporting_down()
         evaluator = HealthEvaluator(docker_client, uptime_kuma_monitor=monitor)
-        container, info = make_container(name="web")
+        container, info = web_container()
 
         result = await evaluator.evaluate(container, info, "web-id")
 
@@ -34,7 +44,7 @@ class TestUptimeKumaDependency:
 
     async def test_defaults_to_no_monitor(self, docker_client):
         evaluator = HealthEvaluator(docker_client)
-        container, info = make_container(name="web")
+        container, info = web_container()
 
         assert evaluator.uptime_kuma_monitor is None
         assert await evaluator.evaluate(container, info, "web-id") == (False, "")
@@ -42,7 +52,7 @@ class TestUptimeKumaDependency:
     async def test_monitor_is_not_consulted_without_a_stable_id(self, docker_client):
         monitor = kuma_reporting_down()
         evaluator = HealthEvaluator(docker_client, uptime_kuma_monitor=monitor)
-        container, info = make_container(name="web")
+        container, info = web_container()
 
         assert await evaluator.evaluate(container, info, None) == (False, "")
         monitor.should_restart_from_uptime_kuma.assert_not_called()
