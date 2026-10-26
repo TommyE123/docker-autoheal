@@ -9,16 +9,17 @@ permissions:
   pull-requests: read
 engine:
   id: gemini
-  # Same pin and model rationale as issue-triage.md (Gemini CLI >= 0.60.0 exits
-  # 41 under AWF; the default Pro-class model has no free-tier quota for this
-  # key). The reused GEMINI_API_KEY secret is the only credential.
+  # Same pin as issue-triage.md (Gemini CLI >= 0.60.0 exits 41 under AWF). Flash
+  # Lite for the same quota reason: the full Flash models are capped at 20
+  # requests/day on the free tier, which one audit run could exhaust. The reused
+  # GEMINI_API_KEY secret is the only credential.
   version: "0.59.0"
-  model: gemini-3.5-flash
+  model: gemini-3.5-flash-lite
 features:
   # See issue-triage.md: actionlint does not recognise the "queue" key.
   group-concurrency-queue: false
 tools:
-  bash: ["cat", "ls", "find", "grep", "head", "tail", "wc", "git", "diff", "safeoutputs"]
+  bash: ["cat", "jq", "ls", "find", "grep", "head", "tail", "wc", "git", "diff", "safeoutputs"]
   edit:
 safe-outputs:
   threat-detection: false
