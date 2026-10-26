@@ -6,7 +6,7 @@ under the *shipped default* ``NotificationsConfig``.
 ``NotificationsConfig.event_filters`` plus ``NotificationManager``'s title map
 decide what happens to them. The two sides are joined only by bare event-type
 strings, and nothing else in the suite checks them against each other: engine
-tests swap ``notification_manager`` for a ``MagicMock`` (see
+tests replace ``send_event_notification`` with an ``AsyncMock`` (see
 ``mock_notification_manager`` in ``conftest.py``), and
 ``test_notification_manager.py`` always supplies its own ``event_filters``.
 
