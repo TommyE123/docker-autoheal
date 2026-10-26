@@ -588,6 +588,7 @@ describe("EventsPage", () => {
 
     afterEach(() => {
       vi.useRealTimers();
+      vi.restoreAllMocks();
     });
 
     it.each([

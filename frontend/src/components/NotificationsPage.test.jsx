@@ -1271,6 +1271,7 @@ describe("NotificationsPage", () => {
 
     afterEach(() => {
       vi.useRealTimers();
+      vi.restoreAllMocks();
     });
 
     it("reports when notifications are disabled", async () => {
