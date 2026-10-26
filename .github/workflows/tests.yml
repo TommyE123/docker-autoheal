@@ -10,6 +10,12 @@ on:
 permissions:
   contents: read
 
+# One run per ref. A new push to a pull request cancels that PR's in-progress run; runs on
+# main and manual runs are never cancelled once running.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # Skips the jobs below for the automated mutation badge PR (badge file only). If this job
   # itself fails, badge-only is empty and they run. See badge-only-check.yml.

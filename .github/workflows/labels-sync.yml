@@ -9,12 +9,14 @@ on:
 
 permissions:
   contents: read
-  issues: write # Creates and updates labels
 
 jobs:
   sync-labels:
     name: Sync labels.yml to GitHub
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write # Creates and updates labels
     steps:
       - name: Checkout labels config
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
