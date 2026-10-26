@@ -241,20 +241,31 @@ def test_weekly_workflow_delegates_to_native_auto_merge_only():
     assert "while" not in AUTO_MERGE_WORKFLOW
 
 
+def _job_block(workflow: str, job: str) -> str:
+    """Return the text of one top-level job, up to the next job or the end."""
+    match = re.search(rf"^  {re.escape(job)}:\n(.*?)(?=^  \S|\Z)", workflow, re.M | re.S)
+    assert match, f"job {job!r} not found"
+    return match.group(1)
+
+
 def test_weekly_workflow_uses_least_privilege_permissions():
     # gh authenticates with the RELEASE_PLEASE_TOKEN PAT, so neither the
     # workflow nor the job needs any GITHUB_TOKEN permission.
-    assert AUTO_MERGE_WORKFLOW.count("permissions: {}") == 2
-    assert ": write" not in AUTO_MERGE_WORKFLOW
+    assert re.search(r"^permissions: \{\}$", AUTO_MERGE_WORKFLOW, re.M)
+    job = _job_block(AUTO_MERGE_WORKFLOW, "auto-merge-release-pr")
+    assert re.search(r"^    permissions: \{\}$", job, re.M)
+    assert not re.search(r"^\s*[\w-]+: (read|write)\b", job, re.M)
+    # With no default-token permissions, the job only works on the PAT.
+    assert re.search(r"^      GH_TOKEN: \$\{\{ secrets\.RELEASE_PLEASE_TOKEN \}\}$", job, re.M)
 
 
 def test_release_please_job_holds_no_github_token_permissions():
     # The action authenticates with the RELEASE_PLEASE_TOKEN PAT, so the
     # job grants the default token nothing.
-    job = WORKFLOW.split("  release-please:\n", 1)[1].split("  docker-release:\n", 1)[0]
-    assert "permissions: {}" in job
-    assert ": write" not in job
-    assert "token: ${{ secrets.RELEASE_PLEASE_TOKEN }}" in job
+    job = _job_block(WORKFLOW, "release-please")
+    assert re.search(r"^    permissions: \{\}$", job, re.M)
+    assert not re.search(r"^\s*[\w-]+: (read|write)\b", job, re.M)
+    assert re.search(r"^          token: \$\{\{ secrets\.RELEASE_PLEASE_TOKEN \}\}$", job, re.M)
 
 
 def test_weekly_workflow_enables_auto_merge_with_the_non_default_token():
