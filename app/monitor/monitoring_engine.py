@@ -4,7 +4,6 @@ Monitors containers and performs auto-healing actions
 """
 
 import asyncio
-import fnmatch
 import logging
 from datetime import UTC, datetime, timedelta
 from http import HTTPStatus
@@ -17,6 +16,7 @@ from app.config.config_manager import (
     config_manager,
 )
 from app.docker_client.docker_client_wrapper import recovery_identifier
+from app.monitor.selection import should_monitor
 from app.notifications.notification_manager import notification_manager
 
 if TYPE_CHECKING:
@@ -563,87 +563,8 @@ class MonitoringEngine:
         Returns:
             True if container should be monitored, False otherwise
         """
-        config = config_manager.get_config()
-        container_id = info.get("full_id")
-        short_id = info.get("id")  # Short ID (first 12 chars)
-        container_name = info.get("name")
-        labels = info.get("labels", {})
-
-        # Get stable identifier (handles all edge cases)
-        stable_id = self.get_stable_identifier(info)
-        compose_service = labels.get("com.docker.compose.service")
-
-        # Check explicit exclusion (check stable_id, compose service, name, and IDs)
-        if (
-            stable_id in config.containers.excluded
-            or container_id in config.containers.excluded
-            or short_id in config.containers.excluded
-            or container_name in config.containers.excluded
-            or (compose_service and compose_service in config.containers.excluded)
-        ):
-            return False
-
-        # Check explicit inclusion (check stable_id, compose service, name, and IDs)
-        if (
-            stable_id in config.containers.selected
-            or container_id in config.containers.selected
-            or short_id in config.containers.selected
-            or container_name in config.containers.selected
-            or (compose_service and compose_service in config.containers.selected)
-        ):
-            logger.debug(
-                "Container %s (stable_id: %s) explicitly selected for monitoring",
-                container_name,
-                stable_id,
-            )
-            return True
-
-        # Check include_all flag
-        if config.monitor.include_all:
-            pass  # Continue to filter checks
-        else:
-            # Check label filter
-            label_key = config.monitor.label_key
-            label_value = config.monitor.label_value
-
-            if label_key not in labels or labels[label_key] != label_value:
-                return False
-
-        # Check blacklist names
-        for pattern in config.filters.blacklist_names:
-            if container_name is not None and fnmatch.fnmatch(container_name, pattern):
-                return False
-
-        # Check whitelist names (if specified, must match at least one)
-        if config.filters.whitelist_names:
-            matched = False
-            for pattern in config.filters.whitelist_names:
-                if container_name is not None and fnmatch.fnmatch(container_name, pattern):
-                    matched = True
-                    break
-            if not matched:
-                return False
-
-        # Check blacklist labels
-        for label_filter in config.filters.blacklist_labels:
-            for key, value in label_filter.items():
-                if labels.get(key) == value:
-                    return False
-
-        # Check whitelist labels (if specified, must match at least one)
-        if config.filters.whitelist_labels:
-            matched = False
-            for label_filter in config.filters.whitelist_labels:
-                for key, value in label_filter.items():
-                    if labels.get(key) == value:
-                        matched = True
-                        break
-                if matched:
-                    break
-            if not matched:
-                return False
-
-        return True
+        del container  # Selection depends on ``info`` only; kept for the callers' signature.
+        return should_monitor(config_manager.get_config(), info, self.get_stable_identifier(info))
 
     async def _evaluate_container_health(
         self, container: Container, info: dict
