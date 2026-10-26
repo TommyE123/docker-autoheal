@@ -816,6 +816,105 @@ describe("ConfigPage", () => {
       ).toBeInTheDocument();
     });
   });
+
+  describe("restart policy validation", () => {
+    it("shows a validation modal instead of saving, and closes it again", async () => {
+      const user = userEvent.setup();
+      getConfig.mockResolvedValue({
+        data: {
+          ...config,
+          restart: { ...config.restart, max_restarts_window_seconds: 5 },
+        },
+      });
+
+      render(<ConfigPage />);
+      await screen.findByText("Monitor Settings");
+
+      await user.click(
+        screen.getByRole("button", { name: /save restart policy/i }),
+      );
+
+      expect(
+        await screen.findByText(/invalid restart policy configuration/i),
+      ).toBeInTheDocument();
+      expect(updateRestartConfig).not.toHaveBeenCalled();
+
+      await user.click(
+        screen.getByRole("button", { name: /close and adjust settings/i }),
+      );
+
+      await waitFor(() =>
+        expect(
+          screen.queryByText(/invalid restart policy configuration/i),
+        ).not.toBeInTheDocument(),
+      );
+    });
+  });
+
+  describe("edge cases", () => {
+    it("ignores an import change event that carries no file", async () => {
+      getConfig.mockResolvedValue({ data: config });
+
+      const { container } = render(<ConfigPage />);
+      await screen.findByText(/configuration export\/import/i);
+
+      fireEvent.change(container.querySelector("#importFile"), {
+        target: { files: [] },
+      });
+
+      expect(importConfig).not.toHaveBeenCalled();
+    });
+
+    it("shows the server-reported message when enabling is rejected", async () => {
+      const user = userEvent.setup();
+      getConfig.mockResolvedValue({ data: kumaReadyConfig });
+      api.post.mockImplementation((url) => {
+        if (url === "/uptime-kuma/test-connection") {
+          return Promise.resolve({ data: { success: true, monitor_count: 2 } });
+        }
+        if (url === "/uptime-kuma/enable") {
+          return Promise.resolve({
+            data: { success: false, message: "Kuma refused" },
+          });
+        }
+        return Promise.reject(new Error(`Unexpected POST ${url}`));
+      });
+
+      render(<ConfigPage />);
+      await user.click(
+        await screen.findByRole("button", { name: /test connection/i }),
+      );
+      await user.click(
+        await screen.findByRole("button", { name: /enable integration/i }),
+      );
+
+      expect(await screen.findByText("Kuma refused")).toBeInTheDocument();
+    });
+
+    it.each([
+      [
+        "a full container id",
+        [{ id: "abc123456", name: "web-app" }],
+        "web-app",
+      ],
+      ["an unknown container", [], "abc123"],
+    ])(
+      "names the mapped container in the delete confirmation for %s",
+      async (_label, knownContainers, expectedName) => {
+        const user = userEvent.setup();
+        getConfig.mockResolvedValue({ data: kumaEnabledConfig });
+        mockKumaGets({ monitors, mappings, containers: knownContainers });
+
+        render(<ConfigPage />);
+        await screen.findByText("Active");
+
+        await user.click(screen.getByRole("button", { name: /^delete$/i }));
+        const dialog = await screen.findByRole("dialog");
+
+        expect(within(dialog).getByText(expectedName)).toBeInTheDocument();
+      },
+    );
+  });
 });
 
 // Small helpers kept local to this file: waitFor wrappers scoped to a specific

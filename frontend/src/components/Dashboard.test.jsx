@@ -77,4 +77,17 @@ describe("Dashboard", () => {
       screen.getByRole("button", { name: /exit maintenance/i }),
     ).toBeInTheDocument();
   });
+
+  it("shows the service as Inactive when monitoring is not active", () => {
+    render(
+      <Dashboard
+        systemStatus={{ ...systemStatus, monitoring_active: false }}
+        onRefresh={vi.fn()}
+        onMaintenanceToggle={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Inactive")).toBeInTheDocument();
+    expect(screen.queryByText("Active")).not.toBeInTheDocument();
+  });
 });

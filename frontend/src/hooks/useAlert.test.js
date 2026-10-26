@@ -68,4 +68,14 @@ describe("useAlert", () => {
 
     expect(result.current.alert).toBeNull();
   });
+
+  it("clearAlert is a no-op when no alert is pending", () => {
+    const { result } = renderHook(() => useAlert());
+
+    act(() => {
+      result.current.clearAlert();
+    });
+
+    expect(result.current.alert).toBeNull();
+  });
 });
