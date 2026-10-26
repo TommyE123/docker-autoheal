@@ -348,7 +348,7 @@ async def test_custom_health_check_is_found_by_id_when_info_has_no_name(engine, 
     config_manager.add_custom_health_check(
         HealthCheckConfig(container_id=info["full_id"], check_type="docker")
     )
-    engine._perform_custom_health_check = AsyncMock(return_value=False)
+    engine._health_evaluator.perform_custom_health_check = AsyncMock(return_value=False)
 
     needs_restart, _reason = await engine._evaluate_container_health(container, info)
 
