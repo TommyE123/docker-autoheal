@@ -53,10 +53,25 @@ const requiredFieldTypes = {
   },
 };
 
+// Fields of the uptime_kuma section the handlers read. They may be absent or
+// null (the form then starts empty) but must have this type when present.
+const optionalUptimeKumaFieldTypes = {
+  server_url: "string",
+  api_token: "string",
+  username: "string",
+  auto_restart_on_down: "boolean",
+};
+
 const hasValidFields = (section, fieldTypes) =>
   isObject(section) &&
   Object.entries(fieldTypes).every(
     ([field, type]) => typeof section[field] === type,
+  );
+
+const isValidUptimeKuma = (section) =>
+  hasValidFields(section, { enabled: "boolean" }) &&
+  Object.entries(optionalUptimeKumaFieldTypes).every(
+    ([field, type]) => section[field] == null || typeof section[field] === type,
   );
 
 const isValidConfig = (data) =>
@@ -67,7 +82,8 @@ const isValidConfig = (data) =>
   // max_seconds is optional: absent or null means no cap (see useConfigValidation)
   (data.restart.backoff.max_seconds == null ||
     typeof data.restart.backoff.max_seconds === "number") &&
-  hasValidFields(data.observability, requiredFieldTypes.observability);
+  hasValidFields(data.observability, requiredFieldTypes.observability) &&
+  isValidUptimeKuma(data.uptime_kuma);
 
 /**
  * ConfigPage Component
@@ -130,7 +146,7 @@ function ConfigPage() {
       setConfig(response.data);
 
       // Load Uptime Kuma data if enabled
-      if (response.data.uptime_kuma?.enabled) {
+      if (response.data.uptime_kuma.enabled) {
         loadUptimeKumaData();
       }
     } catch {

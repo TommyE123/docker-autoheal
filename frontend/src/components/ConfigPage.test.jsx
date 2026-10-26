@@ -244,7 +244,7 @@ describe("ConfigPage", () => {
       expect(screen.queryByText("Monitor Settings")).not.toBeInTheDocument();
     });
 
-    it.each(["monitor", "restart", "observability"])(
+    it.each(["monitor", "restart", "observability", "uptime_kuma"])(
       "shows a failure message when the configuration has no %s section",
       async (missingSection) => {
         const partialConfig = { ...config };
@@ -324,6 +324,59 @@ describe("ConfigPage", () => {
         expect(await screen.findByText("Monitor Settings")).toBeInTheDocument();
       },
     );
+
+    it.each([
+      ["a non-object uptime_kuma section", { ...config, uptime_kuma: "oops" }],
+      ["an array uptime_kuma section", { ...config, uptime_kuma: [] }],
+      [
+        "a non-boolean uptime_kuma.enabled",
+        withValue("uptime_kuma", "enabled", "yes"),
+      ],
+      [
+        "a non-string uptime_kuma.server_url",
+        withValue("uptime_kuma", "server_url", 5),
+      ],
+      [
+        "a non-string uptime_kuma.api_token",
+        withValue("uptime_kuma", "api_token", {}),
+      ],
+      [
+        "a non-string uptime_kuma.username",
+        withValue("uptime_kuma", "username", false),
+      ],
+      [
+        "a non-boolean uptime_kuma.auto_restart_on_down",
+        withValue("uptime_kuma", "auto_restart_on_down", "true"),
+      ],
+    ])("shows a failure message for %s", async (_label, data) => {
+      getConfig.mockResolvedValue({ data });
+
+      render(<ConfigPage />);
+
+      expect(
+        await screen.findByText(/failed to load configuration/i),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Monitor Settings")).not.toBeInTheDocument();
+    });
+
+    it("still loads when optional uptime_kuma fields are null", async () => {
+      getConfig.mockResolvedValue({
+        data: {
+          ...config,
+          uptime_kuma: {
+            enabled: false,
+            server_url: null,
+            api_token: null,
+            username: null,
+            auto_restart_on_down: null,
+          },
+        },
+      });
+
+      render(<ConfigPage />);
+
+      expect(await screen.findByText("Monitor Settings")).toBeInTheDocument();
+    });
 
     it("shows a failure message when backoff max_seconds is not a number", async () => {
       getConfig.mockResolvedValue({
