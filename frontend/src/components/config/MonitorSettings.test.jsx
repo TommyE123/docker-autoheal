@@ -72,4 +72,39 @@ describe("MonitorSettings", () => {
 
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
+
+  it("reports label key, label value and include_all changes", async () => {
+    const user = userEvent.setup();
+    const onConfigChange = vi.fn();
+
+    render(
+      <ControlledMonitorSettings
+        onConfigChange={onConfigChange}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("Label Key"), "X");
+    expect(onConfigChange).toHaveBeenLastCalledWith({
+      ...config,
+      label_key: "autohealX",
+    });
+
+    await user.type(screen.getByLabelText("Label Value"), "Y");
+    expect(onConfigChange).toHaveBeenLastCalledWith({
+      ...config,
+      label_key: "autohealX",
+      label_value: "trueY",
+    });
+
+    await user.click(
+      screen.getByLabelText("Monitor All Containers (ignore label filter)"),
+    );
+    expect(onConfigChange).toHaveBeenLastCalledWith({
+      ...config,
+      label_key: "autohealX",
+      label_value: "trueY",
+      include_all: true,
+    });
+  });
 });
