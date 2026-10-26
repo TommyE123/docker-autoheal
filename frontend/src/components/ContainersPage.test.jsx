@@ -617,11 +617,15 @@ describe("ContainersPage", () => {
       );
     });
 
-    it("shows N/A when the exit code is 0", async () => {
+    it.each([
+      [0, "0"],
+      [null, "N/A"],
+      [undefined, "N/A"],
+    ])("shows exit code %s as %s", async (exitCode, expected) => {
       const user = userEvent.setup();
       getContainers.mockResolvedValue({ data: containers });
       getContainerDetails.mockResolvedValue({
-        data: { ...details, exit_code: 0 },
+        data: { ...details, exit_code: exitCode },
       });
 
       render(<ContainersPage />);
@@ -632,7 +636,7 @@ describe("ContainersPage", () => {
       });
       expect(
         within(dialog).getByText("Exit Code:").nextSibling,
-      ).toHaveTextContent("N/A");
+      ).toHaveTextContent(expected);
     });
   });
 
