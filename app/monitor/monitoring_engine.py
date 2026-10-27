@@ -98,6 +98,11 @@ class MonitoringEngine:
         # sharing a recovery ID share the wait, so only its owner recovering may cancel
         # it. A recreated container has a new ID, so it never inherits a predecessor's wait.
         self._restart_wait_owner: dict[str, str | None] = {}
+        # The cycle in which the owner last confirmed each pending wait by failing again.
+        # A wait the owner did not confirm in the previous cycle (it was quarantined, in
+        # maintenance, or Docker was unavailable) is stale: the failure was not observed
+        # continuously, so the next failure starts a fresh wait instead of using it.
+        self._restart_wait_seen: dict[str, int] = {}
         # Counts monitoring cycles. A quarantined container's healthy checks are consecutive
         # only if each happened in the cycle after the previous one, so a skipped or failed
         # check, or a failed cycle, breaks the streak without any explicit reset.
@@ -546,6 +551,7 @@ class MonitoringEngine:
         """Forget the restart wait recorded for a recovery ID, and who it belongs to"""
         self._next_allowed_restart.pop(recovery_id, None)
         self._restart_wait_owner.pop(recovery_id, None)
+        self._restart_wait_seen.pop(recovery_id, None)
 
     def should_monitor_container(self, container: Container, info: dict) -> bool:
         """
@@ -801,6 +807,18 @@ class MonitoringEngine:
         """
         now = datetime.now(UTC)
         next_allowed = self._next_allowed_restart.get(recovery_id)
+        if next_allowed is not None:
+            if self._restart_wait_seen.get(recovery_id, self._check_cycle) < self._check_cycle - 1:
+                logger.debug(
+                    "Restart wait for %s (recovery_id: %s) was not confirmed last cycle, "
+                    "starting a new one",
+                    container_name,
+                    recovery_id,
+                )
+                self._clear_restart_wait(recovery_id)
+                next_allowed = None
+            elif self._restart_wait_owner.get(recovery_id) == container_id:
+                self._restart_wait_seen[recovery_id] = self._check_cycle
         backoff_delay = min(
             self._backoff_delays.get(recovery_id, config.restart.backoff.initial_seconds),
             config.restart.backoff.max_seconds,
@@ -814,6 +832,7 @@ class MonitoringEngine:
             )
             self._next_allowed_restart[recovery_id] = now + timedelta(seconds=backoff_delay)
             self._restart_wait_owner[recovery_id] = container_id
+            self._restart_wait_seen[recovery_id] = self._check_cycle
             return False
         if now < next_allowed:
             logger.debug(

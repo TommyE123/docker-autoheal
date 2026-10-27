@@ -454,6 +454,53 @@ class TestExplicitMonitoringIdIsShared:
         assert "monitoring.id:shared-web" in engine._next_allowed_restart
         assert engine._restart_wait_owner == {"monitoring.id:shared-web": sick.id}
 
+    async def test_owner_gets_a_fresh_wait_after_a_shared_quarantine_is_lifted(
+        self, engine, docker_client
+    ):
+        """
+        The shared recovery ID is quarantined, so the failing owner is skipped while a
+        healthy sibling releases it. The owner's old wait must not survive that gap (#15).
+        """
+        shared = {"monitoring.id": "shared-web"}
+        sick, sick_info = replica(1, status="exited", exit_code=1, extra_labels=shared)
+        well, well_info = replica(2, extra_labels=shared)
+        docker_client.add_container(sick, sick_info)
+        docker_client.add_container(well, well_info)
+        recovery_id = "monitoring.id:shared-web"
+        await engine._check_containers()  # the owner's wait is scheduled
+        assert engine._restart_wait_owner == {recovery_id: sick.id}
+
+        config_manager.quarantine_container(recovery_id)
+        await until_stable(engine._check_containers)  # the healthy sibling releases it
+        assert not config_manager.is_quarantined(recovery_id)
+        engine._next_allowed_restart[recovery_id] = datetime.now(UTC) - timedelta(seconds=1)
+        await engine._check_containers()
+
+        assert docker_client.restart_calls == []  # no instant restart on the old deadline
+        delay = (engine._next_allowed_restart[recovery_id] - datetime.now(UTC)).total_seconds()
+        assert delay == pytest.approx(10, abs=1)
+        assert engine._restart_wait_owner == {recovery_id: sick.id}
+
+    async def test_non_owner_replica_does_not_take_over_a_pending_wait(self, engine, docker_client):
+        """Both replicas fail every cycle: the wait stays with the replica that started it."""
+        shared = {"monitoring.id": "shared-web"}
+        a, a_info = replica(1, status="exited", exit_code=1, extra_labels=shared)
+        b, b_info = replica(2, status="exited", exit_code=1, extra_labels=shared)
+        docker_client.add_container(a, a_info)
+        docker_client.add_container(b, b_info)
+        recovery_id = "monitoring.id:shared-web"
+        await engine._check_containers()
+        owner = engine._restart_wait_owner[recovery_id]
+        deadline = engine._next_allowed_restart[recovery_id]
+
+        await engine._check_containers()  # the other replica consults the same wait
+
+        assert owner in {a.id, b.id}
+        assert engine._restart_wait_owner == {recovery_id: owner}
+        assert engine._next_allowed_restart == {recovery_id: deadline}
+        assert engine._restart_wait_seen == {recovery_id: engine._check_cycle}
+        assert docker_client.restart_calls == []
+
 
 class TestConfigurationStaysPerService:
     def test_selection_by_service_id_monitors_every_replica(self, engine, update_config):
