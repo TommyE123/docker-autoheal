@@ -1,8 +1,9 @@
 ---
 name: Weekly Maintainer
 description: Read-only weekly maintenance audit. Uses Gemini Flash Lite to report at most one well-evidenced, non-duplicate maintenance finding in the run summary, or an explicit no-finding or incomplete-audit result. Never changes files, branches, issues or pull requests.
+# No schedule here: run manually, later called weekly through workflow_dispatch
+# by cron-job.org, as gh-aw-upgrade.yml is.
 on:
-  schedule: weekly
   workflow_dispatch:
 permissions:
   contents: read
@@ -53,6 +54,7 @@ safe-outputs:
   report-missing-data:
     create-issue: false
   report-failure-as-issue: false
+  report-failed-jobs: false
 ---
 
 # Weekly Maintainer
@@ -66,7 +68,8 @@ changes.
 
 Repository: `${{ github.repository }}` (`OWNER/REPO`; pass the part before the
 slash as `--owner` and the part after it as `--repo`, never the combined value).
-The checked-out commit is `${{ github.sha }}`.
+The repository checkout is of the ref this run was started on, which is `main`
+unless a person chose another.
 
 ## Tools
 
@@ -78,7 +81,9 @@ GitHub state with the `github` CLI, for example
 `github list_pull_requests --owner OWNER --repo REPO --state open` (and
 `--state closed` for recent work), `github pull_request_read --method get_check_runs`
 and `github search_issues --query "..."`. If a flag is rejected, run
-`github <tool> --help`. There are no write tools. You report through two
+`github <tool> --help`. There are no write tools. The Gemini CLI also exposes
+`write_file` and `replace`, which this workflow cannot remove; never use them,
+and never write anywhere except the run summary. You report through two
 things only:
 
 - **The run summary.** Write a short Markdown report with
@@ -93,8 +98,7 @@ things only:
 
 ## Stage 0: Baseline
 
-Record the audit timestamp, the head commit SHA of `main`, and whether the
-checked-out commit `${{ github.sha }}` is that SHA. Gather the recent commits
+Record the audit timestamp and the head commit SHA of `main`. Gather the recent commits
 and merges on `main`, all open issues and open pull requests, the issues and
 pull requests closed or merged in roughly the last 30 days (titles, bodies,
 labels, branch names), and the check runs on recent `main` commits and open PRs
@@ -143,8 +147,8 @@ beneficial low-risk maintenance. Avoid anything whose benefit is subjective.
 Write the summary, then call `noop`. Start the summary with one of these
 headings so the run page shows the outcome:
 
-- `## Finding`, then the baseline (timestamp, `main` SHA, checked-out SHA) and
-  the eight fields.
+- `## Finding`, then the baseline (timestamp and `main` SHA) and the eight
+  fields.
 - `## No worthwhile finding this week`, then the baseline and one line saying
   what was checked.
 - `## Incomplete audit`, then the baseline and exactly what could not be
