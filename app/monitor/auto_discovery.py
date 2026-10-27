@@ -6,18 +6,104 @@ scan of the running containers and from Docker container start events
 
 import asyncio
 import logging
+import threading
+import time
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from app.config.config_manager import AutoHealEvent, config_manager
 from app.notifications.notification_manager import notification_manager
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Awaitable, Callable
 
     from app.monitor.monitoring_engine import DockerClient
 
 logger = logging.getLogger(__name__)
+
+# Pause before reconnecting to the Docker event stream, after any kind of stream end.
+EVENT_RECONNECT_DELAY_SECONDS = 10
+
+# How long stop waits for the event reader thread to exit after closing its stream.
+EVENT_THREAD_JOIN_TIMEOUT_SECONDS = 5
+
+
+class _DockerEventReader:
+    """
+    Reads Docker's blocking event stream on a thread and publishes events to an asyncio queue.
+
+    ``None`` is published when the thread exits, so the consumer never waits on a dead reader.
+    """
+
+    def __init__(
+        self,
+        docker_client: DockerClient,
+        loop: asyncio.AbstractEventLoop,
+        event_queue: asyncio.Queue[dict | None],
+        since: int,
+    ) -> None:
+        self._docker_client = docker_client
+        self._loop = loop
+        self._queue = event_queue
+        self._last_event_time = since
+        self.stop = threading.Event()
+        # The open stream, so a stop can close it and unblock the thread
+        self.stream: Any = None
+
+    def _publish(self, item: dict | None) -> None:
+        try:
+            self._loop.call_soon_threadsafe(self._queue.put_nowait, item)
+        except RuntimeError:
+            # The event loop is closed, so there is nobody left to read
+            self.stop.set()
+
+    def run(self) -> None:
+        """Thread function to read events from Docker (blocking)"""
+        try:
+            while not self.stop.is_set():
+                try:
+                    self._read_stream()
+                except Exception as e:
+                    # Closing the stream to stop makes its iterator fail; that is not an error
+                    if not self.stop.is_set():
+                        logger.exception("Error in event listener thread: %s", e)
+                finally:
+                    self.stream = None
+                # Back off after every stream end, however it ended, without delaying a stop
+                self.stop.wait(EVENT_RECONNECT_DELAY_SECONDS)
+        finally:
+            self._publish(None)
+
+    def _read_stream(self) -> None:
+        logger.debug("Starting Docker event listener thread...")
+        events = self._docker_client.get_events(
+            decode=True,
+            filters={"type": "container", "event": "start"},
+            since=self._last_event_time,
+        )
+        if not events:
+            logger.warning(
+                "Failed to get event stream, retrying in %s seconds...",
+                EVENT_RECONNECT_DELAY_SECONDS,
+            )
+            return
+        self.stream = events
+        # stop is set before the consumer reads ``stream``, so either it closes this
+        # stream or this check sees the stop
+        if self.stop.is_set():
+            return
+        for event in events:
+            if self.stop.is_set():
+                return
+            event_time = event.get("time")
+            if isinstance(event_time, int):
+                self._last_event_time = max(self._last_event_time, event_time)
+            self._publish(event)
+        if not self.stop.is_set():
+            logger.warning(
+                "Docker event stream ended, reconnecting in %s seconds...",
+                EVENT_RECONNECT_DELAY_SECONDS,
+            )
 
 
 class AutoDiscovery:
@@ -160,6 +246,71 @@ class AutoDiscovery:
         )
         config_manager.add_event(event)
         return event
+
+    async def listen(
+        self,
+        since: int | None,
+        *,
+        is_running: Callable[[], bool],
+        handle_event: Callable[[dict], Awaitable[None]],
+    ) -> None:
+        """
+        Listen for Docker events and auto-add containers with the configured monitoring label
+        (autoheal=true by default)
+
+        A reader thread owns the blocking Docker stream and hands events to this coroutine
+        through an ``asyncio.Queue``, so the event loop never blocks. The thread reconnects
+        after every stream end, resuming from the last event it saw so that containers
+        started during the gap are not missed. Each run has its own stop signal, so a thread
+        from one run can never be revived by the next run's ``_running`` flag.
+
+        Args:
+            since: Unix time to replay events from on the first connect. Defaults to now;
+                ``start()`` passes a time taken before the startup scan.
+            is_running: Whether the engine is running; the loop ends once it is false
+            handle_event: Coroutine function that processes one start event
+        """
+        event_queue: asyncio.Queue[dict | None] = asyncio.Queue()
+        reader = _DockerEventReader(
+            self._docker_client,
+            asyncio.get_running_loop(),
+            event_queue,
+            int(time.time()) if since is None else since,
+        )
+        thread = threading.Thread(target=reader.run, daemon=True, name="docker-events")
+        thread.start()
+        logger.debug("Docker event listener thread started")
+
+        try:
+            while is_running():
+                event = await event_queue.get()
+                if event is None:
+                    logger.error("Docker event reader thread exited unexpectedly")
+                    break
+                try:
+                    await handle_event(event)
+                except Exception as e:
+                    logger.exception("Error processing event from queue: %s", e)
+        except asyncio.CancelledError:
+            logger.debug("Event listener cancelled")
+            raise
+        finally:
+            reader.stop.set()
+            await self._stop_event_reader(thread, reader.stream)
+
+    async def _stop_event_reader(self, thread: threading.Thread, stream: Any) -> None:
+        """Close the blocked event stream and wait for the reader thread to exit."""
+        if stream is not None:
+            try:
+                stream.close()
+            except Exception as e:  # DockerException for ssh://, or the stream already gone
+                logger.debug("Error closing Docker event stream: %s", e)
+        await asyncio.to_thread(thread.join, EVENT_THREAD_JOIN_TIMEOUT_SECONDS)
+        if thread.is_alive():
+            logger.warning(
+                "Docker event reader thread still running %s seconds after stop",
+                EVENT_THREAD_JOIN_TIMEOUT_SECONDS,
+            )
 
     async def scan_existing_containers(self) -> None:
         """
