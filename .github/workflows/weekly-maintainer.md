@@ -85,9 +85,14 @@ Do not use them. Read the repository with `cat`, `grep`, `find` and `ls`; use
 GitHub state with the `github` CLI, for example
 `github list_commits --owner OWNER --repo REPO --sha main --perPage 30`,
 `github list_issues --owner OWNER --repo REPO --state OPEN --perPage 100`,
-`github list_pull_requests --owner OWNER --repo REPO --state open` (and
-`--state closed` for recent work), `github pull_request_read --method get_check_runs`
-and `github search_issues --query "..."`. If a flag is rejected, run
+`github list_pull_requests --owner OWNER --repo REPO --state open`,
+`github pull_request_read --method get_check_runs` and
+`github search_issues --query "..."`. For recently closed work, run `date` once
+for the date 30 days ago (`date -d '30 days ago' +%F`; the CLI blocks `$(`, so
+copy the result into the query by hand) and then search, for example
+`github search_issues --query "repo:OWNER/REPO is:issue is:closed closed:>YYYY-MM-DD"`
+and `"repo:OWNER/REPO is:pr is:merged merged:>YYYY-MM-DD"`. Read every result
+page that the turn budget allows. If a flag is rejected, run
 `github <tool> --help`. There are no write tools. The Gemini CLI also exposes
 `write_file` and `replace`, which this workflow cannot remove; never use them,
 and never write anywhere except the run summary. You report through two
@@ -96,8 +101,8 @@ things only:
 - **The run summary.** Write a short Markdown report with
   `cat <<'EOF' > "$GITHUB_STEP_SUMMARY"`. It is the only place a finding is
   reported. The Gemini CLI blocks a shell command that contains a backtick or
-  `$(` outside single quotes, and it does not understand heredocs, so the report
-  must contain **no backticks, no `$(` and no apostrophes**. Write file paths,
+  `$(` outside single quotes, and its check is not aware of heredocs, so the
+  same quote rules apply to the heredoc body: the report must contain **no backticks, no `$(` and no apostrophes**. Write file paths,
   line numbers and code names as plain text (for example app/monitor/x.py line
   12), and write "does not" instead of "doesn't". If the heredoc command is
   rejected, write the same report one line per command with
@@ -147,7 +152,8 @@ exactly these eight fields:
 1. **Problem**
 2. **Evidence**: file and line where applicable
 3. **Verification**: how you confirmed the evidence from the code, tests or
-   configuration (you cannot run anything)
+   configuration (you cannot run the tests or the application; you can read
+   files and use the github CLI)
 4. **Impact**
 5. **Proposed fix**: a description only; do not implement it
 6. **Confidence**: high, medium or low, and why. Report only high confidence.
