@@ -28,7 +28,7 @@ from app.docker_client.docker_client_wrapper import DockerClientWrapper
 from app.main import AutoHealService
 from app.main import main as app_main
 from app.notifications.notification_manager import NotificationManager
-from app.tests.unit.conftest import BlockingStream, make_container, wait_until
+from app.tests.unit.conftest import BlockingStream, cancel_and_wait, make_container, wait_until
 from app.tests.unit.test_notification_manager import (
     _configure_webhook,
     _FakeResponse,
@@ -227,8 +227,7 @@ class TestErrorsLoggedWithTraceback:
         engine._running = True
         task = asyncio.create_task(engine._event_listener_loop())
         await wait_until(lambda: len(attempts) >= 2)
-        task.cancel()
-        await task
+        await cancel_and_wait(task)
 
         assert_error_with_traceback(
             caplog, "Error in event listener thread: stream disconnected", RuntimeError

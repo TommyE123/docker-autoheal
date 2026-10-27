@@ -293,6 +293,7 @@ class AutoDiscovery:
                     logger.exception("Error processing event from queue: %s", e)
         except asyncio.CancelledError:
             logger.debug("Event listener cancelled")
+            raise
         finally:
             reader.stop.set()
             await self._stop_event_reader(thread, reader.stream)
