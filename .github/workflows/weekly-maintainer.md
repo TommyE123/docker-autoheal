@@ -79,7 +79,9 @@ unless a person chose another.
 ## Tools
 
 There is no direct network access, and `gh` and `curl` are not authenticated.
-Do not use them. Read the repository with `cat`, `grep`, `find` and `ls`. Read
+Do not use them. Read the repository with `cat`, `grep`, `find` and `ls`; use
+`find` only to list or locate files, and never with `-exec`, `-execdir`,
+`-delete` or `-fprint`. Read
 GitHub state with the `github` CLI, for example
 `github list_commits --owner OWNER --repo REPO --sha main --perPage 30`,
 `github list_issues --owner OWNER --repo REPO --state OPEN --perPage 100`,
@@ -97,7 +99,10 @@ things only:
   `$(` outside single quotes, and it does not understand heredocs, so the report
   must contain **no backticks, no `$(` and no apostrophes**. Write file paths,
   line numbers and code names as plain text (for example app/monitor/x.py line
-  12), and write "does not" instead of "doesn't".
+  12), and write "does not" instead of "doesn't". If the heredoc command is
+  rejected, write the same report one line per command with
+  `printf '%s\n' 'LINE' >> "$GITHUB_STEP_SUMMARY"`, under the same rules. Do not
+  use `write_file` for this.
 - **`safeoutputs noop`**, your single terminal call, with the outcome in the
   message: `safeoutputs noop '{"message":"FINDING: <title>"}'`,
   `'{"message":"NO FINDING: <reason>"}'` or
