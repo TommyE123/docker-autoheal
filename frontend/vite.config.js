@@ -1,13 +1,47 @@
+import { fileURLToPath } from "node:url";
 import {
   defineConfig,
   configDefaults,
   coverageConfigDefaults,
 } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      // The client registers the service worker itself (src/main.jsx), so the
+      // plugin must not inject its own registerSW.js script into index.html.
+      injectRegister: false,
+      registerType: "autoUpdate",
+      // Use the hand-maintained public/manifest.json (already linked from
+      // index.html) instead of generating one.
+      manifest: false,
+      workbox: {
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
+        // Precache only what is needed to load the app shell; the large
+        // install-dialog screenshots are fetched by the browser on demand.
+        globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
+        globIgnores: ["screenshot-*.png"],
+        navigateFallback: "index.html",
+        // API calls and the backend health endpoint are never answered by the
+        // SPA shell.
+        navigateFallbackDenylist: [/^\/api\//, /^\/health/],
+        runtimeCaching: [
+          {
+            // NetworkOnly on purpose: NetworkFirst would store successful API
+            // responses in Cache Storage and replay them when the backend is down.
+            urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
+            handler: "NetworkOnly",
+          },
+        ],
+      },
+    }),
+  ],
   server: {
     port: 3000,
     proxy: {
@@ -27,6 +61,12 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    // `virtual:pwa-register` only exists inside a Vite build; tests get a mock.
+    alias: {
+      "virtual:pwa-register": fileURLToPath(
+        new URL("./src/test/pwa-register-stub.js", import.meta.url),
+      ),
+    },
     // Playwright UI E2E specs run via `npm run test:ui-e2e`, not Vitest.
     exclude: [...configDefaults.exclude, "e2e-ui/**"],
     setupFiles: ["./src/test/setup.js"],

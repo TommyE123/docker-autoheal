@@ -12,6 +12,26 @@ The landing page shows:
 - An **Enter Maintenance Mode** / **Exit Maintenance** toggle — see
   [Maintenance mode](maintenance-mode.md)
 
+### Installing as an app (PWA)
+
+The web UI is a Progressive Web App, so supported browsers can install it as a standalone
+app window:
+
+- **Chrome / Edge (desktop):** click the install icon in the address bar, or use the
+  browser menu → *Install Docker Auto-Heal Service*.
+- **Android (Chrome):** menu → *Install app* / *Add to Home screen*.
+- **iOS / iPadOS (Safari):** Share → *Add to Home Screen*.
+
+Browsers only offer installation on a secure origin: `https://`, or `http://localhost`.
+A plain `http://<host>:3131` address is usually not installable, so put Auto-Heal behind
+an HTTPS reverse proxy for remote installs.
+
+Limitations: the app does not work offline. Only the static UI files are cached, so the
+window opens without a network but shows no data. Every `/api/*` request goes straight
+to the backend and is never cached, so what you see is always live container state. New
+UI versions are picked up automatically; the open page reloads once the update is
+installed, so unsaved form input can be lost.
+
 ## Containers tab
 
 - Lists every container Docker knows about, with its status, health, and monitoring state
