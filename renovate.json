@@ -11,6 +11,7 @@
     "**/node_modules/**",
     "**/bower_components/**",
     ".github/workflows/issue-triage.lock.yml",
+    ".github/workflows/weekly-maintainer.lock.yml",
     "**/.mise/locks/**"
   ],
   "description": "Dependency-update policy for docker-autoheal. Renovate creates and maintains dependency PRs. Patch updates are automerged once required checks pass; all other updates require manual review and merge. See docs/maintainer/dependency-management.md for the full explanation.",
