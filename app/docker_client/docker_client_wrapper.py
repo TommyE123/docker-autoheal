@@ -358,17 +358,23 @@ class DockerClientWrapper:
         else:
             return response.status_code == expected_status
 
-    def get_events(self, decode: bool = True, filters: dict[str, Any] | None = None) -> Any:
+    def get_events(
+        self,
+        decode: bool = True,
+        filters: dict[str, Any] | None = None,
+        since: Any = None,
+    ) -> Any:
         """
         Get Docker events stream
         Args:
             decode: Whether to decode JSON events
             filters: Event filters (dict)
+            since: Replay events from this time (Unix time or datetime) before streaming
         Returns:
             Generator of events
         """
         try:
-            return self._require_client().events(decode=decode, filters=filters)
+            return self._require_client().events(decode=decode, filters=filters, since=since)
         except Exception as e:
             logger.error("Failed to get events stream: %s", e)
             return None

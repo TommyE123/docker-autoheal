@@ -8,12 +8,15 @@ events.
 
 import asyncio
 import contextlib
-from unittest.mock import AsyncMock
+import threading
+import time
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from app.config.config_manager import config_manager
-from app.tests.unit.conftest import make_container
+from app.monitor.monitoring_engine import _DockerEventReader
+from app.tests.unit.conftest import BlockingStream, event_threads, make_container, wait_until
 
 
 def monitor_label(key: str, value: str):
@@ -935,6 +938,12 @@ class TestMonitorLoop:
         await engine._monitor_loop()
 
 
+@pytest.fixture
+def fast_reconnect(monkeypatch):
+    """Shrink the reconnect pause so retry tests do not wait ten seconds."""
+    monkeypatch.setattr("app.monitor.monitoring_engine.EVENT_RECONNECT_DELAY_SECONDS", 0.01)
+
+
 @pytest.mark.asyncio
 class TestEventListenerLoop:
     """The Docker event listener thread and its async consumer."""
@@ -942,17 +951,9 @@ class TestEventListenerLoop:
     async def test_start_events_are_forwarded_to_the_handler(
         self, engine, docker_client, monkeypatch
     ):
-        import threading
-
-        release = threading.Event()
         event = start_event("a" * 64, "web")
-
-        def event_stream():
-            yield event
-            release.wait(timeout=5)
-
-        docker_client.events = event_stream()
-
+        stream = BlockingStream([event])
+        docker_client.events = stream
         processed = []
 
         async def fake_process(received):
@@ -962,41 +963,24 @@ class TestEventListenerLoop:
         monkeypatch.setattr(engine, "_process_container_start_event", fake_process)
         engine._running = True
 
-        try:
-            await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
-        finally:
-            release.set()
+        await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
 
         assert processed == [event]
+        assert stream.close_calls == 1
+        assert event_threads() == []
 
     async def test_none_event_stream_is_retried_until_it_recovers(
-        self, engine, docker_client, monkeypatch, caplog
+        self, engine, docker_client, monkeypatch, caplog, fast_reconnect
     ):
-        import threading
-
-        release = threading.Event()
         event = start_event("b" * 64, "web")
-        sleep_calls = []
-
-        def fake_sleep(seconds):
-            sleep_calls.append(seconds)
-
-        monkeypatch.setattr("time.sleep", fake_sleep)
-
-        def working_stream():
-            yield event
-            release.wait(timeout=5)
-
+        stream = BlockingStream([event])
         attempts = []
 
         def get_events_sequence():
             attempts.append(1)
-            if len(attempts) == 1:
-                return None
-            return working_stream()
+            return None if len(attempts) == 1 else stream
 
         docker_client.events = get_events_sequence
-
         processed = []
 
         async def fake_process(received):
@@ -1006,49 +990,29 @@ class TestEventListenerLoop:
         monkeypatch.setattr(engine, "_process_container_start_event", fake_process)
         engine._running = True
 
-        try:
-            await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
-        finally:
-            release.set()
+        await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
 
         assert processed == [event]
         assert len(attempts) == 2
-        assert sleep_calls == [10]
-        assert "Failed to get event stream, retrying in 10 seconds" in caplog.text
+        assert "Failed to get event stream, retrying in 0.01 seconds" in caplog.text
 
     async def test_mid_stream_exception_is_retried_until_it_recovers(
-        self, engine, docker_client, monkeypatch, caplog
+        self, engine, docker_client, monkeypatch, caplog, fast_reconnect
     ):
-        import threading
-
-        release = threading.Event()
         first_event = start_event("c" * 64, "web-1")
         second_event = start_event("d" * 64, "web-2")
-        sleep_calls = []
-
-        def fake_sleep(seconds):
-            sleep_calls.append(seconds)
-
-        monkeypatch.setattr("time.sleep", fake_sleep)
+        stream = BlockingStream([second_event])
+        attempts = []
 
         def broken_stream():
             yield first_event
             raise RuntimeError("stream disconnected")
 
-        def working_stream():
-            yield second_event
-            release.wait(timeout=5)
-
-        attempts = []
-
         def get_events_sequence():
             attempts.append(1)
-            if len(attempts) == 1:
-                return broken_stream()
-            return working_stream()
+            return broken_stream() if len(attempts) == 1 else stream
 
         docker_client.events = get_events_sequence
-
         processed = []
 
         async def fake_process(received):
@@ -1059,131 +1023,293 @@ class TestEventListenerLoop:
         monkeypatch.setattr(engine, "_process_container_start_event", fake_process)
         engine._running = True
 
-        try:
-            await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
-        finally:
-            release.set()
+        await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
 
         assert processed == [first_event, second_event]
         assert len(attempts) == 2
-        assert sleep_calls == [10]
         assert "Error in event listener thread: stream disconnected" in caplog.text
 
-    async def test_retry_loop_stops_once_shutdown_is_requested(
+    async def test_every_stream_end_is_followed_by_a_pause(
         self, engine, docker_client, monkeypatch
+    ):
+        """A stream that ends cleanly must not be reopened in a busy loop."""
+        monkeypatch.setattr("app.monitor.monitoring_engine.EVENT_RECONNECT_DELAY_SECONDS", 0.2)
+        times = []
+
+        def ended_stream():
+            times.append(time.monotonic())
+            return iter(())
+
+        docker_client.events = ended_stream
+        engine._running = True
+        task = asyncio.create_task(engine._event_listener_loop())
+        try:
+            await wait_until(lambda: len(times) >= 2)
+        finally:
+            engine._running = False
+            task.cancel()
+            await task
+
+        assert times[1] - times[0] >= 0.15
+
+    async def test_stream_end_is_logged_and_reconnected(
+        self, engine, docker_client, caplog, fast_reconnect
     ):
         attempts = []
 
-        def fake_sleep(seconds):
-            # Simulate a shutdown request arriving while the thread is
-            # waiting to retry, so it must not call get_events() again.
-            engine._running = False
+        def ended_stream():
+            attempts.append(1)
+            return iter(())
 
-        monkeypatch.setattr("time.sleep", fake_sleep)
+        docker_client.events = ended_stream
+        engine._running = True
+        task = asyncio.create_task(engine._event_listener_loop())
+        try:
+            await wait_until(lambda: len(attempts) >= 2)
+        finally:
+            engine._running = False
+            task.cancel()
+            await task
+
+        assert "Docker event stream ended, reconnecting in 0.01 seconds" in caplog.text
+
+    async def test_reconnect_resumes_from_the_last_event_seen(
+        self, engine, docker_client, fast_reconnect
+    ):
+        event = {**start_event("e" * 64, "web"), "time": 1700000005}
+        stream = BlockingStream()
+
+        def broken_stream():
+            yield event
+            raise RuntimeError("stream disconnected")
+
+        calls = []
 
         def get_events_sequence():
-            attempts.append(1)
+            calls.append(1)
+            return broken_stream() if len(calls) == 1 else stream
 
         docker_client.events = get_events_sequence
         engine._running = True
+        task = asyncio.create_task(engine._event_listener_loop(1700000000))
+        try:
+            await wait_until(lambda: len(docker_client.events_since) >= 2)
+        finally:
+            engine._running = False
+            task.cancel()
+            await task
 
-        await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
+        assert docker_client.events_since[:2] == [1700000000, 1700000005]
 
-        assert attempts == [1]
+    async def test_first_connect_defaults_to_now(self, engine, docker_client):
+        stream = BlockingStream()
+        docker_client.events = stream
+        engine._running = True
+        before = int(time.time())
+        task = asyncio.create_task(engine._event_listener_loop())
+        try:
+            await wait_until(lambda: docker_client.events_since)
+        finally:
+            engine._running = False
+            task.cancel()
+            await task
+
+        assert before <= docker_client.events_since[0] <= int(time.time())
+
+    async def test_start_passes_a_pre_scan_timestamp_to_the_listener(self, engine, monkeypatch):
+        seen = {}
+        clock = [1_700_000_000]
+        monkeypatch.setattr(time, "time", lambda: clock[0])
+
+        async def fake_scan():
+            clock[0] += 5
+            seen["scan_started"] = int(time.time())
+
+        async def fake_listener(since=None):
+            seen["since"] = since
+
+        monkeypatch.setattr(engine, "_scan_existing_containers", fake_scan)
+        monkeypatch.setattr(engine, "_monitor_loop", AsyncMock())
+        monkeypatch.setattr(engine, "_event_listener_loop", fake_listener)
+
+        await engine.start()
+        await engine._event_task
+        await engine.stop()
+
+        assert seen["since"] == 1_700_000_000
+        assert seen["since"] < seen["scan_started"]
+
+    async def test_replayed_start_event_does_not_record_auto_monitor_twice(
+        self, engine, docker_client
+    ):
+        container, info = make_container(
+            name="web", container_id="f" * 64, labels={"autoheal": "true"}
+        )
+        docker_client.add_container(container, info)
+        event = start_event("f" * 64, "web")
+
+        await engine._process_container_start_event(event)
+        await engine._process_container_start_event(event)
+
+        assert [e.event_type for e in config_manager.get_events()] == ["auto_monitor"]
+
+    async def test_stop_closes_the_stream_and_joins_the_thread(self, engine, docker_client):
+        stream = BlockingStream()
+        docker_client.events = stream
+        engine._running = True
+        task = asyncio.create_task(engine._event_listener_loop())
+        await wait_until(lambda: docker_client.events_since)
+        await wait_until(event_threads)
+
+        engine._running = False
+        task.cancel()
+        await asyncio.wait_for(task, timeout=10)
+
+        assert stream.close_calls == 1
+        assert event_threads() == []
+
+    async def test_close_raising_does_not_stop_the_shutdown(
+        self, engine, docker_client, caplog, monkeypatch
+    ):
+        monkeypatch.setattr("app.monitor.monitoring_engine.EVENT_THREAD_JOIN_TIMEOUT_SECONDS", 0.05)
+        stream = BlockingStream(close_error=RuntimeError("ssh transport has no close"))
+        docker_client.events = stream
+        engine._running = True
+        task = asyncio.create_task(engine._event_listener_loop())
+        await wait_until(lambda: docker_client.events_since)
+        await wait_until(event_threads)
+
+        engine._running = False
+        task.cancel()
+        with caplog.at_level("DEBUG"):
+            await asyncio.wait_for(task, timeout=10)
+            stream.release()
+
+        assert "Error closing Docker event stream: ssh transport has no close" in caplog.text
+
+    async def test_thread_that_ignores_close_is_reported_not_awaited_forever(
+        self, engine, docker_client, monkeypatch, caplog
+    ):
+        monkeypatch.setattr("app.monitor.monitoring_engine.EVENT_THREAD_JOIN_TIMEOUT_SECONDS", 0.05)
+        stream = BlockingStream(close_error=RuntimeError("cannot close"))
+        docker_client.events = stream
+        engine._running = True
+        task = asyncio.create_task(engine._event_listener_loop())
+        await wait_until(lambda: docker_client.events_since)
+        await wait_until(event_threads)
+
+        engine._running = False
+        task.cancel()
+        try:
+            await asyncio.wait_for(task, timeout=10)
+        finally:
+            stream.release()
+
+        assert "Docker event reader thread still running 0.05 seconds after stop" in caplog.text
+
+    async def test_retry_loop_stops_once_shutdown_is_requested(
+        self, engine, docker_client, fast_reconnect
+    ):
+        attempts = []
+
+        def no_stream():
+            attempts.append(1)
+
+        docker_client.events = no_stream
+        engine._running = True
+        task = asyncio.create_task(engine._event_listener_loop())
+        await wait_until(lambda: len(attempts) >= 2)
+
+        engine._running = False
+        task.cancel()
+        await asyncio.wait_for(task, timeout=10)
+        settled = len(attempts)
+        await asyncio.sleep(0.1)
+
+        assert len(attempts) == settled
+        assert event_threads() == []
 
     async def test_thread_stops_reading_events_once_shutdown_is_requested(
         self, engine, docker_client, monkeypatch
     ):
-        import queue
-        import threading
-
-        stopped = threading.Event()
-        first_event = start_event("a" * 64, "web")
         late_event = start_event("b" * 64, "late")
-        queued = []
-
-        class RecordingQueue(queue.Queue):
-            def put(self, item, block=True, timeout=None):
-                queued.append(item)
-                super().put(item, block, timeout)
+        gate = threading.Event()
 
         def event_stream():
-            yield first_event
-            stopped.wait(timeout=5)
+            yield start_event("a" * 64, "web")
+            gate.wait(timeout=5)
             yield late_event
 
         docker_client.events = event_stream()
-        monkeypatch.setattr(queue, "Queue", RecordingQueue)
-
-        threads = []
-        real_thread = threading.Thread
-
-        def capture_thread(*args, **kwargs):
-            thread = real_thread(*args, **kwargs)
-            threads.append(thread)
-            return thread
-
-        monkeypatch.setattr(threading, "Thread", capture_thread)
+        processed = []
 
         async def fake_process(received):
+            processed.append(received)
             engine._running = False
-            stopped.set()
+            gate.set()
 
         monkeypatch.setattr(engine, "_process_container_start_event", fake_process)
         engine._running = True
 
         await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
-        [thread] = threads
-        thread.join(timeout=5)
 
-        assert not thread.is_alive()
-        assert queued == [first_event]
+        assert [e["Actor"]["Attributes"]["name"] for e in processed] == ["web"]
+        assert event_threads() == []
 
-    async def test_idle_queue_yields_briefly_before_polling_again(
-        self, engine, docker_client, monkeypatch, recorded_sleeps
+    async def test_two_start_stop_cycles_leave_no_live_thread(
+        self, engine, docker_client, monkeypatch
     ):
-        import queue
-        import threading
+        monkeypatch.setattr(engine, "_monitor_loop", AsyncMock())
+        for _ in range(2):
+            docker_client.events = BlockingStream()
+            await engine.start()
+            await wait_until(event_threads)
+            await engine.stop()
+            assert event_threads() == []
 
-        release = threading.Event()
+    async def test_idle_listener_does_not_block_the_event_loop(self, engine, docker_client):
+        stream = BlockingStream()
+        docker_client.events = stream
+        engine._running = True
+        task = asyncio.create_task(engine._event_listener_loop())
+        await wait_until(lambda: docker_client.events_since)
 
-        def event_stream():
-            release.wait(timeout=5)
-            return iter(())
+        longest_gap = 0.0
+        loop = asyncio.get_running_loop()
+        end = loop.time() + 0.5
+        while loop.time() < end:
+            before = loop.time()
+            await asyncio.sleep(0.01)
+            longest_gap = max(longest_gap, loop.time() - before)
 
-        class EmptyQueue(queue.Queue):
-            def get(self, block=True, timeout=None):
-                raise queue.Empty
+        engine._running = False
+        task.cancel()
+        await task
 
-        async def stop_after_idle_sleep(delay, *args, **kwargs):
-            recorded_sleeps.append(delay)
-            engine._running = False
+        # The old consumer blocked in queue.get(timeout=1.0), stalling the loop for a second
+        assert longest_gap < 0.3
 
-        docker_client.events = event_stream
-        monkeypatch.setattr(queue, "Queue", EmptyQueue)
-        monkeypatch.setattr(asyncio, "sleep", stop_after_idle_sleep)
+    async def test_reader_thread_dying_ends_the_listener(
+        self, engine, docker_client, monkeypatch, caplog
+    ):
+        monkeypatch.setattr(threading, "excepthook", lambda args: None)
+
+        def die():
+            raise SystemExit
+
+        docker_client.events = die
         engine._running = True
 
-        try:
-            await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
-        finally:
-            release.set()
+        await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
 
-        assert recorded_sleeps == [0.1]
+        assert "Docker event reader thread exited unexpectedly" in caplog.text
 
     async def test_cancelling_the_listener_ends_the_loop(self, engine, docker_client, monkeypatch):
-        import threading
-
-        release = threading.Event()
-
-        def event_stream():
-            yield start_event("a" * 64, "web")
-            release.wait(timeout=5)
+        docker_client.events = BlockingStream([start_event("a" * 64, "web")])
 
         async def cancelled_process(received):
             raise asyncio.CancelledError
 
-        docker_client.events = event_stream()
         monkeypatch.setattr(engine, "_process_container_start_event", cancelled_process)
         engine._running = True
 
@@ -1191,7 +1317,67 @@ class TestEventListenerLoop:
             await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
         finally:
             engine._running = False
-            release.set()
+
+        assert event_threads() == []
+
+
+class TestDockerEventReader:
+    """Edge cases of the reader thread that the listener loop does not reach."""
+
+    def make_reader(self, docker_client):
+        loop = MagicMock()
+        return _DockerEventReader(docker_client, loop, MagicMock(), 0), loop
+
+    def test_publishing_to_a_closed_event_loop_stops_the_reader(self, docker_client):
+        reader, loop = self.make_reader(docker_client)
+        loop.call_soon_threadsafe.side_effect = RuntimeError("Event loop is closed")
+
+        reader._publish({"id": "x"})
+
+        assert reader.stop.is_set()
+
+    def test_errors_after_stop_are_not_logged(self, docker_client, caplog):
+        reader, _ = self.make_reader(docker_client)
+
+        def closed_stream():
+            reader.stop.set()
+            raise OSError("stream closed")
+
+        docker_client.events = closed_stream
+
+        reader.run()
+
+        assert "Error in event listener thread" not in caplog.text
+
+    def test_stop_requested_mid_stream_drops_the_remaining_events(self, docker_client):
+        reader, loop = self.make_reader(docker_client)
+        first = start_event("a" * 64, "web")
+        late = start_event("b" * 64, "late")
+
+        def stream():
+            yield first
+            reader.stop.set()
+            yield late
+
+        docker_client.events = stream
+        reader.run()
+
+        published = [call.args[1] for call in loop.call_soon_threadsafe.call_args_list]
+        assert published == [first, None]
+
+    def test_stop_seen_right_after_connecting_closes_nothing_and_exits(self, docker_client):
+        reader, loop = self.make_reader(docker_client)
+        stream = BlockingStream([start_event("a" * 64, "web")])
+
+        def stop_while_connecting():
+            reader.stop.set()
+            return stream
+
+        docker_client.events = stop_while_connecting
+
+        reader.run()
+
+        loop.call_soon_threadsafe.assert_called_once_with(reader._queue.put_nowait, None)
 
 
 DEV_LABEL = "autoheal.dev"
