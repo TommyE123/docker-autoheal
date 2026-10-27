@@ -63,7 +63,9 @@ database — all state is JSON files under `/data`.
 
    In parallel, `_event_listener_loop` subscribes to Docker's container-start events (via
    a background thread feeding an asyncio queue) so containers labelled `autoheal=true`
-   are picked up the moment they start, without waiting for the next polling cycle.
+   are picked up the moment they start, without waiting for the next polling cycle. The
+   startup scan and the handling of each start event live in `AutoDiscovery`
+   (`app/monitor/auto_discovery.py`), which the engine drives.
 
 3. **REST API** (`app/api/api.py`, routes in `app/api/routes/`): a FastAPI app exposing
    `/api/*` endpoints for containers, configuration, health checks, maintenance mode,
