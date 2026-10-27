@@ -1118,8 +1118,11 @@ class TestEventListenerLoop:
 
     async def test_start_passes_a_pre_scan_timestamp_to_the_listener(self, engine, monkeypatch):
         seen = {}
+        clock = [1_700_000_000]
+        monkeypatch.setattr(time, "time", lambda: clock[0])
 
         async def fake_scan():
+            clock[0] += 5
             seen["scan_started"] = int(time.time())
 
         async def fake_listener(since=None):
@@ -1128,13 +1131,13 @@ class TestEventListenerLoop:
         monkeypatch.setattr(engine, "_scan_existing_containers", fake_scan)
         monkeypatch.setattr(engine, "_monitor_loop", AsyncMock())
         monkeypatch.setattr(engine, "_event_listener_loop", fake_listener)
-        before = int(time.time())
 
         await engine.start()
         await engine._event_task
         await engine.stop()
 
-        assert before <= seen["since"] <= seen["scan_started"]
+        assert seen["since"] == 1_700_000_000
+        assert seen["since"] < seen["scan_started"]
 
     async def test_replayed_start_event_does_not_record_auto_monitor_twice(
         self, engine, docker_client
