@@ -1165,7 +1165,10 @@ class TestEventListenerLoop:
         assert stream.close_calls == 1
         assert event_threads() == []
 
-    async def test_close_raising_does_not_stop_the_shutdown(self, engine, docker_client, caplog):
+    async def test_close_raising_does_not_stop_the_shutdown(
+        self, engine, docker_client, caplog, monkeypatch
+    ):
+        monkeypatch.setattr("app.monitor.monitoring_engine.EVENT_THREAD_JOIN_TIMEOUT_SECONDS", 0.05)
         stream = BlockingStream(close_error=RuntimeError("ssh transport has no close"))
         docker_client.events = stream
         engine._running = True
