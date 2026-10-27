@@ -213,7 +213,7 @@ class TestErrorsLoggedWithTraceback:
 
     @pytest.mark.asyncio
     async def test_event_thread_error(self, caplog, engine, docker_client, monkeypatch):
-        monkeypatch.setattr("app.monitor.monitoring_engine.EVENT_RECONNECT_DELAY_SECONDS", 0.01)
+        monkeypatch.setattr("app.monitor.auto_discovery.EVENT_RECONNECT_DELAY_SECONDS", 0.01)
         attempts = []
 
         def broken_then_idle():

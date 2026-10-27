@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.config.config_manager import config_manager
-from app.monitor.monitoring_engine import _DockerEventReader
+from app.monitor.auto_discovery import _DockerEventReader
 from app.tests.unit.conftest import BlockingStream, event_threads, make_container, wait_until
 
 
@@ -941,7 +941,7 @@ class TestMonitorLoop:
 @pytest.fixture
 def fast_reconnect(monkeypatch):
     """Shrink the reconnect pause so retry tests do not wait ten seconds."""
-    monkeypatch.setattr("app.monitor.monitoring_engine.EVENT_RECONNECT_DELAY_SECONDS", 0.01)
+    monkeypatch.setattr("app.monitor.auto_discovery.EVENT_RECONNECT_DELAY_SECONDS", 0.01)
 
 
 @pytest.mark.asyncio
@@ -1033,7 +1033,7 @@ class TestEventListenerLoop:
         self, engine, docker_client, monkeypatch
     ):
         """A stream that ends cleanly must not be reopened in a busy loop."""
-        monkeypatch.setattr("app.monitor.monitoring_engine.EVENT_RECONNECT_DELAY_SECONDS", 0.2)
+        monkeypatch.setattr("app.monitor.auto_discovery.EVENT_RECONNECT_DELAY_SECONDS", 0.2)
         times = []
 
         def ended_stream():
@@ -1171,7 +1171,7 @@ class TestEventListenerLoop:
     async def test_close_raising_does_not_stop_the_shutdown(
         self, engine, docker_client, caplog, monkeypatch
     ):
-        monkeypatch.setattr("app.monitor.monitoring_engine.EVENT_THREAD_JOIN_TIMEOUT_SECONDS", 0.05)
+        monkeypatch.setattr("app.monitor.auto_discovery.EVENT_THREAD_JOIN_TIMEOUT_SECONDS", 0.05)
         stream = BlockingStream(close_error=RuntimeError("ssh transport has no close"))
         docker_client.events = stream
         engine._running = True
@@ -1190,7 +1190,7 @@ class TestEventListenerLoop:
     async def test_thread_that_ignores_close_is_reported_not_awaited_forever(
         self, engine, docker_client, monkeypatch, caplog
     ):
-        monkeypatch.setattr("app.monitor.monitoring_engine.EVENT_THREAD_JOIN_TIMEOUT_SECONDS", 0.05)
+        monkeypatch.setattr("app.monitor.auto_discovery.EVENT_THREAD_JOIN_TIMEOUT_SECONDS", 0.05)
         stream = BlockingStream(close_error=RuntimeError("cannot close"))
         docker_client.events = stream
         engine._running = True
