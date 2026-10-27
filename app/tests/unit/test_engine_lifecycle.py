@@ -1187,6 +1187,44 @@ class TestEventListenerLoop:
 
         assert "Error closing Docker event stream: ssh transport has no close" in caplog.text
 
+    async def test_stalled_close_is_bounded_and_does_not_block_the_event_loop(
+        self, engine, docker_client, monkeypatch, caplog
+    ):
+        monkeypatch.setattr("app.monitor.monitoring_engine.EVENT_THREAD_JOIN_TIMEOUT_SECONDS", 0.2)
+        stalled = threading.Event()
+
+        class StalledCloseStream(BlockingStream):
+            def close(self):
+                self.close_calls += 1
+                stalled.wait(timeout=5)
+                self.release()
+
+        stream = StalledCloseStream()
+        docker_client.events = stream
+        engine._running = True
+        task = asyncio.create_task(engine._event_listener_loop())
+        await wait_until(lambda: docker_client.events_since)
+        await wait_until(event_threads)
+
+        engine._running = False
+        task.cancel()
+        loop = asyncio.get_running_loop()
+        started = loop.time()
+        longest_gap = 0.0
+        while not task.done():
+            before = loop.time()
+            await asyncio.sleep(0.01)
+            longest_gap = max(longest_gap, loop.time() - before)
+        try:
+            await task
+            elapsed = loop.time() - started
+        finally:
+            stalled.set()
+
+        assert longest_gap < 0.15
+        assert elapsed < 2
+        assert "Docker event stream still closing 0.2 seconds after stop" in caplog.text
+
     async def test_thread_that_ignores_close_is_reported_not_awaited_forever(
         self, engine, docker_client, monkeypatch, caplog
     ):
