@@ -19,7 +19,7 @@ features:
   # See issue-triage.md: actionlint does not recognise the "queue" key.
   group-concurrency-queue: false
 tools:
-  bash: ["cat", "jq", "ls", "find", "grep", "head", "tail", "wc", "git", "diff", "safeoutputs"]
+  bash: ["cat", "jq", "ls", "find", "grep", "head", "tail", "wc", "safeoutputs"]
   edit:
 safe-outputs:
   threat-detection: false
