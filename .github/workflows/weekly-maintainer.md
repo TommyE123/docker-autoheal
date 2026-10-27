@@ -18,18 +18,23 @@ engine:
   # tier; Flash Lite allows 500/day and 15/minute.
   version: "0.59.0"
   model: gemini-3.5-flash-lite
-# Top-level AWF invocation cap; gh-aw's engines reference lists it as supported
-# for Gemini. The default is 500, and the agent job already has a 20-minute
-# timeout.
-max-turns: 40
+# Top-level AWF invocation cap on model requests; gh-aw's engines reference
+# lists it as supported for Gemini. The default is 500, and the agent step has a
+# 20-minute timeout. 60 leaves room for the baseline reads, the assessment and
+# the summary, and is well inside the 500/day Flash Lite quota. Unverified in a
+# real run.
+max-turns: 60
 features:
   # actionlint (as pinned by this repo's MegaLinter) doesn't yet recognize
   # the "queue" concurrency key gh-aw emits by default.
   group-concurrency-queue: false
 tools:
   # Explicit shell allow-list, required by strict mode when min-integrity is
-  # none. Read-only inspection plus the github and safeoutputs CLIs. There is
-  # no edit tool, so the audit cannot change any file.
+  # none. Inspection commands plus the github and safeoutputs CLIs. There is no
+  # edit tool, but the Gemini engine still exposes write_file and replace, so
+  # the local workspace stays writable. The read-only boundary is the read-only
+  # token, the read-only GitHub MCP server and the absence of any write safe
+  # output.
   bash: ["cat", "jq", "ls", "find", "grep", "head", "tail", "wc", "github", "safeoutputs"]
   github:
     toolsets: [repos, issues, pull_requests]
@@ -87,22 +92,32 @@ and never write anywhere except the run summary. You report through two
 things only:
 
 - **The run summary.** Write a short Markdown report with
-  `cat <<'EOF' > "$GITHUB_STEP_SUMMARY"` (a quoted heredoc, so apostrophes are
-  safe). It is the only place a finding is reported.
+  `cat <<'EOF' > "$GITHUB_STEP_SUMMARY"`. It is the only place a finding is
+  reported. The Gemini CLI blocks a shell command that contains a backtick or
+  `$(` outside single quotes, and it does not understand heredocs, so the report
+  must contain **no backticks, no `$(` and no apostrophes**. Write file paths,
+  line numbers and code names as plain text (for example app/monitor/x.py line
+  12), and write "does not" instead of "doesn't".
 - **`safeoutputs noop`**, your single terminal call, with the outcome in the
   message: `safeoutputs noop '{"message":"FINDING: <title>"}'`,
   `'{"message":"NO FINDING: <reason>"}'` or
-  `'{"message":"INCOMPLETE AUDIT: <what could not be retrieved>"}'`. Never call
-  `report_incomplete`, `report_missing_tool` or `report_missing_data`. Call
+  `'{"message":"INCOMPLETE AUDIT: <what could not be retrieved>"}'`. The
+  message is inside single quotes, so it must also contain no apostrophes. Never
+  call `report_incomplete`, `report_missing_tool` or `report_missing_data`. Call
   `noop` exactly once, after the summary is written.
+
+You have about 60 model turns. Batch reads where you can (`read_many_files`,
+several tool calls in one turn), cover each area once rather than repeatedly,
+and keep the last three turns for the summary and `noop`. If you are running
+short, stop assessing and report what you have as the outcome that fits.
 
 ## Stage 0: Baseline
 
 Record the audit timestamp and the head commit SHA of `main`. Gather the recent commits
 and merges on `main`, all open issues and open pull requests, the issues and
 pull requests closed or merged in roughly the last 30 days (titles, bodies,
-labels, branch names), and the check runs on recent `main` commits and open PRs
-where the token allows it. Read `.github/workflows/` and `renovate.json` to
+labels, branch names), and the check runs on open PRs where the token allows
+it. Read `.github/workflows/` and `renovate.json` to
 learn what existing automation covers. Confirm you can read the source,
 `app/tests/unit/`, `frontend/src/` and the CI workflows.
 
