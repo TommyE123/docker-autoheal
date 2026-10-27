@@ -1198,32 +1198,13 @@ class MonitoringEngine:
             reader.stop.set()
             await self._stop_event_reader(thread, reader.stream)
 
-    async def _close_event_stream(self, stream: Any) -> None:
-        """
-        Close the stream on its own daemon thread, waiting at most the join timeout.
-
-        A close that stalls then holds up neither the event loop nor the default executor.
-        """
-
-        def close() -> None:
+    async def _stop_event_reader(self, thread: threading.Thread, stream: Any) -> None:
+        """Close the blocked event stream and wait for the reader thread to exit."""
+        if stream is not None:
             try:
                 stream.close()
             except Exception as e:  # DockerException for ssh://, or the stream already gone
                 logger.debug("Error closing Docker event stream: %s", e)
-
-        closer = threading.Thread(target=close, daemon=True, name="docker-events-close")
-        closer.start()
-        await asyncio.to_thread(closer.join, EVENT_THREAD_JOIN_TIMEOUT_SECONDS)
-        if closer.is_alive():
-            logger.warning(
-                "Docker event stream still closing %s seconds after stop",
-                EVENT_THREAD_JOIN_TIMEOUT_SECONDS,
-            )
-
-    async def _stop_event_reader(self, thread: threading.Thread, stream: Any) -> None:
-        """Close the blocked event stream and wait for the reader thread to exit."""
-        if stream is not None:
-            await self._close_event_stream(stream)
         await asyncio.to_thread(thread.join, EVENT_THREAD_JOIN_TIMEOUT_SECONDS)
         if thread.is_alive():
             logger.warning(
