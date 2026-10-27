@@ -1156,7 +1156,7 @@ class MonitoringEngine:
         except Exception as e:
             logger.exception("Error during initial container scan: %s", e)
 
-    async def _event_listener_loop(self, since: float | None = None) -> None:
+    async def _event_listener_loop(self, since: int | None = None) -> None:
         """
         Listen for Docker events and auto-add containers with the configured monitoring label
         (autoheal=true by default)
@@ -1176,7 +1176,7 @@ class MonitoringEngine:
             self.docker_client,
             asyncio.get_running_loop(),
             event_queue,
-            int(time.time() if since is None else since),
+            int(time.time()) if since is None else since,
         )
         thread = threading.Thread(target=reader.run, daemon=True, name="docker-events")
         thread.start()

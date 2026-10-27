@@ -1349,6 +1349,22 @@ class TestDockerEventReader:
 
         assert "Error in event listener thread" not in caplog.text
 
+    def test_stop_requested_mid_stream_drops_the_remaining_events(self, docker_client):
+        reader, loop = self.make_reader(docker_client)
+        first = start_event("a" * 64, "web")
+        late = start_event("b" * 64, "late")
+
+        def stream():
+            yield first
+            reader.stop.set()
+            yield late
+
+        docker_client.events = stream
+        reader.run()
+
+        published = [call.args[1] for call in loop.call_soon_threadsafe.call_args_list]
+        assert published == [first, None]
+
     def test_stop_seen_right_after_connecting_closes_nothing_and_exits(self, docker_client):
         reader, loop = self.make_reader(docker_client)
         stream = BlockingStream([start_event("a" * 64, "web")])
