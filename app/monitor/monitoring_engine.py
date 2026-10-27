@@ -808,7 +808,7 @@ class MonitoringEngine:
         now = datetime.now(UTC)
         next_allowed = self._next_allowed_restart.get(recovery_id)
         if next_allowed is not None:
-            if self._restart_wait_seen.get(recovery_id, self._check_cycle) < self._check_cycle - 1:
+            if self._restart_wait_seen[recovery_id] < self._check_cycle - 1:
                 logger.debug(
                     "Restart wait for %s (recovery_id: %s) was not confirmed last cycle, "
                     "starting a new one",

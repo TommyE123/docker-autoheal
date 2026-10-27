@@ -501,6 +501,33 @@ class TestExplicitMonitoringIdIsShared:
         assert engine._restart_wait_seen == {recovery_id: engine._check_cycle}
         assert docker_client.restart_calls == []
 
+    async def test_failing_sibling_does_not_keep_the_owners_wait_alive(self, engine, docker_client):
+        """
+        Only the owner confirms a wait. The owner is skipped (quarantined by name) while
+        its sibling keeps failing, so the owner's wait goes stale and the sibling starts a
+        fresh one instead of restarting on the owner's old deadline (#15).
+        """
+        shared = {"monitoring.id": "shared-web"}
+        a, a_info = replica(1, status="exited", exit_code=1, extra_labels=shared)
+        b, b_info = replica(2, status="exited", exit_code=1, extra_labels=shared)
+        docker_client.add_container(a, a_info)
+        docker_client.add_container(b, b_info)
+        recovery_id = "monitoring.id:shared-web"
+        await engine._check_containers()
+        owner_id = engine._restart_wait_owner[recovery_id]
+        owner, sibling = (a, b) if owner_id == a.id else (b, a)
+        original_deadline = engine._next_allowed_restart[recovery_id]
+
+        config_manager.quarantine_container(owner.name)  # the owner is no longer evaluated
+        await engine._check_containers()  # the sibling consults a wait that is still fresh
+        assert engine._restart_wait_owner == {recovery_id: owner_id}
+        await engine._check_containers()  # the owner went unconfirmed for a cycle
+
+        assert docker_client.restart_calls == []
+        assert engine._restart_wait_owner == {recovery_id: sibling.id}
+        assert engine._next_allowed_restart[recovery_id] > original_deadline
+        assert engine._backoff_delays == {}
+
 
 class TestConfigurationStaysPerService:
     def test_selection_by_service_id_monitors_every_replica(self, engine, update_config):
