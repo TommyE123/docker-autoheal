@@ -14,29 +14,29 @@ vulnerabilities:
   - id: CVE-2026-59951
     paths:
       - ".mise/locks/pypi-semgrep/**/uv.lock"
-    statement: "Dev-only semgrep CLI pins mcp==1.29.0; flaw affects Streamable HTTP servers, which we never run. Remove once semgrep pins mcp>=1.30.0, see issue #596"
+    statement: "Dev-only semgrep CLI pins mcp==1.29.0; flaw affects Streamable HTTP servers, which we never run. Remove once semgrep pins mcp>=1.30.0"
     expired_at: 2026-12-16
 
   - id: CVE-2026-114603
     paths:
       - ".mise/locks/pypi-semgrep/**/uv.lock"
-    statement: "Dev-only semgrep CLI pins opentelemetry-api~=1.37.0; flaw affects servers parsing incoming tracestate, which we never run. Remove once semgrep allows >=1.45.1, see issue #596"
+    statement: "Dev-only semgrep CLI pins opentelemetry-api~=1.37.0; flaw affects servers parsing incoming tracestate, which we never run. Remove once semgrep allows >=1.45.1"
     expired_at: 2026-12-16
 
   - id: CVE-2026-116684
     paths:
       - ".mise/locks/pypi-semgrep/**/uv.lock"
-    statement: "Dev-only semgrep CLI pins mcp==1.29.0; flaw affects server-side bearer-token authentication, which we never run. Remove once semgrep pins mcp>=1.30.0, see issue #596"
+    statement: "Dev-only semgrep CLI pins mcp==1.29.0; flaw affects server-side bearer-token authentication, which we never run. Remove once semgrep pins mcp>=1.30.0"
     expired_at: 2026-12-16
 
   - id: CVE-2026-116685
     paths:
       - ".mise/locks/pypi-semgrep/**/uv.lock"
-    statement: "Dev-only semgrep CLI pins mcp==1.29.0; flaw affects HTTP client transports, which we never run as an MCP client. Remove once semgrep pins mcp>=1.30.0, see issue #596"
+    statement: "Dev-only semgrep CLI pins mcp==1.29.0; flaw affects HTTP client transports, which we never run as an MCP client. Remove once semgrep pins mcp>=1.30.0"
     expired_at: 2026-12-16
 
   - id: CVE-2026-116686
     paths:
       - ".mise/locks/pypi-semgrep/**/uv.lock"
-    statement: "Dev-only semgrep CLI pins mcp==1.29.0; flaw affects client-side $ref URL validation, which we never run as an MCP client. Remove once semgrep pins mcp>=1.30.0, see issue #596"
+    statement: "Dev-only semgrep CLI pins mcp==1.29.0; flaw affects client-side $ref URL validation, which we never run as an MCP client. Remove once semgrep pins mcp>=1.30.0"
     expired_at: 2026-12-16
