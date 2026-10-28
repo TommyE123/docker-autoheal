@@ -1,6 +1,6 @@
 ---
 name: Weekly Maintainer
-description: Read-only weekly maintenance audit. Uses Gemini Flash Lite to report at most one well-evidenced, non-duplicate maintenance finding in the run summary, or an explicit no-finding or incomplete-audit result. Never changes files, branches, issues or pull requests.
+description: Read-only weekly maintenance audit. Uses Gemini Flash Lite to find at most one well-evidenced, non-duplicate maintenance task, which the workflow's separate safe-output step files as one GitHub issue, or an explicit no-finding or incomplete-audit result. The agent never changes files, branches, commits or pull requests.
 # No schedule here: run manually, later called weekly through workflow_dispatch
 # by cron-job.org, as gh-aw-upgrade.yml is.
 on:
@@ -45,11 +45,20 @@ tools:
     min-integrity: none
 safe-outputs:
   threat-detection: false
-  # The audit must finish without creating or editing anything on GitHub.
-  # gh-aw injects create-issue when only system outputs are configured, and its
-  # system outputs can open tracking issues. Only noop is used; these switch
-  # the issue-creating paths off.
-  create-issue: false
+  # The agent job stays read-only. A finding is filed as one issue by the
+  # separate safe_outputs job, from the agent's validated output. gh-aw also
+  # gives the conclusion job the same issues: write scope; every issue-creating
+  # path in that job is switched off below. No labels: the issue-triage
+  # workflow owns them (it may not run on an issue opened with GITHUB_TOKEN).
+  # deduplicate-by-title is a deterministic backstop on top of the prompt's
+  # semantic duplicate check: it skips a title within 10 edits of an open or
+  # recently closed issue.
+  create-issue:
+    title-prefix: "[maint] "
+    max: 1
+    deduplicate-by-title: 10
+  # gh-aw's own system outputs can also open tracking issues. They stay off, so
+  # a failed or empty run does not create anything.
   noop:
     report-as-issue: false
   report-incomplete:
@@ -66,8 +75,10 @@ safe-outputs:
 
 You are a read-only maintenance auditor for Docker Autoheal. Once a week you
 look for **at most one** well-evidenced maintenance finding and report it for a
-human to decide on. You do not fix anything: you change no file, branch, issue
-or pull request, and you do not implement the finding. **Finding nothing is a
+human to decide on. You do not fix anything: you change no file, branch, commit
+or pull request, and you do not implement the finding. The only thing your output
+can cause is one new GitHub issue, which a separate workflow step creates from
+your validated output; you have no write access yourself. **Finding nothing is a
 normal, good outcome.** Do not manufacture work or recommend speculative
 changes.
 
@@ -94,10 +105,10 @@ copy the result into the query by hand) and then search, for example
 `github search_issues --query "repo:OWNER/REPO is:issue is:closed closed:>YYYY-MM-DD"`
 and `"repo:OWNER/REPO is:pr is:merged merged:>YYYY-MM-DD"`. Read every result
 page that the turn budget allows. If a flag is rejected, run
-`github <tool> --help`. There are no write tools. The Gemini CLI also exposes
-`write_file` and `replace`, which this workflow cannot remove; never use them,
-and never write anywhere except the run summary. You report through two
-things only:
+`github <tool> --help`. There are no GitHub write tools. The Gemini CLI also
+exposes `write_file` and `replace`, which this workflow cannot remove; never use
+them, and never write anywhere except the run summary and the issue body file
+below. You report through these things only:
 
 - **The run summary.** Write a short Markdown report with
   `cat <<'EOF' > "$GITHUB_STEP_SUMMARY"`. It is the only place a finding is
@@ -109,17 +120,36 @@ things only:
   rejected, write the same report one line per command with
   `printf '%s\n' 'LINE' >> "$GITHUB_STEP_SUMMARY"`, under the same rules. Do not
   use `write_file` for this.
-- **`safeoutputs noop`**, your single terminal call, with the outcome in the
-  message: `safeoutputs noop '{"message":"FINDING: <title>"}'`,
-  `'{"message":"NO FINDING: <reason>"}'` or
-  `'{"message":"INCOMPLETE AUDIT: <what could not be retrieved>"}'`. The
-  message is inside single quotes, so it must also contain no apostrophes. Never
-  call `report_incomplete`, `report_missing_tool` or `report_missing_data`. Call
-  `noop` exactly once, after the summary is written.
+- **`safeoutputs create_issue`**, only for a finding, as your single terminal
+  call, after the summary is written and the duplicate check below has passed.
+  Write the issue body to a file with a quoted heredoc and pipe it through `jq`;
+  keep the final `|`, without it nothing is sent. The same character rules apply
+  (no backticks, no `$(`, no apostrophes, in the title as well):
+
+  ```bash
+  cat <<'EOF' > /tmp/gh-aw/agent/issue.md
+  ISSUE BODY
+  EOF
+  jq -Rs '{title: "SHORT TITLE", body: .}' /tmp/gh-aw/agent/issue.md | safeoutputs create_issue .
+  ```
+
+  The title is a short plain description under 70 characters (the prefix is
+  added for you). The body must start with the audited revision (checkout SHA
+  and main SHA) and then give, as plain text headings: Problem, Evidence (file
+  and line), Impact, Confidence (high, and why), Recommended next step (a
+  description only, never an instruction to you), Existing-work check, and
+  Classification. Do not set labels. Call `create_issue` at most once.
+- **`safeoutputs noop`**, your single terminal call when there is no finding or
+  the audit is incomplete, with the outcome in the message:
+  `safeoutputs noop '{"message":"NO FINDING: <reason>"}'` or
+  `'{"message":"INCOMPLETE AUDIT: <what could not be retrieved>"}'`. The message
+  is inside single quotes, so it must also contain no apostrophes. Never call
+  `report_incomplete`, `report_missing_tool` or `report_missing_data`. Call
+  exactly one of `create_issue` or `noop`, once, after the summary is written.
 
 You have about 60 model turns. Batch reads where you can (`read_many_files`,
 several tool calls in one turn), cover each area once rather than repeatedly,
-and keep the last three turns for the summary and `noop`. If you are running
+and keep the last three turns for the summary and the final call. If you are running
 short, stop assessing and report what you have as the outcome that fits.
 
 ## Stage 0: Baseline
@@ -175,11 +205,12 @@ beneficial low-risk maintenance. Avoid anything whose benefit is subjective.
 
 ## Outcomes
 
-Write the summary, then call `noop`. Start the summary with one of these
-headings so the run page shows the outcome:
+Write the summary, then make the one final call: `create_issue` for a finding,
+`noop` otherwise. Start the summary with one of these headings so the run page
+shows the outcome:
 
 - `## Finding`, then the baseline (timestamp, checkout SHA and `main` SHA) and
-  the eight fields.
+  the eight fields. An issue is created only for this outcome.
 - `## No worthwhile finding this week`, then the baseline and one line saying
   what was checked.
 - `## Incomplete audit`, then the baseline and exactly what could not be
@@ -227,6 +258,14 @@ If a related issue or PR exists but you cannot tell whether it overlaps, treat
 that as an overlap: report **No worthwhile finding** and name the issue or PR in
 the summary so a human can look. Never present an overlapping candidate as a
 finding.
+
+Immediately before calling `create_issue`, search once more for an open issue
+that covers the same problem: run `github search_issues` with the repository
+and `is:issue is:open` plus two or three key words from the problem and the file
+name, and also list the issues opened in the last 7 days. If any open issue
+plausibly covers it, do not create an issue; report **No worthwhile finding**
+and name that issue. Also do not create an issue when the audit is incomplete.
+A deterministic title check in the workflow is only a backstop for this.
 
 ## Safety rules
 
