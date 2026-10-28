@@ -7,9 +7,10 @@ available — useful while you're doing manual container work and don't want Aut
 ## What it does
 
 - The monitoring loop keeps running and the dashboard stays usable, but every container
-  check is skipped — no restarts, no quarantines, no auto-unquarantines. A restart that
-  was waiting out its backoff when maintenance began starts a fresh wait once maintenance
-  ends, rather than restarting immediately.
+  check is skipped — no restarts, no quarantines, no auto-unquarantines. If at least
+  one monitoring check is skipped, a restart that was waiting out its backoff starts a
+  fresh wait once maintenance ends, rather than restarting immediately. Switching
+  maintenance on and off between two checks changes nothing.
 - Manual actions (restart, unquarantine) via the UI or API still work normally.
 - State persists across restarts of the Auto-Heal container and across page refreshes —
   it's stored in `/data/maintenance.json`, not just in the browser.
