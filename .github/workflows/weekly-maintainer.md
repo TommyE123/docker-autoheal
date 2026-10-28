@@ -35,7 +35,7 @@ tools:
   # the local workspace stays writable. The read-only boundary is the read-only
   # token, the read-only GitHub MCP server and the fact that the only write
   # safe output is one create-issue, applied by the separate safe_outputs job.
-  bash: ["cat", "jq", "ls", "find", "grep", "head", "tail", "wc", "github", "safeoutputs"]
+  bash: ["cat", "jq", "ls", "find", "grep", "head", "tail", "wc", "sort", "uniq", "date", "printf", "echo", "github", "safeoutputs"]
   github:
     toolsets: [repos, issues, pull_requests]
     # gh-aw applies min-integrity "approved" automatically on a public repo,
