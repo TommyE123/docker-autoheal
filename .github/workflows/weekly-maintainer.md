@@ -93,9 +93,13 @@ it is the audited revision.
 ## Tools
 
 There is no direct network access, and `gh` and `curl` are not authenticated.
-Do not use them. Read the repository with `cat`, `grep`, `find` and `ls`; use
-`find` only to list or locate files, and never with `-exec`, `-execdir`,
-`-delete` or `-fprint`. Read
+Do not use them. `git`, `python3` and every other command that is not on the
+allow-list are denied by policy, so never try them (a previous run lost about
+half of its tool calls retrying `git log` and `python3` wrappers around it). Read
+the repository with `cat`, `grep`, `find` and `ls`, or with the built-in
+`read_file`, `read_many_files` and `grep_search` tools; use `find` only to list
+or locate files, and never with `-exec`, `-execdir`, `-delete` or `-fprint`.
+Listing a directory with `find` or `ls` is not reading it: open the files. Read
 GitHub state with the `github` CLI, for example
 `github list_commits --owner OWNER --repo REPO --sha main --perPage 30`,
 `github list_issues --owner OWNER --repo REPO --state OPEN --perPage 100`,
@@ -153,7 +157,16 @@ below. You report through these things only:
 You have about 60 model turns. Batch reads where you can (`read_many_files`,
 several tool calls in one turn), cover each area once rather than repeatedly,
 and keep the last three turns for the summary and the final call. If you are running
-short, stop assessing and report what you have as the outcome that fits.
+short, stop assessing and report what you have as the outcome that fits, which is
+**Incomplete audit** if the reading rule below is not met.
+
+**Reading rule.** Every report must list under a "Files read" line the paths you
+actually opened with `cat`, `read_file`, `read_many_files` or `grep_search`, and
+may claim to have checked only what is on that list. Before you report **No
+worthwhile finding** you must have read, at the least, `.github/workflows/`
+files, `renovate.json`, several modules under `app/`, and several test files under
+`app/tests/unit/`. If you have not, the outcome is **Incomplete audit**, not a
+clean result. Never write that you checked something you did not read.
 
 ## Stage 0: Baseline
 
@@ -208,16 +221,18 @@ beneficial low-risk maintenance. Avoid anything whose benefit is subjective.
 
 ## Outcomes
 
-Write the summary, then make the one final call: `create_issue` for a finding,
+Write the summary once, with a single command (do not repeat it with a second
+command, which would duplicate it on the run page), then make the one final call: `create_issue` for a finding,
 `noop` otherwise. Start the summary with one of these headings so the run page
 shows the outcome:
 
-- `## Finding`, then the baseline (timestamp, checkout SHA and `main` SHA) and
-  the eight fields. An issue is created only for this outcome.
-- `## No worthwhile finding this week`, then the baseline and one line saying
-  what was checked.
-- `## Incomplete audit`, then the baseline and exactly what could not be
-  retrieved. This is never a clean result.
+- `## Finding`, then the baseline (timestamp, checkout SHA and `main` SHA), the
+  eight fields and the "Files read" list. An issue is created only for this
+  outcome.
+- `## No worthwhile finding this week`, then the baseline and the "Files read"
+  list.
+- `## Incomplete audit`, then the baseline, the "Files read" list and exactly
+  what could not be retrieved or read. This is never a clean result.
 
 ## Scope
 
