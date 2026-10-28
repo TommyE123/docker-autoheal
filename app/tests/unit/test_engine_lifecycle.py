@@ -15,8 +15,14 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.config.config_manager import config_manager
-from app.monitor.monitoring_engine import _DockerEventReader
-from app.tests.unit.conftest import BlockingStream, event_threads, make_container, wait_until
+from app.monitor.auto_discovery import _DockerEventReader
+from app.tests.unit.conftest import (
+    BlockingStream,
+    cancel_and_wait,
+    event_threads,
+    make_container,
+    wait_until,
+)
 
 
 def monitor_label(key: str, value: str):
@@ -941,7 +947,7 @@ class TestMonitorLoop:
 @pytest.fixture
 def fast_reconnect(monkeypatch):
     """Shrink the reconnect pause so retry tests do not wait ten seconds."""
-    monkeypatch.setattr("app.monitor.monitoring_engine.EVENT_RECONNECT_DELAY_SECONDS", 0.01)
+    monkeypatch.setattr("app.monitor.auto_discovery.EVENT_RECONNECT_DELAY_SECONDS", 0.01)
 
 
 @pytest.mark.asyncio
@@ -1033,7 +1039,7 @@ class TestEventListenerLoop:
         self, engine, docker_client, monkeypatch
     ):
         """A stream that ends cleanly must not be reopened in a busy loop."""
-        monkeypatch.setattr("app.monitor.monitoring_engine.EVENT_RECONNECT_DELAY_SECONDS", 0.2)
+        monkeypatch.setattr("app.monitor.auto_discovery.EVENT_RECONNECT_DELAY_SECONDS", 0.2)
         times = []
 
         def ended_stream():
@@ -1047,8 +1053,7 @@ class TestEventListenerLoop:
             await wait_until(lambda: len(times) >= 2)
         finally:
             engine._running = False
-            task.cancel()
-            await task
+            await cancel_and_wait(task)
 
         assert times[1] - times[0] >= 0.15
 
@@ -1068,8 +1073,7 @@ class TestEventListenerLoop:
             await wait_until(lambda: len(attempts) >= 2)
         finally:
             engine._running = False
-            task.cancel()
-            await task
+            await cancel_and_wait(task)
 
         assert "Docker event stream ended, reconnecting in 0.01 seconds" in caplog.text
 
@@ -1096,8 +1100,7 @@ class TestEventListenerLoop:
             await wait_until(lambda: len(docker_client.events_since) >= 2)
         finally:
             engine._running = False
-            task.cancel()
-            await task
+            await cancel_and_wait(task)
 
         assert docker_client.events_since[:2] == [1700000000, 1700000005]
 
@@ -1111,8 +1114,7 @@ class TestEventListenerLoop:
             await wait_until(lambda: docker_client.events_since)
         finally:
             engine._running = False
-            task.cancel()
-            await task
+            await cancel_and_wait(task)
 
         assert before <= docker_client.events_since[0] <= int(time.time())
 
@@ -1162,8 +1164,7 @@ class TestEventListenerLoop:
         await wait_until(event_threads)
 
         engine._running = False
-        task.cancel()
-        await asyncio.wait_for(task, timeout=10)
+        await cancel_and_wait(task)
 
         assert stream.close_calls == 1
         assert event_threads() == []
@@ -1171,7 +1172,7 @@ class TestEventListenerLoop:
     async def test_close_raising_does_not_stop_the_shutdown(
         self, engine, docker_client, caplog, monkeypatch
     ):
-        monkeypatch.setattr("app.monitor.monitoring_engine.EVENT_THREAD_JOIN_TIMEOUT_SECONDS", 0.05)
+        monkeypatch.setattr("app.monitor.auto_discovery.EVENT_THREAD_JOIN_TIMEOUT_SECONDS", 0.05)
         stream = BlockingStream(close_error=RuntimeError("ssh transport has no close"))
         docker_client.events = stream
         engine._running = True
@@ -1180,9 +1181,8 @@ class TestEventListenerLoop:
         await wait_until(event_threads)
 
         engine._running = False
-        task.cancel()
         with caplog.at_level("DEBUG"):
-            await asyncio.wait_for(task, timeout=10)
+            await cancel_and_wait(task)
             stream.release()
 
         assert "Error closing Docker event stream: ssh transport has no close" in caplog.text
@@ -1190,7 +1190,7 @@ class TestEventListenerLoop:
     async def test_thread_that_ignores_close_is_reported_not_awaited_forever(
         self, engine, docker_client, monkeypatch, caplog
     ):
-        monkeypatch.setattr("app.monitor.monitoring_engine.EVENT_THREAD_JOIN_TIMEOUT_SECONDS", 0.05)
+        monkeypatch.setattr("app.monitor.auto_discovery.EVENT_THREAD_JOIN_TIMEOUT_SECONDS", 0.05)
         stream = BlockingStream(close_error=RuntimeError("cannot close"))
         docker_client.events = stream
         engine._running = True
@@ -1199,9 +1199,8 @@ class TestEventListenerLoop:
         await wait_until(event_threads)
 
         engine._running = False
-        task.cancel()
         try:
-            await asyncio.wait_for(task, timeout=10)
+            await cancel_and_wait(task)
         finally:
             stream.release()
 
@@ -1221,8 +1220,7 @@ class TestEventListenerLoop:
         await wait_until(lambda: len(attempts) >= 2)
 
         engine._running = False
-        task.cancel()
-        await asyncio.wait_for(task, timeout=10)
+        await cancel_and_wait(task)
         settled = len(attempts)
         await asyncio.sleep(0.1)
 
@@ -1283,8 +1281,7 @@ class TestEventListenerLoop:
             longest_gap = max(longest_gap, loop.time() - before)
 
         engine._running = False
-        task.cancel()
-        await task
+        await cancel_and_wait(task)
 
         # The old consumer blocked in queue.get(timeout=1.0), stalling the loop for a second
         assert longest_gap < 0.3
@@ -1314,7 +1311,8 @@ class TestEventListenerLoop:
         engine._running = True
 
         try:
-            await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
         finally:
             engine._running = False
 

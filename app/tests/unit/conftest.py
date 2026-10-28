@@ -306,6 +306,14 @@ async def wait_until(condition, within=5.0):
         await asyncio.sleep(0.01)
 
 
+async def cancel_and_wait(task, within=10.0):
+    """Cancel a task and wait for it, asserting it ended as cancelled."""
+    task.cancel()
+    done, _ = await asyncio.wait({task}, timeout=within)
+    assert task in done
+    assert task.cancelled()
+
+
 def event_threads():
     return [t for t in threading.enumerate() if t.name == "docker-events" and t.is_alive()]
 
