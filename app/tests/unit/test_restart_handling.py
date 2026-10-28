@@ -1021,3 +1021,135 @@ async def test_restart_is_skipped_when_container_info_lacks_identifiers(
     assert [r.getMessage() for r in caplog.records] == [
         "Not restarting container with incomplete identifiers: " + logged
     ]
+
+
+@pytest.mark.asyncio
+class TestStaleRestartWait:
+    """
+    A wait is only kept while its owner is seen failing every cycle (#15).
+
+    After a gap (quarantine, maintenance mode, an unavailable Docker daemon) the failure
+    was not observed continuously, so the next failure starts a fresh wait instead of
+    restarting at once on a deadline that ran out long ago. The stale wait does not
+    escalate the backoff.
+    """
+
+    @staticmethod
+    def _failing_web(docker_client):
+        container, info = make_container(name="web", status="exited", exit_code=1)
+        docker_client.add_container(container, info)
+        return container
+
+    @staticmethod
+    def _assert_fresh_wait(engine, docker_client):
+        assert docker_client.restart_calls == []
+        assert scheduled_delay(engine, "web") == pytest.approx(10, abs=1)
+        assert engine._backoff_delays == {}  # the stale wait was not consumed
+
+    async def test_wait_is_kept_while_failures_are_observed_every_cycle(
+        self, engine, docker_client
+    ):
+        self._failing_web(docker_client)
+        await engine._check_containers()
+        deadline = engine._next_allowed_restart["web"]
+
+        await engine._check_containers()
+        assert engine._next_allowed_restart == {"web": deadline}
+        assert docker_client.restart_calls == []
+
+        elapse_backoff(engine, "web")
+        await engine._check_containers()
+        assert docker_client.restart_calls == ["web"]
+
+    async def test_unquarantine_after_a_quarantine_starts_a_fresh_wait(self, engine, docker_client):
+        self._failing_web(docker_client)
+        await engine._check_containers()  # schedules the wait
+
+        config_manager.quarantine_container("web")  # e.g. max_restarts was lowered
+        await engine._check_containers()
+        await engine._check_containers()
+        config_manager.unquarantine_container("web")
+        elapse_backoff(engine, "web")
+        await engine._check_containers()
+
+        self._assert_fresh_wait(engine, docker_client)
+
+    async def test_maintenance_mode_gap_starts_a_fresh_wait(self, engine, docker_client):
+        self._failing_web(docker_client)
+        await engine._check_containers()
+
+        config_manager.enable_maintenance_mode()
+        await engine._check_containers()
+        config_manager.disable_maintenance_mode()
+        elapse_backoff(engine, "web")
+        await engine._check_containers()
+
+        self._assert_fresh_wait(engine, docker_client)
+
+    async def test_failed_listing_gap_starts_a_fresh_wait(self, engine, docker_client):
+        self._failing_web(docker_client)
+        await engine._check_containers()
+
+        docker_client.list_containers_error = RuntimeError("docker daemon unavailable")
+        await engine._check_containers()
+        docker_client.list_containers_error = None
+        elapse_backoff(engine, "web")
+        await engine._check_containers()
+
+        self._assert_fresh_wait(engine, docker_client)
+
+    async def test_empty_listing_gap_starts_a_fresh_wait(self, engine, docker_client, monkeypatch):
+        container = self._failing_web(docker_client)
+        await engine._check_containers()
+
+        with monkeypatch.context() as patched:
+            patched.setattr(docker_client, "list_containers", lambda all_containers=False: [])
+            await engine._check_containers()
+        assert container in docker_client.list_containers(all_containers=True)
+        elapse_backoff(engine, "web")
+        await engine._check_containers()
+
+        self._assert_fresh_wait(engine, docker_client)
+
+    async def test_fresh_wait_after_a_gap_keeps_the_escalated_delay(self, engine, docker_client):
+        self._failing_web(docker_client)
+        engine._backoff_delays["web"] = 40
+        await engine._check_containers()
+
+        config_manager.enable_maintenance_mode()
+        await engine._check_containers()
+        config_manager.disable_maintenance_mode()
+        elapse_backoff(engine, "web")
+        await engine._check_containers()
+
+        assert docker_client.restart_calls == []
+        assert scheduled_delay(engine, "web") == pytest.approx(40, abs=1)
+        assert engine._backoff_delays == {"web": 40}  # escalation kept, not advanced
+
+    async def test_stale_wait_is_replaced_and_owned_by_the_current_container(
+        self, engine, docker_client
+    ):
+        container = self._failing_web(docker_client)
+        await engine._check_containers()
+        config_manager.enable_maintenance_mode()
+        await engine._check_containers()
+        config_manager.disable_maintenance_mode()
+
+        await engine._check_containers()
+
+        assert engine._restart_wait_owner == {"web": container.id}
+        assert set(engine._restart_wait_seen) == set(engine._next_allowed_restart) == {"web"}
+        assert engine._restart_wait_seen["web"] == engine._check_cycle
+
+    async def test_clearing_a_wait_forgets_when_it_was_last_seen(self, engine, docker_client):
+        container, info = make_container(name="web", status="exited", exit_code=1)
+        docker_client.add_container(container, info)
+        await engine._check_containers()
+        assert engine._restart_wait_seen
+
+        docker_client.remove_container(container)
+        bystander, bystander_info = make_container(name="db", container_id="d" * 64)
+        docker_client.add_container(bystander, bystander_info)
+        await engine._check_containers()
+
+        assert engine._restart_wait_seen == {}
