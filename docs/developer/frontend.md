@@ -70,6 +70,8 @@ runtime into `static/` during `npm run build`; `src/main.jsx` registers the work
   excluded from the navigation fallback (as is `/health`), so API data is never cached
   and failed API calls are never answered with cached data or `index.html`. There is no
   offline support.
+- `e2e-ui/parallel/pwa.spec.js` (`@pwa`) checks the service worker, Cache Storage, installability and
+  offline `/api/*` behaviour against the production image; see `docs/developer/testing.md`.
 - Tests resolve `virtual:pwa-register` to `src/test/pwa-register-stub.js` (`test.alias`).
 - The service worker only exists in production builds. Check changes against
   `npm run build` served by the backend, not `npm run dev`.
