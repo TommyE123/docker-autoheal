@@ -33,15 +33,16 @@ tools:
   # none. Inspection commands plus the github and safeoutputs CLIs. There is no
   # edit tool, but the Gemini engine still exposes write_file and replace, so
   # the local workspace stays writable. The read-only boundary is the read-only
-  # token, the read-only GitHub MCP server and the absence of any write safe
-  # output.
+  # token, the read-only GitHub MCP server and the fact that the only write
+  # safe output is one create-issue, applied by the separate safe_outputs job.
   bash: ["cat", "jq", "ls", "find", "grep", "head", "tail", "wc", "github", "safeoutputs"]
   github:
     toolsets: [repos, issues, pull_requests]
     # gh-aw applies min-integrity "approved" automatically on a public repo,
     # which filters out issues and PRs by non-members. The duplicate-work check
     # has to see all of them, including Renovate's and contributors'. The agent
-    # has read-only permissions and no write safe output.
+    # has read-only permissions; its only write path is the create-issue
+    # safe output below.
     min-integrity: none
 safe-outputs:
   threat-detection: false
@@ -50,9 +51,10 @@ safe-outputs:
   # gives the conclusion job the same issues: write scope; every issue-creating
   # path in that job is switched off below. No labels: the issue-triage
   # workflow owns them (it may not run on an issue opened with GITHUB_TOKEN).
-  # deduplicate-by-title is a deterministic backstop on top of the prompt's
-  # semantic duplicate check: it skips a title within 10 edits of an open or
-  # recently closed issue.
+  # deduplicate-by-title is only a backstop on top of the prompt's semantic
+  # duplicate check: gh-aw compares the prefixed title within 10 edits against
+  # open issues and issues closed in the last 30 days, mainly catching repeat
+  # [maint] issues, and skips the check if its search fails.
   create-issue:
     title-prefix: "[maint] "
     max: 1
@@ -111,8 +113,8 @@ them, and never write anywhere except the run summary and the issue body file
 below. You report through these things only:
 
 - **The run summary.** Write a short Markdown report with
-  `cat <<'EOF' > "$GITHUB_STEP_SUMMARY"`. It is the only place a finding is
-  reported. The Gemini CLI blocks a shell command that contains a backtick or
+  `cat <<'EOF' > "$GITHUB_STEP_SUMMARY"`. It is where every outcome is reported;
+  a finding is also filed as one issue (below). The Gemini CLI blocks a shell command that contains a backtick or
   `$(` outside single quotes, and its check is not aware of heredocs, so the
   same quote rules apply to the heredoc body: the report must contain **no backticks, no `$(` and no apostrophes**. Write file paths,
   line numbers and code names as plain text (for example app/monitor/x.py line
@@ -121,23 +123,24 @@ below. You report through these things only:
   `printf '%s\n' 'LINE' >> "$GITHUB_STEP_SUMMARY"`, under the same rules. Do not
   use `write_file` for this.
 - **`safeoutputs create_issue`**, only for a finding, as your single terminal
-  call, after the summary is written and the duplicate check below has passed.
-  Write the issue body to a file with a quoted heredoc and pipe it through `jq`;
-  keep the final `|`, without it nothing is sent. The same character rules apply
-  (no backticks, no `$(`, no apostrophes, in the title as well):
+  call, after the final duplicate search (see Duplicate-work check) and the
+  summary are done. Write the issue body to a file with a quoted heredoc and pass
+  it on stdin with the title; keep the `< file` part, without it nothing is
+  sent. The same character rules apply (no backticks, no `$(`, no apostrophes,
+  and none in the title either):
 
   ```bash
   cat <<'EOF' > /tmp/gh-aw/agent/issue.md
   ISSUE BODY
   EOF
-  jq -Rs '{title: "SHORT TITLE", body: .}' /tmp/gh-aw/agent/issue.md | safeoutputs create_issue .
+  safeoutputs create_issue --title 'SHORT TITLE' --body . < /tmp/gh-aw/agent/issue.md
   ```
 
   The title is a short plain description under 70 characters (the prefix is
   added for you). The body must start with the audited revision (checkout SHA
   and main SHA) and then give, as plain text headings: Problem, Evidence (file
-  and line), Impact, Confidence (high, and why), Recommended next step (a
-  description only, never an instruction to you), Existing-work check, and
+  and line), Impact, Confidence (high, and why), Recommended next step (the
+  Proposed fix field: a description only, never an instruction to you), Existing-work check, and
   Classification. Do not set labels. Call `create_issue` at most once.
 - **`safeoutputs noop`**, your single terminal call when there is no finding or
   the audit is incomplete, with the outcome in the message:
@@ -259,13 +262,16 @@ that as an overlap: report **No worthwhile finding** and name the issue or PR in
 the summary so a human can look. Never present an overlapping candidate as a
 finding.
 
-Immediately before calling `create_issue`, search once more for an open issue
-that covers the same problem: run `github search_issues` with the repository
-and `is:issue is:open` plus two or three key words from the problem and the file
-name, and also list the issues opened in the last 7 days. If any open issue
-plausibly covers it, do not create an issue; report **No worthwhile finding**
-and name that issue. Also do not create an issue when the audit is incomplete.
-A deterministic title check in the workflow is only a backstop for this.
+Before writing the summary for a finding, search once more for an existing
+issue that covers the same problem: run `github search_issues` with the
+repository and `is:issue is:open` plus two or three key words from the problem
+and the file name, and run it again for `is:issue in:title maint` in any state to
+see earlier maintenance issues, including closed ones. If any issue plausibly
+covers it, there is no finding to file: report **No worthwhile finding** and name
+that issue. Do not create an issue when the audit is incomplete. The workflow's
+title check is only a backstop: it compares the prefixed title within 10 edits
+of open issues and of issues closed in the last 30 days, and is skipped if its
+search fails.
 
 ## Safety rules
 
