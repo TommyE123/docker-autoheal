@@ -74,7 +74,8 @@ changes.
 Repository: `${{ github.repository }}` (`OWNER/REPO`; pass the part before the
 slash as `--owner` and the part after it as `--repo`, never the combined value).
 The repository checkout is of the ref this run was started on, which is `main`
-unless a person chose another.
+unless a person chose another. All source evidence comes from that checkout, so
+it is the audited revision.
 
 ## Tools
 
@@ -123,7 +124,11 @@ short, stop assessing and report what you have as the outcome that fits.
 
 ## Stage 0: Baseline
 
-Record the audit timestamp and the head commit SHA of `main`. Gather the recent commits
+Record the audit timestamp, the commit SHA of the checkout (the audited revision:
+`cat .git/HEAD`, and if it names a ref, `cat` that ref file under `.git/`) and the
+head commit SHA of `main`. If the two SHAs differ, the audit covers the checkout,
+not `main`: say so at the top of the report, and refer every finding to the
+checkout SHA and never to `main`'s. Gather the recent commits
 and merges on `main`, all open issues and open pull requests, the issues and
 pull requests closed or merged in roughly the last 30 days (titles, bodies,
 labels, branch names), and the check runs on open PRs where the token allows
@@ -173,8 +178,8 @@ beneficial low-risk maintenance. Avoid anything whose benefit is subjective.
 Write the summary, then call `noop`. Start the summary with one of these
 headings so the run page shows the outcome:
 
-- `## Finding`, then the baseline (timestamp and `main` SHA) and the eight
-  fields.
+- `## Finding`, then the baseline (timestamp, checkout SHA and `main` SHA) and
+  the eight fields.
 - `## No worthwhile finding this week`, then the baseline and one line saying
   what was checked.
 - `## Incomplete audit`, then the baseline and exactly what could not be
