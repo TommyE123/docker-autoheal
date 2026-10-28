@@ -23,6 +23,7 @@ import asyncio
 import shutil
 import sys
 import tempfile
+import threading
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -184,6 +185,7 @@ class FakeDockerClient:
         self.reconnect_calls = 0
         self.list_containers_error: Exception | None = None
         self.events: Any = []
+        self.events_since: list[Any] = []
         self.health_results: dict[str, bool] = {}
         self.native_health: dict[str, str | None] = {}
         self.health_check_error: Exception | None = None
@@ -265,10 +267,55 @@ class FakeDockerClient:
             raise self.health_check_error
         return self.native_health.get(container.name)
 
-    def get_events(self, decode: bool = True, filters: Any = None) -> Any:
+    def get_events(self, decode: bool = True, filters: Any = None, since: Any = None) -> Any:
+        self.events_since.append(since)
         if callable(self.events):
             return self.events()
         return self.events
+
+
+class BlockingStream:
+    """An event stream that blocks like Docker's until it is closed."""
+
+    def __init__(self, events=(), close_error=None):
+        self._events = list(events)
+        self._closed = threading.Event()
+        self._close_error = close_error
+        self.close_calls = 0
+
+    def __iter__(self):
+        yield from self._events
+        self._closed.wait(timeout=5)
+
+    def close(self):
+        self.close_calls += 1
+        if self._close_error is not None:
+            raise self._close_error
+        self._closed.set()
+
+    def release(self):
+        self._closed.set()
+
+
+async def wait_until(condition, within=5.0):
+    """Yield to the loop until ``condition()`` holds."""
+    deadline = asyncio.get_running_loop().time() + within
+    while not condition():
+        if asyncio.get_running_loop().time() > deadline:
+            raise AssertionError("condition not reached in time")
+        await asyncio.sleep(0.01)
+
+
+async def cancel_and_wait(task, within=10.0):
+    """Cancel a task and wait for it, asserting it ended as cancelled."""
+    task.cancel()
+    done, _ = await asyncio.wait({task}, timeout=within)
+    assert task in done
+    assert task.cancelled()
+
+
+def event_threads():
+    return [t for t in threading.enumerate() if t.name == "docker-events" and t.is_alive()]
 
 
 class FakeUptimeKumaClient:

@@ -72,6 +72,7 @@ def real_notification_manager(monkeypatch, docker_client) -> NotificationManager
     manager = NotificationManager()
     manager._session = _FakeSession()
     monkeypatch.setattr("app.monitor.monitoring_engine.notification_manager", manager)
+    monkeypatch.setattr("app.monitor.auto_discovery.notification_manager", manager)
     monkeypatch.setattr("app.api.state.notification_manager", manager)
     monkeypatch.setattr("app.api.state.docker_client", docker_client)
     return manager

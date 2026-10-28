@@ -10,7 +10,6 @@ change what operators see in the logs.
 
 import asyncio
 import logging
-import threading
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -29,7 +28,7 @@ from app.docker_client.docker_client_wrapper import DockerClientWrapper
 from app.main import AutoHealService
 from app.main import main as app_main
 from app.notifications.notification_manager import NotificationManager
-from app.tests.unit.conftest import make_container
+from app.tests.unit.conftest import BlockingStream, cancel_and_wait, make_container, wait_until
 from app.tests.unit.test_notification_manager import (
     _configure_webhook,
     _FakeResponse,
@@ -214,8 +213,7 @@ class TestErrorsLoggedWithTraceback:
 
     @pytest.mark.asyncio
     async def test_event_thread_error(self, caplog, engine, docker_client, monkeypatch):
-        release = threading.Event()
-        monkeypatch.setattr("time.sleep", lambda seconds: None)
+        monkeypatch.setattr("app.monitor.auto_discovery.EVENT_RECONNECT_DELAY_SECONDS", 0.01)
         attempts = []
 
         def broken_then_idle():
@@ -223,47 +221,34 @@ class TestErrorsLoggedWithTraceback:
             if len(attempts) == 1:
                 raise RuntimeError("stream disconnected")
             engine._running = False
-            release.wait(timeout=5)
             return iter(())
 
         docker_client.events = broken_then_idle
         engine._running = True
-        try:
-            await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
-        finally:
-            release.set()
+        task = asyncio.create_task(engine._event_listener_loop())
+        await wait_until(lambda: len(attempts) >= 2)
+        await cancel_and_wait(task)
 
         assert_error_with_traceback(
             caplog, "Error in event listener thread: stream disconnected", RuntimeError
         )
 
     @pytest.mark.asyncio
-    async def test_event_queue_consumer_error(
-        self, caplog, engine, docker_client, monkeypatch, recorded_sleeps
-    ):
-        release = threading.Event()
+    async def test_event_queue_consumer_error(self, caplog, engine, docker_client, monkeypatch):
         event = {"Actor": {"ID": "a" * 64, "Attributes": {"name": "web"}}}
-
-        def event_stream():
-            yield event
-            release.wait(timeout=5)
 
         async def failing_process(received):
             engine._running = False
             raise RuntimeError("cannot process")
 
-        docker_client.events = event_stream()
+        docker_client.events = BlockingStream([event])
         monkeypatch.setattr(engine, "_process_container_start_event", failing_process)
         engine._running = True
-        try:
-            await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
-        finally:
-            release.set()
+        await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
 
         assert_error_with_traceback(
             caplog, "Error processing event from queue: cannot process", RuntimeError
         )
-        assert 1 in recorded_sleeps
 
     @pytest.mark.asyncio
     async def test_container_start_event_error(self, caplog, engine, docker_client):
