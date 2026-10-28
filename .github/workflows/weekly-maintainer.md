@@ -196,7 +196,10 @@ saw (from the digest or opened), and under "Rejected candidates" at least three
 specific candidates (file, what you looked at, and why you rejected it, for
 example excluded area, existing issue, unclear behaviour or low confidence).
 Without those lists the outcome is **Incomplete audit**, not a clean result. A
-finding must quote the exact line or lines it rests on.
+finding must quote the exact line or lines it rests on, with the file and line
+number. The output rules forbid backticks, `$(` and apostrophes, so when a
+quoted line contains one, write [backtick], [dollar-paren] or [apos] in its
+place; the file and line number let a reader find the original.
 
 ## Stage 0: Baseline
 
