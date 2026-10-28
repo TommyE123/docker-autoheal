@@ -35,7 +35,7 @@ tools:
   # the local workspace stays writable. The read-only boundary is the read-only
   # token, the read-only GitHub MCP server and the fact that the only write
   # safe output is one create-issue, applied by the separate safe_outputs job.
-  bash: ["cat", "jq", "ls", "find", "grep", "head", "tail", "wc", "github", "safeoutputs"]
+  bash: ["cat", "jq", "ls", "find", "grep", "head", "tail", "wc", "sort", "uniq", "date", "printf", "echo", "github", "safeoutputs"]
   github:
     toolsets: [repos, issues, pull_requests]
     # gh-aw applies min-integrity "approved" automatically on a public repo,
@@ -93,9 +93,16 @@ it is the audited revision.
 ## Tools
 
 There is no direct network access, and `gh` and `curl` are not authenticated.
-Do not use them. Read the repository with `cat`, `grep`, `find` and `ls`; use
-`find` only to list or locate files, and never with `-exec`, `-execdir`,
-`-delete` or `-fprint`. Read
+Do not use them. Only these shell commands work: `cat`, `grep`, `find`, `ls`,
+`head`, `tail`, `wc`, `jq`, `sort`, `uniq`, `date`, `printf`, `echo`, `github` and
+`safeoutputs`. Every other command, such as `git` or `python3`, is denied by
+policy, and so is any command chained to one of them with `&&` or `|`. Never try
+them (a previous run lost about half of its tool calls retrying `git log` and
+`python3` wrappers around it). Read
+the repository with `cat`, `grep`, `find` and `ls`, or with the built-in
+`read_file`, `read_many_files` and `grep_search` tools; use `find` only to list
+or locate files, and never with `-exec`, `-execdir`, `-delete` or `-fprint`.
+Listing a directory with `find` or `ls` is not reading it: open the files. Read
 GitHub state with the `github` CLI, for example
 `github list_commits --owner OWNER --repo REPO --sha main --perPage 30`,
 `github list_issues --owner OWNER --repo REPO --state OPEN --perPage 100`,
@@ -113,15 +120,19 @@ them, and never write anywhere except the run summary and the issue body file
 below. You report through these things only:
 
 - **The run summary.** Write a short Markdown report with
-  `cat <<'EOF' > "$GITHUB_STEP_SUMMARY"`. It is where every outcome is reported;
+  `cat <<'EOF' > /tmp/gh-aw/agent-step-summary.md`. Use that literal path: the
+  variable `GITHUB_STEP_SUMMARY` is empty in your shell, so a redirect to it fails
+  with "No such file or directory" even though the tool reports success. The
+  workflow appends this file to the run page. It is where every outcome is reported;
   a finding is also filed as one issue (below). The Gemini CLI blocks a shell command that contains a backtick or
   `$(` outside single quotes, and its check is not aware of heredocs, so the
   same quote rules apply to the heredoc body: the report must contain **no backticks, no `$(` and no apostrophes**. Write file paths,
   line numbers and code names as plain text (for example app/monitor/x.py line
-  12), and write "does not" instead of "doesn't". If the heredoc command is
-  rejected, write the same report one line per command with
-  `printf '%s\n' 'LINE' >> "$GITHUB_STEP_SUMMARY"`, under the same rules. Do not
-  use `write_file` for this.
+  12), and write "does not" instead of "doesn't". Only if the heredoc command is
+  rejected, write the same report with one `printf '%s\n' 'LINE1' 'LINE2' >
+  /tmp/gh-aw/agent-step-summary.md` command, under the same rules. Do not use
+  `write_file` for this, and do not also print the report to the screen or repeat
+  it in your final message, which should be one short line.
 - **`safeoutputs create_issue`**, only for a finding, as your single terminal
   call, after the final duplicate search (see Duplicate-work check) and the
   summary are done. Write the issue body to a file with a quoted heredoc and pass
@@ -153,7 +164,20 @@ below. You report through these things only:
 You have about 60 model turns. Batch reads where you can (`read_many_files`,
 several tool calls in one turn), cover each area once rather than repeatedly,
 and keep the last three turns for the summary and the final call. If you are running
-short, stop assessing and report what you have as the outcome that fits.
+short, stop assessing and report what you have as the outcome that fits, which is
+**Incomplete audit** if the reading rule below is not met.
+
+**Reading rule.** Every report must list under a "Files read" line the paths
+whose full contents you opened with `cat`, `read_file` or `read_many_files`
+(`grep` and `grep_search` hits do not count), and may claim to have checked only
+what is on that list. One `read_many_files` call on a narrow glob, such as
+`.github/workflows/*.yml` or `app/tests/unit/test_*.py`, covers an area in a
+single turn; avoid whole-tree globs. Before you report **No worthwhile finding**
+you must have read `renovate.json`, at least three workflow files, at least three
+modules under `app/` and at least three test files under `app/tests/unit/`. If
+you have not, the outcome is **Incomplete audit**, not a clean result. Never write
+that you checked something you did not read. The `noop` message for a clean
+result must say how many files you read.
 
 ## Stage 0: Baseline
 
@@ -208,16 +232,19 @@ beneficial low-risk maintenance. Avoid anything whose benefit is subjective.
 
 ## Outcomes
 
-Write the summary, then make the one final call: `create_issue` for a finding,
+Write the summary once (the heredoc, or the single `printf` command only if the
+heredoc was rejected; never both, which would duplicate it on the run page), then
+make the one final call: `create_issue` for a finding,
 `noop` otherwise. Start the summary with one of these headings so the run page
 shows the outcome:
 
-- `## Finding`, then the baseline (timestamp, checkout SHA and `main` SHA) and
-  the eight fields. An issue is created only for this outcome.
-- `## No worthwhile finding this week`, then the baseline and one line saying
-  what was checked.
-- `## Incomplete audit`, then the baseline and exactly what could not be
-  retrieved. This is never a clean result.
+- `## Finding`, then the baseline (timestamp, checkout SHA and `main` SHA), the
+  eight fields and the "Files read" list. An issue is created only for this
+  outcome.
+- `## No worthwhile finding this week`, then the baseline and the "Files read"
+  list.
+- `## Incomplete audit`, then the baseline, the "Files read" list and exactly
+  what could not be retrieved or read. This is never a clean result.
 
 ## Scope
 
