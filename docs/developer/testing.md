@@ -272,7 +272,7 @@ Tags select tests and are not mutually exclusive: one test can be
 | `@regression`                                                               | Tests that guard a specific past or likely regression.                           |
 | `@containers`, `@monitoring`, `@events`, `@configuration`, `@notifications` | Functional areas                                                                 |
 | `@errors`                                                                   | Loading, empty and failure handling, using `page.route` to fail one API call     |
-| `@pwa`                                                                      | Service worker, Cache Storage and installability (Chromium, production image)   |
+| `@pwa`                                                                      | Service worker, Cache Storage and installability (Chromium, production image)    |
 
 ### Parallelism and shared state
 
