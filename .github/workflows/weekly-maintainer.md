@@ -93,9 +93,12 @@ it is the audited revision.
 ## Tools
 
 There is no direct network access, and `gh` and `curl` are not authenticated.
-Do not use them. `git`, `python3` and every other command that is not on the
-allow-list are denied by policy, so never try them (a previous run lost about
-half of its tool calls retrying `git log` and `python3` wrappers around it). Read
+Do not use them. Only these shell commands work: `cat`, `grep`, `find`, `ls`,
+`head`, `tail`, `wc`, `jq`, `sort`, `uniq`, `date`, `printf`, `echo`, `github` and
+`safeoutputs`. Every other command, such as `git` or `python3`, is denied by
+policy, and so is any command chained to one of them with `&&` or `|`. Never try
+them (a previous run lost about half of its tool calls retrying `git log` and
+`python3` wrappers around it). Read
 the repository with `cat`, `grep`, `find` and `ls`, or with the built-in
 `read_file`, `read_many_files` and `grep_search` tools; use `find` only to list
 or locate files, and never with `-exec`, `-execdir`, `-delete` or `-fprint`.
@@ -117,15 +120,19 @@ them, and never write anywhere except the run summary and the issue body file
 below. You report through these things only:
 
 - **The run summary.** Write a short Markdown report with
-  `cat <<'EOF' > "$GITHUB_STEP_SUMMARY"`. It is where every outcome is reported;
+  `cat <<'EOF' > /tmp/gh-aw/agent-step-summary.md`. Use that literal path: the
+  variable `GITHUB_STEP_SUMMARY` is empty in your shell, so a redirect to it fails
+  with "No such file or directory" even though the tool reports success. The
+  workflow appends this file to the run page. It is where every outcome is reported;
   a finding is also filed as one issue (below). The Gemini CLI blocks a shell command that contains a backtick or
   `$(` outside single quotes, and its check is not aware of heredocs, so the
   same quote rules apply to the heredoc body: the report must contain **no backticks, no `$(` and no apostrophes**. Write file paths,
   line numbers and code names as plain text (for example app/monitor/x.py line
-  12), and write "does not" instead of "doesn't". If the heredoc command is
-  rejected, write the same report one line per command with
-  `printf '%s\n' 'LINE' >> "$GITHUB_STEP_SUMMARY"`, under the same rules. Do not
-  use `write_file` for this.
+  12), and write "does not" instead of "doesn't". Only if the heredoc command is
+  rejected, write the same report with one `printf '%s\n' 'LINE1' 'LINE2' >
+  /tmp/gh-aw/agent-step-summary.md` command, under the same rules. Do not use
+  `write_file` for this, and do not also print the report to the screen or repeat
+  it in your final message, which should be one short line.
 - **`safeoutputs create_issue`**, only for a finding, as your single terminal
   call, after the final duplicate search (see Duplicate-work check) and the
   summary are done. Write the issue body to a file with a quoted heredoc and pass
@@ -160,13 +167,17 @@ and keep the last three turns for the summary and the final call. If you are run
 short, stop assessing and report what you have as the outcome that fits, which is
 **Incomplete audit** if the reading rule below is not met.
 
-**Reading rule.** Every report must list under a "Files read" line the paths you
-actually opened with `cat`, `read_file`, `read_many_files` or `grep_search`, and
-may claim to have checked only what is on that list. Before you report **No
-worthwhile finding** you must have read, at the least, `.github/workflows/`
-files, `renovate.json`, several modules under `app/`, and several test files under
-`app/tests/unit/`. If you have not, the outcome is **Incomplete audit**, not a
-clean result. Never write that you checked something you did not read.
+**Reading rule.** Every report must list under a "Files read" line the paths
+whose full contents you opened with `cat`, `read_file` or `read_many_files`
+(`grep` and `grep_search` hits do not count), and may claim to have checked only
+what is on that list. One `read_many_files` call on a narrow glob, such as
+`.github/workflows/*.yml` or `app/tests/unit/test_*.py`, covers an area in a
+single turn; avoid whole-tree globs. Before you report **No worthwhile finding**
+you must have read `renovate.json`, at least three workflow files, at least three
+modules under `app/` and at least three test files under `app/tests/unit/`. If
+you have not, the outcome is **Incomplete audit**, not a clean result. Never write
+that you checked something you did not read. The `noop` message for a clean
+result must say how many files you read.
 
 ## Stage 0: Baseline
 
@@ -221,8 +232,9 @@ beneficial low-risk maintenance. Avoid anything whose benefit is subjective.
 
 ## Outcomes
 
-Write the summary once, with a single command (do not repeat it with a second
-command, which would duplicate it on the run page), then make the one final call: `create_issue` for a finding,
+Write the summary once (the heredoc, or the single `printf` command only if the
+heredoc was rejected; never both, which would duplicate it on the run page), then
+make the one final call: `create_issue` for a finding,
 `noop` otherwise. Start the summary with one of these headings so the run page
 shows the outcome:
 
