@@ -69,6 +69,10 @@ key/value pairs, independent of the `autoheal` label:
 | `whitelist_labels` | Only monitor containers matching at least one of these label filters |
 | `blacklist_labels` | Never monitor containers matching one of these label filters         |
 
+A label filter is a set of key/value pairs, and a container matches it only when it carries
+every pair. For example, `{"tier": "prod", "team": "a"}` does not match a container labelled only
+`tier=prod`.
+
 These filters are applied after container selection is otherwise determined, in this order:
 
 1. An explicit UI/API exclusion (`containers.excluded`) always wins — the container is never
