@@ -11,22 +11,34 @@ permissions:
   pull-requests: read
 engine:
   id: gemini
-  # Same pins as issue-triage.md: Gemini CLI >= 0.60.0 exits 41 "Invalid auth
-  # method selected" under AWF (see #583), and the default Pro-class model has
-  # no free-tier quota for the existing GEMINI_API_KEY. Flash Lite is used
-  # because the full Flash models are capped at 20 requests/day on the free
-  # tier; Flash Lite allows 500/day and 15/minute.
+  # Same CLI pin as issue-triage.md: Gemini CLI >= 0.60.0 exits 41 "Invalid
+  # auth method selected" under AWF (see #583). The default Pro-class model has
+  # no free-tier quota for the existing GEMINI_API_KEY. Full Flash rather than
+  # Flash Lite: a Flash Lite test run (40834249654) read 3 of the 35 source
+  # files and reported all of them read. Full Flash is capped at 20 requests a
+  # day on the free tier, and the prompt plans about five per run.
   version: "0.59.0"
-  model: gemini-3.5-flash-lite
+  model: gemini-3.5-flash
 # Top-level AWF invocation cap on model requests; gh-aw's engines reference
 # lists it as supported for Gemini. The default is 500, and the agent step has a
 # 20-minute timeout. The prompt plans about five requests (several tool calls go
-# out in one request), so 20 leaves room for retries and on-demand reads.
-max-turns: 20
+# out in one request); 12 leaves room for retries and on-demand reads while
+# keeping one run well inside the 20-requests-a-day Flash quota.
+max-turns: 12
 features:
   # actionlint (as pinned by this repo's MegaLinter) doesn't yet recognize
   # the "queue" concurrency key gh-aw emits by default.
   group-concurrency-queue: false
+# Counts the app source files the agent actually read, from its own tool-call
+# log, because the agent's coverage claim cannot be trusted. Runs after gh-aw
+# writes the agent output and before the safe_outputs job reads it: if any file
+# was not read, a create_issue is replaced by a noop and the step fails, so the
+# run shows red and no issue is filed from an incomplete audit. Run through
+# bash because gh-aw restores .github from the base branch without exec bits.
+post-steps:
+  - name: Check the agent read every app source file
+    if: always()
+    run: bash .github/scripts/weekly-maintainer-coverage.sh
 tools:
   # Explicit shell allow-list, required by strict mode when min-integrity is
   # none. Inspection commands plus the github and safeoutputs CLIs. There is no
@@ -110,7 +122,7 @@ that, as the plan below does.
 
 ## Plan: about five model turns
 
-You have at most 20 model turns. Put every independent tool call of a step into
+You have at most 12 model turns. Put every independent tool call of a step into
 the **same turn**: several tool calls in one turn cost one model request. Follow
 this plan and do not spend turns on anything else.
 
@@ -137,7 +149,9 @@ once more without the pipe and read what it returns.
 
 **Turn 2, read the whole app source.** Read **every** file from the app source
 list, each with its own `cat -n FILE`, all in this one turn. `cat -n` numbers the
-lines; those numbers are the only line numbers you may cite. Read a file of more
+lines; those numbers are the only line numbers you may cite. A later workflow
+step checks your tool calls: any source file not read with `cat -n` makes the
+audit incomplete, and no issue is filed. Read a file of more
 than 30,000 bytes in parts of 600 lines: `cat -n FILE | head -n 600`, then
 `cat -n FILE | tail -n +601` (for a file over 60,000 bytes, read the middle part
 with `cat -n FILE | head -n 1200 | tail -n +601` and start the last part at line
@@ -157,7 +171,7 @@ raise a question you must answer before deciding.
 **Turn 4, report.** In one turn, write the summary and make the one final call,
 `create_issue` or `noop` (see Reporting). Your final message is one short line.
 
-If a call fails, fix it once and carry on. If you have used 16 turns and have
+If a call fails, fix it once and carry on. If you have used 9 turns and have
 not reported yet, stop: write the summary as an **Incomplete audit** that says
 how far you got, and call `noop`. If the source or the issue and pull
 request lists cannot be read, stop and report an **Incomplete audit**.
