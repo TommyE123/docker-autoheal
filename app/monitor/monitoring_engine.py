@@ -221,6 +221,11 @@ class MonitoringEngine:
             return None
         return container_id, container_name, recovery_id
 
+    @property
+    def is_running(self) -> bool:
+        """Whether the monitoring loop is active"""
+        return self._running
+
     async def start(self) -> None:
         """Start the monitoring engine"""
         if self._running:

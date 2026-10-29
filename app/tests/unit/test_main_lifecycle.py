@@ -700,6 +700,9 @@ class TestUiUrl:
 
 
 class TestSignalHandler:
+    def setup_method(self):
+        main_module._shutdown_tasks.clear()
+
     def teardown_method(self):
         main_module.service = None
 
@@ -711,8 +714,25 @@ class TestSignalHandler:
 
         signal_handler(signal.SIGTERM, None)
         await asyncio.sleep(0)  # let the scheduled task run
+        await asyncio.sleep(0)  # and its done callback
 
         mock_service.stop.assert_awaited_once()
+        assert not main_module._shutdown_tasks  # finished tasks are released
+
+    @pytest.mark.asyncio
+    async def test_signal_handler_keeps_reference_to_pending_stop(self):
+        release = asyncio.Event()
+        mock_service = MagicMock()
+        mock_service.stop = AsyncMock(side_effect=release.wait)
+        main_module.service = mock_service
+
+        signal_handler(signal.SIGTERM, None)
+        assert len(main_module._shutdown_tasks) == 1
+
+        release.set()
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        assert not main_module._shutdown_tasks
 
     def test_signal_handler_noop_when_service_not_set(self):
         main_module.service = None
@@ -757,24 +777,59 @@ class TestAutoHealServiceRun:
         service = AutoHealService()
         service.start = AsyncMock(side_effect=lambda: setattr(service, "running", True))
         service.stop = AsyncMock()
+        service._stop_event.set()  # a stop requested while running ends the wait
 
-        async def fake_sleep(_delay):
-            service.running = False
-
-        with patch("app.main.asyncio.sleep", side_effect=fake_sleep):
-            await service.run()
+        await service.run()
 
         service.start.assert_awaited_once()
         service.stop.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_run_stops_on_cancelled_error_during_sleep(self):
+    async def test_run_blocks_until_stop_event_is_set(self):
         service = AutoHealService()
-        service.start = AsyncMock(side_effect=lambda: setattr(service, "running", True))
+        service.start = AsyncMock()
         service.stop = AsyncMock()
 
-        with patch("app.main.asyncio.sleep", side_effect=asyncio.CancelledError):
-            await service.run()  # CancelledError must be swallowed, not propagated
+        run_task = asyncio.create_task(service.run())
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        assert not run_task.done()
+
+        service._stop_event.set()
+        await asyncio.wait_for(run_task, timeout=1)
+
+        service.stop.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_run_returns_promptly_when_stop_was_requested_first(self):
+        service = AutoHealService()
+        service.start = AsyncMock()
+        service.stop = AsyncMock()
+        service._stop_event.set()
+
+        await asyncio.wait_for(service.run(), timeout=1)
+
+        service.stop.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_stop_sets_stop_event(self):
+        service = AutoHealService()
+
+        await service.stop()
+
+        assert service._stop_event.is_set()
+
+    @pytest.mark.asyncio
+    async def test_run_stops_on_cancelled_error_while_waiting(self):
+        service = AutoHealService()
+        service.start = AsyncMock()
+        service.stop = AsyncMock()
+
+        run_task = asyncio.create_task(service.run())
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        run_task.cancel()
+        await run_task  # CancelledError must be swallowed, not propagated
 
         service.stop.assert_awaited_once()
 

@@ -86,6 +86,7 @@ INCOMPLETE_INFO_CASES = [
 
 def make_container(
     name: str = "web",
+    *,
     container_id: str = "a" * 64,
     status: str = "running",
     labels: dict | None = None,

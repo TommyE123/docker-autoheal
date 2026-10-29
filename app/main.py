@@ -105,6 +105,7 @@ class AutoHealService:
         self.uptime_kuma_monitor: UptimeKumaMonitor | None = None
         self.metrics_server: WSGIServer | None = None
         self.running = False
+        self._stop_event = asyncio.Event()
 
     async def start(self) -> None:
         """Start the auto-heal service"""
@@ -222,6 +223,7 @@ class AutoHealService:
         logger.info("Stopping Docker Auto-Heal Service...")
 
         self.running = False
+        self._stop_event.set()
 
         # Stop components gracefully with error handling. The Docker client is
         # closed in `finally` so a cancellation (not an Exception) during an
@@ -259,8 +261,7 @@ class AutoHealService:
 
         # Keep running until stopped
         try:
-            while self.running:
-                await asyncio.sleep(1)
+            await self._stop_event.wait()
         except asyncio.CancelledError:
             pass
         finally:
@@ -269,6 +270,9 @@ class AutoHealService:
 
 # Global service instance
 service: AutoHealService | None = None
+
+# Strong references to in-flight shutdown tasks, so the event loop can't garbage collect them
+_shutdown_tasks: set[asyncio.Task] = set()
 
 
 def get_public_port() -> str | None:
@@ -296,7 +300,9 @@ def signal_handler(signum: int, _frame: FrameType | None) -> None:
     """Handle shutdown signals"""
     logger.info("Received signal %s, initiating shutdown...", signum)
     if service:
-        asyncio.create_task(service.stop())
+        task = asyncio.create_task(service.stop())
+        _shutdown_tasks.add(task)
+        task.add_done_callback(_shutdown_tasks.discard)
 
 
 async def run_api_server() -> None:
