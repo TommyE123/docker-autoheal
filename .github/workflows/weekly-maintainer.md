@@ -137,6 +137,9 @@ this plan and do not spend turns on anything else.
   (every app source file, with its size in bytes)
 - `find app/tests/unit frontend/src .github/workflows -type f -printf "%s %p\n"`
   and `cat renovate.json` (what the tests, frontend and automation cover)
+- `grep -n "^FROM python" Dockerfile` and
+  `grep -n "target-version" .linter-rules/.ruff.toml` (the Python version the
+  app runs on; see Assess)
 - the GitHub state, each piped through `jq` so the result stays short (the
   raw results run to over 100,000 characters and would be cut):
   - `github list_commits --owner OWNER --repo REPO --sha main --perPage 30 | jq -r '.[] | "\(.sha[0:12]) \(.commit.message | split("\n")[0])"'`
@@ -260,6 +263,14 @@ using exactly these eight fields:
    overlap
 8. **Classification**: one of regression test, coverage gap, reliability or CI,
    maintainability, housekeeping, other
+
+Judge the code by the Python version from turn 1, never by an older one. For
+example, from Python 3.14 (PEP 758) `except ValueError, OSError:` without `as`
+catches both exception types, exactly like `except (ValueError, OSError):`. CI
+parses, lints and runs the unit tests on every change, so never report a syntax
+error, an import that does not resolve, or code that cannot run. If a candidate
+depends on how a language feature behaves and you are not certain how it
+behaves in that version, it is not high confidence: reject it.
 
 When several candidates qualify, prefer them in this order: small regression
 test for existing behaviour; small coverage gap with clearly defined expected
