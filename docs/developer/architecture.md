@@ -61,6 +61,12 @@ database — all state is JSON files under `/data`.
    - `_handle_container_restart` — applies cooldown, backoff, and the restart threshold;
      restarts the container or quarantines it.
 
+   The in-memory restart state (each container's last restart time, backoff delay, pending
+   restart wait and healthy run, and the cycle count) lives in `RecoveryPolicy`
+   (`app/monitor/recovery.py`). It is synchronous and makes no Docker, configuration or
+   notification calls: the engine passes in the configuration it already read and keeps the
+   Docker calls, the persisted restart counts and quarantine, events, and notifications.
+
    In parallel, `AutoDiscovery.listen` (`app/monitor/auto_discovery.py`) subscribes to
    Docker's container-start events (via a background thread feeding an asyncio queue) so
    containers labelled `autoheal=true` are picked up the moment they start, without waiting
