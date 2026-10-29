@@ -1,9 +1,11 @@
 """
-In-memory restart and backoff state for the monitoring engine
+In-memory restart, backoff and quarantine-release state for the monitoring engine
 
 ``RecoveryPolicy`` is synchronous and does not touch Docker, the configuration manager or
 notifications. The engine passes in the configuration snapshot it is already working with,
 so a decision never mixes two configurations, and the policy's clock can be replaced in tests.
+The one exception is the backoff reset on a quarantine release, which takes a callback so the
+initial delay is only read from the configuration when a backoff is being tracked.
 """
 
 import logging
@@ -17,18 +19,37 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Consecutive healthy checks, on the same container run, before a quarantined container
+# is released. The container must also have been up for this many monitoring intervals.
+QUARANTINE_STABLE_CHECKS = 3
+
 
 def utc_now() -> datetime:
     """The current time in UTC, the policy's default clock"""
     return datetime.now(UTC)
 
 
+def uptime_seconds(started_at: str, now: datetime) -> float | None:
+    """Seconds from a Docker ``StartedAt`` timestamp to ``now``, or None if it is unusable"""
+    try:
+        started = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if started.year <= 1:  # Docker's zero time: never started
+        return None
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=UTC)
+    return (now - started).total_seconds()
+
+
 class RecoveryPolicy:
     """
-    Cooldown, restart backoff and healthy-run state, keyed by recovery identifier
+    Cooldown, restart backoff, healthy-run and quarantine-release state
 
-    Restart waits and healthy runs also record the container (by Docker ID) they belong
-    to, because replicas can share a recovery ID and a recreated container gets a new ID.
+    Restart state is keyed by recovery identifier. Restart waits and healthy runs also
+    record the container (by Docker ID) they belong to, because replicas can share a
+    recovery ID and a recreated container gets a new ID. Quarantine streaks are keyed by
+    Docker ID only.
     """
 
     def __init__(self, clock: Callable[[], datetime] = utc_now) -> None:
@@ -58,6 +79,11 @@ class RecoveryPolicy:
         # only if each happened in the cycle after the previous one, so a skipped or failed
         # check, or a failed cycle, breaks the streak without any explicit reset.
         self._check_cycle = 0
+        # Per container (by Docker ID, since replicas can share a recovery ID): StartedAt,
+        # consecutive healthy checks while quarantined, and the cycle of the latest one.
+        # The engine checks one container at a time and the update has no await, so no
+        # lock is needed. Concurrent checks of one container would need one.
+        self.quarantine_streaks: dict[str, tuple[str, int, int]] = {}
 
     @property
     def check_cycle(self) -> int:
@@ -65,8 +91,16 @@ class RecoveryPolicy:
         return self._check_cycle
 
     def begin_cycle(self) -> None:
-        """Count the start of a monitoring cycle"""
+        """Count the start of a monitoring cycle and end the streaks it can't extend"""
         self._check_cycle += 1
+        # A streak not extended last cycle is over; this also forgets removed containers
+        ended = [
+            container_id
+            for container_id, (_, _, cycle) in self.quarantine_streaks.items()
+            if cycle < self._check_cycle - 1
+        ]
+        for container_id in ended:
+            del self.quarantine_streaks[container_id]
 
     def forget_absent(self, listed_ids: set[str | None]) -> None:
         """
@@ -272,3 +306,65 @@ class RecoveryPolicy:
     def record_restart(self, recovery_id: str) -> None:
         """Start the cooldown after a restart attempt, whether or not it succeeded"""
         self.last_restart_times[recovery_id] = self._clock()
+
+    def quarantine_recovery_confirmed(
+        self, container_id: str, info: dict, restart_mode: str, interval_seconds: int
+    ) -> bool:
+        """
+        Record one healthy check of a quarantined container; True once it is stable.
+
+        Stable means ``QUARANTINE_STABLE_CHECKS`` consecutive healthy checks of the same
+        run (same ``StartedAt``), each in the cycle after the previous one, and an uptime
+        of that many monitoring intervals. Only a healthy check is recorded, so anything
+        else (unhealthy, not running, skipped, failed, or a failed cycle) leaves a gap,
+        and ``begin_cycle`` at the start of the next cycle ends the streak. The loop sleeps
+        ``interval_seconds`` between checks, so real checks are at least that far apart
+        and the uptime floor is a lower bound. Docker health ``starting`` is not healthy
+        for this purpose in the health-based modes.
+
+        Args:
+            container_id: Full Docker container ID
+            info: Container information dict, known to be running and not needing restart
+            restart_mode: Configured restart mode
+            interval_seconds: Configured monitoring interval
+
+        Returns:
+            True if the container may be released from quarantine
+        """
+        health = info.get("health")
+        if restart_mode in ("health", "both") and health and health.get("status") == "starting":
+            return False
+
+        started_at = info.get("started_at") or info.get("state", {}).get("StartedAt") or ""
+        uptime = uptime_seconds(started_at, self._clock())
+        if uptime is None:
+            # Without a usable StartedAt the run cannot be identified or timed, so the
+            # container stays quarantined and nothing counts towards a streak
+            return False
+
+        previous = self.quarantine_streaks.get(container_id)
+        count = previous[1] + 1 if previous and previous[0] == started_at else 1
+        self.quarantine_streaks[container_id] = (started_at, count, self._check_cycle)
+
+        required_uptime = QUARANTINE_STABLE_CHECKS * interval_seconds
+        return count >= QUARANTINE_STABLE_CHECKS and uptime >= required_uptime
+
+    def note_quarantine_released(
+        self, container_id: str, recovery_id: str, initial_backoff: Callable[[], int]
+    ) -> None:
+        """
+        Forget a released container's streak and restart wait, and reset its backoff
+
+        A wait started by another replica sharing the recovery ID is still valid, so it is
+        kept. The backoff is reset only if one is recorded.
+
+        Args:
+            container_id: Docker ID of the released container
+            recovery_id: Recovery identifier the backoff is recorded under
+            initial_backoff: Returns the configured initial backoff; called only when a
+                backoff is recorded
+        """
+        self.quarantine_streaks.pop(container_id, None)
+        self.cancel_restart_wait(recovery_id, container_id)
+        if recovery_id in self.backoff_delays:
+            self.backoff_delays[recovery_id] = initial_backoff()
