@@ -11,7 +11,12 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.config.config_manager import BackoffConfig, RestartConfig
-from app.monitor.recovery import RecoveryPolicy, utc_now
+from app.monitor.recovery import (
+    QUARANTINE_STABLE_CHECKS,
+    RecoveryPolicy,
+    uptime_seconds,
+    utc_now,
+)
 
 OWNER = "a" * 64
 SIBLING = "b" * 64
@@ -331,3 +336,192 @@ class TestLogging:
             "Container web-1 (recovery_id: web) waiting out restart backoff (7.5s left)",
         ]
         assert {record.name for record in caplog.records} == {"app.monitor.recovery"}
+
+
+def started(at: datetime = START) -> str:
+    """A Docker ``StartedAt`` timestamp"""
+    return at.isoformat().replace("+00:00", "Z")
+
+
+def running_info(started_at: str | None = None, **extra) -> dict:
+    return {"started_at": started() if started_at is None else started_at, **extra}
+
+
+def confirm(
+    policy: RecoveryPolicy,
+    info: dict | None = None,
+    container_id: str = OWNER,
+    mode: str = "on-failure",
+    interval: int = 10,
+) -> bool:
+    return policy.quarantine_recovery_confirmed(
+        container_id, running_info() if info is None else info, mode, interval
+    )
+
+
+class TestUptime:
+    def test_seconds_since_a_docker_timestamp(self):
+        now = START + timedelta(seconds=90)
+        assert uptime_seconds(f"{started()[:-1]}.123456789Z", now) == pytest.approx(
+            89.877, abs=1e-3
+        )
+        assert uptime_seconds(started(), now) == 90.0
+
+    def test_a_naive_timestamp_is_utc(self):
+        assert uptime_seconds("2026-01-01T00:00:00", START + timedelta(seconds=5)) == 5.0
+
+    def test_an_offset_is_honoured(self):
+        assert uptime_seconds("2026-01-01T02:00:00+02:00", START + timedelta(seconds=5)) == 5.0
+
+    @pytest.mark.parametrize("started_at", ["", "not-a-date", "0001-01-01T00:00:00Z"])
+    def test_unusable_timestamps(self, started_at):
+        assert uptime_seconds(started_at, START) is None
+
+    def test_year_two_is_a_real_start(self):
+        assert uptime_seconds("0002-01-01T00:00:00Z", START) is not None
+
+
+class TestQuarantineStreak:
+    def test_needs_the_configured_number_of_consecutive_checks(self, policy, clock):
+        clock.advance(1000)
+        results = []
+        for _ in range(QUARANTINE_STABLE_CHECKS):
+            policy.begin_cycle()
+            results.append(confirm(policy))
+        assert results == [False] * (QUARANTINE_STABLE_CHECKS - 1) + [True]
+        assert policy.quarantine_streaks == {
+            OWNER: (started(), QUARANTINE_STABLE_CHECKS, QUARANTINE_STABLE_CHECKS)
+        }
+
+    def test_the_streak_records_the_cycle_it_was_last_seen(self, policy):
+        policy.begin_cycle()
+        policy.begin_cycle()
+        confirm(policy)
+        assert policy.quarantine_streaks == {OWNER: (started(), 1, 2)}
+
+    def test_uptime_must_cover_that_many_intervals(self, policy, clock):
+        for _ in range(QUARANTINE_STABLE_CHECKS):
+            policy.begin_cycle()
+            confirm(policy, interval=10)
+        clock.advance(QUARANTINE_STABLE_CHECKS * 10 - 1)
+        policy.begin_cycle()
+        assert confirm(policy, interval=10) is False
+        clock.advance(1)
+        policy.begin_cycle()
+        assert confirm(policy, interval=10) is True
+
+    def test_a_gap_of_a_cycle_restarts_the_count(self, policy, clock):
+        clock.advance(1000)
+        for _ in range(QUARANTINE_STABLE_CHECKS - 1):
+            policy.begin_cycle()
+            confirm(policy)
+        policy.begin_cycle()  # not checked this cycle
+        policy.begin_cycle()
+        assert OWNER not in policy.quarantine_streaks
+        assert confirm(policy) is False
+        assert policy.quarantine_streaks[OWNER][1] == 1
+
+    def test_a_new_run_restarts_the_count(self, policy, clock):
+        clock.advance(1000)
+        for _ in range(QUARANTINE_STABLE_CHECKS - 1):
+            policy.begin_cycle()
+            confirm(policy)
+        restarted = started(START + timedelta(seconds=1))
+        policy.begin_cycle()
+        assert confirm(policy, running_info(restarted)) is False
+        assert policy.quarantine_streaks == {OWNER: (restarted, 1, QUARANTINE_STABLE_CHECKS)}
+
+    def test_streaks_are_per_container(self, policy):
+        policy.begin_cycle()
+        confirm(policy)
+        confirm(policy, container_id=SIBLING)
+        confirm(policy)
+        assert policy.quarantine_streaks == {OWNER: (started(), 2, 1), SIBLING: (started(), 1, 1)}
+
+    def test_state_started_at_is_the_fallback(self, policy):
+        info = {"started_at": "", "state": {"StartedAt": started()}}
+        confirm(policy, info)
+        assert policy.quarantine_streaks == {OWNER: (started(), 1, 0)}
+
+    @pytest.mark.parametrize("info", [{}, {"state": {}}, running_info("0001-01-01T00:00:00Z")])
+    def test_without_a_usable_start_nothing_counts(self, policy, info):
+        assert confirm(policy, info) is False
+        assert policy.quarantine_streaks == {}
+
+    @pytest.mark.parametrize("mode", ["health", "both"])
+    def test_health_starting_is_not_healthy_in_health_modes(self, policy, mode):
+        info = running_info(health={"status": "starting"})
+        assert confirm(policy, info, mode=mode) is False
+        assert policy.quarantine_streaks == {}
+
+    @pytest.mark.parametrize(
+        ("mode", "health"),
+        [
+            ("on-failure", {"status": "starting"}),
+            ("health", {"status": "healthy"}),
+            ("health", None),
+            ("both", {}),
+        ],
+    )
+    def test_other_health_states_count(self, policy, mode, health):
+        confirm(policy, running_info(health=health), mode=mode)
+        assert policy.quarantine_streaks[OWNER][1] == 1
+
+
+class TestStreakPrune:
+    def test_begin_cycle_ends_streaks_not_extended_last_cycle(self, policy):
+        streaks = policy.quarantine_streaks
+        streaks.update({OWNER: ("a", 1, 1), SIBLING: ("b", 2, 2), "c" * 64: ("c", 1, 0)})
+        for _ in range(3):
+            policy.begin_cycle()
+        assert policy.check_cycle == 3
+        assert policy.quarantine_streaks == {SIBLING: ("b", 2, 2)}
+        assert policy.quarantine_streaks is streaks  # pruned in place
+
+    def test_a_streak_from_this_cycle_is_kept(self, policy):
+        policy.begin_cycle()
+        policy.quarantine_streaks[OWNER] = ("a", 1, 1)
+        policy.begin_cycle()
+        assert policy.quarantine_streaks == {OWNER: ("a", 1, 1)}
+
+
+class TestQuarantineRelease:
+    def test_forgets_the_streak_and_resets_a_tracked_backoff(self, policy):
+        policy.quarantine_streaks.update({OWNER: ("a", 2, 0), SIBLING: ("b", 1, 0)})
+        policy.backoff_delays.update({"web": 160, "db": 40})
+        policy.note_quarantine_released(OWNER, "web", lambda: 10)
+        assert policy.quarantine_streaks == {SIBLING: ("b", 1, 0)}
+        assert policy.backoff_delays == {"web": 10, "db": 40}
+
+    def test_without_a_backoff_the_configuration_is_not_read(self, policy):
+        def initial_backoff() -> int:
+            raise AssertionError("read the configuration without a backoff to reset")
+
+        policy.note_quarantine_released(OWNER, "web", initial_backoff)
+        assert policy.backoff_delays == {}
+
+    def test_cancels_its_own_wait(self, policy):
+        wait_elapsed(policy)
+        policy.note_quarantine_released(OWNER, "web", lambda: 10)
+        assert policy.next_allowed_restart == {}
+        assert policy.restart_wait_owner == {}
+        assert policy.restart_wait_seen == {}
+
+    def test_keeps_a_wait_started_by_a_sibling(self, policy):
+        wait_elapsed(policy, container_id=SIBLING)
+        policy.note_quarantine_released(OWNER, "web", lambda: 10)
+        assert policy.restart_wait_owner == {"web": SIBLING}
+
+    def test_a_failed_configuration_read_leaves_the_backoff(self, policy):
+        wait_elapsed(policy)
+        policy.quarantine_streaks[OWNER] = ("a", 2, 0)
+        policy.backoff_delays["web"] = 160
+
+        def initial_backoff() -> int:
+            raise RuntimeError("config unavailable")
+
+        with pytest.raises(RuntimeError, match="config unavailable"):
+            policy.note_quarantine_released(OWNER, "web", initial_backoff)
+        assert policy.quarantine_streaks == {}
+        assert policy.restart_wait_owner == {}
+        assert policy.backoff_delays == {"web": 160}

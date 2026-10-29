@@ -18,7 +18,12 @@ from app.config.config_manager import (
 from app.docker_client.docker_client_wrapper import recovery_identifier
 from app.monitor.auto_discovery import AutoDiscovery
 from app.monitor.health import HealthEvaluator
-from app.monitor.recovery import RecoveryPolicy
+from app.monitor.recovery import (
+    QUARANTINE_STABLE_CHECKS,  # noqa: F401  (re-exported for the tests)
+    RecoveryPolicy,
+    uptime_seconds,
+    utc_now,
+)
 from app.monitor.selection import should_monitor
 from app.notifications.notification_manager import notification_manager
 
@@ -28,10 +33,6 @@ if TYPE_CHECKING:
     from app.monitor.uptime_kuma_monitor import UptimeKumaMonitor
 
 logger = logging.getLogger(__name__)
-
-# Consecutive healthy checks, on the same container run, before a quarantined container
-# is released. The container must also have been up for this many monitoring intervals.
-QUARANTINE_STABLE_CHECKS = 3
 
 
 class DockerClient(Protocol):
@@ -88,20 +89,14 @@ class MonitoringEngine:
         self._running = False
         self._task: asyncio.Task | None = None
         self._event_task: asyncio.Task | None = None
-        # Cooldown, backoff, restart waits, healthy runs and the cycle count
+        # Cooldown, backoff, restart waits, healthy runs, quarantine streaks and the cycle count
         self._recovery = RecoveryPolicy()
-        # Per container (by Docker ID, since replicas can share a recovery ID): StartedAt,
-        # consecutive healthy checks while quarantined, and the cycle of the latest one.
-        # _check_containers checks one container at a time and the update has no await, so
-        # no lock is needed. Concurrent checks of one container would need one.
-        self._quarantine_streaks: dict[str, tuple[str, int, int]] = {}
         self._health_evaluator = HealthEvaluator(docker_client)
         self._auto_discovery = AutoDiscovery(docker_client, self._container_identifiers)
 
     # Read-only views of the recovery policy's state, under the names the engine used
     # before the state moved to ``RecoveryPolicy``. The properties can't be rebound, but
-    # they return the policy's own dicts, so the engine still writes to
-    # ``_backoff_delays`` when a quarantine is released, until that moves too.
+    # they return the policy's own dicts.
 
     @property
     def _last_restart_times(self) -> dict[str, datetime]:
@@ -130,6 +125,10 @@ class MonitoringEngine:
     @property
     def _check_cycle(self) -> int:
         return self._recovery.check_cycle
+
+    @property
+    def _quarantine_streaks(self) -> dict[str, tuple[str, int, int]]:
+        return self._recovery.quarantine_streaks
 
     @property
     def uptime_kuma_monitor(self) -> UptimeKumaMonitor | None:
@@ -298,17 +297,12 @@ class MonitoringEngine:
         """
         Check all containers and perform auto-healing if needed
 
-        Containers are checked one at a time. ``_quarantine_streaks`` relies on that:
-        running the checks concurrently would need a per-container lock around its
-        read-modify-write.
+        Containers are checked one at a time. The quarantine streaks in ``RecoveryPolicy``
+        rely on that: running the checks concurrently would need a per-container lock
+        around their read-modify-write.
         """
+        # Also ends the quarantine streaks not extended last cycle
         self._recovery.begin_cycle()
-        # A streak not extended last cycle is over; this also forgets removed containers
-        self._quarantine_streaks = {
-            container_id: streak
-            for container_id, streak in self._quarantine_streaks.items()
-            if streak[2] >= self._check_cycle - 1
-        }
         try:
             # Ensure Docker connection is active
             if not self.docker_client.is_connected():
@@ -433,14 +427,8 @@ class MonitoringEngine:
         """
         Record one healthy check of a quarantined container; True once it is stable.
 
-        Stable means ``QUARANTINE_STABLE_CHECKS`` consecutive healthy checks of the same
-        run (same ``StartedAt``), each in the cycle after the previous one, and an uptime
-        of that many monitoring intervals. Only a healthy check is recorded, so anything
-        else (unhealthy, not running, skipped, failed, or a failed cycle) leaves a gap,
-        and the sweep at the start of the next cycle ends the streak. The loop sleeps
-        ``interval_seconds`` between checks, so real checks are at least that far apart
-        and the uptime floor is a lower bound. Docker health ``starting`` is not healthy
-        for this purpose in the health-based modes.
+        See ``RecoveryPolicy.quarantine_recovery_confirmed``. The configuration is read
+        here, after the health check, so the decision uses the latest snapshot.
 
         Args:
             container_id: Full Docker container ID
@@ -450,40 +438,14 @@ class MonitoringEngine:
             True if the container may be released from quarantine
         """
         config = config_manager.get_config()
-        health = info.get("health")
-        if (
-            config.restart.mode in ("health", "both")
-            and health
-            and health.get("status") == "starting"
-        ):
-            return False
-
-        started_at = info.get("started_at") or info.get("state", {}).get("StartedAt") or ""
-        uptime = self._uptime_seconds(started_at)
-        if uptime is None:
-            # Without a usable StartedAt the run cannot be identified or timed, so the
-            # container stays quarantined and nothing counts towards a streak
-            return False
-
-        previous = self._quarantine_streaks.get(container_id)
-        count = previous[1] + 1 if previous and previous[0] == started_at else 1
-        self._quarantine_streaks[container_id] = (started_at, count, self._check_cycle)
-
-        required_uptime = QUARANTINE_STABLE_CHECKS * config.monitor.interval_seconds
-        return count >= QUARANTINE_STABLE_CHECKS and uptime >= required_uptime
+        return self._recovery.quarantine_recovery_confirmed(
+            container_id, info, config.restart.mode, config.monitor.interval_seconds
+        )
 
     @staticmethod
     def _uptime_seconds(started_at: str) -> float | None:
         """Seconds since a Docker ``StartedAt`` timestamp, or None if it is unusable"""
-        try:
-            started = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
-        except ValueError:
-            return None
-        if started.year <= 1:  # Docker's zero time: never started
-            return None
-        if started.tzinfo is None:
-            started = started.replace(tzinfo=UTC)
-        return (datetime.now(UTC) - started).total_seconds()
+        return uptime_seconds(started_at, utc_now())
 
     def should_monitor_container(self, container: Container, info: dict) -> bool:
         """
@@ -546,14 +508,14 @@ class MonitoringEngine:
 
             # Also clear the restart count so it starts fresh
             config_manager.clear_restart_history(recovery_id)
-            self._quarantine_streaks.pop(container_id, None)
 
-            # Reset backoff delays; a wait started by another replica sharing this
-            # recovery ID is still valid
-            self._recovery.cancel_restart_wait(recovery_id, container_id)
-            if recovery_id in self._backoff_delays:
-                config = config_manager.get_config()
-                self._backoff_delays[recovery_id] = config.restart.backoff.initial_seconds
+            # Forget the streak and reset backoff delays; a wait started by another
+            # replica sharing this recovery ID is still valid
+            self._recovery.note_quarantine_released(
+                container_id,
+                recovery_id,
+                lambda: config_manager.get_config().restart.backoff.initial_seconds,
+            )
 
             # Log the event
             event = AutoHealEvent(
