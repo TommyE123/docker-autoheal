@@ -193,9 +193,13 @@ the first line of an issue body, and in the `noop` message. A report without the
 token is an **Incomplete audit**. If no digest is present in this prompt, there
 is no token: report `INCOMPLETE AUDIT: no digest present` and nothing else. A clean result must also list under "Examined" the files whose text you
 saw (from the digest or opened), and under "Rejected candidates" at least three
-specific candidates (file, what you looked at, and why you rejected it, for
-example excluded area, existing issue, unclear behaviour or low confidence).
-Without those lists the outcome is **Incomplete audit**, not a clean result. A
+**code-level** candidates. Each names a file, the function or class, and one
+line quoted from the digest or from a file you opened (the digest has no line
+numbers), says what looked like a maintenance opportunity, and says why you
+rejected it (for example already covered by a test, behaviour unclear, risky
+lifecycle logic, or low confidence). An existing issue, an excluded area or
+documentation drift does not count as a code-level candidate; you may list those
+as extras. Without those lists the outcome is **Incomplete audit**, not a clean result. A
 finding must quote the exact line or lines it rests on, with the file and line
 number. The output rules forbid backticks, `$(` and apostrophes, so when a
 quoted line contains one, write [backtick], [dollar-paren] or [apos] in its
