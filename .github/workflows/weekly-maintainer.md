@@ -166,13 +166,16 @@ requests (each search covers only one kind unless the query says which):
 - `github search_issues --query "repo:OWNER/REPO is:pr is:closed closed:>YYYY-MM-DD" --perPage 100 | jq -r '.[] | "#\(.number) \(.closed_at // "" | .[0:10]) \(.title)"'`
 
 **Turn 3, check the candidate.** Assess the source (see Assess). For your best
-candidate, open whatever else it rests on in one turn: the relevant test file
-with `cat -n`, a workflow or a frontend file, and run the final duplicate
-searches (see Duplicate-work check). Use one more turn only if those results
-raise a question you must answer before deciding.
+candidate, make every remaining check in this one turn: open the relevant test
+file with `cat -n`, any workflow or frontend file, run any `grep` you need, and
+run the final duplicate searches (see Duplicate-work check). Do not split these
+checks across turns. Use one more turn only if their results raise a question
+you must answer before deciding.
 
-**Turn 4, report.** In one turn, write the summary and make the one final call,
-`create_issue` or `noop` (see Reporting). Your final message is one short line.
+**Turn 4, report.** Make **one** tool call: a single shell command that writes
+the summary, then for a finding the issue body, and ends with the final call,
+`create_issue` or `noop`, joined with `&&` (see Reporting). Your final message
+after it is one short line.
 
 If a call fails, fix it once and carry on. If you have used 9 turns and have
 not reported yet, stop: write the summary as an **Incomplete audit** that says
@@ -224,6 +227,27 @@ You report through these things only:
   is inside single quotes, so it must also contain no apostrophes. Never call
   `report_incomplete`, `report_missing_tool` or `report_missing_data`. Call
   exactly one of `create_issue` or `noop`, once.
+
+Turn 4 is one command. For a finding:
+
+```bash
+cat <<'EOF' > /tmp/gh-aw/agent-step-summary.md && cat <<'EOF2' > /tmp/gh-aw/agent/issue.md && safeoutputs create_issue --title 'SHORT TITLE' --body . < /tmp/gh-aw/agent/issue.md
+SUMMARY
+EOF
+ISSUE BODY
+EOF2
+```
+
+Without a finding:
+
+```bash
+cat <<'EOF' > /tmp/gh-aw/agent-step-summary.md && safeoutputs noop '{"message":"NO FINDING: <reason>"}'
+SUMMARY
+EOF
+```
+
+Only if that command is rejected, run its parts as separate calls in the same
+order.
 
 **Evidence rule.** A finding, and every rejected candidate, may rest only on text
 you saw in a tool result in this run, never on memory, documentation or a guess.
