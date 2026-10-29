@@ -18,5 +18,4 @@ pytest_add_cli_args_test_selection = [
     "--ignore=app/tests/unit/test_release_please_workflow.py",
     "--ignore=app/tests/unit/test_dev_stack_files.py",
     "--ignore=app/tests/unit/test_badge_ci_scripts.py",
-    "--ignore=app/tests/unit/test_weekly_maintainer_digest.py",
 ]
