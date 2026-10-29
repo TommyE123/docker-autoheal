@@ -34,7 +34,9 @@ features:
 # in the prompt there is nothing left to skip. Fails the job if it cannot append.
 pre-agent-steps:
   - name: Append evidence digest to the prompt
-    run: .github/scripts/weekly-maintainer-digest.sh
+    # Run through bash: gh-aw restores .github from the base branch before this
+    # step, and the restored script was not executable (exit 126 in run 40775528568).
+    run: bash .github/scripts/weekly-maintainer-digest.sh
 tools:
   # Explicit shell allow-list, required by strict mode when min-integrity is
   # none. Inspection commands plus the github and safeoutputs CLIs. There is no
