@@ -40,7 +40,7 @@
       "description": "Group Prettier dependency updates across package files into one PR.",
       "matchManagers": ["npm"],
       "matchPackageNames": ["prettier"],
-      "groupName": "Prettier,
+      "groupName": "Prettier",
       "minimumReleaseAge": "7 days"
     },
     {
