@@ -154,13 +154,11 @@ specifiers = ["3.99.4"]
 
 [tools."aqua:trufflesecurity/trufflehog"."platforms.linux-arm64"]
 checksum = "sha256:e6285aff62e692131255dca91ad300a62a479330e0b72e4eb1d60ae58908f8d5"
-checksum_source = "mise-versions"
 url = "https://github.com/trufflesecurity/trufflehog/releases/download/v3.99.4/trufflehog_3.99.4_linux_arm64.tar.gz"
 url_api = "https://api.github.com/repos/trufflesecurity/trufflehog/releases/assets/666278364"
 
 [tools."aqua:trufflesecurity/trufflehog"."platforms.linux-x64"]
 checksum = "sha256:5ae9b313342d1bfa96404064c0f59e77a2cbd1824d797ca7b11e6655aa8fd9d1"
-checksum_source = "mise-versions"
 url = "https://github.com/trufflesecurity/trufflehog/releases/download/v3.99.4/trufflehog_3.99.4_linux_amd64.tar.gz"
 url_api = "https://api.github.com/repos/trufflesecurity/trufflehog/releases/assets/666278359"
 
@@ -182,10 +180,10 @@ url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/645467
 provenance = "github-attestations"
 
 [[tools."pypi:djlint"]]
-version = "1.46.6"
+version = "1.47.0"
 backend = "pypi:djlint"
-specifiers = ["1.46.6"]
-uv = { path = ".mise/locks/pypi-djlint/1.46.6", digest = "sha256:f88bf9f1c15bf667f2a5ec30fcd636e998d93381f1cbce64b3aee29773ca05e9" }
+specifiers = ["1.47.0"]
+uv = { path = ".mise/locks/pypi-djlint/1.47.0", digest = "sha256:f355a9973b8001c85af8f6a9e7c22d83a29225dd2c139be595d30a0a872936bd" }
 
 [[tools."pypi:semgrep"]]
 version = "1.182.1"
