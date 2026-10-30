@@ -17,7 +17,8 @@ docker-autoheal/
 │   ├── monitor/
 │   │   ├── auto_discovery.py     # Adds labelled containers to monitoring (startup scan, start-event listener)
 │   │   ├── health.py             # Whether a container needs a restart (exit status, health checks)
-│   │   ├── monitoring_engine.py  # Core monitoring loop, restart/backoff/quarantine logic
+│   │   ├── monitoring_engine.py  # Core monitoring loop, restarts and quarantine
+│   │   ├── recovery.py           # In-memory cooldown, backoff, restart-wait and quarantine-release state
 │   │   ├── selection.py          # Which containers are monitored (selected/excluded, labels, filters)
 │   │   └── uptime_kuma_monitor.py
 │   ├── notifications/
@@ -90,7 +91,11 @@ suites (see [Testing](testing.md#legacy-script-triage) for what happened to each
   `docker` SDK: listing containers, restarting/stopping them, HTTP/TCP/exec health checks,
   and reading Docker's native health status.
 - **`app/monitor/monitoring_engine.py`** — the core auto-healing logic described in
-  [Architecture](architecture.md).
+  [Architecture](architecture.md): the monitoring loop, restarts, quarantine, events and
+  notifications.
+- **`app/monitor/recovery.py`** — `RecoveryPolicy`, the synchronous in-memory restart state:
+  cooldown, backoff, pending restart waits, the healthy runs that reset backoff, and the
+  streaks of healthy checks that release a quarantined container.
 - **`app/monitor/auto_discovery.py`** — `AutoDiscovery`, which adds containers carrying the
   monitoring label to the monitored list, from the startup scan and from Docker start events,
   including the reconnecting event-stream listener.

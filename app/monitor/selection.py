@@ -39,10 +39,10 @@ def _matches_any_name(patterns: list[str], name: str | None) -> bool:
 
 
 def _matches_any_label(label_filters: list[dict], labels: dict) -> bool:
+    """Whether any filter has all of its key/value pairs on the container; an empty one never does"""
     return any(
-        labels.get(key) == value
+        bool(label_filter) and all(labels.get(key) == value for key, value in label_filter.items())
         for label_filter in label_filters
-        for key, value in label_filter.items()
     )
 
 
