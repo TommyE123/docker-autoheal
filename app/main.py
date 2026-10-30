@@ -106,6 +106,8 @@ class AutoHealService:
         self.metrics_server: WSGIServer | None = None
         self.running = False
         self._stop_event = asyncio.Event()
+        self._stop_lock = asyncio.Lock()
+        self._stopped = False
 
     async def start(self) -> None:
         """Start the auto-heal service"""
@@ -219,11 +221,24 @@ class AutoHealService:
         self.metrics_server = None
 
     async def stop(self) -> None:
-        """Stop the auto-heal service"""
-        logger.info("Stopping Docker Auto-Heal Service...")
+        """
+        Stop the auto-heal service
 
+        Safe to call concurrently (the signal handler and ``run()`` both do): later callers
+        wait for the first shutdown to finish, then return without repeating it.
+        """
+        # Set before taking the lock so `run()` wakes even while another stop is in progress
         self.running = False
         self._stop_event.set()
+
+        async with self._stop_lock:
+            if self._stopped:
+                return
+            await self._shutdown()
+
+    async def _shutdown(self) -> None:
+        """Stop the components and release the Docker client and metrics server"""
+        logger.info("Stopping Docker Auto-Heal Service...")
 
         # Stop components gracefully with error handling. The Docker client is
         # closed in `finally` so a cancellation (not an Exception) during an
@@ -246,6 +261,7 @@ class AutoHealService:
             except Exception as e:
                 logger.warning("Error stopping notification manager: %s", e, exc_info=True)
         finally:
+            self._stopped = True
             self._close_metrics_server()
             if self.docker_client:
                 try:

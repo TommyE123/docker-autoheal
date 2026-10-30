@@ -812,6 +812,38 @@ class TestAutoHealServiceRun:
         service.stop.assert_awaited_once()
 
     @pytest.mark.asyncio
+    async def test_concurrent_stops_share_one_shutdown(self):
+        service = AutoHealService()
+        engine_release = asyncio.Event()
+        order = []
+
+        async def slow_engine_stop():
+            order.append("engine stop started")
+            await engine_release.wait()
+            order.append("engine stop finished")
+
+        service.monitoring_engine = MagicMock()
+        service.monitoring_engine.stop = AsyncMock(side_effect=slow_engine_stop)
+        service.docker_client = MagicMock()
+        service.docker_client.close = MagicMock(side_effect=lambda: order.append("docker closed"))
+        service.notification_manager = MagicMock()
+        service.notification_manager.stop = AsyncMock()
+
+        first = asyncio.create_task(service.stop())
+        await asyncio.sleep(0)
+        second = asyncio.create_task(service.stop())
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        assert not second.done()  # waits for the first shutdown instead of repeating it
+
+        engine_release.set()
+        await asyncio.wait_for(asyncio.gather(first, second), timeout=1)
+
+        assert order == ["engine stop started", "engine stop finished", "docker closed"]
+        service.monitoring_engine.stop.assert_awaited_once()
+        service.docker_client.close.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_stop_sets_stop_event(self):
         service = AutoHealService()
 
