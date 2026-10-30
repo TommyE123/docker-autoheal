@@ -11,21 +11,21 @@ permissions:
   pull-requests: read
 engine:
   id: gemini
-  # Same CLI pin as issue-triage.md: Gemini CLI >= 0.60.0 exits 41 "Invalid
-  # auth method selected" under AWF (see #583). The default Pro-class model has
-  # no free-tier quota for the existing GEMINI_API_KEY. Full Flash rather than
+  # Gemini CLI 0.60.0 to 0.64.0 exited 41 "Invalid auth method selected" under
+  # AWF because AWF kept its settings under the runner-owned home
+  # (gh-aw-firewall #10246). The fix (gh-aw-firewall #10260) is in AWF
+  # v0.28.70, which gh-aw v0.93.2 uses, so this workflow can move past the 0.59.0
+  # pin that issue-triage.md still has. 0.66.0 also stops rewriting explicit
+  # Flash model IDs: 0.59 sent every name ending in "flash" as gemini-3.5-flash,
+  # which Google served as gemini-3.6-flash. The default Pro-class model has no
+  # free-tier quota for the existing GEMINI_API_KEY. Full Flash rather than
   # Flash Lite: a Flash Lite test run (40834249654) read 3 of the 35 source
   # files and reported all of them read. Free-tier limits are per project and
   # per model (AI Studio, October 2026): each Flash model allows 5 requests a
   # minute, 250K input tokens a minute and 20 requests a day, failed requests
-  # included. Gemini CLI 0.59 sends every model name that ends in "flash" as
-  # gemini-3.5-flash (resolveModel in config/models.js, behind a server-side
-  # experiment flag), which Google served as gemini-3.6-flash, so a pin such as
-  # gemini-3.8-flash has no effect. gemini-flash-latest is Google's alias for
-  # its current Flash and passes through unchanged; Google can move it without
-  # notice. issue-triage stays on Flash Lite, a separate quota.
-  version: "0.59.0"
-  model: gemini-flash-latest
+  # included. issue-triage stays on Flash Lite, a separate quota.
+  version: "0.66.0"
+  model: gemini-3.8-flash
 # Top-level AWF invocation cap on model requests; gh-aw's engines reference
 # lists it as supported for Gemini. The default is 500, and the agent step has a
 # 20-minute timeout. The prompt plans about five requests (several tool calls go
