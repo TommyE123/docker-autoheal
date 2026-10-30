@@ -8,7 +8,7 @@
     "@secretlint/secretlint-rule-preset-recommend": "13.0.7",
     "htmlhint": "1.9.2",
     "markdown-table-formatter": "1.7.0",
-    "markdownlint-cli2": "0.23.3",
+    "markdownlint-cli2": "0.24.0",
     "prettier": "3.9.10",
     "pyright": "1.1.414",
     "secretlint": "13.0.7",
