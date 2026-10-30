@@ -15,10 +15,14 @@ engine:
   # auth method selected" under AWF (see #583). The default Pro-class model has
   # no free-tier quota for the existing GEMINI_API_KEY. Full Flash rather than
   # Flash Lite: a Flash Lite test run (40834249654) read 3 of the 35 source
-  # files and reported all of them read. Full Flash is capped at 20 requests a
-  # day on the free tier, and the prompt plans about five per run.
+  # files and reported all of them read. Free-tier limits are per project and
+  # per model (AI Studio, October 2026): each Flash model allows 5 requests a
+  # minute, 250K input tokens a minute and 20 requests a day, failed requests
+  # included. Requests for gemini-3.5-flash were served as gemini-3.6-flash, so
+  # a version name is not a stable pin. 3.8 is the newest Flash and has its
+  # own quota; issue-triage stays on Flash Lite, a separate quota.
   version: "0.59.0"
-  model: gemini-3.5-flash
+  model: gemini-3.8-flash
 # Top-level AWF invocation cap on model requests; gh-aw's engines reference
 # lists it as supported for Gemini. The default is 500, and the agent step has a
 # 20-minute timeout. The prompt plans about five requests (several tool calls go
