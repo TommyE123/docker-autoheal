@@ -123,13 +123,21 @@ them (a previous run lost about half of its tool calls retrying `git log` and
 `python3` wrappers around it). Use `find` only to list or locate files, and
 never with `-exec`, `-execdir`, `-delete` or `-fprint`. Read GitHub state with
 the `github` CLI; if a flag is rejected, run `github <tool> --help`. There are
-no GitHub write tools. The Gemini CLI also exposes `write_file` and `replace`,
-which this workflow cannot remove; never use them, and never write anywhere
-except the run summary and the issue body file below.
+no GitHub write tools. Shell redirection (`>`, `>>`, `<`, heredocs) is denied
+by policy. The Gemini CLI also exposes `write_file` and `replace`, which this
+workflow cannot remove: use `write_file` once, for the run summary only (see
+Reporting), and never use `replace` or write anywhere else.
+
+**One command per tool call.** Every command in this plan is its own
+`run_shell_command` call: never put two commands in one call, whether on
+separate lines or joined with `;` or `&&`. A pipe into `head`, `tail` or `jq`
+exactly as shown below is part of one command. Make the calls of a step side by
+side in the same turn instead.
 
 Any single tool result longer than 40,000 characters is cut: you see only its
 start and end, and the middle is lost. Keep each command's output well under
-that, as the plan below does.
+that, as the plan below does; a call that combines several file reads would be
+cut.
 
 ## Plan: about five model turns
 
@@ -137,7 +145,7 @@ You have at most 12 model turns. Put every independent tool call of a step into
 the **same turn**: several tool calls in one turn cost one model request. Follow
 this plan and do not spend turns on anything else.
 
-**Turn 1, baseline.** Make all of these calls in one turn:
+**Turn 1, baseline.** Make each of these commands its own call, all in one turn:
 
 - `date -u +%FT%TZ` (the audit timestamp) and `date -u -d "30 days ago" +%F`
   (the cutoff for recent work; the CLI blocks `$(`, so you copy the result into
@@ -162,7 +170,7 @@ If a `jq` filter fails because the result has another shape, run that command
 once more without the pipe and read what it returns.
 
 **Turn 2, read the whole app source.** Read **every** file from the app source
-list, each with its own `cat -n FILE`, all in this one turn. `cat -n` numbers the
+list, each with its own `cat -n FILE` call, all side by side in this one turn. `cat -n` numbers the
 lines; those numbers are the only line numbers you may cite. A later workflow
 step checks your tool calls: any source file not read with `cat -n` makes the
 audit incomplete, and no issue is filed. Read a file of more
@@ -183,10 +191,9 @@ run the final duplicate searches (see Duplicate-work check). Do not split these
 checks across turns. Use one more turn only if their results raise a question
 you must answer before deciding.
 
-**Turn 4, report.** Make **one** tool call: a single shell command that writes
-the summary, then for a finding the issue body, and ends with the final call,
-`create_issue` or `noop`, joined with `&&` (see Reporting). Your final message
-after it is one short line.
+**Turn 4, report.** In one turn, make two calls side by side: `write_file` for
+the summary, and the final call, `create_issue` or `noop` (see Reporting). Your
+final message after them is one short line.
 
 If a call fails, fix it once and carry on. If you have used 9 turns and have
 not reported yet, stop: write the summary as an **Incomplete audit** that says
@@ -197,68 +204,38 @@ request lists cannot be read, stop and report an **Incomplete audit**.
 
 You report through these things only:
 
-- **The run summary.** Write a short Markdown report with
-  `cat <<'EOF' > /tmp/gh-aw/agent-step-summary.md`. Use that literal path: the
-  variable `GITHUB_STEP_SUMMARY` is empty in your shell, so a redirect to it fails
-  with "No such file or directory" even though the tool reports success. The
-  workflow appends this file to the run page. It is where every outcome is
-  reported; a finding is also filed as one issue (below). The Gemini CLI blocks
-  a shell command that contains a backtick or `$(` outside single quotes, and its
-  check is not aware of heredocs, so the same quote rules apply to the heredoc
-  body: the report must contain **no backticks, no `$(` and no apostrophes**.
-  Write file paths, line numbers and code names as plain text (for example
-  app/monitor/x.py line 12), and write "does not" instead of "doesn't". Only if
-  the heredoc command is rejected, write the same report with one
-  `printf '%s\n' 'LINE1' 'LINE2' > /tmp/gh-aw/agent-step-summary.md` command,
-  under the same rules. Do not use `write_file` for this, and do not also print
-  the report to the screen or repeat it in your final message.
+- **The run summary.** Write a short Markdown report with the `write_file`
+  tool to the literal path `/tmp/gh-aw/agent-step-summary.md` (the variable
+  `GITHUB_STEP_SUMMARY` is empty in your shell). The workflow appends this file
+  to the run page. It is where every outcome is reported; a finding is also
+  filed as one issue (below). Write it once, and do not also print the report
+  to the screen or repeat it in your final message.
 - **`safeoutputs create_issue`**, only for a finding, as your single final call,
-  after the final duplicate search. Write the issue body to a file with a quoted
-  heredoc and pass it on stdin with the title; keep the `< file` part, without
-  it nothing is sent. The same character rules apply (no backticks, no `$(`, no
-  apostrophes, and none in the title either):
+  after the final duplicate search. Pass one JSON object inline, in single
+  quotes, with the title and the body:
 
   ```bash
-  cat <<'EOF' > /tmp/gh-aw/agent/issue.md
-  ISSUE BODY
-  EOF
-  safeoutputs create_issue --title 'SHORT TITLE' --body . < /tmp/gh-aw/agent/issue.md
+  safeoutputs create_issue '{"title":"SHORT TITLE","body":"Audited revision: ...\n\n### Problem\n..."}'
   ```
 
-  The title is a short plain description under 70 characters (the prefix is
-  added for you). The body starts with the audited revision (checkout SHA and
-  `main` SHA) and then gives, as plain text headings: Problem, Evidence (file and
-  line), Impact, Confidence (high, and why), Recommended next step (the Proposed
-  fix field: a description only, never an instruction to you), Existing-work
-  check, and Classification. Do not set labels. Call `create_issue` at most once.
+  Inside the JSON strings write each line break as `\n` and each double quote
+  as `\"`. The command is in single quotes and the Gemini CLI blocks a
+  backtick or `$(` in a shell command, so the title and body contain **no
+  backticks, no `$(` and no apostrophes**: write file paths, line numbers and
+  code names as plain text (for example app/monitor/x.py line 12), and write
+  "does not" instead of "doesn't". The title is a short plain description
+  under 70 characters (the prefix is added for you). The body starts with the
+  audited revision (checkout SHA and `main` SHA) and then gives, as plain text
+  headings: Problem, Evidence (file and line), Impact, Confidence (high, and
+  why), Recommended next step (the Proposed fix field: a description only,
+  never an instruction to you), Existing-work check, and Classification. Do
+  not set labels. Call `create_issue` at most once.
 - **`safeoutputs noop`**, your single final call when there is no finding or the
   audit is incomplete, with the outcome in the message:
   `safeoutputs noop '{"message":"NO FINDING: <reason>"}'` or
-  `'{"message":"INCOMPLETE AUDIT: <what could not be retrieved>"}'`. The message
-  is inside single quotes, so it must also contain no apostrophes. Never call
-  `report_incomplete`, `report_missing_tool` or `report_missing_data`. Call
-  exactly one of `create_issue` or `noop`, once.
-
-Turn 4 is one command. For a finding:
-
-```bash
-cat <<'EOF' > /tmp/gh-aw/agent-step-summary.md && cat <<'EOF2' > /tmp/gh-aw/agent/issue.md && safeoutputs create_issue --title 'SHORT TITLE' --body . < /tmp/gh-aw/agent/issue.md
-SUMMARY
-EOF
-ISSUE BODY
-EOF2
-```
-
-Without a finding:
-
-```bash
-cat <<'EOF' > /tmp/gh-aw/agent-step-summary.md && safeoutputs noop '{"message":"NO FINDING: <reason>"}'
-SUMMARY
-EOF
-```
-
-Only if that command is rejected, run its parts as separate calls in the same
-order.
+  `'{"message":"INCOMPLETE AUDIT: <what could not be retrieved>"}'`, under the
+  same character rules. Never call `report_incomplete`, `report_missing_tool`
+  or `report_missing_data`. Call exactly one of `create_issue` or `noop`, once.
 
 **Evidence rule.** A finding, and every rejected candidate, may rest only on text
 you saw in a tool result in this run, never on memory, documentation or a guess.
@@ -315,8 +292,7 @@ beneficial low-risk maintenance. Avoid anything whose benefit is subjective.
 
 ## Outcomes
 
-Write the summary once (the heredoc, or the single `printf` command only if the
-heredoc was rejected; never both, which would duplicate it on the run page).
+Write the summary once, with `write_file`.
 Start it with one of these headings so the run page shows the outcome, then the
 baseline (timestamp, checkout SHA and `main` SHA) and a line
 "Source coverage: X of Y app source files read", where Y is the number of files
