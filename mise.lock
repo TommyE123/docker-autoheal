@@ -183,6 +183,7 @@ provenance = "github-attestations"
 version = "1.47.0"
 backend = "pypi:djlint"
 specifiers = ["1.47.0"]
+uv = { path = ".mise/locks/pypi-djlint/1.47.0", digest = "sha256:f355a9973b8001c85af8f6a9e7c22d83a29225dd2c139be595d30a0a872936bd" }
 
 [[tools."pypi:semgrep"]]
 version = "1.182.1"
