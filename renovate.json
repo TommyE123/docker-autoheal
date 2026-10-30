@@ -40,7 +40,8 @@
       "description": "Group Prettier dependency updates across package files into one PR.",
       "matchManagers": ["npm"],
       "matchPackageNames": ["prettier"],
-      "groupName": "Prettier"
+      "groupName": "Prettier,
+      "minimumReleaseAge": "7 days"
     },
     {
       "description": "Coordinate major upgrades of the interdependent frontend build and test toolchain in one PR, so lockfile generation sees compatible Vite, Vitest and plugin majors together. Patch and minor updates keep their normal grouping.",
