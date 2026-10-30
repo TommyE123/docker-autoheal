@@ -25,7 +25,7 @@ engine:
   # minute, 250K input tokens a minute and 20 requests a day, failed requests
   # included. issue-triage stays on Flash Lite, a separate quota.
   version: "0.66.0"
-  model: gemini-3.8-flash
+  model: gemini-3.7-flash
 # Top-level AWF invocation cap on model requests; gh-aw's engines reference
 # lists it as supported for Gemini. The default is 500, and the agent step has a
 # 20-minute timeout. The prompt plans about five requests (several tool calls go
