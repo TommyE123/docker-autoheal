@@ -18,12 +18,7 @@ from app.config.config_manager import (
 from app.docker_client.docker_client_wrapper import recovery_identifier
 from app.monitor.auto_discovery import AutoDiscovery
 from app.monitor.health import HealthEvaluator
-from app.monitor.recovery import (
-    QUARANTINE_STABLE_CHECKS,  # noqa: F401  (re-exported for the tests)
-    RecoveryPolicy,
-    uptime_seconds,
-    utc_now,
-)
+from app.monitor.recovery import RecoveryPolicy
 from app.monitor.selection import should_monitor
 from app.notifications.notification_manager import notification_manager
 
@@ -93,42 +88,6 @@ class MonitoringEngine:
         self._recovery = RecoveryPolicy()
         self._health_evaluator = HealthEvaluator(docker_client)
         self._auto_discovery = AutoDiscovery(docker_client, self._container_identifiers)
-
-    # Read-only views of the recovery policy's state, under the names the engine used
-    # before the state moved to ``RecoveryPolicy``. The properties can't be rebound, but
-    # they return the policy's own dicts.
-
-    @property
-    def _last_restart_times(self) -> dict[str, datetime]:
-        return self._recovery.last_restart_times
-
-    @property
-    def _backoff_delays(self) -> dict[str, int]:
-        return self._recovery.backoff_delays
-
-    @property
-    def _healthy_since(self) -> dict[str, tuple[str | None, datetime]]:
-        return self._recovery.healthy_since
-
-    @property
-    def _next_allowed_restart(self) -> dict[str, datetime]:
-        return self._recovery.next_allowed_restart
-
-    @property
-    def _restart_wait_owner(self) -> dict[str, str | None]:
-        return self._recovery.restart_wait_owner
-
-    @property
-    def _restart_wait_seen(self) -> dict[str, int]:
-        return self._recovery.restart_wait_seen
-
-    @property
-    def _check_cycle(self) -> int:
-        return self._recovery.check_cycle
-
-    @property
-    def _quarantine_streaks(self) -> dict[str, tuple[str, int, int]]:
-        return self._recovery.quarantine_streaks
 
     @property
     def uptime_kuma_monitor(self) -> UptimeKumaMonitor | None:
@@ -447,11 +406,6 @@ class MonitoringEngine:
             container_id, info, config.restart.mode, config.monitor.interval_seconds
         )
 
-    @staticmethod
-    def _uptime_seconds(started_at: str) -> float | None:
-        """Seconds since a Docker ``StartedAt`` timestamp, or None if it is unusable"""
-        return uptime_seconds(started_at, utc_now())
-
     def should_monitor_container(self, container: Container, info: dict) -> bool:
         """
         Determine if container should be monitored for auto-healing
@@ -717,7 +671,7 @@ class MonitoringEngine:
         """Get monitoring engine status"""
         return {
             "running": self._running,
-            "monitored_containers": len(self._last_restart_times),
+            "monitored_containers": len(self._recovery.last_restart_times),
             "quarantined_containers": len(config_manager.get_quarantined_containers()),
         }
 

@@ -105,7 +105,7 @@ class TestStartStop:
         assert engine._running is False
 
     async def test_get_status_reports_engine_state(self, engine):
-        engine._last_restart_times["web"] = None
+        engine._recovery.last_restart_times["web"] = None
         config_manager.quarantine_container("db")
 
         status = engine.get_status()

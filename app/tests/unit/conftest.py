@@ -43,7 +43,8 @@ from app.docker_client.docker_client_wrapper import (
     DockerClientWrapper,
     recovery_identifier,
 )
-from app.monitor.monitoring_engine import QUARANTINE_STABLE_CHECKS, MonitoringEngine
+from app.monitor.monitoring_engine import MonitoringEngine
+from app.monitor.recovery import QUARANTINE_STABLE_CHECKS
 from app.notifications.notification_manager import NotificationManager, notification_manager
 
 # ---------------------------------------------------------------------------
@@ -154,10 +155,10 @@ async def after_backoff(engine: MonitoringEngine, action, *args) -> None:
     the restart rather than the wait use this instead of sleeping.
     """
     await action(*args)
-    if engine._next_allowed_restart:
+    if engine._recovery.next_allowed_restart:
         elapsed = datetime.now(UTC) - timedelta(seconds=1)
-        for recovery_id in engine._next_allowed_restart:
-            engine._next_allowed_restart[recovery_id] = elapsed
+        for recovery_id in engine._recovery.next_allowed_restart:
+            engine._recovery.next_allowed_restart[recovery_id] = elapsed
         await action(*args)
 
 
