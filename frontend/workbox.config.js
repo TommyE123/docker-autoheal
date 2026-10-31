@@ -7,6 +7,10 @@ export const workbox = {
   // install-dialog screenshots are fetched by the browser on demand.
   globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
   globIgnores: ["screenshot-*.png"],
+  // Keep Workbox's defaults (utm_*, fbclid) and also ignore the 32-character hash
+  // bootstrap-icons appends to its font URLs (`.woff2?<hash>`), which would
+  // otherwise miss the precache and leave the icons blank whenever the backend is down.
+  ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^[0-9a-f]{32}$/],
   navigateFallback: "index.html",
   // API calls and the backend health endpoint are never answered by the
   // SPA shell.

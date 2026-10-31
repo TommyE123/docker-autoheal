@@ -31,4 +31,14 @@ describe("Workbox config", () => {
   it("does not precache the install screenshots", () => {
     expect(workbox.globIgnores).toContain("screenshot-*.png");
   });
+
+  it("matches precached fonts that carry a bootstrap-icons hash query", () => {
+    const ignored = (param) =>
+      workbox.ignoreURLParametersMatching.some((re) => re.test(param));
+    expect(ignored("e34853135f9e39acf64315236852cd5a")).toBe(true);
+    // Workbox's own defaults stay in place.
+    expect(ignored("utm_source")).toBe(true);
+    expect(ignored("fbclid")).toBe(true);
+    expect(ignored("page")).toBe(false);
+  });
 });
