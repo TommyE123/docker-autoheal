@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from app.config.config_manager import HealthCheckConfig, config_manager
 from app.monitor.health import HealthEvaluator
 from app.monitor.monitoring_engine import MonitoringEngine
 from app.tests.unit.conftest import make_container
@@ -99,3 +100,145 @@ class TestEngineHandOff:
         await engine._evaluate_container_health(container, info)
 
         monitor.should_restart_from_uptime_kuma.assert_awaited_once_with("stable-from-engine")
+
+
+class FakeClock:
+    """A monotonic clock the test moves by hand"""
+
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+def add_tcp_check(retries: int, interval_seconds: int = 30, container_id: str = "web") -> None:
+    config_manager.add_custom_health_check(
+        HealthCheckConfig(
+            container_id=container_id,
+            check_type="tcp",
+            tcp_port=8080,
+            retries=retries,
+            interval_seconds=interval_seconds,
+        )
+    )
+
+
+@pytest.mark.asyncio
+class TestCustomCheckRetriesAndInterval:
+    @pytest.fixture(autouse=True)
+    def _health_mode(self, update_config):
+        update_config(lambda c: setattr(c.restart, "mode", "health"))
+
+    @pytest.fixture
+    def clock(self, engine) -> FakeClock:
+        clock = FakeClock()
+        engine._health_evaluator._clock = clock
+        return clock
+
+    async def cycle(self, engine, clock, container, info, *, healthy: bool, **kwargs):
+        """One monitoring cycle (30 seconds, the default interval) with the check passing or not"""
+        engine.docker_client.health_results[container.name] = healthy
+        clock.now += 30
+        return await engine._evaluate_container_health(container, info, **kwargs)
+
+    async def test_fewer_than_retries_failures_do_not_restart(self, engine, clock):
+        container, info = web_container()
+        engine.docker_client.add_container(container, info)
+        add_tcp_check(retries=3)
+
+        for _ in range(2):
+            result = await self.cycle(engine, clock, container, info, healthy=False)
+            assert result == (False, "")
+
+    async def test_retries_consecutive_failures_request_a_restart(self, engine, clock):
+        container, info = web_container()
+        engine.docker_client.add_container(container, info)
+        add_tcp_check(retries=3)
+
+        for _ in range(2):
+            await self.cycle(engine, clock, container, info, healthy=False)
+        result = await self.cycle(engine, clock, container, info, healthy=False)
+
+        assert result == (True, "Custom health check failed (tcp)")
+
+    async def test_a_pass_resets_the_count(self, engine, clock):
+        container, info = web_container()
+        engine.docker_client.add_container(container, info)
+        add_tcp_check(retries=2)
+
+        await self.cycle(engine, clock, container, info, healthy=False)
+        await self.cycle(engine, clock, container, info, healthy=True)
+        result = await self.cycle(engine, clock, container, info, healthy=False)
+
+        assert result == (False, "")
+
+    async def test_count_is_kept_per_container(self, engine, clock):
+        labels = {"autoheal": "true", "monitoring.id": "shared"}
+        first, first_info = make_container(name="a", container_id="a" * 64, labels=labels)
+        second, second_info = make_container(name="b", container_id="b" * 64, labels=labels)
+        engine.docker_client.add_container(first, first_info)
+        engine.docker_client.add_container(second, second_info)
+        add_tcp_check(retries=2, container_id="shared")
+
+        engine.docker_client.health_results = {"a": False, "b": True}
+        clock.now += 30
+        await engine._evaluate_container_health(cast("Container", first), first_info)
+        await engine._evaluate_container_health(cast("Container", second), second_info)
+        clock.now += 30
+        failing = await engine._evaluate_container_health(cast("Container", first), first_info)
+        passing = await engine._evaluate_container_health(cast("Container", second), second_info)
+
+        assert failing[0] is True
+        assert passing == (False, "")
+
+    async def test_a_restarted_container_starts_a_new_count(self, engine, clock):
+        container, info = web_container()
+        engine.docker_client.add_container(container, info)
+        add_tcp_check(retries=2)
+
+        await self.cycle(engine, clock, container, info, healthy=False)
+        restarted = {**info, "started_at": "2024-02-02T00:00:00Z"}
+        result = await self.cycle(engine, clock, container, restarted, healthy=False)
+
+        assert result == (False, "")
+
+    async def test_quarantine_check_fails_at_once_without_counting(self, engine, clock):
+        container, info = web_container()
+        engine.docker_client.add_container(container, info)
+        add_tcp_check(retries=3)
+
+        immediate = await self.cycle(
+            engine, clock, container, info, healthy=False, apply_check_schedule=False
+        )
+        counted = await self.cycle(engine, clock, container, info, healthy=False)
+
+        assert immediate == (True, "Custom health check failed (tcp)")
+        assert counted == (False, "")
+
+    async def test_check_runs_only_when_its_interval_has_passed(self, engine, clock):
+        container, info = web_container()
+        engine.docker_client.add_container(container, info)
+        add_tcp_check(retries=1, interval_seconds=90)
+        runs: list[bool] = []
+        engine.docker_client.check_tcp_health = lambda *_args, **_kwargs: runs.append(True) or False
+
+        verdicts = []
+        for _ in range(4):
+            clock.now += 30
+            verdicts.append(await engine._evaluate_container_health(container, info))
+
+        # Runs on the first cycle, then every third; the last verdict stands in between
+        assert len(runs) == 2
+        assert all(v[0] is True for v in verdicts)
+
+    async def test_forgotten_container_starts_a_new_count(self, engine, clock):
+        container, info = web_container()
+        engine.docker_client.add_container(container, info)
+        add_tcp_check(retries=2)
+
+        await self.cycle(engine, clock, container, info, healthy=False)
+        engine._health_evaluator.forget_container(info["full_id"])
+        result = await self.cycle(engine, clock, container, info, healthy=False)
+
+        assert result == (False, "")

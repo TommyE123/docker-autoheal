@@ -5,11 +5,15 @@ Decides from a container's state and health checks whether it needs a restart
 
 import asyncio
 import logging
+import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from app.config.config_manager import config_manager
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from docker.models.containers import Container
 
     from app.config.config_manager import AutoHealConfig, HealthCheckConfig
@@ -19,11 +23,23 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class CustomCheckRun:
+    """The last real run of a container's custom health check"""
+
+    started_at: str
+    ran_at: float
+    consecutive_failures: int
+
+
 class HealthEvaluator:
     """Evaluates whether a container needs a restart"""
 
     def __init__(
-        self, docker_client: DockerClient, uptime_kuma_monitor: UptimeKumaMonitor | None = None
+        self,
+        docker_client: DockerClient,
+        uptime_kuma_monitor: UptimeKumaMonitor | None = None,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         """
         Initialize the evaluator
@@ -31,12 +47,26 @@ class HealthEvaluator:
             docker_client: Docker client wrapper instance. The evaluator keeps this reference
                 for its lifetime, so it must be the same client the monitoring engine uses.
             uptime_kuma_monitor: Uptime Kuma monitor, or None when it is not set up
+            clock: Returns monotonic seconds; replaced in tests
         """
         self.docker_client = docker_client
         self.uptime_kuma_monitor = uptime_kuma_monitor
+        self._clock = clock
+        # Per container (by Docker ID, since replicas share a stable ID)
+        self._custom_check_runs: dict[str, CustomCheckRun] = {}
+
+    def forget_container(self, container_id: str | None) -> None:
+        """Forget the custom check history of a container that is no longer monitored"""
+        if container_id is not None:
+            self._custom_check_runs.pop(container_id, None)
 
     async def evaluate(
-        self, container: Container, info: dict, stable_id: str | None
+        self,
+        container: Container,
+        info: dict,
+        stable_id: str | None,
+        *,
+        apply_check_schedule: bool = True,
     ) -> tuple[bool, str]:
         """
         Evaluate if container needs restart based on health checks
@@ -44,6 +74,9 @@ class HealthEvaluator:
             container: Container object
             info: Container information dict
             stable_id: The container's stable identifier
+            apply_check_schedule: Honour a custom check's ``interval_seconds`` and
+                ``retries``. False runs the check now and counts any failure at once, without
+                recording it, as the quarantine release does.
         Returns:
             Tuple of (needs_restart: bool, reason: str)
         """
@@ -64,7 +97,12 @@ class HealthEvaluator:
                 return stopped_result
 
         if config.restart.mode in ["health", "both"]:
-            failure = await self._health_check_failure(container, info, stable_id)
+            failure = await self._health_check_failure(
+                container,
+                info,
+                stable_id,
+                monitor_interval=config.monitor.interval_seconds if apply_check_schedule else None,
+            )
             if failure is not None:
                 return True, failure
 
@@ -110,7 +148,11 @@ class HealthEvaluator:
         return True, "Container stopped (exit 0)"
 
     async def _health_check_failure(
-        self, container: Container, info: dict, stable_id: str | None
+        self,
+        container: Container,
+        info: dict,
+        stable_id: str | None,
+        monitor_interval: int | None,
     ) -> str | None:
         """
         The reason a custom or Docker native health check fails, or None when both pass
@@ -118,6 +160,8 @@ class HealthEvaluator:
             container: Container object
             info: Container information dict
             stable_id: The container's stable identifier
+            monitor_interval: ``monitor.interval_seconds`` when the custom check's schedule
+                applies, or None to run it now and fail at once
         Returns:
             Failure reason, or None
         """
@@ -129,7 +173,9 @@ class HealthEvaluator:
                 custom_hc = config_manager.get_custom_health_check(key)
                 if custom_hc:
                     break
-        if custom_hc and not await self.perform_custom_health_check(container, custom_hc):
+        if custom_hc and await self._custom_check_failed(
+            container, info, custom_hc, monitor_interval
+        ):
             return f"Custom health check failed ({custom_hc.check_type})"
 
         # Then check Docker native health
@@ -137,6 +183,51 @@ class HealthEvaluator:
         if health and health.get("status") == "unhealthy":
             return "Docker health check reports unhealthy"
         return None
+
+    async def _custom_check_failed(
+        self,
+        container: Container,
+        info: dict,
+        health_check: HealthCheckConfig,
+        monitor_interval: int | None,
+    ) -> bool:
+        """
+        Whether a custom check has failed enough to count, honouring its schedule.
+
+        The check runs only once its ``interval_seconds`` has passed since its last run, to
+        the nearest monitoring cycle; between runs the last verdict stands. It counts as
+        failed after ``retries`` consecutive failed runs, and a pass resets the count. The
+        history belongs to one run of one container, so a restart or a replica starts fresh.
+
+        Args:
+            container: Container object
+            info: Container information dict
+            health_check: Health check configuration
+            monitor_interval: ``monitor.interval_seconds``, or None to run the check now
+                and fail at once, leaving the history alone
+        Returns:
+            True if the custom check should be treated as failing
+        """
+        container_id = info.get("full_id")
+        if monitor_interval is None or container_id is None:
+            return not await self.perform_custom_health_check(container, health_check)
+
+        started_at = info.get("started_at") or info.get("state", {}).get("StartedAt") or ""
+        now = self._clock()
+        last = self._custom_check_runs.get(container_id)
+        if last is not None and last.started_at != started_at:
+            last = None
+        # Cycles are about monitor_interval apart, so a check due within half a cycle
+        # belongs to this one; otherwise timing jitter would skip every other cycle
+        if (
+            last is None
+            or now - last.ran_at >= health_check.interval_seconds - monitor_interval / 2
+        ):
+            passed = await self.perform_custom_health_check(container, health_check)
+            failures = 0 if passed else (last.consecutive_failures if last else 0) + 1
+            last = CustomCheckRun(started_at, now, failures)
+            self._custom_check_runs[container_id] = last
+        return last.consecutive_failures >= health_check.retries
 
     async def perform_custom_health_check(
         self, container: Container, health_check: HealthCheckConfig

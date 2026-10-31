@@ -64,6 +64,21 @@ Supported `check_type` values:
 | `exec`   | Runs `exec_command` inside the container and checks its exit code                                   |
 | `docker` | Defers to Docker's native health status (equivalent to not setting a custom check)                  |
 
+Two more fields control when a custom check counts as failed:
+
+- `interval_seconds` (default `30`) is how often the check runs. Checks happen on
+  monitoring cycles, so the effective interval is rounded to the nearest whole
+  `monitor.interval_seconds`, and a value below it runs the check every cycle. Between runs the
+  last result stands.
+- `retries` (default `3`) is how many consecutive failed runs it takes before the container
+  counts as unhealthy and the restart steps below begin. A passing run resets the count. Each
+  container keeps its own count, including each replica of a scaled Compose service, and a
+  restart starts it again from zero. With the defaults a failing container is therefore
+  restarted on the third failed run, about a minute after the first, plus any restart backoff. Set `retries` to `1` to act on the
+  first failure.
+
+Docker's native health status is not affected by either field.
+
 Each type must supply the fields it uses (`http_endpoint` and `http_expected_status` for `http`,
 `tcp_port` for `tcp`, `exec_command` for `exec`), and `check_type` must be one of the values
 above. The values must also be usable: `tcp_port` between 1 and 65535, `exec_command` a
@@ -83,6 +98,9 @@ Manage custom health checks with `GET /api/healthchecks`, `GET /api/healthchecks
 and `DELETE /api/healthchecks/{id}`.
 
 ## Restart behavior once a check fails
+
+This applies once the check has failed `retries` times in a row (a custom check) or as soon as
+Docker reports the container unhealthy.
 
 1. **Cooldown** — if the container was restarted more recently than
    `restart.cooldown_seconds` ago, Auto-Heal waits.
@@ -106,7 +124,8 @@ and `DELETE /api/healthchecks/{id}`.
    trying to restart it until you intervene, or until it becomes healthy on its own (see
    below).
 4. **Auto-unquarantine** — on every monitoring cycle, Auto-Heal re-checks quarantined
-   containers. One that has been running and passing its health check(s) for 3
+   containers. A custom check is run on every cycle for this, ignoring `interval_seconds` and
+   `retries`. One that has been running and passing its health check(s) for 3
    consecutive checks of the same run, and has been up for at least 3 monitoring
    intervals, is removed from quarantine and its restart count reset. A single healthy
    snapshot isn't enough, since a crash-looping container is running between crashes,

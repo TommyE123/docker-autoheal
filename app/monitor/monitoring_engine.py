@@ -323,6 +323,7 @@ class MonitoringEngine:
         if not self.should_monitor_container(container, info):
             # No longer monitored: a wait it started would otherwise linger
             self._recovery.forget_container(container_id)
+            self._health_evaluator.forget_container(container_id)
             return
 
         # Check if container is quarantined (by recovery ID, name, or ID for backwards compatibility)
@@ -385,7 +386,9 @@ class MonitoringEngine:
         """
         container_id = info["full_id"]
         if info.get("state", {}).get("Status", "").lower() == "running":
-            needs_restart, _ = await self._evaluate_container_health(container, info)
+            needs_restart, _ = await self._evaluate_container_health(
+                container, info, apply_check_schedule=False
+            )
             if not needs_restart and self._quarantine_recovery_confirmed(container_id, info):
                 await self._auto_unquarantine_container(
                     quarantine_id, recovery_id, info["name"], container_id
@@ -425,18 +428,22 @@ class MonitoringEngine:
         return should_monitor(config_manager.get_config(), info, self.get_stable_identifier(info))
 
     async def _evaluate_container_health(
-        self, container: Container, info: dict
+        self, container: Container, info: dict, *, apply_check_schedule: bool = True
     ) -> tuple[bool, str]:
         """
         Evaluate if container needs restart based on health checks
         Args:
             container: Container object
             info: Container information dict
+            apply_check_schedule: See ``HealthEvaluator.evaluate``
         Returns:
             Tuple of (needs_restart: bool, reason: str)
         """
         return await self._health_evaluator.evaluate(
-            container, info, self.get_stable_identifier(info)
+            container,
+            info,
+            self.get_stable_identifier(info),
+            apply_check_schedule=apply_check_schedule,
         )
 
     async def _auto_unquarantine_container(

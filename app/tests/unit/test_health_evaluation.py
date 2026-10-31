@@ -118,6 +118,7 @@ class TestCustomHealthChecks:
         docker_client.health_results["web"] = False
         config_manager.add_custom_health_check(
             HealthCheckConfig(
+                retries=1,
                 container_id="web",
                 check_type="http",
                 http_endpoint="http://localhost/health",
@@ -134,7 +135,7 @@ class TestCustomHealthChecks:
         docker_client.add_container(container, info)
         docker_client.health_results["web"] = True
         config_manager.add_custom_health_check(
-            HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080)
+            HealthCheckConfig(retries=1, container_id="web", check_type="tcp", tcp_port=8080)
         )
 
         needs_restart, reason = await engine._evaluate_container_health(container, info)
@@ -155,7 +156,9 @@ class TestCustomHealthChecks:
         docker_client.add_container(container, info)
         docker_client.health_results["stack-web-1"] = False
         config_manager.add_custom_health_check(
-            HealthCheckConfig(container_id="stack_web", check_type="exec", exec_command=["true"])
+            HealthCheckConfig(
+                retries=1, container_id="stack_web", check_type="exec", exec_command=["true"]
+            )
         )
 
         needs_restart, reason = await engine._evaluate_container_health(container, info)
@@ -170,6 +173,7 @@ class TestCustomHealthChecks:
         docker_client.health_results["web"] = False
         config_manager.add_custom_health_check(
             HealthCheckConfig(
+                retries=1,
                 container_id="d" * 64,
                 check_type="http",
                 http_endpoint="http://localhost/",
@@ -185,7 +189,7 @@ class TestCustomHealthChecks:
         docker_client.add_container(container, info)
         docker_client.native_health["web"] = "unhealthy"
         config_manager.add_custom_health_check(
-            HealthCheckConfig(container_id="web", check_type="docker")
+            HealthCheckConfig(retries=1, container_id="web", check_type="docker")
         )
 
         needs_restart, reason = await engine._evaluate_container_health(container, info)
@@ -200,7 +204,7 @@ class TestCustomHealthChecks:
         docker_client.add_container(container, info)
         docker_client.native_health["web"] = None
         config_manager.add_custom_health_check(
-            HealthCheckConfig(container_id="web", check_type="docker")
+            HealthCheckConfig(retries=1, container_id="web", check_type="docker")
         )
 
         needs_restart, _ = await engine._evaluate_container_health(container, info)
@@ -228,7 +232,7 @@ class TestCustomHealthChecks:
         docker_client.health_check_error = RuntimeError("docker API unavailable")
         config_manager.add_custom_health_check(
             HealthCheckConfig(
-                container_id="web", check_type="http", http_endpoint="http://localhost/"
+                retries=1, container_id="web", check_type="http", http_endpoint="http://localhost/"
             )
         )
 
@@ -264,7 +268,9 @@ class TestCustomHealthChecks:
         docker_client.add_container(container, info)
         docker_client.health_results["web"] = True
         config_manager.add_custom_health_check(
-            HealthCheckConfig.model_construct(container_id="web", check_type=check_type, **fields)
+            HealthCheckConfig.model_construct(
+                retries=1, container_id="web", check_type=check_type, **fields
+            )
         )
 
         needs_restart, reason = await engine._evaluate_container_health(container, info)
@@ -348,7 +354,7 @@ async def test_custom_health_check_is_found_by_id_when_info_has_no_name(engine, 
     container, info = make_container(name="web")
     del info["name"]
     config_manager.add_custom_health_check(
-        HealthCheckConfig(container_id=info["full_id"], check_type="docker")
+        HealthCheckConfig(retries=1, container_id=info["full_id"], check_type="docker")
     )
     engine._health_evaluator.perform_custom_health_check = AsyncMock(return_value=False)
 
