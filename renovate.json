@@ -93,7 +93,7 @@
       "matchPackageNames": ["tommye123/docker-autoheal"],
       "enabled": false,
       "minimumReleaseAge": null
-    }
+    },
     {
       "description": "Schedule FastAPI updates for Saturdays.",
       "matchManagers": ["pip_requirements"],
