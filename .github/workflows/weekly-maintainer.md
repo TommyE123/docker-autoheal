@@ -2,7 +2,12 @@
 name: Weekly Maintainer
 description: Read-only weekly maintenance audit. Uses Gemini to read the whole app source and find at most one well-evidenced, non-duplicate maintenance task, which the workflow's separate safe-output step files as one GitHub issue, or an explicit no-finding or incomplete-audit result. The agent never changes files, branches, commits or pull requests.
 # No schedule here: run manually, later called weekly through workflow_dispatch
-# by cron-job.org, as gh-aw-upgrade.yml is.
+# by cron-job.org, as gh-aw-upgrade.yml is. Suggested time: about 20 minutes
+# after the free-tier daily quota resets at midnight Pacific (00:20
+# America/Los_Angeles, 07:20 or 08:20 UTC), ideally at a weekend. A run then has
+# all 20 daily requests, and in October 2026 test runs met far fewer 503 "high
+# demand" refusals there than in the US working day (about 14:00 to 23:00 UTC),
+# though a busy spell can come at any hour.
 on:
   workflow_dispatch:
 permissions:
