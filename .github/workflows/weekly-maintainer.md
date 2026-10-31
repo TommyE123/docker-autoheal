@@ -29,9 +29,7 @@ engine:
   # is the one that completed a run (41023115800). issue-triage stays on Flash
   # Lite, a separate quota.
   version: "0.66.0"
-  # TEMPORARY for a process test on Flash Lite's separate quota; restore
-  # gemini-3.6-flash before review.
-  model: gemini-3.5-flash-lite
+  model: gemini-3.6-flash
 # Top-level AWF invocation cap on model requests; gh-aw's engines reference
 # lists it as supported for Gemini. The default is 500, and the agent step has a
 # 20-minute timeout. The prompt plans about five requests without a candidate
@@ -66,7 +64,8 @@ tools:
   # the local workspace stays writable. The read-only boundary is the read-only
   # token, the read-only GitHub MCP server and the fact that the only write
   # safe output is one create-issue, applied by the separate safe_outputs job.
-  bash: ["cat", "jq", "ls", "find", "grep", "head", "tail", "wc", "sort", "uniq", "date", "printf", "echo", "github", "safeoutputs"]
+  # sleep paces the requests: see turn 3 of the prompt.
+  bash: ["cat", "jq", "ls", "find", "grep", "head", "tail", "wc", "sort", "uniq", "date", "printf", "echo", "sleep", "github", "safeoutputs"]
   github:
     toolsets: [repos, issues, pull_requests]
     # gh-aw applies min-integrity "approved" automatically on a public repo,
@@ -76,9 +75,6 @@ tools:
     # safe output below.
     min-integrity: none
 safe-outputs:
-  # TEMPORARY for the Flash Lite process test: preview the final call on the
-  # run page instead of creating anything. Remove before review.
-  staged: true
   threat-detection: false
   # The agent job stays read-only. A finding is filed as one issue by the
   # separate safe_outputs job, from the agent's validated output. gh-aw also
@@ -194,12 +190,17 @@ once more without the pipe and read what it returns.
 
 **Turn 2, read part 2.** Run the commands of part 2 of the read plan.
 
-**Turn 3, read part 3.** Run the commands of part 3, together with these two
-searches with the cutoff date from turn 1, one for issues and one for pull
+**Turn 3, read part 3.** Run the commands of part 3, together with one
+`sleep 60` call and these two searches with the cutoff date from turn 1, one for issues and one for pull
 requests (each search covers only one kind unless the query says which):
 
 - `github search_issues --query "repo:OWNER/REPO is:issue is:closed closed:>YYYY-MM-DD" --perPage 100 | jq -r '.[] | "#\(.number) \(.closed_at // "" | .[0:10]) \(.title)"'`
 - `github search_issues --query "repo:OWNER/REPO is:pr is:closed closed:>YYYY-MM-DD" --perPage 100 | jq -r '.[] | "#\(.number) \(.closed_at // "" | .[0:10]) \(.title)"'`
+
+The `sleep 60` costs no request: it holds back the next one, which carries the
+whole source, until the earlier reads are out of the free tier's one-minute
+window of 250,000 input tokens. Without it, a test run was throttled (429) and
+spent an extra request on the retry.
 
 **Turn 4, only with a candidate: check it.** Assess the source (see Assess). If
 you have no candidate worth checking, skip this turn and go straight to the
