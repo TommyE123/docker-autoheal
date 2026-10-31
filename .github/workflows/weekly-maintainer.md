@@ -32,8 +32,8 @@ engine:
   model: gemini-3.6-flash
 # Top-level AWF invocation cap on model requests; gh-aw's engines reference
 # lists it as supported for Gemini. The default is 500, and the agent step has a
-# 20-minute timeout. The prompt plans about five requests (several tool calls go
-# out in one request); 12 leaves room for retries and on-demand reads while
+# 20-minute timeout. The prompt plans about seven requests (several tool calls
+# go out in one request); 12 leaves room for retries and on-demand reads while
 # keeping one run well inside the 20-requests-a-day Flash quota.
 max-turns: 12
 features:
@@ -139,7 +139,7 @@ start and end, and the middle is lost. Keep each command's output well under
 that, as the plan below does; a call that combines several file reads would be
 cut.
 
-## Plan: about five model turns
+## Plan: about seven model turns
 
 You have at most 12 model turns. Put every independent tool call of a step into
 the **same turn**: several tool calls in one turn cost one model request. Follow
@@ -169,29 +169,31 @@ this plan and do not spend turns on anything else.
 If a `jq` filter fails because the result has another shape, run that command
 once more without the pipe and read what it returns.
 
-**Turn 2, read the whole app source.** Read **every** file from the app source
-list, each with its own `cat -n FILE` call, all side by side in this one turn. `cat -n` numbers the
-lines; those numbers are the only line numbers you may cite. A later workflow
+**Turns 2 to 4, read the whole app source.** Read **every** file from the app
+source list, each with its own `cat -n FILE` call. Split the list into three
+parts in its listed order and read one part per turn, about 13 calls side by
+side in each: a single reply with about 40 tool calls has come back cut off and
+failed the run. `cat -n` numbers the lines; those numbers are the only line numbers you may cite. A later workflow
 step checks your tool calls: any source file not read with `cat -n` makes the
 audit incomplete, and no issue is filed. Read a file of more
 than 30,000 bytes in parts of 600 lines: `cat -n FILE | head -n 600`, then
 `cat -n FILE | tail -n +601` (for a file over 60,000 bytes, read the middle part
 with `cat -n FILE | head -n 1200 | tail -n +601` and start the last part at line
-1201). Never redirect or discard the output. In the same turn, run these two
-searches with the cutoff date from turn 1, one for issues and one for pull
+1201). Never redirect or discard the output. In turn 4, with the last part, run
+these two searches with the cutoff date from turn 1, one for issues and one for pull
 requests (each search covers only one kind unless the query says which):
 
 - `github search_issues --query "repo:OWNER/REPO is:issue is:closed closed:>YYYY-MM-DD" --perPage 100 | jq -r '.[] | "#\(.number) \(.closed_at // "" | .[0:10]) \(.title)"'`
 - `github search_issues --query "repo:OWNER/REPO is:pr is:closed closed:>YYYY-MM-DD" --perPage 100 | jq -r '.[] | "#\(.number) \(.closed_at // "" | .[0:10]) \(.title)"'`
 
-**Turn 3, check the candidate.** Assess the source (see Assess). For your best
+**Turn 5, check the candidate.** Assess the source (see Assess). For your best
 candidate, make every remaining check in this one turn: open the relevant test
 file with `cat -n`, any workflow or frontend file, run any `grep` you need, and
 run the final duplicate searches (see Duplicate-work check). Do not split these
 checks across turns. Use one more turn only if their results raise a question
 you must answer before deciding.
 
-**Turn 4, report.** In one turn, make two calls side by side: `write_file` for
+**Turn 6, report.** In one turn, make two calls side by side: `write_file` for
 the summary, and the final call, `create_issue` or `noop` (see Reporting). Your
 final message after them is one short line.
 
