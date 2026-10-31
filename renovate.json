@@ -86,5 +86,11 @@
       "enabled": false,
       "minimumReleaseAge": null
     }
+    {
+      "description": "Schedule FastAPI updates for Saturdays.",
+      "matchManagers": ["pip_requirements"],
+      "matchPackageNames": ["fastapi"],
+      "schedule": ["* * * * 6"]
+    }
   ]
 }
