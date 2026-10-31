@@ -74,12 +74,16 @@ tools:
     min-integrity: none
 safe-outputs:
   threat-detection: false
+  # Every write below is pinned to the issue being triaged: the triggering issue
+  # on an event run, the issue_number input on a dispatch. The agent does not
+  # choose the target, so injected issue text cannot redirect a write to another
+  # issue. Do not use target: "*" here; it would let the agent pick any issue.
   add-labels:
     allowed: ["kind:*", "area:*", "status:needs-triage", "status:needs-information"]
     create-if-missing: false
     max: 3
     pull-requests: false
-    target: "*"
+    target: ${{ github.event.issue.number || github.event.inputs.issue_number }}
   remove-labels:
     allowed: ["kind:*", "area:*", "status:needs-triage", "status:needs-information"]
     # Outcome A must be able to remove every stale kind:*, area:*, and
@@ -89,11 +93,11 @@ safe-outputs:
     # set - a lower cap here is a real correctness bug, not a safety limit.
     max: 16
     pull-requests: false
-    target: "*"
+    target: ${{ github.event.issue.number || github.event.inputs.issue_number }}
   add-comment:
     max: 1
     pull-requests: false
-    target: "*"
+    target: ${{ github.event.issue.number || github.event.inputs.issue_number }}
 ---
 
 # Issue Triage
@@ -124,11 +128,10 @@ you run from the shell:
   comments. Stop when a page contains fewer than 100. If a flag is rejected,
   run `github issue_read --help` and use the flags it lists.
 - **Writes: `safeoutputs`**. Pass one JSON object as a single quoted argument.
-  Every `add_labels`, `remove_labels`, and `add_comment` call must include
-  `"item_number": ${{ github.event.issue.number || github.event.inputs.issue_number }}`, the issue you are triaging; a manual dispatch has no
-  triggering issue, so without it the write is skipped:
-  - `safeoutputs add_labels '{"item_number":${{ github.event.issue.number || github.event.inputs.issue_number }},"labels":["kind:bug","area:restart"]}'`
-  - `safeoutputs remove_labels '{"item_number":${{ github.event.issue.number || github.event.inputs.issue_number }},"labels":["status:needs-triage"]}'`
+  Do not pass an issue number: the workflow fixes the target of every write to
+  the issue being triaged, and a write cannot go anywhere else:
+  - `safeoutputs add_labels '{"labels":["kind:bug","area:restart"]}'`
+  - `safeoutputs remove_labels '{"labels":["status:needs-triage"]}'`
   - `safeoutputs noop '{"message":"..."}'`
   - `safeoutputs report_incomplete '{"reason":"..."}'`
 
@@ -138,7 +141,7 @@ apostrophes, which break a single-quoted JSON argument. Write the body to
 heredocs are denied by policy). Then build the JSON with `jq` and pipe it in:
 
 ```bash
-jq -Rs '{item_number: ${{ github.event.issue.number || github.event.inputs.issue_number }}, body: .}' /tmp/gh-aw/agent/comment.md | safeoutputs add_comment .
+jq -Rs '{body: .}' /tmp/gh-aw/agent/comment.md | safeoutputs add_comment .
 ```
 
 Keep the `|`. Without it nothing is sent.
@@ -152,7 +155,10 @@ combination is the `jq ... | safeoutputs add_comment .` pipe above.
 1. Fetch issue #${{ github.event.issue.number || github.event.inputs.issue_number }} (its title, body, and its
    current labels) with `github issue_read` as described under Tools. If you
    cannot fetch it, call `report_incomplete` with the reason and stop. Never
-   call `noop` for this, because it hides the failure. If the `comments`
+   call `noop` for this, because it hides the failure. If the response has a
+   `pull_request` field, the number belongs to a pull request, not an issue
+   (a dispatch can be given any number): call `noop` saying so and stop,
+   without any label or comment. If the `comments`
    count in the response is present and non-zero, also fetch every page of
    its comments with `--method get_comments` as described under Tools. Keep
    them for step 3: the reporter's replies (comments by the issue's author)
