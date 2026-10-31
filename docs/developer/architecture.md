@@ -19,9 +19,12 @@ database — all state is JSON files under `/data`.
 │                              ┌──────────────▼──────────────┐│
 │                              │ MonitoringEngine             ││
 │                              │  (app/monitor)                ││
-│                              │  - per-cycle container checks ││
-│                              │  - Docker event listener       ││
-│                              │  - restart/backoff/quarantine  ││
+│                              │  - per-cycle container checks  ││
+│                              │  - restarts and quarantine     ││
+│                              │  - AutoDiscovery: Docker events││
+│                              │  - HealthEvaluator: evaluation ││
+│                              │  - RecoveryPolicy: backoff     ││
+│                              │  - selection.py: filters       ││
 │                              └──────┬─────────────┬──────────┘│
 │                                     │             │            │
 │                    ┌────────────────▼──┐   ┌──────▼──────────┐│
@@ -46,7 +49,8 @@ database — all state is JSON files under `/data`.
 
 ## Request/monitoring flow
 
-1. **Startup** (`app/main.py`): connects to Docker, constructs the `MonitoringEngine`,
+1. **Startup** (`app/main.py`): connects to Docker, constructs the Uptime Kuma monitor,
+   constructs the `MonitoringEngine` with that monitor as a constructor argument,
    initializes the API, optionally starts the Prometheus metrics server, starts the
    `NotificationManager`, then starts the monitoring engine and (if enabled) the Uptime
    Kuma monitor. The FastAPI server and the monitoring engine run concurrently as asyncio
@@ -54,10 +58,12 @@ database — all state is JSON files under `/data`.
 
 2. **Monitoring loop** (`MonitoringEngine._monitor_loop`): every `monitor.interval_seconds`,
    lists all containers (including stopped ones) and evaluates each one:
-   - `should_monitor_container` — applies the label filter, `include_all`, explicit
-     selection/exclusion, and whitelist/blacklist filters.
-   - `_evaluate_container_health` — checks exit status, custom health checks, Docker's
-     native health status, and (if enabled) the Uptime Kuma monitor's status.
+   - `should_monitor_container`, which calls `should_monitor` in `app/monitor/selection.py`
+     — applies the label filter, `include_all`, explicit selection/exclusion, and
+     whitelist/blacklist filters.
+   - `_evaluate_container_health`, which calls `HealthEvaluator.evaluate` in
+     `app/monitor/health.py` — checks exit status, custom health checks, Docker's native
+     health status, and (if enabled) the Uptime Kuma monitor's status.
    - `_handle_container_restart` — applies cooldown, backoff, and the restart threshold;
      restarts the container or quarantines it.
 
@@ -119,8 +125,9 @@ keyed by the per-service stable identifier.
 ## Notifications
 
 `NotificationManager` runs an async worker consuming a queue, so a slow or failing
-notification endpoint never blocks the monitoring loop. `MonitoringEngine` and the API
-layer both call `notification_manager.send_event_notification()` after logging an event;
+notification endpoint never blocks the monitoring loop. `MonitoringEngine`, `AutoDiscovery`
+(for `auto_monitor` events) and the API layer call
+`notification_manager.send_event_notification()` after logging an event;
 the manager checks `notifications.enabled` and the event filter before queuing, then
 dispatches to each configured service by type (`app/notifications/notification_manager.py`
 has one `_send_<service>` method per supported service type).
