@@ -202,7 +202,7 @@ class AutoHealService:
         except (Exception, asyncio.CancelledError) as e:
             # CancelledError is a BaseException; clean up on cancellation too, then re-raise.
             logger.exception("Failed to start service: %s", e)
-            await self.stop()
+            await self._abort_startup()
             raise
 
     def _close_metrics_server(self) -> None:
@@ -228,13 +228,23 @@ class AutoHealService:
         wait for the first shutdown to finish, then return without repeating it.
         """
         # Set before taking the lock so `run()` wakes even while another stop is in progress
-        self.running = False
-        self._stop_event.set()
+        self._request_stop()
 
         async with self._stop_lock:
             if self._stopped:
                 return
             await self._shutdown()
+
+    async def _abort_startup(self) -> None:
+        """Clean up after a failed start; the caller of `run()` already holds the stop lock"""
+        self._request_stop()
+        if not self._stopped:
+            await self._shutdown()
+
+    def _request_stop(self) -> None:
+        """Mark the service as stopping and wake `run()`"""
+        self.running = False
+        self._stop_event.set()
 
     async def _shutdown(self) -> None:
         """Stop the components and release the Docker client and metrics server"""
@@ -273,7 +283,12 @@ class AutoHealService:
 
     async def run(self) -> None:
         """Run the service (blocking)"""
-        await self.start()
+        # Startup holds the stop lock so a stop requested meanwhile (e.g. SIGTERM) waits for it
+        # to finish and then tears down everything it started; one requested before this point
+        # skips startup.
+        async with self._stop_lock:
+            if not self._stop_event.is_set():
+                await self.start()
 
         # Keep running until stopped
         try:

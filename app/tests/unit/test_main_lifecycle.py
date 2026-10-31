@@ -777,9 +777,12 @@ class TestAutoHealServiceRun:
         service = AutoHealService()
         service.start = AsyncMock(side_effect=lambda: setattr(service, "running", True))
         service.stop = AsyncMock()
-        service._stop_event.set()  # a stop requested while running ends the wait
 
-        await service.run()
+        run_task = asyncio.create_task(service.run())
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        service._stop_event.set()  # a stop requested while running ends the wait
+        await asyncio.wait_for(run_task, timeout=1)
 
         service.start.assert_awaited_once()
         service.stop.assert_awaited_once()
@@ -801,13 +804,76 @@ class TestAutoHealServiceRun:
         service.stop.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_run_returns_promptly_when_stop_was_requested_first(self):
+    async def test_stop_requested_before_run_skips_startup(self):
+        service = AutoHealService()
+        service.start = AsyncMock()
+        service.docker_client = MagicMock()
+
+        await service.stop()
+        await asyncio.wait_for(service.run(), timeout=1)
+
+        service.start.assert_not_awaited()
+        service.docker_client.close.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_stop_during_startup_waits_then_stops_what_startup_created(self):
+        service = AutoHealService()
+        service.notification_manager = MagicMock()
+        service.notification_manager.stop = AsyncMock()
+        engine = MagicMock()
+        engine.stop = AsyncMock()
+        release_start = asyncio.Event()
+
+        async def slow_start():
+            await release_start.wait()
+            service.monitoring_engine = engine  # created after the stop was requested
+            service.running = True
+
+        service.start = slow_start
+
+        run_task = asyncio.create_task(service.run())
+        await asyncio.sleep(0)
+        stop_task = asyncio.create_task(service.stop())  # e.g. SIGTERM mid-startup
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        engine.stop.assert_not_awaited()  # shutdown waits for startup to finish
+
+        release_start.set()
+        await asyncio.wait_for(asyncio.gather(run_task, stop_task), timeout=1)
+
+        engine.stop.assert_awaited_once()
+        assert service.running is False
+
+    @pytest.mark.asyncio
+    async def test_failed_startup_after_shutdown_does_not_shut_down_twice(self):
+        service = AutoHealService()
+        service._shutdown = AsyncMock()
+        service._stopped = True
+
+        await service._abort_startup()
+
+        service._shutdown.assert_not_awaited()
+        assert service._stop_event.is_set()
+
+    @pytest.mark.asyncio
+    async def test_stop_sets_stop_event(self):
+        service = AutoHealService()
+
+        await service.stop()
+
+        assert service._stop_event.is_set()
+
+    @pytest.mark.asyncio
+    async def test_run_stops_on_cancelled_error_while_waiting(self):
         service = AutoHealService()
         service.start = AsyncMock()
         service.stop = AsyncMock()
-        service._stop_event.set()
 
-        await asyncio.wait_for(service.run(), timeout=1)
+        run_task = asyncio.create_task(service.run())
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        run_task.cancel()
+        await run_task  # CancelledError must be swallowed, not propagated
 
         service.stop.assert_awaited_once()
 
@@ -842,28 +908,6 @@ class TestAutoHealServiceRun:
         assert order == ["engine stop started", "engine stop finished", "docker closed"]
         service.monitoring_engine.stop.assert_awaited_once()
         service.docker_client.close.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_stop_sets_stop_event(self):
-        service = AutoHealService()
-
-        await service.stop()
-
-        assert service._stop_event.is_set()
-
-    @pytest.mark.asyncio
-    async def test_run_stops_on_cancelled_error_while_waiting(self):
-        service = AutoHealService()
-        service.start = AsyncMock()
-        service.stop = AsyncMock()
-
-        run_task = asyncio.create_task(service.run())
-        await asyncio.sleep(0)
-        await asyncio.sleep(0)
-        run_task.cancel()
-        await run_task  # CancelledError must be swallowed, not propagated
-
-        service.stop.assert_awaited_once()
 
 
 class TestMain:
