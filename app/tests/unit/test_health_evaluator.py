@@ -76,6 +76,7 @@ class TestEngineHandOff:
             True,
             "Uptime-Kuma monitor reports DOWN",
         )
+        monitor.should_restart_from_uptime_kuma.assert_awaited_once_with("web")
 
     async def test_monitor_attached_to_the_engine_reaches_the_evaluator(self, engine):
         monitor = kuma_reporting_down()
