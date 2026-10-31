@@ -836,7 +836,8 @@ class TestAutoHealServiceRun:
         stop_task = asyncio.create_task(service.stop())  # e.g. SIGTERM mid-startup
         await asyncio.sleep(0)
         await asyncio.sleep(0)
-        engine.stop.assert_not_awaited()  # shutdown waits for startup to finish
+        assert not stop_task.done()  # shutdown waits for startup to finish
+        engine.stop.assert_not_awaited()
 
         release_start.set()
         await asyncio.wait_for(asyncio.gather(run_task, stop_task), timeout=1)
