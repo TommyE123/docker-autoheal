@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from app.monitor.monitoring_engine import QUARANTINE_STABLE_CHECKS
+from app.monitor.recovery import QUARANTINE_STABLE_CHECKS
 from app.tests.unit.conftest import until_stable
 
 

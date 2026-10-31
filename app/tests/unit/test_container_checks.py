@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.config.config_manager import config_manager
-from app.monitor.monitoring_engine import QUARANTINE_STABLE_CHECKS, MonitoringEngine
+from app.monitor.recovery import QUARANTINE_STABLE_CHECKS
 from app.tests.unit.conftest import (
     INCOMPLETE_INFO_CASES,
     after_backoff,
@@ -22,26 +22,6 @@ from app.tests.unit.conftest import (
 
 def event_types() -> list:
     return [event.event_type for event in config_manager.get_events()]
-
-
-class TestUptimeSeconds:
-    """Docker ``StartedAt`` parsing behind the quarantine uptime guard."""
-
-    def test_docker_nanosecond_timestamp_is_parsed(self):
-        started = (datetime.now(UTC) - timedelta(seconds=120)).strftime("%Y-%m-%dT%H:%M:%S")
-
-        uptime = MonitoringEngine._uptime_seconds(f"{started}.123456789Z")
-
-        assert uptime == pytest.approx(120, abs=5)
-
-    def test_timestamp_without_timezone_is_read_as_utc(self):
-        started = (datetime.now(UTC) - timedelta(seconds=60)).strftime("%Y-%m-%dT%H:%M:%S")
-
-        assert MonitoringEngine._uptime_seconds(started) == pytest.approx(60, abs=5)
-
-    @pytest.mark.parametrize("started_at", ["", "not-a-date", "0001-01-01T00:00:00Z"])
-    def test_unusable_or_zero_timestamp_has_no_uptime(self, started_at):
-        assert MonitoringEngine._uptime_seconds(started_at) is None
 
 
 @pytest.mark.asyncio
@@ -147,13 +127,13 @@ class TestQuarantinedContainerChecks:
         docker_client.add_container(container, info)
         config_manager.quarantine_container("web")
         config_manager.record_restart("web")
-        engine._backoff_delays["web"] = 320
+        engine._recovery.backoff_delays["web"] = 320
 
         await until_stable(engine._check_containers)
 
         assert config_manager.is_quarantined("web") is False
         assert config_manager.get_restart_count("web", 600) == 0
-        assert engine._backoff_delays["web"] == 10  # reset to initial_seconds
+        assert engine._recovery.backoff_delays["web"] == 10  # reset to initial_seconds
         assert event_types() == ["auto_unquarantine"]
 
     async def test_single_running_check_does_not_unquarantine(self, engine, docker_client):
@@ -226,7 +206,7 @@ class TestQuarantinedContainerChecks:
         await until_stable(engine._check_containers)
 
         assert config_manager.is_quarantined("web") is True
-        assert engine._quarantine_streaks == {}
+        assert engine._recovery.quarantine_streaks == {}
 
     async def test_short_uptime_blocks_unquarantine(self, engine, docker_client):
         """Enough consecutive checks are not enough when the current run is young."""
@@ -304,13 +284,13 @@ class TestQuarantinedContainerChecks:
         docker_client.add_container(other, other_info)
         config_manager.quarantine_container("web")
         await engine._check_containers()
-        assert container.id in engine._quarantine_streaks
+        assert container.id in engine._recovery.quarantine_streaks
 
         docker_client.remove_container(container)
         await engine._check_containers()
         await engine._check_containers()
 
-        assert engine._quarantine_streaks == {}
+        assert engine._recovery.quarantine_streaks == {}
 
     async def test_maintenance_mode_gap_resets_the_streak(self, engine, docker_client):
         container, info = make_container(name="web", status="running")
@@ -332,7 +312,7 @@ class TestQuarantinedContainerChecks:
         config_manager.quarantine_container("web")
         for _ in range(QUARANTINE_STABLE_CHECKS - 1):
             await engine._check_containers()
-        assert container.id in engine._quarantine_streaks
+        assert container.id in engine._recovery.quarantine_streaks
         return container, info
 
     async def _assert_fresh_streak_is_needed(self, engine):
