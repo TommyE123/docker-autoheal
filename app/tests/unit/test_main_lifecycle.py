@@ -771,6 +771,14 @@ class TestRunApiServer:
             mock_server_instance.serve.assert_awaited_once()
 
 
+async def real_delay(seconds: float) -> None:
+    """Wait on the event loop clock; ``asyncio.sleep`` is replaced by a yield in these tests"""
+    loop = asyncio.get_running_loop()
+    done = loop.create_future()
+    loop.call_later(seconds, done.set_result, None)
+    await done
+
+
 class TestAutoHealServiceRun:
     @pytest.mark.asyncio
     async def test_run_starts_loops_then_stops(self):
@@ -871,6 +879,80 @@ class TestAutoHealServiceRun:
 
         engine.stop.assert_awaited_once()  # whatever startup created was still torn down
         assert service._stopped is True
+
+    @pytest.mark.asyncio
+    async def test_second_stop_does_not_interrupt_startup_cleanup(self, monkeypatch):
+        monkeypatch.setattr(main_module, "STARTUP_STOP_GRACE_SECONDS", 0.05)
+        service = AutoHealService()
+        service.notification_manager = MagicMock()
+        service.notification_manager.stop = AsyncMock()
+        cleanup_started = asyncio.Event()
+        release_cleanup = asyncio.Event()
+        finished = []
+
+        async def slow_engine_stop():
+            cleanup_started.set()
+            await release_cleanup.wait()
+            finished.append("engine stopped")
+
+        engine = MagicMock()
+        engine.stop = AsyncMock(side_effect=slow_engine_stop)
+
+        async def hung_start():
+            service.monitoring_engine = engine
+            try:
+                await asyncio.Event().wait()
+            except Exception, asyncio.CancelledError:
+                await service._abort_startup()
+                raise
+
+        service.start = hung_start
+
+        run_task = asyncio.create_task(service.run())
+        await asyncio.sleep(0)
+        first = asyncio.create_task(service.stop())
+        await real_delay(0.02)  # the autouse fixture turns asyncio.sleep into a plain yield
+        second = asyncio.create_task(service.stop())  # e.g. a second signal
+        await asyncio.wait_for(cleanup_started.wait(), timeout=2)
+        await real_delay(0.1)  # past the second stop's grace period, cleanup still running
+        assert finished == []
+
+        release_cleanup.set()
+        await asyncio.wait_for(asyncio.gather(run_task, first, second), timeout=2)
+
+        assert finished == ["engine stopped"]
+
+    @pytest.mark.asyncio
+    async def test_run_cancelled_while_startup_is_cancelled_by_stop_still_propagates(
+        self, monkeypatch
+    ):
+        monkeypatch.setattr(main_module, "STARTUP_STOP_GRACE_SECONDS", 0.05)
+        service = AutoHealService()
+        service.notification_manager = MagicMock()
+        service.notification_manager.stop = AsyncMock()
+        cleanup_started = asyncio.Event()
+        release_cleanup = asyncio.Event()
+
+        async def hung_start():
+            try:
+                await asyncio.Event().wait()
+            except Exception, asyncio.CancelledError:
+                cleanup_started.set()
+                await release_cleanup.wait()
+                raise
+
+        service.start = hung_start
+
+        run_task = asyncio.create_task(service.run())
+        await asyncio.sleep(0)
+        stop_task = asyncio.create_task(service.stop())
+        await asyncio.wait_for(cleanup_started.wait(), timeout=2)
+        run_task.cancel()  # an outside cancel on top of the stop's startup cancel
+        release_cleanup.set()
+
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(run_task, timeout=2)
+        await asyncio.wait_for(stop_task, timeout=2)
 
     @pytest.mark.asyncio
     async def test_startup_finishing_within_grace_period_is_not_cancelled(self):

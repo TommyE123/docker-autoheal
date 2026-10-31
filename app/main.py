@@ -245,10 +245,12 @@ class AutoHealService:
     async def _cancel_slow_startup(self) -> None:
         """Give a startup in progress a short grace period, then cancel it"""
         startup = self._start_task
+        # Cancel once only: a second signal must not interrupt the cleanup the first one started
         if startup is None or startup.done():
             return
         done, _ = await asyncio.wait({startup}, timeout=STARTUP_STOP_GRACE_SECONDS)
-        if not done:
+        # Checked after the wait: another stop may have cancelled the startup in the meantime
+        if not done and not self._startup_cancelled:
             logger.warning(
                 "Startup still running %ss after a stop request, cancelling it",
                 STARTUP_STOP_GRACE_SECONDS,
