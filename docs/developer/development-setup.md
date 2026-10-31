@@ -308,10 +308,10 @@ test isolation works.
 `.github/workflows/mega-linter.yml` runs [MegaLinter](https://megalinter.io/) on every
 pull request targeting `main`, covering Python, JavaScript, YAML, Dockerfile,
 Markdown, and security checks provided by Ruff's `S` rules — see `.linter-rules/.mega-linter.yml`
-for the exact set. Several of those linters (`JAVASCRIPT_PRETTIER` and others listed in
-`.linter-rules/.mega-linter.yml`'s `DISABLE_ERRORS_LINTERS`) currently have pre-existing
-findings and are configured not to fail the build over them; they still run and report.
-Ruff is not in that list, so any ruff finding fails the MegaLinter check. There is no
+for the exact set. The linters listed in `.linter-rules/.mega-linter.yml`'s
+`DISABLE_ERRORS_LINTERS` currently have pre-existing findings and are configured not to
+fail the build over them; they still run and report. Ruff is not in that list, so any ruff
+finding fails the MegaLinter check. There is no
 repository-wide Python formatter/import-sorter enforced beyond what MegaLinter reports.
 On pull requests from branches in this repository, MegaLinter posts a PR comment and per-linter
 statuses. Fork pull requests get a read-only token, so there the results are only in
