@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       issue_number:
-        description: Number of the issue to triage
+        description: Number of the issue to triage (an issue, not a pull request)
         required: true
         type: string
   roles: all
@@ -78,6 +78,10 @@ safe-outputs:
   # on an event run, the issue_number input on a dispatch. The agent does not
   # choose the target, so injected issue text cannot redirect a write to another
   # issue. Do not use target: "*" here; it would let the agent pick any issue.
+  # A pull request number given to a dispatch fails closed: the issue_read
+  # result carries no pull_request field to check, but pull-requests: false
+  # below leaves the write token without pull request access, so the label
+  # write is refused (HTTP 403, test run 41223807050) and nothing changes.
   add-labels:
     allowed: ["kind:*", "area:*", "status:needs-triage", "status:needs-information"]
     create-if-missing: false
@@ -155,10 +159,7 @@ combination is the `jq ... | safeoutputs add_comment .` pipe above.
 1. Fetch issue #${{ github.event.issue.number || github.event.inputs.issue_number }} (its title, body, and its
    current labels) with `github issue_read` as described under Tools. If you
    cannot fetch it, call `report_incomplete` with the reason and stop. Never
-   call `noop` for this, because it hides the failure. If the response has a
-   `pull_request` field, the number belongs to a pull request, not an issue
-   (a dispatch can be given any number): call `noop` saying so and stop,
-   without any label or comment. If the `comments`
+   call `noop` for this, because it hides the failure. If the `comments`
    count in the response is present and non-zero, also fetch every page of
    its comments with `--method get_comments` as described under Tools. Keep
    them for step 3: the reporter's replies (comments by the issue's author)
