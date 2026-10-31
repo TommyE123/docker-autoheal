@@ -50,6 +50,9 @@ class RecoveryPolicy:
     record the container (by Docker ID) they belong to, because replicas can share a
     recovery ID and a recreated container gets a new ID. Quarantine streaks are keyed by
     Docker ID only.
+
+    The state dicts are public attributes on purpose: the engine reads them and tests move
+    time by writing past datetimes into them, and private fields would need test-only setters.
     """
 
     def __init__(self, clock: Callable[[], datetime] = utc_now) -> None:

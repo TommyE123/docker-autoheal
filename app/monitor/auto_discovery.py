@@ -262,7 +262,7 @@ class AutoDiscovery:
         through an ``asyncio.Queue``, so the event loop never blocks. The thread reconnects
         after every stream end, resuming from the last event it saw so that containers
         started during the gap are not missed. Each run has its own stop signal, so a thread
-        from one run can never be revived by the next run's ``_running`` flag.
+        from one run can never be revived by the next run's ``is_running`` callback.
 
         Args:
             since: Unix time to replay events from on the first connect. Defaults to now;

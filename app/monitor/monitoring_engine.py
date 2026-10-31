@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from app.config.config_manager import (
     AutoHealEvent,
-    HealthCheckConfig,
     config_manager,
 )
 from app.docker_client.docker_client_wrapper import recovery_identifier
@@ -74,11 +73,16 @@ class MonitoringEngine:
     Core monitoring engine that checks container health and performs restarts
     """
 
-    def __init__(self, docker_client: DockerClient) -> None:
+    def __init__(
+        self,
+        docker_client: DockerClient,
+        uptime_kuma_monitor: UptimeKumaMonitor | None = None,
+    ) -> None:
         """
         Initialize monitoring engine
         Args:
             docker_client: Docker client wrapper instance
+            uptime_kuma_monitor: Uptime Kuma monitor, or None when it is not set up
         """
         self.docker_client = docker_client
         self._running = False
@@ -86,7 +90,9 @@ class MonitoringEngine:
         self._event_task: asyncio.Task | None = None
         # Cooldown, backoff, restart waits, healthy runs, quarantine streaks and the cycle count
         self._recovery = RecoveryPolicy()
-        self._health_evaluator = HealthEvaluator(docker_client)
+        self._health_evaluator = HealthEvaluator(
+            docker_client, uptime_kuma_monitor=uptime_kuma_monitor
+        )
         self._auto_discovery = AutoDiscovery(docker_client, self._container_identifiers)
 
     @property
@@ -94,7 +100,7 @@ class MonitoringEngine:
         """
         The Uptime Kuma monitor, or None when Uptime Kuma is not set up.
 
-        Attached by the service after construction. Health evaluation reads it.
+        Passed in by the service at construction. Health evaluation reads it.
         """
         return self._health_evaluator.uptime_kuma_monitor
 
@@ -180,6 +186,11 @@ class MonitoringEngine:
             return None
         return container_id, container_name, recovery_id
 
+    @property
+    def is_running(self) -> bool:
+        """Whether the monitoring loop is active"""
+        return self._running
+
     async def start(self) -> None:
         """Start the monitoring engine"""
         if self._running:
@@ -192,7 +203,7 @@ class MonitoringEngine:
         events_since = int(time.time())
 
         # Proactively scan for existing containers with the configured monitoring label
-        await self._scan_existing_containers()
+        await self._auto_discovery.scan_existing_containers()
 
         self._task = asyncio.create_task(self._monitor_loop())
         self._event_task = asyncio.create_task(self._event_listener_loop(events_since))
@@ -428,19 +439,6 @@ class MonitoringEngine:
             container, info, self.get_stable_identifier(info)
         )
 
-    async def _perform_custom_health_check(
-        self, container: Container, health_check: HealthCheckConfig
-    ) -> bool:
-        """
-        Perform custom health check on container
-        Args:
-            container: Container object
-            health_check: Health check configuration
-        Returns:
-            True if healthy, False otherwise
-        """
-        return await self._health_evaluator.perform_custom_health_check(container, health_check)
-
     async def _auto_unquarantine_container(
         self,
         quarantine_id: str,
@@ -674,14 +672,6 @@ class MonitoringEngine:
         """Listen for Docker container start events (see ``AutoDiscovery.listen``)"""
         await self._auto_discovery.listen(
             since,
-            is_running=lambda: self._running,
-            handle_event=self._process_container_start_event,
+            is_running=lambda: self.is_running,
+            handle_event=self._auto_discovery.process_start_event,
         )
-
-    async def _scan_existing_containers(self) -> None:
-        """Scan running containers for the monitoring label (see ``AutoDiscovery``)"""
-        await self._auto_discovery.scan_existing_containers()
-
-    async def _process_container_start_event(self, event: dict) -> None:
-        """Handle one Docker container start event (see ``AutoDiscovery``)"""
-        await self._auto_discovery.process_start_event(event)
