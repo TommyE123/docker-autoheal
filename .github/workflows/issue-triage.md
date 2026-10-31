@@ -75,6 +75,7 @@ safe-outputs:
     create-if-missing: false
     max: 3
     pull-requests: false
+    target: "*"
   remove-labels:
     allowed: ["kind:*", "area:*", "status:needs-triage", "status:needs-information"]
     # Outcome A must be able to remove every stale kind:*, area:*, and
@@ -84,9 +85,11 @@ safe-outputs:
     # set - a lower cap here is a real correctness bug, not a safety limit.
     max: 16
     pull-requests: false
+    target: "*"
   add-comment:
     max: 1
     pull-requests: false
+    target: "*"
 ---
 
 # Issue Triage
@@ -116,9 +119,12 @@ you run from the shell:
   `--page 3` and so on only when the current page contains exactly 100
   comments. Stop when a page contains fewer than 100. If a flag is rejected,
   run `github issue_read --help` and use the flags it lists.
-- **Writes: `safeoutputs`**. Pass one JSON object as a single quoted argument:
-  - `safeoutputs add_labels '{"labels":["kind:bug","area:restart"]}'`
-  - `safeoutputs remove_labels '{"labels":["status:needs-triage"]}'`
+- **Writes: `safeoutputs`**. Pass one JSON object as a single quoted argument.
+  Every `add_labels`, `remove_labels`, and `add_comment` call must include
+  `"item_number": ${{ github.event.issue.number || github.event.inputs.issue_number }}`, the issue you are triaging; a manual dispatch has no
+  triggering issue, so without it the write is skipped:
+  - `safeoutputs add_labels '{"item_number":${{ github.event.issue.number || github.event.inputs.issue_number }},"labels":["kind:bug","area:restart"]}'`
+  - `safeoutputs remove_labels '{"item_number":${{ github.event.issue.number || github.event.inputs.issue_number }},"labels":["status:needs-triage"]}'`
   - `safeoutputs noop '{"message":"..."}'`
   - `safeoutputs report_incomplete '{"reason":"..."}'`
 
@@ -128,7 +134,7 @@ apostrophes, which break a single-quoted JSON argument. Write the body to
 heredocs are denied by policy). Then build the JSON with `jq` and pipe it in:
 
 ```bash
-jq -Rs '{body: .}' /tmp/gh-aw/agent/comment.md | safeoutputs add_comment .
+jq -Rs '{item_number: ${{ github.event.issue.number || github.event.inputs.issue_number }}, body: .}' /tmp/gh-aw/agent/comment.md | safeoutputs add_comment .
 ```
 
 Keep the `|`. Without it nothing is sent.
