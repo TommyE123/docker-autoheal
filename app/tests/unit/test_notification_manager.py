@@ -725,6 +725,31 @@ async def test_process_notification_dispatches_only_to_enabled_known_services(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "service_type",
+    ["webhook", "discord", "slack", "telegram", "ntfy", "gotify", "pushover"],
+)
+async def test_process_notification_dispatches_each_type_to_its_sender(
+    monkeypatch, isolated_config_manager, manager, service_type
+):
+    """Each notification type must route to its own ``_send_<type>`` method."""
+    senders = {t: AsyncMock(return_value=True) for t in manager._senders()}
+    for t, mock in senders.items():
+        monkeypatch.setattr(manager, f"_send_{t}", mock)
+    config = isolated_config_manager.get_config()
+    config.notifications.enabled = True
+    config.notifications.services = [
+        NotificationService(name="Svc", type=service_type, enabled=True)
+    ]
+    isolated_config_manager.update_config(config)
+
+    await manager._process_notification(_make_event("restart"))
+
+    for t, mock in senders.items():
+        assert mock.await_count == (1 if t == service_type else 0)
+
+
+@pytest.mark.asyncio
 async def test_test_notification_reports_failure_for_disabled_service(
     isolated_config_manager, manager
 ):
