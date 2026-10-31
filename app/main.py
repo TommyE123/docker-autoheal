@@ -389,7 +389,8 @@ async def run_api_server() -> None:
 
 async def main() -> None:
     """Main entry point"""
-    global service
+    # Deliberate: the module-level signal handler reads ``service`` to stop it.
+    global service  # noqa: PLW0603
 
     # Register signal handlers
     signal.signal(signal.SIGINT, signal_handler)

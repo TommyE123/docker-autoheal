@@ -32,6 +32,8 @@ def init_api(
     monitoring_engine_instance: MonitoringEngine,
 ) -> None:
     """Initialize API with Docker client and monitoring engine"""
-    global docker_client, monitoring_engine
+    # Deliberate: routes read these at call time via ``state.X`` (see module
+    # docstring), and tests monkeypatch ``app.api.state.X``.
+    global docker_client, monitoring_engine  # noqa: PLW0603
     docker_client = docker_client_instance
     monitoring_engine = monitoring_engine_instance
