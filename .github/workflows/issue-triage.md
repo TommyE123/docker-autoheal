@@ -48,6 +48,10 @@ engine:
   # triage run can exhaust; Flash Lite allows 500/day and 15/minute.
   version: "0.66.0"
   model: gemini-3.5-flash-lite
+# Top-level AWF cap on model requests (the default is 500). A normal run makes
+# about 9 requests; 12 leaves room for a retry and stops a runaway loop from
+# spending the 500 a day that Flash Lite allows.
+max-turns: 12
 features:
   # actionlint (as pinned by this repo's MegaLinter) doesn't yet recognize
   # the "queue" concurrency key gh-aw emits by default; disable it rather
