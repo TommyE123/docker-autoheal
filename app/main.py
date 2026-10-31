@@ -45,6 +45,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.info("Logging to: %s", LOG_FILE)
 
+# How long a stop waits for a startup in progress before cancelling it. Kept under Docker's
+# default 10 second stop timeout so a hung startup can't hold the shutdown until SIGKILL.
+STARTUP_STOP_GRACE_SECONDS = 5.0
+
 
 class CancelledErrorFilter(logging.Filter):
     """Filter to suppress CancelledError from uvicorn.error logs during shutdown"""
@@ -105,6 +109,11 @@ class AutoHealService:
         self.uptime_kuma_monitor: UptimeKumaMonitor | None = None
         self.metrics_server: WSGIServer | None = None
         self.running = False
+        self._stop_event = asyncio.Event()
+        self._stop_lock = asyncio.Lock()
+        self._stopped = False
+        self._start_task: asyncio.Task[None] | None = None
+        self._startup_cancelled = False
 
     async def start(self) -> None:
         """Start the auto-heal service"""
@@ -199,7 +208,7 @@ class AutoHealService:
         except (Exception, asyncio.CancelledError) as e:
             # CancelledError is a BaseException; clean up on cancellation too, then re-raise.
             logger.exception("Failed to start service: %s", e)
-            await self.stop()
+            await self._abort_startup()
             raise
 
     def _close_metrics_server(self) -> None:
@@ -218,10 +227,51 @@ class AutoHealService:
         self.metrics_server = None
 
     async def stop(self) -> None:
-        """Stop the auto-heal service"""
-        logger.info("Stopping Docker Auto-Heal Service...")
+        """
+        Stop the auto-heal service
 
+        Safe to call concurrently (the signal handler and ``run()`` both do): later callers
+        wait for the first shutdown to finish, then return without repeating it.
+        """
+        # Set before taking the lock so `run()` wakes even while another stop is in progress
+        self._request_stop()
+        await self._cancel_slow_startup()
+
+        async with self._stop_lock:
+            if self._stopped:
+                return
+            await self._shutdown()
+
+    async def _cancel_slow_startup(self) -> None:
+        """Give a startup in progress a short grace period, then cancel it"""
+        startup = self._start_task
+        # Cancel once only: a second signal must not interrupt the cleanup the first one started
+        if startup is None or startup.done():
+            return
+        done, _ = await asyncio.wait({startup}, timeout=STARTUP_STOP_GRACE_SECONDS)
+        # Checked after the wait: another stop may have cancelled the startup in the meantime
+        if not done and not self._startup_cancelled:
+            logger.warning(
+                "Startup still running %ss after a stop request, cancelling it",
+                STARTUP_STOP_GRACE_SECONDS,
+            )
+            self._startup_cancelled = True
+            startup.cancel()
+
+    async def _abort_startup(self) -> None:
+        """Clean up after a failed start; the caller of `run()` already holds the stop lock"""
+        self._request_stop()
+        if not self._stopped:
+            await self._shutdown()
+
+    def _request_stop(self) -> None:
+        """Mark the service as stopping and wake `run()`"""
         self.running = False
+        self._stop_event.set()
+
+    async def _shutdown(self) -> None:
+        """Stop the components and release the Docker client and metrics server"""
+        logger.info("Stopping Docker Auto-Heal Service...")
 
         # Stop components gracefully with error handling. The Docker client is
         # closed in `finally` so a cancellation (not an Exception) during an
@@ -244,6 +294,7 @@ class AutoHealService:
             except Exception as e:
                 logger.warning("Error stopping notification manager: %s", e, exc_info=True)
         finally:
+            self._stopped = True
             self._close_metrics_server()
             if self.docker_client:
                 try:
@@ -255,12 +306,26 @@ class AutoHealService:
 
     async def run(self) -> None:
         """Run the service (blocking)"""
-        await self.start()
+        # Startup holds the stop lock so a stop requested meanwhile (e.g. SIGTERM) waits for it
+        # to finish and then tears down everything it started; one requested before this point
+        # skips startup. A startup that outlasts the grace period is cancelled by `stop()`;
+        # `start()` cleans up after itself on cancellation.
+        async with self._stop_lock:
+            if not self._stop_event.is_set():
+                self._start_task = asyncio.create_task(self.start())
+                try:
+                    await self._start_task
+                except asyncio.CancelledError:
+                    # Re-raise unless only the startup task was cancelled, by `stop()`
+                    current = asyncio.current_task()
+                    if not self._startup_cancelled or (current and current.cancelling()):
+                        raise
+                finally:
+                    self._start_task = None
 
         # Keep running until stopped
         try:
-            while self.running:
-                await asyncio.sleep(1)
+            await self._stop_event.wait()
         except asyncio.CancelledError:
             pass
         finally:
@@ -269,6 +334,9 @@ class AutoHealService:
 
 # Global service instance
 service: AutoHealService | None = None
+
+# Strong references to in-flight shutdown tasks, so the event loop can't garbage collect them
+_shutdown_tasks: set[asyncio.Task] = set()
 
 
 def get_public_port() -> str | None:
@@ -296,7 +364,9 @@ def signal_handler(signum: int, _frame: FrameType | None) -> None:
     """Handle shutdown signals"""
     logger.info("Received signal %s, initiating shutdown...", signum)
     if service:
-        asyncio.create_task(service.stop())
+        task = asyncio.create_task(service.stop())
+        _shutdown_tasks.add(task)
+        task.add_done_callback(_shutdown_tasks.discard)
 
 
 async def run_api_server() -> None:

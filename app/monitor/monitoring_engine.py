@@ -186,6 +186,11 @@ class MonitoringEngine:
             return None
         return container_id, container_name, recovery_id
 
+    @property
+    def is_running(self) -> bool:
+        """Whether the monitoring loop is active"""
+        return self._running
+
     async def start(self) -> None:
         """Start the monitoring engine"""
         if self._running:
@@ -198,7 +203,7 @@ class MonitoringEngine:
         events_since = int(time.time())
 
         # Proactively scan for existing containers with the configured monitoring label
-        await self._scan_existing_containers()
+        await self._auto_discovery.scan_existing_containers()
 
         self._task = asyncio.create_task(self._monitor_loop())
         self._event_task = asyncio.create_task(self._event_listener_loop(events_since))
@@ -667,14 +672,6 @@ class MonitoringEngine:
         """Listen for Docker container start events (see ``AutoDiscovery.listen``)"""
         await self._auto_discovery.listen(
             since,
-            is_running=lambda: self._running,
-            handle_event=self._process_container_start_event,
+            is_running=lambda: self.is_running,
+            handle_event=self._auto_discovery.process_start_event,
         )
-
-    async def _scan_existing_containers(self) -> None:
-        """Scan running containers for the monitoring label (see ``AutoDiscovery``)"""
-        await self._auto_discovery.scan_existing_containers()
-
-    async def _process_container_start_event(self, event: dict) -> None:
-        """Handle one Docker container start event (see ``AutoDiscovery``)"""
-        await self._auto_discovery.process_start_event(event)
