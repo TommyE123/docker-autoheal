@@ -192,7 +192,7 @@ class TestErrorsLoggedWithTraceback:
         docker_client.add_container(container, info)
         docker_client.info_errors[container.id] = RuntimeError("inspect failed")
 
-        await engine._scan_existing_containers()
+        await engine._auto_discovery.scan_existing_containers()
 
         assert_error_with_traceback(
             caplog,
@@ -205,7 +205,7 @@ class TestErrorsLoggedWithTraceback:
     async def test_initial_scan_error(self, caplog, engine, docker_client):
         docker_client.list_containers_error = RuntimeError("list failed")
 
-        await engine._scan_existing_containers()
+        await engine._auto_discovery.scan_existing_containers()
 
         assert_error_with_traceback(
             caplog, "Error during initial container scan: list failed", RuntimeError
@@ -242,7 +242,7 @@ class TestErrorsLoggedWithTraceback:
             raise RuntimeError("cannot process")
 
         docker_client.events = BlockingStream([event])
-        monkeypatch.setattr(engine, "_process_container_start_event", failing_process)
+        monkeypatch.setattr(engine._auto_discovery, "process_start_event", failing_process)
         engine._running = True
         await asyncio.wait_for(engine._event_listener_loop(), timeout=10)
 
@@ -257,7 +257,7 @@ class TestErrorsLoggedWithTraceback:
         docker_client.info_errors[container.id] = RuntimeError("inspect failed")
         event = {"Actor": {"ID": container.id, "Attributes": {"name": "web"}}}
 
-        await engine._process_container_start_event(event)
+        await engine._auto_discovery.process_start_event(event)
 
         assert_error_with_traceback(
             caplog,

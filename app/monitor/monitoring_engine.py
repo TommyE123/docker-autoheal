@@ -6,19 +6,18 @@ Monitors containers and performs auto-healing actions
 import asyncio
 import logging
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Protocol
 
 from app.config.config_manager import (
-    AutoHealConfig,
     AutoHealEvent,
-    HealthCheckConfig,
     config_manager,
 )
 from app.docker_client.docker_client_wrapper import recovery_identifier
 from app.monitor.auto_discovery import AutoDiscovery
 from app.monitor.health import HealthEvaluator
+from app.monitor.recovery import RecoveryPolicy
 from app.monitor.selection import should_monitor
 from app.notifications.notification_manager import notification_manager
 
@@ -28,10 +27,6 @@ if TYPE_CHECKING:
     from app.monitor.uptime_kuma_monitor import UptimeKumaMonitor
 
 logger = logging.getLogger(__name__)
-
-# Consecutive healthy checks, on the same container run, before a quarantined container
-# is released. The container must also have been up for this many monitoring intervals.
-QUARANTINE_STABLE_CHECKS = 3
 
 
 class DockerClient(Protocol):
@@ -78,41 +73,26 @@ class MonitoringEngine:
     Core monitoring engine that checks container health and performs restarts
     """
 
-    def __init__(self, docker_client: DockerClient) -> None:
+    def __init__(
+        self,
+        docker_client: DockerClient,
+        uptime_kuma_monitor: UptimeKumaMonitor | None = None,
+    ) -> None:
         """
         Initialize monitoring engine
         Args:
             docker_client: Docker client wrapper instance
+            uptime_kuma_monitor: Uptime Kuma monitor, or None when it is not set up
         """
         self.docker_client = docker_client
         self._running = False
         self._task: asyncio.Task | None = None
         self._event_task: asyncio.Task | None = None
-        self._last_restart_times: dict[str, datetime] = {}
-        self._backoff_delays: dict[str, int] = {}
-        # Per recovery ID: the container (by Docker ID) and when its current unbroken run
-        # of healthy evaluations began. A recreated container starts a new run.
-        self._healthy_since: dict[str, tuple[str | None, datetime]] = {}
-        self._next_allowed_restart: dict[str, datetime] = {}
-        # The container (by Docker ID) whose failure started each pending wait. Replicas
-        # sharing a recovery ID share the wait, so only its owner recovering may cancel
-        # it. A recreated container has a new ID, so it never inherits a predecessor's wait.
-        self._restart_wait_owner: dict[str, str | None] = {}
-        # The cycle in which the owner last confirmed each pending wait by failing again.
-        # A wait the owner did not confirm in the previous cycle (it was quarantined, in
-        # maintenance, or Docker was unavailable) is stale: the failure was not observed
-        # continuously, so the next failure starts a fresh wait instead of using it.
-        self._restart_wait_seen: dict[str, int] = {}
-        # Counts monitoring cycles. A quarantined container's healthy checks are consecutive
-        # only if each happened in the cycle after the previous one, so a skipped or failed
-        # check, or a failed cycle, breaks the streak without any explicit reset.
-        self._check_cycle = 0
-        # Per container (by Docker ID, since replicas can share a recovery ID): StartedAt,
-        # consecutive healthy checks while quarantined, and the cycle of the latest one.
-        # _check_containers checks one container at a time and the update has no await, so
-        # no lock is needed. Concurrent checks of one container would need one.
-        self._quarantine_streaks: dict[str, tuple[str, int, int]] = {}
-        self._health_evaluator = HealthEvaluator(docker_client)
+        # Cooldown, backoff, restart waits, healthy runs, quarantine streaks and the cycle count
+        self._recovery = RecoveryPolicy()
+        self._health_evaluator = HealthEvaluator(
+            docker_client, uptime_kuma_monitor=uptime_kuma_monitor
+        )
         self._auto_discovery = AutoDiscovery(docker_client, self._container_identifiers)
 
     @property
@@ -120,7 +100,7 @@ class MonitoringEngine:
         """
         The Uptime Kuma monitor, or None when Uptime Kuma is not set up.
 
-        Attached by the service after construction. Health evaluation reads it.
+        Passed in by the service at construction. Health evaluation reads it.
         """
         return self._health_evaluator.uptime_kuma_monitor
 
@@ -206,6 +186,11 @@ class MonitoringEngine:
             return None
         return container_id, container_name, recovery_id
 
+    @property
+    def is_running(self) -> bool:
+        """Whether the monitoring loop is active"""
+        return self._running
+
     async def start(self) -> None:
         """Start the monitoring engine"""
         if self._running:
@@ -218,7 +203,7 @@ class MonitoringEngine:
         events_since = int(time.time())
 
         # Proactively scan for existing containers with the configured monitoring label
-        await self._scan_existing_containers()
+        await self._auto_discovery.scan_existing_containers()
 
         self._task = asyncio.create_task(self._monitor_loop())
         self._event_task = asyncio.create_task(self._event_listener_loop(events_since))
@@ -282,17 +267,12 @@ class MonitoringEngine:
         """
         Check all containers and perform auto-healing if needed
 
-        Containers are checked one at a time. ``_quarantine_streaks`` relies on that:
-        running the checks concurrently would need a per-container lock around its
-        read-modify-write.
+        Containers are checked one at a time. The quarantine streaks in ``RecoveryPolicy``
+        rely on that: running the checks concurrently would need a per-container lock
+        around their read-modify-write.
         """
-        self._check_cycle += 1
-        # A streak not extended last cycle is over; this also forgets removed containers
-        self._quarantine_streaks = {
-            container_id: streak
-            for container_id, streak in self._quarantine_streaks.items()
-            if streak[2] >= self._check_cycle - 1
-        }
+        # Also ends the quarantine streaks not extended last cycle
+        self._recovery.begin_cycle()
         try:
             # Ensure Docker connection is active
             if not self.docker_client.is_connected():
@@ -310,15 +290,7 @@ class MonitoringEngine:
             # list_containers returns [] when the Docker call fails, which says nothing
             # about whether the containers still exist.
             if containers:
-                listed_ids = {container.id for container in containers}
-                abandoned = [
-                    recovery_id
-                    for recovery_id, owner in self._restart_wait_owner.items()
-                    if owner not in listed_ids
-                ]
-                for recovery_id in abandoned:
-                    self._clear_restart_wait(recovery_id)
-                self._clear_healthy_runs_not_in(listed_ids)
+                self._recovery.forget_absent({container.id for container in containers})
 
             for container in containers:
                 try:
@@ -350,8 +322,7 @@ class MonitoringEngine:
         # Check if container should be monitored
         if not self.should_monitor_container(container, info):
             # No longer monitored: a wait it started would otherwise linger
-            self._clear_restart_waits_owned_by(container_id)
-            self._clear_healthy_runs_owned_by(container_id)
+            self._recovery.forget_container(container_id)
             return
 
         # Check if container is quarantined (by recovery ID, name, or ID for backwards compatibility)
@@ -387,51 +358,12 @@ class MonitoringEngine:
         needs_restart, reason = await self._evaluate_container_health(container, info)
 
         if needs_restart:
-            self._healthy_since.pop(recovery_id, None)
+            self._recovery.note_unhealthy(recovery_id)
             await self._handle_container_restart(container, info, reason)
             return
 
-        self._note_healthy_container(recovery_id, container_id, info, config)
-
-    def _note_healthy_container(
-        self, recovery_id: str, container_id: str | None, info: dict, config: AutoHealConfig
-    ) -> None:
-        """Update restart state for a container that was evaluated as healthy"""
-        if self._restart_wait_owner.get(recovery_id) == container_id:
-            # Recovered on its own: drop the restart it was waiting out its backoff for
-            self._clear_restart_wait(recovery_id)
-        self._reset_backoff_if_stable(recovery_id, container_id, info, config)
-
-    def _reset_backoff_if_stable(
-        self, recovery_id: str, container_id: str | None, info: dict, config: AutoHealConfig
-    ) -> None:
-        """
-        Reset a container's restart backoff once it has stayed healthy for long enough
-
-        A restarted container is briefly running and healthy even if it is crash-looping, so
-        a healthy evaluation alone is not a recovery. The container must have been running
-        and healthy, without a failed evaluation in between, for at least the delay it would
-        wait before its next restart.
-
-        Args:
-            recovery_id: Recovery identifier the backoff is recorded under
-            container_id: Docker ID of the container the healthy run belongs to
-            info: Container information dict
-            config: Current configuration
-        """
-        if info.get("state", {}).get("Status", "").lower() != "running":
-            self._healthy_since.pop(recovery_id, None)
-            return
-        now = datetime.now(UTC)
-        owner, healthy_since = self._healthy_since.get(recovery_id, (None, now))
-        if owner != container_id:
-            healthy_since = now
-        self._healthy_since[recovery_id] = (container_id, healthy_since)
-        delay = self._backoff_delays.get(recovery_id)
-        if delay is None or (now - healthy_since).total_seconds() < delay:
-            return
-        self._backoff_delays[recovery_id] = config.restart.backoff.initial_seconds
-        self._healthy_since.pop(recovery_id, None)
+        running = info.get("state", {}).get("Status", "").lower() == "running"
+        self._recovery.note_healthy(recovery_id, container_id, running, config.restart)
 
     async def _check_quarantined_container(
         self, container: Container, info: dict, quarantine_id: str, recovery_id: str
@@ -465,14 +397,8 @@ class MonitoringEngine:
         """
         Record one healthy check of a quarantined container; True once it is stable.
 
-        Stable means ``QUARANTINE_STABLE_CHECKS`` consecutive healthy checks of the same
-        run (same ``StartedAt``), each in the cycle after the previous one, and an uptime
-        of that many monitoring intervals. Only a healthy check is recorded, so anything
-        else (unhealthy, not running, skipped, failed, or a failed cycle) leaves a gap,
-        and the sweep at the start of the next cycle ends the streak. The loop sleeps
-        ``interval_seconds`` between checks, so real checks are at least that far apart
-        and the uptime floor is a lower bound. Docker health ``starting`` is not healthy
-        for this purpose in the health-based modes.
+        See ``RecoveryPolicy.quarantine_recovery_confirmed``. The configuration is read
+        here, after the health check, so the decision uses the latest snapshot.
 
         Args:
             container_id: Full Docker container ID
@@ -482,76 +408,9 @@ class MonitoringEngine:
             True if the container may be released from quarantine
         """
         config = config_manager.get_config()
-        health = info.get("health")
-        if (
-            config.restart.mode in ("health", "both")
-            and health
-            and health.get("status") == "starting"
-        ):
-            return False
-
-        started_at = info.get("started_at") or info.get("state", {}).get("StartedAt") or ""
-        uptime = self._uptime_seconds(started_at)
-        if uptime is None:
-            # Without a usable StartedAt the run cannot be identified or timed, so the
-            # container stays quarantined and nothing counts towards a streak
-            return False
-
-        previous = self._quarantine_streaks.get(container_id)
-        count = previous[1] + 1 if previous and previous[0] == started_at else 1
-        self._quarantine_streaks[container_id] = (started_at, count, self._check_cycle)
-
-        required_uptime = QUARANTINE_STABLE_CHECKS * config.monitor.interval_seconds
-        return count >= QUARANTINE_STABLE_CHECKS and uptime >= required_uptime
-
-    @staticmethod
-    def _uptime_seconds(started_at: str) -> float | None:
-        """Seconds since a Docker ``StartedAt`` timestamp, or None if it is unusable"""
-        try:
-            started = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
-        except ValueError:
-            return None
-        if started.year <= 1:  # Docker's zero time: never started
-            return None
-        if started.tzinfo is None:
-            started = started.replace(tzinfo=UTC)
-        return (datetime.now(UTC) - started).total_seconds()
-
-    def _clear_restart_waits_owned_by(self, container_id: str | None) -> None:
-        """Forget every restart wait that the given container (by Docker ID) started"""
-        owned = [
-            recovery_id
-            for recovery_id, owner in self._restart_wait_owner.items()
-            if owner == container_id
-        ]
-        for recovery_id in owned:
-            self._clear_restart_wait(recovery_id)
-
-    def _clear_healthy_runs_owned_by(self, container_id: str | None) -> None:
-        """Forget the healthy run the given container (by Docker ID) has built up"""
-        owned = [
-            recovery_id
-            for recovery_id, (owner, _) in self._healthy_since.items()
-            if owner == container_id
-        ]
-        for recovery_id in owned:
-            del self._healthy_since[recovery_id]
-
-    def _clear_healthy_runs_not_in(self, listed_ids: set[str | None]) -> None:
-        """Forget the healthy runs of containers that Docker no longer lists"""
-        gone = [
-            recovery_id
-            for recovery_id, (owner, _) in self._healthy_since.items()
-            if owner not in listed_ids
-        ]
-        for recovery_id in gone:
-            del self._healthy_since[recovery_id]
-
-    def _clear_restart_wait(self, recovery_id: str) -> None:
-        """Forget the restart wait recorded for a recovery ID, and who it belongs to"""
-        self._next_allowed_restart.pop(recovery_id, None)
-        self._restart_wait_owner.pop(recovery_id, None)
-        self._restart_wait_seen.pop(recovery_id, None)
+        return self._recovery.quarantine_recovery_confirmed(
+            container_id, info, config.restart.mode, config.monitor.interval_seconds
+        )
 
     def should_monitor_container(self, container: Container, info: dict) -> bool:
         """
@@ -580,19 +439,6 @@ class MonitoringEngine:
             container, info, self.get_stable_identifier(info)
         )
 
-    async def _perform_custom_health_check(
-        self, container: Container, health_check: HealthCheckConfig
-    ) -> bool:
-        """
-        Perform custom health check on container
-        Args:
-            container: Container object
-            health_check: Health check configuration
-        Returns:
-            True if healthy, False otherwise
-        """
-        return await self._health_evaluator.perform_custom_health_check(container, health_check)
-
     async def _auto_unquarantine_container(
         self,
         quarantine_id: str,
@@ -614,15 +460,14 @@ class MonitoringEngine:
 
             # Also clear the restart count so it starts fresh
             config_manager.clear_restart_history(recovery_id)
-            self._quarantine_streaks.pop(container_id, None)
 
-            # Reset backoff delays; a wait started by another replica sharing this
-            # recovery ID is still valid
-            if self._restart_wait_owner.get(recovery_id) == container_id:
-                self._clear_restart_wait(recovery_id)
-            if recovery_id in self._backoff_delays:
-                config = config_manager.get_config()
-                self._backoff_delays[recovery_id] = config.restart.backoff.initial_seconds
+            # Forget the streak and reset backoff delays; a wait started by another
+            # replica sharing this recovery ID is still valid
+            self._recovery.note_quarantine_released(
+                container_id,
+                recovery_id,
+                lambda: config_manager.get_config().restart.backoff.initial_seconds,
+            )
 
             # Log the event
             event = AutoHealEvent(
@@ -682,17 +527,15 @@ class MonitoringEngine:
         logger.debug("Using recovery_id '%s' for container %s", recovery_id, container_name)
 
         # Check cooldown (using recovery_id)
-        last_restart = self._last_restart_times.get(recovery_id)
-        if last_restart:
-            elapsed = (datetime.now(UTC) - last_restart).total_seconds()
-            if elapsed < config.restart.cooldown_seconds:
-                logger.debug(
-                    "Container %s (recovery_id: %s) in cooldown period (%.1fs)",
-                    container_name,
-                    recovery_id,
-                    elapsed,
-                )
-                return
+        elapsed = self._recovery.seconds_into_cooldown(recovery_id, config.restart.cooldown_seconds)
+        if elapsed is not None:
+            logger.debug(
+                "Container %s (recovery_id: %s) in cooldown period (%.1fs)",
+                container_name,
+                recovery_id,
+                elapsed,
+            )
+            return
 
         # Check restart threshold (using recovery_id for persistence)
         restart_count = config_manager.get_restart_count(
@@ -732,14 +575,14 @@ class MonitoringEngine:
             return
 
         # Apply backoff if enabled (using recovery_id)
-        if config.restart.backoff.enabled and not self._restart_wait_elapsed(
-            recovery_id, container_id, container_name, config
+        if config.restart.backoff.enabled and not self._recovery.restart_wait_elapsed(
+            recovery_id, container_id, container_name, config.restart
         ):
             return
 
         # The restart goes ahead now, so no wait is pending (backoff may also have been
         # disabled while one was)
-        self._clear_restart_wait(recovery_id)
+        self._recovery.clear_restart_wait(recovery_id)
 
         # Perform restart
         logger.info(
@@ -752,7 +595,7 @@ class MonitoringEngine:
 
         # Record restart (using recovery_id - persists across ID changes and handles all edge cases)
         config_manager.record_restart(recovery_id, config.restart.max_restarts_window_seconds)
-        self._last_restart_times[recovery_id] = datetime.now(UTC)
+        self._recovery.record_restart(recovery_id)
 
         # Log event
         event = AutoHealEvent(
@@ -781,75 +624,6 @@ class MonitoringEngine:
                 container_name,
                 recovery_id,
             )
-
-    def _restart_wait_elapsed(
-        self,
-        recovery_id: str,
-        container_id: str | None,
-        container_name: str | None,
-        config: AutoHealConfig,
-    ) -> bool:
-        """
-        Apply the restart backoff for a container that needs restarting
-
-        The wait is recorded as a timestamp and checked on later cycles, never slept
-        inline, so one container's backoff cannot stall the monitoring of the others.
-
-        Args:
-            recovery_id: Recovery identifier the wait is recorded under
-            container_id: Docker ID of the container, recorded as the owner of a new wait
-            container_name: Container name, for logging
-            config: Current configuration
-
-        Returns:
-            True if the restart may go ahead now. False if a wait was just scheduled
-            or the existing one has not run out yet.
-        """
-        now = datetime.now(UTC)
-        next_allowed = self._next_allowed_restart.get(recovery_id)
-        if next_allowed is not None:
-            if self._restart_wait_seen[recovery_id] < self._check_cycle - 1:
-                logger.debug(
-                    "Restart wait for %s (recovery_id: %s) was not confirmed last cycle, "
-                    "starting a new one",
-                    container_name,
-                    recovery_id,
-                )
-                self._clear_restart_wait(recovery_id)
-                next_allowed = None
-            elif self._restart_wait_owner.get(recovery_id) == container_id:
-                self._restart_wait_seen[recovery_id] = self._check_cycle
-        backoff_delay = min(
-            self._backoff_delays.get(recovery_id, config.restart.backoff.initial_seconds),
-            config.restart.backoff.max_seconds,
-        )
-        if next_allowed is None:
-            logger.debug(
-                "Applying backoff delay of %ss for %s (recovery_id: %s)",
-                backoff_delay,
-                container_name,
-                recovery_id,
-            )
-            self._next_allowed_restart[recovery_id] = now + timedelta(seconds=backoff_delay)
-            self._restart_wait_owner[recovery_id] = container_id
-            self._restart_wait_seen[recovery_id] = self._check_cycle
-            return False
-        if now < next_allowed:
-            logger.debug(
-                "Container %s (recovery_id: %s) waiting out restart backoff (%.1fs left)",
-                container_name,
-                recovery_id,
-                (next_allowed - now).total_seconds(),
-            )
-            return False
-
-        # Update backoff for next time
-        next_backoff = min(
-            int(backoff_delay * config.restart.backoff.multiplier),
-            config.restart.backoff.max_seconds,
-        )
-        self._backoff_delays[recovery_id] = next_backoff
-        return True
 
     async def _send_alert(self, event: AutoHealEvent) -> None:
         """
@@ -890,7 +664,7 @@ class MonitoringEngine:
         """Get monitoring engine status"""
         return {
             "running": self._running,
-            "monitored_containers": len(self._last_restart_times),
+            "monitored_containers": len(self._recovery.last_restart_times),
             "quarantined_containers": len(config_manager.get_quarantined_containers()),
         }
 
@@ -898,14 +672,6 @@ class MonitoringEngine:
         """Listen for Docker container start events (see ``AutoDiscovery.listen``)"""
         await self._auto_discovery.listen(
             since,
-            is_running=lambda: self._running,
-            handle_event=self._process_container_start_event,
+            is_running=lambda: self.is_running,
+            handle_event=self._auto_discovery.process_start_event,
         )
-
-    async def _scan_existing_containers(self) -> None:
-        """Scan running containers for the monitoring label (see ``AutoDiscovery``)"""
-        await self._auto_discovery.scan_existing_containers()
-
-    async def _process_container_start_event(self, event: dict) -> None:
-        """Handle one Docker container start event (see ``AutoDiscovery``)"""
-        await self._auto_discovery.process_start_event(event)

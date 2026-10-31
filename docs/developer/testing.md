@@ -134,8 +134,11 @@ The suite focuses on the monitoring engine and its restart/recovery behaviour:
 | Area                                                                                | File                               |
 |-------------------------------------------------------------------------------------|------------------------------------|
 | Stable identifier and monitoring selection/filters                                  | `test_monitoring_identity.py`      |
+| Monitoring selection rules (`should_monitor`), without an engine                    | `test_selection.py`                |
 | Health evaluation (exit codes, Docker health, custom checks, Uptime-Kuma)           | `test_health_evaluation.py`        |
+| `HealthEvaluator`: Uptime Kuma dependency, identifier and engine hand-off           | `test_health_evaluator.py`         |
 | Cooldown, thresholds, quarantine, backoff, restart success/failure, alerts          | `test_restart_handling.py`         |
+| `RecoveryPolicy` with a fake clock: cooldown, backoff, waits, quarantine release    | `test_recovery_policy.py`          |
 | Per-cycle checks, quarantine skip/auto-unquarantine, disappearance, Docker failures | `test_container_checks.py`         |
 | Per-replica recovery state for scaled Compose services                              | `test_compose_replica_recovery.py` |
 | Start/stop, monitor loop, event listener, auto-discovery                            | `test_engine_lifecycle.py`         |
@@ -150,8 +153,9 @@ The suite focuses on the monitoring engine and its restart/recovery behaviour:
   tests never touch the real `/data` directory and never share state.
 * `FakeDockerClient` is an in-memory stand-in for `DockerClientWrapper` that
   serves canned container information and records restart calls.
-* `mock_notification_manager` (autouse) replaces the notification manager used
-  by the monitoring engine, so no outbound requests are attempted.
+* `mock_notification_manager` (autouse) replaces `send_event_notification` on the
+  shared notification manager singleton, whichever module (the monitoring engine,
+  `AutoDiscovery`, the API routes) calls it, so no outbound requests are attempted.
 * `recorded_sleeps` (autouse) replaces `asyncio.sleep`, so any sleep is recorded
   rather than actually waited for. The restart backoff doesn't sleep; the engine
   records when the next restart is allowed. `after_backoff` runs a call, lets that wait

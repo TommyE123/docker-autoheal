@@ -153,6 +153,32 @@ class TestLabelFilters:
 
         assert monitored(config) is False
 
+    def test_multi_label_blacklist_filter_needs_every_label(self):
+        config = config_with(filters={"blacklist_labels": [{"tier": "dev", "team": "a"}]})
+        partial = {**INFO, "labels": {**INFO["labels"], "tier": "dev", "team": "b"}}
+        full = {**INFO, "labels": {**INFO["labels"], "tier": "dev", "team": "a"}}
+
+        assert monitored(config, partial) is True
+        assert monitored(config, full) is False
+
+    def test_multi_label_whitelist_filter_needs_every_label(self):
+        config = config_with(filters={"whitelist_labels": [{"tier": "prod", "team": "a"}]})
+        partial = {**INFO, "labels": {**INFO["labels"], "tier": "prod", "team": "b"}}
+        full = {**INFO, "labels": {**INFO["labels"], "tier": "prod", "team": "a"}}
+
+        assert monitored(config, partial) is False
+        assert monitored(config, full) is True
+
+    def test_any_one_of_several_multi_label_filters_is_enough(self):
+        config = config_with(
+            filters={
+                "whitelist_labels": [{"tier": "prod", "team": "a"}, {"tier": "dev", "team": "b"}]
+            }
+        )
+        info = {**INFO, "labels": {**INFO["labels"], "tier": "dev", "team": "b"}}
+
+        assert monitored(config, info) is True
+
     def test_blacklist_wins_over_whitelist(self):
         config = config_with(
             filters={

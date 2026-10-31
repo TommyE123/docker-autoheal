@@ -37,6 +37,13 @@
       "minimumReleaseAge": "7 days"
     },
     {
+      "description": "Group Prettier dependency updates across package files into one PR.",
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["prettier"],
+      "groupName": "Prettier",
+      "minimumReleaseAge": "7 days"
+    },
+    {
       "description": "Coordinate major upgrades of the interdependent frontend build and test toolchain in one PR, so lockfile generation sees compatible Vite, Vitest and plugin majors together. Patch and minor updates keep their normal grouping.",
       "matchManagers": ["npm"],
       "matchFileNames": ["frontend/package.json"],
@@ -86,6 +93,14 @@
       "matchPackageNames": ["tommye123/docker-autoheal"],
       "enabled": false,
       "minimumReleaseAge": null
+    },
+    {
+      "description": "Schedule FastAPI updates for Saturdays.",
+      "matchManagers": ["pip_requirements"],
+      "matchPackageNames": ["fastapi"],
+      "minimumReleaseAge": "7 days",
+      "schedule": ["* * * * 6"],
+      "updateNotScheduled": false
     }
   ]
 }

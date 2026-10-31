@@ -79,8 +79,9 @@ known-first-party = ["app"]
 # ignored for tests below (policy: docs/developer/type-annotations.md), so
 # the test-specific rules to list here are:
 #   SLF001                  - private-member access, e.g.
-#            `engine._handle_container_restart` or `engine._last_restart_times`
-#            reached into directly from a test; unit tests routinely do this
+#            `engine._handle_container_restart` or
+#            `engine._recovery.last_restart_times` reached into directly from
+#            a test; unit tests routinely do this
 #            to assert on internal state, so it's expected here, not a smell.
 #   PLR2004                 - literal ("magic") values used in comparisons,
 #            e.g. `== 3`, `== 20`, `== 80` in assertions; those are expected
