@@ -29,17 +29,26 @@ engine:
   # is the one that completed a run (41023115800). issue-triage stays on Flash
   # Lite, a separate quota.
   version: "0.66.0"
-  model: gemini-3.6-flash
+  # TEMPORARY for a process test on Flash Lite's separate quota; restore
+  # gemini-3.6-flash before review.
+  model: gemini-3.5-flash-lite
 # Top-level AWF invocation cap on model requests; gh-aw's engines reference
 # lists it as supported for Gemini. The default is 500, and the agent step has a
-# 20-minute timeout. The prompt plans about seven requests (several tool calls
-# go out in one request); 12 leaves room for retries and on-demand reads while
+# 20-minute timeout. The prompt plans about five requests without a candidate
+# and six with one (several tool calls go out in one request); 12 leaves room for retries and on-demand reads while
 # keeping one run well inside the 20-requests-a-day Flash quota.
 max-turns: 12
 features:
   # actionlint (as pinned by this repo's MegaLinter) doesn't yet recognize
   # the "queue" concurrency key gh-aw emits by default.
   group-concurrency-queue: false
+# Appends the source read plan to the prompt: every app source file as the exact
+# cat -n commands the agent runs, in three parts. It saves the agent a listing
+# turn, and it lists the same files the coverage post-step checks. Fails the job
+# if it cannot append. Run through bash for the same reason as the post-step.
+pre-agent-steps:
+  - name: Append the source read plan to the prompt
+    run: bash .github/scripts/weekly-maintainer-reads.sh
 # Counts the app source files the agent actually read, from its own tool-call
 # log, because the agent's coverage claim cannot be trusted. Runs after gh-aw
 # writes the agent output and before the safe_outputs job reads it: if any file
@@ -67,6 +76,9 @@ tools:
     # safe output below.
     min-integrity: none
 safe-outputs:
+  # TEMPORARY for the Flash Lite process test: preview the final call on the
+  # run page instead of creating anything. Remove before review.
+  staged: true
   threat-detection: false
   # The agent job stays read-only. A finding is filed as one issue by the
   # separate safe_outputs job, from the agent's validated output. gh-aw also
@@ -139,21 +151,32 @@ start and end, and the middle is lost. Keep each command's output well under
 that, as the plan below does; a call that combines several file reads would be
 cut.
 
-## Plan: about seven model turns
+## Plan: about five model turns
 
 You have at most 12 model turns. Put every independent tool call of a step into
 the **same turn**: several tool calls in one turn cost one model request. Follow
 this plan and do not spend turns on anything else.
 
-**Turn 1, baseline.** Make each of these commands its own call, all in one turn:
+The end of this prompt holds a read plan, between the lines SOURCE READS START
+and SOURCE READS END, generated from the checkout before you started. It lists
+every app source file as the exact `cat -n` commands that read it, in three
+parts. Run each command as its own call, exactly as written: a later workflow
+step checks your tool calls against the same files, and any file not read that
+way makes the audit incomplete, and no issue is filed. `cat -n` numbers the
+lines; those numbers are the only line numbers you may cite. Never redirect or
+discard the output. The parts keep each reply small: a single reply with about
+40 tool calls has come back cut off and failed the run. If the read plan is
+missing, write an **Incomplete audit** summary and call `noop` with
+`INCOMPLETE AUDIT: no read plan`.
+
+**Turn 1, baseline and read part 1.** Make each of these commands its own call,
+all in one turn, together with the commands of part 1 of the read plan:
 
 - `date -u +%FT%TZ` (the audit timestamp) and `date -u -d "30 days ago" +%F`
   (the cutoff for recent work; the CLI blocks `$(`, so you copy the result into
   a later query by hand)
 - `cat .git/HEAD .git/FETCH_HEAD` (the checkout: the branch, and its commit SHA,
   which is the audited revision)
-- `find app -path app/tests -prune -o -name "*.py" -size +0 -printf "%s %p\n"`
-  (every app source file, with its size in bytes)
 - `find app/tests/unit frontend/src .github/workflows -type f -printf "%s %p\n"`
   and `cat renovate.json` (what the tests, frontend and automation cover)
 - `grep -n "^FROM python" Dockerfile` and
@@ -169,33 +192,28 @@ this plan and do not spend turns on anything else.
 If a `jq` filter fails because the result has another shape, run that command
 once more without the pipe and read what it returns.
 
-**Turns 2 to 4, read the whole app source.** Read **every** file from the app
-source list, each with its own `cat -n FILE` call. Split the list into three
-parts in its listed order and read one part per turn, about 13 calls side by
-side in each: a single reply with about 40 tool calls has come back cut off and
-failed the run. `cat -n` numbers the lines; those numbers are the only line numbers you may cite. A later workflow
-step checks your tool calls: any source file not read with `cat -n` makes the
-audit incomplete, and no issue is filed. Read a file of more
-than 30,000 bytes in parts of 600 lines: `cat -n FILE | head -n 600`, then
-`cat -n FILE | tail -n +601` (for a file over 60,000 bytes, read the middle part
-with `cat -n FILE | head -n 1200 | tail -n +601` and start the last part at line
-1201). Never redirect or discard the output. In turn 4, with the last part, run
-these two searches with the cutoff date from turn 1, one for issues and one for pull
+**Turn 2, read part 2.** Run the commands of part 2 of the read plan.
+
+**Turn 3, read part 3.** Run the commands of part 3, together with these two
+searches with the cutoff date from turn 1, one for issues and one for pull
 requests (each search covers only one kind unless the query says which):
 
 - `github search_issues --query "repo:OWNER/REPO is:issue is:closed closed:>YYYY-MM-DD" --perPage 100 | jq -r '.[] | "#\(.number) \(.closed_at // "" | .[0:10]) \(.title)"'`
 - `github search_issues --query "repo:OWNER/REPO is:pr is:closed closed:>YYYY-MM-DD" --perPage 100 | jq -r '.[] | "#\(.number) \(.closed_at // "" | .[0:10]) \(.title)"'`
 
-**Turn 5, check the candidate.** Assess the source (see Assess). For your best
-candidate, make every remaining check in this one turn: open the relevant test
-file with `cat -n`, any workflow or frontend file, run any `grep` you need, and
-run the final duplicate searches (see Duplicate-work check). Do not split these
-checks across turns. Use one more turn only if their results raise a question
-you must answer before deciding.
+**Turn 4, only with a candidate: check it.** Assess the source (see Assess). If
+you have no candidate worth checking, skip this turn and go straight to the
+report. For your best candidate, make every remaining check in this one turn:
+open the relevant test file with `cat -n`, any workflow or frontend file, run
+any `grep` you need, and run the final duplicate searches (see Duplicate-work
+check). Do not split these checks across turns. Use one more turn only if their
+results raise a question you must answer before deciding. Skipping this turn
+changes nothing else: a clean result still needs its three rejected candidates.
 
-**Turn 6, report.** In one turn, make two calls side by side: `write_file` for
-the summary, and the final call, `create_issue` or `noop` (see Reporting). Your
-final message after them is one short line.
+**Turn 5, report (turn 4 without a candidate, turn 6 after an extra check
+turn).** In one turn, make two calls
+side by side: `write_file` for the summary, and the final call, `create_issue`
+or `noop` (see Reporting). Your final message after them is one short line.
 
 If a call fails, fix it once and carry on. If you have used 9 turns and have
 not reported yet, stop: write the summary as an **Incomplete audit** that says
@@ -299,7 +317,7 @@ Write the summary once, with `write_file`.
 Start it with one of these headings so the run page shows the outcome, then the
 baseline (timestamp, checkout SHA and `main` SHA) and a line
 "Source coverage: X of Y app source files read", where Y is the number of files
-in the turn 1 list:
+in the read plan:
 
 - `## Finding`, then the eight fields. An issue is created only for this
   outcome.
