@@ -35,10 +35,12 @@ if: >-
 permissions:
   contents: read
   issues: read
-# Gives each dispatch its own conclusion concurrency slot; event runs keep
-# sharing one per issue.
+# One run at a time per issue, whether it came from an event or a dispatch, so
+# two runs cannot read stale labels or both post a needs-information comment.
+# The run_id fallback only applies if neither number is set.
 concurrency:
-  job-discriminator: ${{ github.event.issue.number || github.run_id }}
+  group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number || github.event.inputs.issue_number || github.run_id }}"
+  job-discriminator: ${{ github.event.issue.number || github.event.inputs.issue_number || github.run_id }}
 engine:
   id: gemini
   # Gemini CLI 0.60 to 0.65 under older AWF versions skipped the AWF system
@@ -81,10 +83,13 @@ safe-outputs:
   # on an event run, the issue_number input on a dispatch. The agent does not
   # choose the target, so injected issue text cannot redirect a write to another
   # issue. Do not use target: "*" here; it would let the agent pick any issue.
-  # A pull request number given to a dispatch fails closed: the issue_read
-  # result carries no pull_request field to check, but pull-requests: false
-  # below leaves the write token without pull request access, so the label
-  # write is refused (HTTP 403, test run 41223807050) and nothing changes.
+  # A pull request number given to a dispatch is refused only while safe
+  # outputs write with the default GITHUB_TOKEN: pull-requests: false leaves it
+  # without pull request access, so the label write fails (HTTP 403, test run
+  # 41223807050) and nothing changes. A GH_AW_GITHUB_TOKEN secret with pull
+  # request write access would remove that protection, and the issue_read
+  # result carries no pull_request field for the agent to check. Do not add
+  # such a token without also validating the input.
   add-labels:
     allowed: ["kind:*", "area:*", "status:needs-triage", "status:needs-information"]
     create-if-missing: false
