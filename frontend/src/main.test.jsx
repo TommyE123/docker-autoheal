@@ -29,4 +29,13 @@ describe("main entry point", () => {
     const tree = renderMock.mock.calls[0][0];
     expect(tree.props.children.type.name).toBe("BrowserRouter");
   });
+
+  it("registers the service worker immediately on startup", async () => {
+    await import("./main.jsx");
+    // Import after resetModules so this is the instance main.jsx received.
+    const { registerSW } = await import("virtual:pwa-register");
+
+    expect(registerSW).toHaveBeenCalledTimes(1);
+    expect(registerSW).toHaveBeenCalledWith({ immediate: true });
+  });
 });
