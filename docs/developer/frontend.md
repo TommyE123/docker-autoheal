@@ -56,6 +56,26 @@ python -m app.main
 # open http://localhost:3131
 ```
 
+## PWA
+
+`vite-plugin-pwa` (configured in `vite.config.js`) generates `sw.js` and a `workbox-*.js`
+runtime into `static/` during `npm run build`; `src/main.jsx` registers the worker with
+`registerSW` from `virtual:pwa-register`. The manifest is the hand-maintained
+`public/manifest.json` (`manifest: false` in the plugin config), and FastAPI serves
+`manifest.json`, `sw.js` and `workbox-*.js` from the root (`app/api/routes/ui.py`).
+
+- `registerType: "autoUpdate"` with `skipWaiting`/`clientsClaim`: a new build activates
+  immediately and reloads open pages, and `cleanupOutdatedCaches` drops old precaches.
+- Only the app shell is precached. `/api/*` uses a `NetworkOnly` runtime rule and is
+  excluded from the navigation fallback (as is `/health`), so API data is never cached
+  and failed API calls are never answered with cached data or `index.html`. There is no
+  offline support.
+- `e2e-ui/parallel/pwa.spec.js` (`@pwa`) checks the service worker, Cache Storage, installability and
+  offline `/api/*` behaviour against the production image; see `docs/developer/testing.md`.
+- Tests resolve `virtual:pwa-register` to `src/test/pwa-register-stub.js` (`test.alias`).
+- The service worker only exists in production builds. Check changes against
+  `npm run build` served by the backend, not `npm run dev`.
+
 ## Project structure
 
 ```text
