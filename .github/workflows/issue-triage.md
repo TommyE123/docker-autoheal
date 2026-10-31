@@ -42,15 +42,16 @@ engine:
   # Gemini CLI 0.60 to 0.65 under older AWF versions skipped the AWF system
   # settings file and exited 41 "Invalid auth method selected" (gh-aw-firewall
   # #10246, fixed by #10260 in AWF v0.28.70; gh-aw v1.0.1 uses AWF v0.29.0).
-  # 0.66.0 authenticates normally under that AWF. The model is pinned because the default Pro-class
-  # model has no free-tier quota for this key. Flash Lite is used because the
-  # full Flash models are capped at 20 requests/day on the free tier, which one
-  # triage run can exhaust; Flash Lite allows 500/day and 15/minute.
+  # 0.66.0 authenticates normally under that AWF. The model is pinned because
+  # the default Pro-class model has no free-tier quota for this key. Flash Lite
+  # is used because the full Flash models are capped at 20 requests/day on the
+  # free tier, which one triage run can exhaust; Flash Lite allows 500/day and
+  # 15/minute.
   version: "0.66.0"
   model: gemini-3.5-flash-lite
-# Top-level AWF cap on model requests (the default is 500). A normal run makes
-# about 9 requests; 12 leaves room for a retry and stops a runaway loop from
-# spending the 500 a day that Flash Lite allows.
+# Top-level AWF cap on model requests (the default is 500). Test runs made 4 to
+# 9 requests; 12 leaves room for a retry and stops a runaway loop from spending
+# the 500 a day that Flash Lite allows.
 max-turns: 12
 features:
   # actionlint (as pinned by this repo's MegaLinter) doesn't yet recognize
@@ -106,13 +107,13 @@ safe-outputs:
 
 # Issue Triage
 
-Classify issue #${{ github.event.issue.number || github.event.inputs.issue_number }} against the label taxonomy in
-`.github/labels.yml`, then bring its `kind:*`, `area:*`, and `status:*` labels
-to match exactly one of the three outcomes below. Never modify the issue
-title or body. This run can be started by a new comment, an
-edit, or a manual dispatch, so classify from the title, the body, and the reporter's replies in the
-comments together. A reply to the needs-information request may supply the
-missing detail.
+Classify issue #${{ github.event.issue.number || github.event.inputs.issue_number }}
+against the label taxonomy in `.github/labels.yml`, then bring its `kind:*`,
+`area:*`, and `status:*` labels to match exactly one of the three outcomes
+below. Never modify the issue title or body. This run can be started by a new
+comment, an edit, or a manual dispatch, so classify from the title, the body,
+and the reporter's replies in the comments together. A reply to the
+needs-information request may supply the missing detail.
 
 ## Tools
 
@@ -156,8 +157,9 @@ combination is the `jq ... | safeoutputs add_comment .` pipe above.
 
 ## Steps
 
-1. Fetch issue #${{ github.event.issue.number || github.event.inputs.issue_number }} (its title, body, and its
-   current labels) with `github issue_read` as described under Tools. If you
+1. Fetch issue #${{ github.event.issue.number || github.event.inputs.issue_number }}
+   (its title, body, and its current labels) with `github issue_read` as
+   described under Tools. If you
    cannot fetch it, call `report_incomplete` with the reason and stop. Never
    call `noop` for this, because it hides the failure. If the `comments`
    count in the response is present and non-zero, also fetch every page of
