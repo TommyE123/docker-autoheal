@@ -85,7 +85,7 @@ INCOMPLETE_INFO_CASES = [
 ]
 
 
-def make_container(
+def make_container(  # noqa: PLR0913 - keyword-only options mirror the info dict fields
     name: str = "web",
     *,
     container_id: str = "a" * 64,
