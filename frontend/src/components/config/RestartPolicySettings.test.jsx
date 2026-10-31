@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import RestartPolicySettings from "./RestartPolicySettings";
 
@@ -52,6 +52,29 @@ describe("RestartPolicySettings", () => {
     expect(onConfigChange).toHaveBeenCalledWith({
       ...config,
       respect_manual_stop: false,
+    });
+  });
+
+  it.each([
+    ["Cooldown (seconds)", "cooldown_seconds", "20"],
+    ["Max Restarts", "max_restarts", "5"],
+    ["Max Restarts Window (seconds)", "max_restarts_window_seconds", "900"],
+  ])("reports a changed %s as a number", (label, field, value) => {
+    const onConfigChange = vi.fn();
+
+    render(
+      <RestartPolicySettings
+        config={config}
+        onConfigChange={onConfigChange}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(label), { target: { value } });
+
+    expect(onConfigChange).toHaveBeenCalledWith({
+      ...config,
+      [field]: Number(value),
     });
   });
 });

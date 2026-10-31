@@ -443,7 +443,7 @@ function ContainersPage() {
                   </tr>
                   <tr>
                     <th>Exit Code:</th>
-                    <td>{modalContainer.exit_code || "N/A"}</td>
+                    <td>{modalContainer.exit_code ?? "N/A"}</td>
                   </tr>
                   <tr>
                     <th>Restart Count:</th>

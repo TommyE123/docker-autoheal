@@ -9,12 +9,14 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 jobs:
   sync-labels:
     name: Sync labels.yml to GitHub
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write # Creates and updates labels
     steps:
       - name: Checkout labels config
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -22,6 +24,7 @@ jobs:
           sparse-checkout: |
             .github/labels.yml
           sparse-checkout-cone-mode: false
+          persist-credentials: false
 
       # Creates/updates the kind:*, area:*, status:* labels by exact name
       # only - labels.yml intentionally has no `aliases`, since renaming an

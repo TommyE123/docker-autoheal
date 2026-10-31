@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   render,
   screen,
@@ -63,6 +63,10 @@ const multipleEvents = [
 beforeEach(() => {
   vi.clearAllMocks();
   getContainers.mockResolvedValue({ data: [] });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("EventsPage", () => {
@@ -576,5 +580,121 @@ describe("EventsPage", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 
     consoleErrorSpy.mockRestore();
+  });
+
+  describe("alerts and fallbacks", () => {
+    const clearAllEvents = async (user) => {
+      await user.click(screen.getByRole("button", { name: /clear all/i }));
+      await user.click(
+        screen.getByRole("button", { name: /clear all events/i }),
+      );
+    };
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it.each([
+      ["success", () => clearEvents.mockResolvedValue({}), 3000],
+      ["failure", () => clearEvents.mockRejectedValue(new Error("no")), 5000],
+    ])(
+      "auto-dismisses the %s alert after its timeout",
+      async (_name, arrange, timeout) => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+        getEvents.mockResolvedValue({ data: sampleEvents });
+        arrange();
+
+        render(<EventsPage />);
+        await screen.findByText("web-app");
+        await clearAllEvents(user);
+        expect(await screen.findByRole("alert")).toBeInTheDocument();
+
+        act(() => {
+          vi.advanceTimersByTime(timeout + 1);
+        });
+
+        await waitFor(() =>
+          expect(document.querySelector(".alert-floating")).toBeNull(),
+        );
+      },
+    );
+
+    it("dismisses an alert when its close button is clicked", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      const user = userEvent.setup();
+      getEvents.mockResolvedValue({ data: sampleEvents });
+      clearEvents.mockRejectedValue(new Error("no"));
+
+      render(<EventsPage />);
+      await screen.findByText("web-app");
+      await clearAllEvents(user);
+      await screen.findByText(/failed to clear events/i);
+
+      await user.click(screen.getByRole("button", { name: /close alert/i }));
+
+      expect(
+        screen.queryByText(/failed to clear events/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it("logs and carries on when the container list cannot be loaded", async () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      getEvents.mockResolvedValue({ data: sampleEvents });
+      getContainers.mockRejectedValue(new Error("containers down"));
+
+      render(<EventsPage />);
+
+      expect(await screen.findByText("web-app")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          "Failed to load containers:",
+          expect.any(Error),
+        ),
+      );
+    });
+
+    it("renders events with an unrecognised type and status using fallbacks", async () => {
+      getEvents.mockResolvedValue({
+        data: [
+          {
+            ...sampleEvents[0],
+            event_type: "mystery",
+            status: "weird",
+          },
+        ],
+      });
+
+      render(<EventsPage />);
+
+      expect(await screen.findByText("weird")).toHaveClass("bg-secondary");
+      expect(document.querySelector(".bi-info-circle")).not.toBeNull();
+    });
+  });
+
+  it("refetches on visibilitychange only while the tab is visible", async () => {
+    getEvents.mockResolvedValue({ data: sampleEvents });
+    render(<EventsPage />);
+    await screen.findByText("web-app");
+    const hidden = vi.spyOn(document, "hidden", "get");
+    const callsBefore = getEvents.mock.calls.length;
+
+    try {
+      hidden.mockReturnValue(false);
+      document.dispatchEvent(new Event("visibilitychange"));
+      await waitFor(() =>
+        expect(getEvents).toHaveBeenCalledTimes(callsBefore + 1),
+      );
+
+      hidden.mockReturnValue(true);
+      document.dispatchEvent(new Event("visibilitychange"));
+      await act(async () => {});
+      expect(getEvents).toHaveBeenCalledTimes(callsBefore + 1);
+    } finally {
+      hidden.mockRestore();
+    }
   });
 });

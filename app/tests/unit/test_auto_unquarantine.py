@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from app.monitor.monitoring_engine import QUARANTINE_STABLE_CHECKS
+from app.monitor.recovery import QUARANTINE_STABLE_CHECKS
 from app.tests.unit.conftest import until_stable
 
 
@@ -29,21 +29,23 @@ class TestAutoUnquarantine:
 
         try:
             # Patch the data directory
-            with patch.object(ConfigManager, "DATA_DIR", temp_dir):
-                with patch.object(ConfigManager, "_ensure_data_directory"):
-                    manager = ConfigManager.__new__(ConfigManager)
-                    manager.DATA_DIR = temp_dir
-                    manager._lock = __import__("threading").RLock()
-                    manager._quarantined_containers = set()
+            with (
+                patch.object(ConfigManager, "DATA_DIR", temp_dir),
+                patch.object(ConfigManager, "_ensure_data_directory"),
+            ):
+                manager = ConfigManager.__new__(ConfigManager)
+                manager.DATA_DIR = temp_dir
+                manager._lock = __import__("threading").RLock()
+                manager._quarantined_containers = set()
 
-                    # Test quarantine operations
-                    manager._quarantined_containers.add("test-container-1")
-                    assert manager.is_quarantined("test-container-1")
-                    assert not manager.is_quarantined("test-container-2")
+                # Test quarantine operations
+                manager._quarantined_containers.add("test-container-1")
+                assert manager.is_quarantined("test-container-1")
+                assert not manager.is_quarantined("test-container-2")
 
-                    # Test unquarantine
-                    manager._quarantined_containers.discard("test-container-1")
-                    assert not manager.is_quarantined("test-container-1")
+                # Test unquarantine
+                manager._quarantined_containers.discard("test-container-1")
+                assert not manager.is_quarantined("test-container-1")
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -169,7 +171,7 @@ class TestAutoUnquarantine:
                 side_effect=mock_to_thread,
             ),
         ):
-            # Setup: container is quarantined by stable_id
+            # Given a quarantined container by stable_id
             mock_config.is_maintenance_mode.return_value = False
             mock_config.is_quarantined.side_effect = lambda x: x == "test_stable_id"
             mock_config.get_config.return_value = Mock(
@@ -237,7 +239,7 @@ class TestAutoUnquarantine:
                 side_effect=mock_to_thread,
             ),
         ):
-            # Setup: container is quarantined
+            # Given a quarantined container
             mock_config.is_maintenance_mode.return_value = False
             mock_config.is_quarantined.side_effect = lambda x: x == "test_stable_id"
             mock_config.get_config.return_value = Mock(monitor=Mock(interval_seconds=30))

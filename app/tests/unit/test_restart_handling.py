@@ -44,7 +44,7 @@ class TestRestartDecision:
 
         assert docker_client.restart_calls == ["web"]
         assert config_manager.get_restart_count("web", 600) == 1
-        assert "web" in engine._last_restart_times
+        assert "web" in engine._recovery.last_restart_times
 
         restarts = events_of_type("restart")
         assert len(restarts) == 1
@@ -80,7 +80,7 @@ class TestRestartDecision:
 
         assert config_manager.get_restart_count("stack_web", 600) == 1
         assert config_manager.get_restart_count("stack-web-1", 600) == 0
-        assert "stack_web" in engine._last_restart_times
+        assert "stack_web" in engine._recovery.last_restart_times
 
 
 @pytest.mark.asyncio
@@ -108,7 +108,7 @@ class TestFailedRestart:
         await after_backoff(engine, engine._handle_container_restart, container, info, "unhealthy")
 
         assert config_manager.get_restart_count("web", 600) == 1
-        assert "web" in engine._last_restart_times
+        assert "web" in engine._recovery.last_restart_times
 
     async def test_failed_restart_does_not_reset_backoff(
         self, engine, docker_client, update_config
@@ -121,7 +121,7 @@ class TestFailedRestart:
         await after_backoff(engine, engine._handle_container_restart, container, info, "unhealthy")
 
         assert docker_client.restart_calls == ["web"]
-        assert engine._backoff_delays["web"] == 20
+        assert engine._recovery.backoff_delays["web"] == 20
 
 
 @pytest.mark.asyncio
@@ -131,7 +131,7 @@ class TestCooldown:
     async def test_restart_suppressed_during_cooldown(self, engine, docker_client):
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
-        engine._last_restart_times["web"] = datetime.now(UTC)
+        engine._recovery.last_restart_times["web"] = datetime.now(UTC)
 
         await engine._handle_container_restart(container, info, "unhealthy")
 
@@ -145,7 +145,7 @@ class TestCooldown:
         update_config(lambda c: setattr(c.restart, "cooldown_seconds", 60))
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
-        engine._last_restart_times["web"] = datetime.now(UTC) - timedelta(seconds=61)
+        engine._recovery.last_restart_times["web"] = datetime.now(UTC) - timedelta(seconds=61)
 
         await after_backoff(engine, engine._handle_container_restart, container, info, "unhealthy")
 
@@ -352,12 +352,12 @@ class TestRestartThresholdAndQuarantine:
 
 def scheduled_delay(engine, recovery_id: str) -> float:
     """Seconds from now until the engine allows the next restart of ``recovery_id``."""
-    return (engine._next_allowed_restart[recovery_id] - datetime.now(UTC)).total_seconds()
+    return (engine._recovery.next_allowed_restart[recovery_id] - datetime.now(UTC)).total_seconds()
 
 
 def elapse_backoff(engine, recovery_id: str) -> None:
     """Pretend the backoff wait recorded for ``recovery_id`` has run out."""
-    engine._next_allowed_restart[recovery_id] = datetime.now(UTC) - timedelta(seconds=1)
+    engine._recovery.next_allowed_restart[recovery_id] = datetime.now(UTC) - timedelta(seconds=1)
 
 
 @pytest.mark.asyncio
@@ -390,7 +390,7 @@ class TestRestartBackoff:
         await engine._handle_container_restart(container, info, "unhealthy")
 
         assert docker_client.restart_calls == ["web"]
-        assert "web" not in engine._next_allowed_restart
+        assert "web" not in engine._recovery.next_allowed_restart
 
     async def test_a_new_failure_after_a_restart_waits_for_an_escalated_backoff(
         self, engine, docker_client, update_config
@@ -411,7 +411,7 @@ class TestRestartBackoff:
         container, info = make_container(name="web", status="exited", exit_code=1)
         docker_client.add_container(container, info)
         await engine._check_single_container(container)
-        assert "web" in engine._next_allowed_restart
+        assert "web" in engine._recovery.next_allowed_restart
 
         healthy_info = {
             **info,
@@ -420,7 +420,7 @@ class TestRestartBackoff:
         }
         docker_client._info[container.id] = healthy_info
         await engine._check_single_container(container)
-        assert "web" not in engine._next_allowed_restart
+        assert "web" not in engine._recovery.next_allowed_restart
 
         docker_client._info[container.id] = info  # fails again later
         await engine._check_single_container(container)
@@ -452,7 +452,7 @@ class TestRestartBackoff:
         await engine._check_single_container(container)
 
         assert docker_client.restart_calls == ["web"]  # restarted at once, no backoff
-        assert "web" not in engine._next_allowed_restart
+        assert "web" not in engine._recovery.next_allowed_restart
 
         update_config(lambda c: setattr(c.restart.backoff, "enabled", True))
         await engine._check_single_container(container)
@@ -467,7 +467,7 @@ class TestRestartBackoff:
         container, info = make_container(name="web", status="exited", exit_code=1)
         docker_client.add_container(container, info)
         await engine._check_single_container(container)
-        assert "web" in engine._next_allowed_restart
+        assert "web" in engine._recovery.next_allowed_restart
         config_manager.quarantine_container("web")
         docker_client._info[container.id] = {
             **info,
@@ -478,8 +478,8 @@ class TestRestartBackoff:
         await until_stable(engine._check_containers)
 
         assert config_manager.is_quarantined("web") is False
-        assert "web" not in engine._next_allowed_restart
-        assert engine._restart_wait_owner == {}
+        assert "web" not in engine._recovery.next_allowed_restart
+        assert engine._recovery.restart_wait_owner == {}
 
     async def test_backoff_is_not_reset_by_a_successful_restart_call(self, engine, docker_client):
         """Issue #433: restart() returning says nothing about the container staying up."""
@@ -489,7 +489,7 @@ class TestRestartBackoff:
         await after_backoff(engine, engine._handle_container_restart, container, info, "unhealthy")
 
         assert docker_client.restart_calls == ["web"]
-        assert engine._backoff_delays["web"] == 20
+        assert engine._recovery.backoff_delays["web"] == 20
 
     async def test_backoff_escalates_for_a_crash_looping_container(
         self, engine, docker_client, update_config
@@ -527,7 +527,7 @@ class TestRestartBackoff:
             await engine._handle_container_restart(container, info, "unhealthy")
 
         assert delays == pytest.approx([10, 20, 30, 30], abs=1)
-        assert engine._backoff_delays["web"] == 30
+        assert engine._recovery.backoff_delays["web"] == 30
 
     async def test_backoff_cap_below_initial_seconds_bounds_the_first_wait(
         self, engine, docker_client, update_config
@@ -546,7 +546,7 @@ class TestRestartBackoff:
         update_config(lambda c: setattr(c.restart.backoff, "max_seconds", 30))
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
-        engine._backoff_delays["web"] = 160
+        engine._recovery.backoff_delays["web"] = 160
 
         await engine._handle_container_restart(container, info, "unhealthy")
 
@@ -557,12 +557,15 @@ class TestRestartBackoff:
     ):
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
-        engine._backoff_delays["web"] = 80
-        engine._healthy_since["web"] = ("a" * 64, datetime.now(UTC) - timedelta(seconds=81))
+        engine._recovery.backoff_delays["web"] = 80
+        engine._recovery.healthy_since["web"] = (
+            "a" * 64,
+            datetime.now(UTC) - timedelta(seconds=81),
+        )
 
         await engine._check_single_container(container)
 
-        assert engine._backoff_delays["web"] == 10  # reset to initial_seconds
+        assert engine._recovery.backoff_delays["web"] == 10  # reset to initial_seconds
 
     async def test_brief_health_between_crash_loop_restarts_does_not_reset_backoff(
         self, engine, docker_client
@@ -570,46 +573,52 @@ class TestRestartBackoff:
         """A restarted container is running for a moment even when it keeps crashing."""
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
-        engine._backoff_delays["web"] = 80
-        engine._healthy_since["web"] = ("a" * 64, datetime.now(UTC) - timedelta(seconds=5))
+        engine._recovery.backoff_delays["web"] = 80
+        engine._recovery.healthy_since["web"] = ("a" * 64, datetime.now(UTC) - timedelta(seconds=5))
 
         await engine._check_single_container(container)
 
-        assert engine._backoff_delays["web"] == 80
+        assert engine._recovery.backoff_delays["web"] == 80
 
     async def test_first_healthy_evaluation_starts_the_healthy_period(self, engine, docker_client):
         """Time since the last restart is not time spent healthy."""
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
-        engine._backoff_delays["web"] = 80
-        engine._last_restart_times["web"] = datetime.now(UTC) - timedelta(seconds=1000)
+        engine._recovery.backoff_delays["web"] = 80
+        engine._recovery.last_restart_times["web"] = datetime.now(UTC) - timedelta(seconds=1000)
 
         await engine._check_single_container(container)
 
-        assert engine._backoff_delays["web"] == 80
-        assert "web" in engine._healthy_since
+        assert engine._recovery.backoff_delays["web"] == 80
+        assert "web" in engine._recovery.healthy_since
 
     async def test_unhealthy_evaluation_restarts_the_healthy_period(self, engine, docker_client):
         container, info = make_container(name="web", status="exited", exit_code=1)
         docker_client.add_container(container, info)
-        engine._backoff_delays["web"] = 80
-        engine._healthy_since["web"] = ("a" * 64, datetime.now(UTC) - timedelta(seconds=1000))
+        engine._recovery.backoff_delays["web"] = 80
+        engine._recovery.healthy_since["web"] = (
+            "a" * 64,
+            datetime.now(UTC) - timedelta(seconds=1000),
+        )
 
         await engine._check_single_container(container)  # fails 79s in, say
 
-        assert "web" not in engine._healthy_since
-        assert engine._backoff_delays["web"] == 80
+        assert "web" not in engine._recovery.healthy_since
+        assert engine._recovery.backoff_delays["web"] == 80
 
     async def test_recreated_container_starts_a_new_healthy_period(self, engine, docker_client):
         container, info = make_container(name="web", container_id="c" * 64)
         docker_client.add_container(container, info)
-        engine._backoff_delays["web"] = 80
-        engine._healthy_since["web"] = ("a" * 64, datetime.now(UTC) - timedelta(seconds=1000))
+        engine._recovery.backoff_delays["web"] = 80
+        engine._recovery.healthy_since["web"] = (
+            "a" * 64,
+            datetime.now(UTC) - timedelta(seconds=1000),
+        )
 
         await engine._check_single_container(container)
 
-        assert engine._backoff_delays["web"] == 80
-        assert engine._healthy_since["web"][0] == "c" * 64
+        assert engine._recovery.backoff_delays["web"] == 80
+        assert engine._recovery.healthy_since["web"][0] == "c" * 64
 
     async def test_healthy_period_is_forgotten_when_the_container_disappears(
         self, engine, docker_client
@@ -617,36 +626,39 @@ class TestRestartBackoff:
         other, other_info = make_container(name="db", container_id="b" * 64)
         docker_client.add_container(other, other_info)
         now = datetime.now(UTC)
-        engine._healthy_since.update({"web": ("a" * 64, now), "db": ("b" * 64, now)})
+        engine._recovery.healthy_since.update({"web": ("a" * 64, now), "db": ("b" * 64, now)})
 
         await engine._check_containers()
 
-        assert "web" not in engine._healthy_since
-        assert "db" in engine._healthy_since
+        assert "web" not in engine._recovery.healthy_since
+        assert "db" in engine._recovery.healthy_since
 
     async def test_healthy_period_is_forgotten_when_the_container_is_no_longer_monitored(
         self, engine, docker_client, update_config
     ):
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
-        engine._healthy_since["web"] = ("a" * 64, datetime.now(UTC))
+        engine._recovery.healthy_since["web"] = ("a" * 64, datetime.now(UTC))
         update_config(lambda c: c.containers.excluded.append("web"))
 
         await engine._check_single_container(container)
 
-        assert "web" not in engine._healthy_since
+        assert "web" not in engine._recovery.healthy_since
 
     async def test_cleanly_stopped_container_does_not_reset_backoff(self, engine, docker_client):
         """Not restarting a manual stop is not the same as the container having recovered."""
         container, info = make_container(name="web", status="exited", exit_code=0)
         docker_client.add_container(container, info)
-        engine._backoff_delays["web"] = 80
-        engine._healthy_since["web"] = ("a" * 64, datetime.now(UTC) - timedelta(seconds=1000))
+        engine._recovery.backoff_delays["web"] = 80
+        engine._recovery.healthy_since["web"] = (
+            "a" * 64,
+            datetime.now(UTC) - timedelta(seconds=1000),
+        )
 
         await engine._check_single_container(container)
 
-        assert engine._backoff_delays["web"] == 80
-        assert "web" not in engine._healthy_since
+        assert engine._recovery.backoff_delays["web"] == 80
+        assert "web" not in engine._recovery.healthy_since
 
     async def test_healthy_container_does_not_reset_another_containers_backoff(
         self, engine, docker_client
@@ -658,15 +670,17 @@ class TestRestartBackoff:
         docker_client.add_container(healthy, healthy_info)
         docker_client.add_container(failing, failing_info)
         long_ago = datetime.now(UTC) - timedelta(seconds=1000)
-        engine._backoff_delays.update({"web": 80, "db": 80})
-        engine._healthy_since.update({"web": ("a" * 64, long_ago), "db": ("b" * 64, long_ago)})
+        engine._recovery.backoff_delays.update({"web": 80, "db": 80})
+        engine._recovery.healthy_since.update(
+            {"web": ("a" * 64, long_ago), "db": ("b" * 64, long_ago)}
+        )
         await engine._check_single_container(failing)  # db waits out a backoff
 
         await engine._check_single_container(healthy)
 
-        assert engine._backoff_delays["web"] == 10
-        assert engine._backoff_delays["db"] == 80
-        assert "db" in engine._next_allowed_restart
+        assert engine._recovery.backoff_delays["web"] == 10
+        assert engine._recovery.backoff_delays["db"] == 80
+        assert "db" in engine._recovery.next_allowed_restart
 
     async def test_backoff_grows_while_restarts_keep_failing(
         self, engine, docker_client, update_config
@@ -686,7 +700,7 @@ class TestRestartBackoff:
 
         assert delays == pytest.approx([10, 20, 40], abs=1)
         assert docker_client.restart_calls == ["web"] * 3
-        assert engine._backoff_delays["web"] == 80
+        assert engine._recovery.backoff_delays["web"] == 80
 
     async def test_backoff_multiplier_is_configurable(self, engine, docker_client, update_config):
         def _configure(config):
@@ -732,8 +746,8 @@ class TestRestartBackoff:
 
         assert config_manager.is_quarantined("web") is True
         assert docker_client.restart_calls == []
-        assert engine._next_allowed_restart == {}
-        assert engine._restart_wait_owner == {}
+        assert engine._recovery.next_allowed_restart == {}
+        assert engine._recovery.restart_wait_owner == {}
 
 
 @pytest.mark.asyncio
@@ -773,7 +787,7 @@ class TestBackoffDoesNotStallMonitoring:
 
         assert evaluated == ["db", "api"]  # "api" was reached in the same cycle
         assert docker_client.restart_calls == []  # both are still waiting out their backoff
-        assert set(engine._next_allowed_restart) == {"db", "api"}
+        assert set(engine._recovery.next_allowed_restart) == {"db", "api"}
 
         # Once the waits have run out, the next cycle restarts both.
         elapse_backoff(engine, "db")
@@ -781,8 +795,8 @@ class TestBackoffDoesNotStallMonitoring:
         await asyncio.wait_for(engine._check_containers(), timeout=5)
 
         assert docker_client.restart_calls == ["db", "api"]
-        assert engine._next_allowed_restart == {}
-        assert engine._restart_wait_owner == {}
+        assert engine._recovery.next_allowed_restart == {}
+        assert engine._recovery.restart_wait_owner == {}
 
 
 @pytest.mark.asyncio
@@ -791,7 +805,9 @@ class TestAbandonedRestartWait:
 
     @staticmethod
     def _assert_consistent(engine):
-        assert set(engine._next_allowed_restart) == set(engine._restart_wait_owner)
+        assert set(engine._recovery.next_allowed_restart) == set(
+            engine._recovery.restart_wait_owner
+        )
 
     async def test_wait_is_dropped_when_its_container_disappears(self, engine, docker_client):
         container, info = make_container(name="web", status="exited", exit_code=1)
@@ -799,24 +815,24 @@ class TestAbandonedRestartWait:
         docker_client.add_container(container, info)
         docker_client.add_container(bystander, bystander_info)
         await engine._check_containers()
-        assert "web" in engine._next_allowed_restart
+        assert "web" in engine._recovery.next_allowed_restart
 
         docker_client.remove_container(container)
         await engine._check_containers()
 
-        assert engine._next_allowed_restart == {}
-        assert engine._restart_wait_owner == {}
+        assert engine._recovery.next_allowed_restart == {}
+        assert engine._recovery.restart_wait_owner == {}
         assert docker_client.restart_calls == []
 
     async def test_wait_is_kept_while_its_container_is_still_listed(self, engine, docker_client):
         container, info = make_container(name="web", status="exited", exit_code=1)
         docker_client.add_container(container, info)
         await engine._check_containers()
-        deadline = engine._next_allowed_restart["web"]
+        deadline = engine._recovery.next_allowed_restart["web"]
 
         await engine._check_containers()
 
-        assert engine._next_allowed_restart == {"web": deadline}
+        assert engine._recovery.next_allowed_restart == {"web": deadline}
         self._assert_consistent(engine)
 
     async def test_wait_is_not_dropped_when_listing_fails(self, engine, docker_client):
@@ -827,7 +843,7 @@ class TestAbandonedRestartWait:
 
         await engine._check_containers()
 
-        assert "web" in engine._next_allowed_restart
+        assert "web" in engine._recovery.next_allowed_restart
         self._assert_consistent(engine)
 
     async def test_wait_is_not_dropped_when_listing_returns_nothing(
@@ -837,12 +853,12 @@ class TestAbandonedRestartWait:
         container, info = make_container(name="web", status="exited", exit_code=1)
         docker_client.add_container(container, info)
         await engine._check_containers()
-        deadline = engine._next_allowed_restart["web"]
+        deadline = engine._recovery.next_allowed_restart["web"]
         monkeypatch.setattr(docker_client, "list_containers", lambda all_containers=False: [])
 
         await engine._check_containers()
 
-        assert engine._next_allowed_restart == {"web": deadline}
+        assert engine._recovery.next_allowed_restart == {"web": deadline}
         self._assert_consistent(engine)
 
     async def test_wait_is_dropped_when_its_container_stops_being_monitored(
@@ -851,13 +867,13 @@ class TestAbandonedRestartWait:
         container, info = make_container(name="web", status="exited", exit_code=1)
         docker_client.add_container(container, info)
         await engine._check_containers()
-        assert "web" in engine._next_allowed_restart
+        assert "web" in engine._recovery.next_allowed_restart
 
         update_config(lambda c: c.containers.excluded.append("web"))
         await engine._check_containers()
 
-        assert engine._next_allowed_restart == {}
-        assert engine._restart_wait_owner == {}
+        assert engine._recovery.next_allowed_restart == {}
+        assert engine._recovery.restart_wait_owner == {}
         assert docker_client.restart_calls == []
         assert "Error checking container" not in caplog.text  # cleared without raising
 
@@ -880,9 +896,9 @@ class TestAbandonedRestartWait:
         )
         docker_client.add_container(old, old_info)
         config_manager.record_restart("web")
-        engine._backoff_delays["web"] = 40
+        engine._recovery.backoff_delays["web"] = 40
         last_restart = datetime.now(UTC) - timedelta(hours=1)
-        engine._last_restart_times["web"] = last_restart
+        engine._recovery.last_restart_times["web"] = last_restart
         await engine._check_containers()
         elapse_backoff(engine, "web")  # the predecessor's deadline has run out
 
@@ -895,9 +911,9 @@ class TestAbandonedRestartWait:
 
         assert docker_client.restart_calls == []  # it did not restart straight away
         assert scheduled_delay(engine, "web") == pytest.approx(40, abs=1)  # escalation kept
-        assert engine._restart_wait_owner == {"web": new.id}
+        assert engine._recovery.restart_wait_owner == {"web": new.id}
         assert config_manager.get_total_restart_count("web") == 1  # history kept
-        assert engine._last_restart_times["web"] == last_restart  # cooldown history kept
+        assert engine._recovery.last_restart_times["web"] == last_restart  # cooldown history kept
         self._assert_consistent(engine)
 
         elapse_backoff(engine, "web")
@@ -1021,3 +1037,139 @@ async def test_restart_is_skipped_when_container_info_lacks_identifiers(
     assert [r.getMessage() for r in caplog.records] == [
         "Not restarting container with incomplete identifiers: " + logged
     ]
+
+
+@pytest.mark.asyncio
+class TestStaleRestartWait:
+    """
+    A wait is only kept while its owner is seen failing every cycle (#15).
+
+    After a gap (quarantine, maintenance mode, an unavailable Docker daemon) the failure
+    was not observed continuously, so the next failure starts a fresh wait instead of
+    restarting at once on a deadline that ran out long ago. The stale wait does not
+    escalate the backoff.
+    """
+
+    @staticmethod
+    def _failing_web(docker_client):
+        container, info = make_container(name="web", status="exited", exit_code=1)
+        docker_client.add_container(container, info)
+        return container
+
+    @staticmethod
+    def _assert_fresh_wait(engine, docker_client):
+        assert docker_client.restart_calls == []
+        assert scheduled_delay(engine, "web") == pytest.approx(10, abs=1)
+        assert engine._recovery.backoff_delays == {}  # the stale wait was not consumed
+
+    async def test_wait_is_kept_while_failures_are_observed_every_cycle(
+        self, engine, docker_client
+    ):
+        self._failing_web(docker_client)
+        await engine._check_containers()
+        deadline = engine._recovery.next_allowed_restart["web"]
+
+        await engine._check_containers()
+        assert engine._recovery.next_allowed_restart == {"web": deadline}
+        assert docker_client.restart_calls == []
+
+        elapse_backoff(engine, "web")
+        await engine._check_containers()
+        assert docker_client.restart_calls == ["web"]
+
+    async def test_unquarantine_after_a_quarantine_starts_a_fresh_wait(self, engine, docker_client):
+        self._failing_web(docker_client)
+        await engine._check_containers()  # schedules the wait
+
+        config_manager.quarantine_container("web")  # e.g. max_restarts was lowered
+        await engine._check_containers()
+        await engine._check_containers()
+        config_manager.unquarantine_container("web")
+        elapse_backoff(engine, "web")
+        await engine._check_containers()
+
+        self._assert_fresh_wait(engine, docker_client)
+
+    async def test_maintenance_mode_gap_starts_a_fresh_wait(self, engine, docker_client):
+        self._failing_web(docker_client)
+        await engine._check_containers()
+
+        config_manager.enable_maintenance_mode()
+        await engine._check_containers()
+        config_manager.disable_maintenance_mode()
+        elapse_backoff(engine, "web")
+        await engine._check_containers()
+
+        self._assert_fresh_wait(engine, docker_client)
+
+    async def test_failed_listing_gap_starts_a_fresh_wait(self, engine, docker_client):
+        self._failing_web(docker_client)
+        await engine._check_containers()
+
+        docker_client.list_containers_error = RuntimeError("docker daemon unavailable")
+        await engine._check_containers()
+        docker_client.list_containers_error = None
+        elapse_backoff(engine, "web")
+        await engine._check_containers()
+
+        self._assert_fresh_wait(engine, docker_client)
+
+    async def test_empty_listing_gap_starts_a_fresh_wait(self, engine, docker_client, monkeypatch):
+        container = self._failing_web(docker_client)
+        await engine._check_containers()
+
+        with monkeypatch.context() as patched:
+            patched.setattr(docker_client, "list_containers", lambda all_containers=False: [])
+            await engine._check_containers()
+        assert container in docker_client.list_containers(all_containers=True)
+        elapse_backoff(engine, "web")
+        await engine._check_containers()
+
+        self._assert_fresh_wait(engine, docker_client)
+
+    async def test_fresh_wait_after_a_gap_keeps_the_escalated_delay(self, engine, docker_client):
+        self._failing_web(docker_client)
+        engine._recovery.backoff_delays["web"] = 40
+        await engine._check_containers()
+
+        config_manager.enable_maintenance_mode()
+        await engine._check_containers()
+        config_manager.disable_maintenance_mode()
+        elapse_backoff(engine, "web")
+        await engine._check_containers()
+
+        assert docker_client.restart_calls == []
+        assert scheduled_delay(engine, "web") == pytest.approx(40, abs=1)
+        assert engine._recovery.backoff_delays == {"web": 40}  # escalation kept, not advanced
+
+    async def test_stale_wait_is_replaced_and_owned_by_the_current_container(
+        self, engine, docker_client
+    ):
+        container = self._failing_web(docker_client)
+        await engine._check_containers()
+        config_manager.enable_maintenance_mode()
+        await engine._check_containers()
+        config_manager.disable_maintenance_mode()
+
+        await engine._check_containers()
+
+        assert engine._recovery.restart_wait_owner == {"web": container.id}
+        assert (
+            set(engine._recovery.restart_wait_seen)
+            == set(engine._recovery.next_allowed_restart)
+            == {"web"}
+        )
+        assert engine._recovery.restart_wait_seen["web"] == engine._recovery.check_cycle
+
+    async def test_clearing_a_wait_forgets_when_it_was_last_seen(self, engine, docker_client):
+        container, info = make_container(name="web", status="exited", exit_code=1)
+        docker_client.add_container(container, info)
+        await engine._check_containers()
+        assert engine._recovery.restart_wait_seen
+
+        docker_client.remove_container(container)
+        bystander, bystander_info = make_container(name="db", container_id="d" * 64)
+        docker_client.add_container(bystander, bystander_info)
+        await engine._check_containers()
+
+        assert engine._recovery.restart_wait_seen == {}

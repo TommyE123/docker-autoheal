@@ -16,6 +16,8 @@ name: Weekly Release Please auto-merge
 on:
   workflow_dispatch:
 
+permissions: {}
+
 concurrency:
   group: release-please-auto-merge
   cancel-in-progress: false
@@ -25,8 +27,9 @@ jobs:
     name: Auto-merge the Release PR
     runs-on: ubuntu-latest
 
-    permissions:
-      pull-requests: write
+    # No GITHUB_TOKEN permissions: gh authenticates with GH_TOKEN below (the
+    # RELEASE_PLEASE_TOKEN PAT), so the default token is never used.
+    permissions: {}
 
     env:
       # The default GITHUB_TOKEN is deliberately not used here: GitHub can

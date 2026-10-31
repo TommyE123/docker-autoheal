@@ -728,7 +728,14 @@ class TestEvents:
         stream = wrapper.get_events(decode=True, filters={"type": "container"})
 
         assert list(stream) == [{"status": "start"}]
-        sdk_client.events.assert_called_once_with(decode=True, filters={"type": "container"})
+        sdk_client.events.assert_called_once_with(
+            decode=True, filters={"type": "container"}, since=None
+        )
+
+    def test_events_passes_since_to_the_sdk(self, wrapper, sdk_client):
+        wrapper.get_events(since=1700000000)
+
+        sdk_client.events.assert_called_once_with(decode=True, filters=None, since=1700000000)
 
     def test_events_returns_none_on_failure(self, wrapper, sdk_client):
         sdk_client.events.side_effect = docker.errors.APIError("boom")

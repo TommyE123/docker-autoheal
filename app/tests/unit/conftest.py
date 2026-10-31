@@ -11,8 +11,10 @@ directory:
 * ``isolated_config_manager`` points the global ``config_manager`` singleton at
   a per-test temporary directory and resets its in-memory state, so every test
   starts from the documented defaults.
-* ``mock_notification_manager`` replaces the global notification manager used
-  by the monitoring engine, so no HTTP requests are ever attempted.
+* ``mock_notification_manager`` replaces ``send_event_notification`` on the global
+  notification manager itself, so every module that imported it (the engine, the
+  API state, the service, and any added later) is covered and no HTTP request is
+  ever attempted.
 * ``recorded_sleeps`` replaces ``asyncio.sleep`` so any sleep is recorded rather
   than actually waited for, keeping tests fast and deterministic.
 """
@@ -21,6 +23,7 @@ import asyncio
 import shutil
 import sys
 import tempfile
+import threading
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -40,7 +43,9 @@ from app.docker_client.docker_client_wrapper import (
     DockerClientWrapper,
     recovery_identifier,
 )
-from app.monitor.monitoring_engine import QUARANTINE_STABLE_CHECKS, MonitoringEngine
+from app.monitor.monitoring_engine import MonitoringEngine
+from app.monitor.recovery import QUARANTINE_STABLE_CHECKS
+from app.notifications.notification_manager import NotificationManager, notification_manager
 
 # ---------------------------------------------------------------------------
 # Fakes
@@ -82,6 +87,7 @@ INCOMPLETE_INFO_CASES = [
 
 def make_container(
     name: str = "web",
+    *,
     container_id: str = "a" * 64,
     status: str = "running",
     labels: dict | None = None,
@@ -149,10 +155,10 @@ async def after_backoff(engine: MonitoringEngine, action, *args) -> None:
     the restart rather than the wait use this instead of sleeping.
     """
     await action(*args)
-    if engine._next_allowed_restart:
+    if engine._recovery.next_allowed_restart:
         elapsed = datetime.now(UTC) - timedelta(seconds=1)
-        for recovery_id in engine._next_allowed_restart:
-            engine._next_allowed_restart[recovery_id] = elapsed
+        for recovery_id in engine._recovery.next_allowed_restart:
+            engine._recovery.next_allowed_restart[recovery_id] = elapsed
         await action(*args)
 
 
@@ -181,6 +187,7 @@ class FakeDockerClient:
         self.reconnect_calls = 0
         self.list_containers_error: Exception | None = None
         self.events: Any = []
+        self.events_since: list[Any] = []
         self.health_results: dict[str, bool] = {}
         self.native_health: dict[str, str | None] = {}
         self.health_check_error: Exception | None = None
@@ -262,10 +269,55 @@ class FakeDockerClient:
             raise self.health_check_error
         return self.native_health.get(container.name)
 
-    def get_events(self, decode: bool = True, filters: Any = None) -> Any:
+    def get_events(self, decode: bool = True, filters: Any = None, since: Any = None) -> Any:
+        self.events_since.append(since)
         if callable(self.events):
             return self.events()
         return self.events
+
+
+class BlockingStream:
+    """An event stream that blocks like Docker's until it is closed."""
+
+    def __init__(self, events=(), close_error=None):
+        self._events = list(events)
+        self._closed = threading.Event()
+        self._close_error = close_error
+        self.close_calls = 0
+
+    def __iter__(self):
+        yield from self._events
+        self._closed.wait(timeout=5)
+
+    def close(self):
+        self.close_calls += 1
+        if self._close_error is not None:
+            raise self._close_error
+        self._closed.set()
+
+    def release(self):
+        self._closed.set()
+
+
+async def wait_until(condition, within=5.0):
+    """Yield to the loop until ``condition()`` holds."""
+    deadline = asyncio.get_running_loop().time() + within
+    while not condition():
+        if asyncio.get_running_loop().time() > deadline:
+            raise AssertionError("condition not reached in time")
+        await asyncio.sleep(0.01)
+
+
+async def cancel_and_wait(task, within=10.0):
+    """Cancel a task and wait for it, asserting it ended as cancelled."""
+    task.cancel()
+    done, _ = await asyncio.wait({task}, timeout=within)
+    assert task in done
+    assert task.cancelled()
+
+
+def event_threads():
+    return [t for t in threading.enumerate() if t.name == "docker-events" and t.is_alive()]
 
 
 class FakeUptimeKumaClient:
@@ -386,15 +438,21 @@ def docker_client() -> FakeDockerClient:
 
 
 @pytest.fixture(autouse=True)
-def mock_notification_manager(monkeypatch) -> MagicMock:
-    """Replace the notification manager so no outbound requests are made."""
-    fake = MagicMock()
-    fake.send_event_notification = AsyncMock()
-    monkeypatch.setattr(
-        "app.monitor.monitoring_engine.notification_manager",
-        fake,
-    )
-    return fake
+def mock_notification_manager(monkeypatch) -> NotificationManager:
+    """
+    Stop the notification manager sending anything, and return it.
+
+    ``send_event_notification`` is replaced on the shared singleton itself rather than
+    on one module's reference to it, so a module that imports the singleton by name is
+    covered whichever module it lives in. Tests that need a real manager build their
+    own and patch the module names they exercise.
+
+    The replacement goes into the instance ``__dict__``: ``monkeypatch.setattr`` on an
+    instance would put the original bound method back on teardown and leave it shadowing
+    the class, so a later patch of the class method would not reach the singleton.
+    """
+    monkeypatch.setitem(vars(notification_manager), "send_event_notification", AsyncMock())
+    return notification_manager
 
 
 @pytest.fixture(autouse=True)

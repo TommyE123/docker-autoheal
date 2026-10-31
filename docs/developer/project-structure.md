@@ -15,7 +15,11 @@ docker-autoheal/
 │   ├── docker_client/
 │   │   └── docker_client_wrapper.py  # Thin wrapper around the `docker` SDK
 │   ├── monitor/
-│   │   ├── monitoring_engine.py  # Core monitoring loop, restart/backoff/quarantine logic
+│   │   ├── auto_discovery.py     # Adds labelled containers to monitoring (startup scan, start-event listener)
+│   │   ├── health.py             # Whether a container needs a restart (exit status, health checks)
+│   │   ├── monitoring_engine.py  # Core monitoring loop, restarts and quarantine
+│   │   ├── recovery.py           # In-memory cooldown, backoff, restart-wait and quarantine-release state
+│   │   ├── selection.py          # Which containers are monitored (selected/excluded, labels, filters)
 │   │   └── uptime_kuma_monitor.py
 │   ├── notifications/
 │   │   └── notification_manager.py   # Async notification dispatch (Discord/Slack/Telegram/ntfy/Gotify/Pushover/webhook)
@@ -87,7 +91,19 @@ suites (see [Testing](testing.md#legacy-script-triage) for what happened to each
   `docker` SDK: listing containers, restarting/stopping them, HTTP/TCP/exec health checks,
   and reading Docker's native health status.
 - **`app/monitor/monitoring_engine.py`** — the core auto-healing logic described in
-  [Architecture](architecture.md).
+  [Architecture](architecture.md): the monitoring loop, restarts, quarantine, events and
+  notifications.
+- **`app/monitor/recovery.py`** — `RecoveryPolicy`, the synchronous in-memory restart state:
+  cooldown, backoff, pending restart waits, the healthy runs that reset backoff, and the
+  streaks of healthy checks that release a quarantined container.
+- **`app/monitor/auto_discovery.py`** — `AutoDiscovery`, which adds containers carrying the
+  monitoring label to the monitored list, from the startup scan and from Docker start events,
+  including the reconnecting event-stream listener.
+- **`app/monitor/health.py`** — `HealthEvaluator`, which decides from a container's exit status,
+  custom health checks, Docker's native health and the Uptime Kuma monitor whether it needs a
+  restart.
+- **`app/monitor/selection.py`** — the pure function that decides, from configuration and
+  container information, whether a container is monitored.
 - **`app/notifications/notification_manager.py`** — async, queue-based notification
   delivery to external services.
 - **`app/uptime_kuma/`** and **`app/monitor/uptime_kuma_monitor.py`** — the optional
