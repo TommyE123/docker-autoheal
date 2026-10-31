@@ -721,7 +721,9 @@ async def test_process_notification_dispatches_only_to_enabled_known_services(
 
     assert len(fake_session(manager).calls) == 1
     assert fake_session(manager).calls[0]["url"] == "https://example.invalid/webhook"
-    assert any("Unsupported notification type" in r.message for r in caplog.records)
+    assert "Unsupported notification type: carrier-pigeon" in [
+        r.getMessage() for r in caplog.records
+    ]
 
 
 @pytest.mark.asyncio
