@@ -14,7 +14,9 @@ on:
       issue_number:
         description: Number of the issue to triage (an issue, not a pull request)
         required: true
-        type: string
+        # A number, not a free string: the value is rendered into the compiled
+        # safe-outputs JSON config, so it must not carry quotes or other text.
+        type: number
   roles: all
 # Never triage issues authored by Renovate (the Dependency Dashboard). Checking
 # the issue author rather than the actor also covers a person ticking a box on
