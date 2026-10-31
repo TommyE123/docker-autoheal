@@ -156,7 +156,7 @@ so there was no period of running them side by side.
 
 ## Docker build
 
-The main `Dockerfile` builds the frontend in its first stage (Node 24) and copies the
+The main `Dockerfile` builds the frontend in its first stage (Node 26) and copies the
 output into the final Python image — see [Architecture](architecture.md). You don't need
 Node.js installed locally to build or run the published image; it's only needed for
 frontend development.

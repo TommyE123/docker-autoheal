@@ -5,7 +5,7 @@
 - Python 3 matching the version pinned in the `Dockerfile`'s `FROM python:X.Y-slim` line
   (CI tests against exactly that version, read dynamically from the Dockerfile — see
   [Testing](testing.md))
-- Node.js 24 and npm (only needed if you're touching the frontend)
+- Node.js 26 and npm (only needed if you're touching the frontend)
 - Docker and Docker Compose
 
 Everything below can be installed by hand, or you can use the Dev Container, which
@@ -20,7 +20,7 @@ Container**. It also works as a GitHub Codespace.
 
 The container provides:
 
-- Python (matching the pinned base image in `.devcontainer/Dockerfile`) and Node.js 24
+- Python (matching the pinned base image in `.devcontainer/Dockerfile`) and Node.js 26
 - Its own, isolated Docker daemon, via the `docker-in-docker` feature (see
   [Docker isolation](#docker-isolation))
 - The GitHub CLI (`gh`). The `github/gh-aw` extension, for working on the agentic
