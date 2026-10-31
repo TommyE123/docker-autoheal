@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.monitor.health import HealthEvaluator
+from app.monitor.monitoring_engine import MonitoringEngine
 from app.tests.unit.conftest import make_container
 
 if TYPE_CHECKING:
@@ -62,6 +63,20 @@ class TestUptimeKumaDependency:
 class TestEngineHandOff:
     def test_engine_has_no_uptime_kuma_monitor_by_default(self, engine):
         assert engine.uptime_kuma_monitor is None
+
+    async def test_monitor_passed_to_the_engine_constructor_reaches_the_evaluator(
+        self, docker_client
+    ):
+        monitor = kuma_reporting_down()
+        engine = MonitoringEngine(docker_client, uptime_kuma_monitor=monitor)
+        container, info = web_container()
+
+        assert engine.uptime_kuma_monitor is monitor
+        assert await engine._evaluate_container_health(container, info) == (
+            True,
+            "Uptime-Kuma monitor reports DOWN",
+        )
+        monitor.should_restart_from_uptime_kuma.assert_awaited_once_with("web")
 
     async def test_monitor_attached_to_the_engine_reaches_the_evaluator(self, engine):
         monitor = kuma_reporting_down()

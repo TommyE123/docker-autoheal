@@ -136,16 +136,16 @@ class AutoHealService:
             self.docker_client = DockerClientWrapper()
             logger.info("Docker client connected successfully")
 
-            # Initialize monitoring engine
-            logger.info("Initializing monitoring engine...")
-            self.monitoring_engine = MonitoringEngine(self.docker_client)
-
-            # Initialize Uptime-Kuma monitor (independent service that provides status)
+            # Initialize Uptime-Kuma monitor (independent service that provides status).
+            # Built before the engine, which takes it as a dependency; started further down.
             logger.info("Initializing Uptime-Kuma monitor...")
             self.uptime_kuma_monitor = UptimeKumaMonitor()
 
-            # Attach to monitoring engine for API access
-            self.monitoring_engine.uptime_kuma_monitor = self.uptime_kuma_monitor
+            # Initialize monitoring engine
+            logger.info("Initializing monitoring engine...")
+            self.monitoring_engine = MonitoringEngine(
+                self.docker_client, uptime_kuma_monitor=self.uptime_kuma_monitor
+            )
 
             # Initialize API
             init_api(self.docker_client, self.monitoring_engine)
