@@ -33,6 +33,10 @@ if: >-
 permissions:
   contents: read
   issues: read
+# Gives each dispatch its own conclusion concurrency slot; event runs keep
+# sharing one per issue.
+concurrency:
+  job-discriminator: ${{ github.event.issue.number || github.run_id }}
 engine:
   id: gemini
   # Gemini CLI 0.60 to 0.65 under older AWF versions skipped the AWF system
