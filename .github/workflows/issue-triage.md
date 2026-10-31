@@ -6,6 +6,17 @@ on:
     types: [opened, edited, reopened]
   issue_comment:
     types: [created]
+  # Manual run against a chosen issue, so a branch's workflow file can be tested
+  # (issue events always run the default branch's file). On a dispatch
+  # github.event.issue is unset; the issue number comes from the input.
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Number of the issue to triage (an issue, not a pull request)
+        required: true
+        # A number, not a free string: the value is rendered into the compiled
+        # safe-outputs JSON config, so it must not carry quotes or other text.
+        type: number
   roles: all
 # Never triage issues authored by Renovate (the Dependency Dashboard). Checking
 # the issue author rather than the actor also covers a person ticking a box on
@@ -13,6 +24,8 @@ on:
 # to issues (not pull requests) and to comments by the issue's reporter: the
 # workflow's own needs-information comment (a bot) would otherwise retrigger it,
 # and other people's comments would spend Gemini quota without new detail.
+# On workflow_dispatch github.event.issue is unset, so both checks pass and the
+# run proceeds; the dispatcher chooses the issue.
 if: >-
   ${{ github.event.issue.user.login != 'renovate[bot]' &&
   (github.event_name != 'issue_comment' ||
@@ -22,16 +35,28 @@ if: >-
 permissions:
   contents: read
   issues: read
+# One run at a time per issue, whether it came from an event or a dispatch, so
+# two runs cannot read stale labels or both post a needs-information comment.
+# The run_id fallback only applies if neither number is set.
+concurrency:
+  group: "gh-aw-${{ github.workflow }}-${{ github.event.issue.number || github.event.inputs.issue_number || github.run_id }}"
+  job-discriminator: ${{ github.event.issue.number || github.event.inputs.issue_number || github.run_id }}
 engine:
   id: gemini
-  # Gemini CLI >= 0.60.0 skips the AWF system settings file (parent dir not
-  # root-owned) and exits 41 "Invalid auth method selected"; 0.59.0 is the last
-  # good version. See #583. The model is pinned because the default Pro-class
-  # model has no free-tier quota for this key. Flash Lite is used because the
-  # full Flash models are capped at 20 requests/day on the free tier, which one
-  # triage run can exhaust; Flash Lite allows 500/day and 15/minute.
-  version: "0.59.0"
+  # Gemini CLI 0.60 to 0.65 under older AWF versions skipped the AWF system
+  # settings file and exited 41 "Invalid auth method selected" (gh-aw-firewall
+  # #10246, fixed by #10260 in AWF v0.28.70; gh-aw v1.0.1 uses AWF v0.29.0).
+  # 0.66.0 authenticates normally under that AWF. The model is pinned because
+  # the default Pro-class model has no free-tier quota for this key. Flash Lite
+  # is used because the full Flash models are capped at 20 requests/day on the
+  # free tier, which one triage run can exhaust; Flash Lite allows 500/day and
+  # 15/minute.
+  version: "0.66.0"
   model: gemini-3.5-flash-lite
+# Top-level AWF cap on model requests (the default is 500). Test runs made 4 to
+# 9 requests; 12 leaves room for a retry and stops a runaway loop from spending
+# the 500 a day that Flash Lite allows.
+max-turns: 12
 features:
   # actionlint (as pinned by this repo's MegaLinter) doesn't yet recognize
   # the "queue" concurrency key gh-aw emits by default; disable it rather
@@ -39,8 +64,10 @@ features:
   group-concurrency-queue: false
 tools:
   # Explicit shell allow-list, required by strict mode when min-integrity is
-  # none. The prompt needs the github and safeoutputs CLIs, cat/jq for the
-  # comment body, and read-only file inspection.
+  # none. The prompt needs the github and safeoutputs CLIs, jq for the comment
+  # body, and read-only file inspection. Gemini CLI 0.66 denies shell
+  # redirection (> and heredocs) on allowed commands, so files are written with
+  # the write_file tool, not the shell.
   bash: ["cat", "jq", "ls", "find", "grep", "head", "tail", "wc", "github", "safeoutputs"]
   github:
     toolsets: [issues]
@@ -52,11 +79,23 @@ tools:
     min-integrity: none
 safe-outputs:
   threat-detection: false
+  # Every write below is pinned to the issue being triaged: the triggering issue
+  # on an event run, the issue_number input on a dispatch. The agent does not
+  # choose the target, so injected issue text cannot redirect a write to another
+  # issue. Do not use target: "*" here; it would let the agent pick any issue.
+  # A pull request number given to a dispatch is refused only while safe
+  # outputs write with the default GITHUB_TOKEN: pull-requests: false leaves it
+  # without pull request access, so the label write fails (HTTP 403, test run
+  # 41223807050) and nothing changes. A GH_AW_GITHUB_TOKEN secret with pull
+  # request write access would remove that protection, and the issue_read
+  # result carries no pull_request field for the agent to check. Do not add
+  # such a token without also validating the input.
   add-labels:
     allowed: ["kind:*", "area:*", "status:needs-triage", "status:needs-information"]
     create-if-missing: false
     max: 3
     pull-requests: false
+    target: ${{ github.event.issue.number || github.event.inputs.issue_number }}
   remove-labels:
     allowed: ["kind:*", "area:*", "status:needs-triage", "status:needs-information"]
     # Outcome A must be able to remove every stale kind:*, area:*, and
@@ -66,20 +105,22 @@ safe-outputs:
     # set - a lower cap here is a real correctness bug, not a safety limit.
     max: 16
     pull-requests: false
+    target: ${{ github.event.issue.number || github.event.inputs.issue_number }}
   add-comment:
     max: 1
     pull-requests: false
+    target: ${{ github.event.issue.number || github.event.inputs.issue_number }}
 ---
 
 # Issue Triage
 
-Classify issue #${{ github.event.issue.number }} against the label taxonomy in
-`.github/labels.yml`, then bring its `kind:*`, `area:*`, and `status:*` labels
-to match exactly one of the three outcomes below. Never modify the issue
-title or body. This run can be started by a new comment as well as by an
-edit, so classify from the title, the body, and the reporter's replies in the
-comments together. A reply to the needs-information request may supply the
-missing detail.
+Classify issue #${{ github.event.issue.number || github.event.inputs.issue_number }}
+against the label taxonomy in `.github/labels.yml`, then bring its `kind:*`,
+`area:*`, and `status:*` labels to match exactly one of the three outcomes
+below. Never modify the issue title or body. This run can be started by a new
+comment, an edit, or a manual dispatch, so classify from the title, the body,
+and the reporter's replies in the comments together. A reply to the
+needs-information request may supply the missing detail.
 
 ## Tools
 
@@ -98,29 +139,34 @@ you run from the shell:
   `--page 3` and so on only when the current page contains exactly 100
   comments. Stop when a page contains fewer than 100. If a flag is rejected,
   run `github issue_read --help` and use the flags it lists.
-- **Writes: `safeoutputs`**. Pass one JSON object as a single quoted argument:
+- **Writes: `safeoutputs`**. Pass one JSON object as a single quoted argument.
+  Do not pass an issue number: the workflow fixes the target of every write to
+  the issue being triaged, and a write cannot go anywhere else:
   - `safeoutputs add_labels '{"labels":["kind:bug","area:restart"]}'`
   - `safeoutputs remove_labels '{"labels":["status:needs-triage"]}'`
   - `safeoutputs noop '{"message":"..."}'`
   - `safeoutputs report_incomplete '{"reason":"..."}'`
 
 **Comments: `safeoutputs add_comment`.** A comment body can contain
-apostrophes, which break a single-quoted JSON argument. Write the body to a
-file with a quoted heredoc, then build the JSON with `jq` and pipe it in:
+apostrophes, which break a single-quoted JSON argument. Write the body to
+`/tmp/gh-aw/agent/comment.md` with the `write_file` tool (shell redirection and
+heredocs are denied by policy). Then build the JSON with `jq` and pipe it in:
 
 ```bash
-cat <<'EOF' > /tmp/gh-aw/agent/comment.md
-COMMENT TEXT
-EOF
 jq -Rs '{body: .}' /tmp/gh-aw/agent/comment.md | safeoutputs add_comment .
 ```
 
 Keep the `|`. Without it nothing is sent.
 
+Run one command per shell call. Do not join commands with `&&`, `;`, or
+newlines, and do not use redirection (`>`, `<`, heredocs). The only allowed
+combination is the `jq ... | safeoutputs add_comment .` pipe above.
+
 ## Steps
 
-1. Fetch issue #${{ github.event.issue.number }} (its title, body, and its
-   current labels) with `github issue_read` as described under Tools. If you
+1. Fetch issue #${{ github.event.issue.number || github.event.inputs.issue_number }}
+   (its title, body, and its current labels) with `github issue_read` as
+   described under Tools. If you
    cannot fetch it, call `report_incomplete` with the reason and stop. Never
    call `noop` for this, because it hides the failure. If the `comments`
    count in the response is present and non-zero, also fetch every page of
