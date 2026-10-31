@@ -72,6 +72,7 @@ class TestStartStop:
         await engine.start()
         try:
             assert engine._running is True
+            assert engine.is_running is True
             assert isinstance(engine._task, asyncio.Task)
             assert isinstance(engine._event_task, asyncio.Task)
         finally:
@@ -94,6 +95,7 @@ class TestStartStop:
         await engine.stop()
 
         assert engine._running is False
+        assert engine.is_running is False
         assert engine._task.done()
         assert engine._event_task.done()
 
