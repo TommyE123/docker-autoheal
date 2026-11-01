@@ -17,6 +17,7 @@ from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock
 
+import aiohttp
 import pytest
 
 from app.config.config_manager import AutoHealEvent, NotificationService
@@ -1518,7 +1519,7 @@ async def test_test_notification_reports_failure_on_http_error_status(
     result = await manager.test_notification("svc")
 
     assert result["success"] is False
-    assert "not delivered" in result["message"]
+    assert "failed:" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -1532,7 +1533,7 @@ async def test_test_notification_reports_failure_when_request_raises(
     result = await manager.test_notification("svc")
 
     assert result["success"] is False
-    assert "not delivered" in result["message"]
+    assert "failed:" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -1547,7 +1548,7 @@ async def test_test_notification_reports_failure_when_no_session_is_active(
     result = await unstarted.test_notification("svc")
 
     assert result["success"] is False
-    assert "not delivered" in result["message"]
+    assert "failed:" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -1562,7 +1563,7 @@ async def test_test_notification_reports_failure_when_service_is_not_configured(
     result = await manager.test_notification("svc")
 
     assert result["success"] is False
-    assert "not delivered" in result["message"]
+    assert "failed:" in result["message"]
     assert fake_session(manager).calls == []
 
 
@@ -1793,3 +1794,160 @@ async def test_send_pushover_redirect_status_is_failure_despite_accepted_body(
 
     assert delivered is False
     assert any(f"failed with status {status}" in r.getMessage() for r in caplog.records)
+
+
+# --- Safe failure reasons for test notifications (issue #20) -------------------------------
+
+_SECRET_URL = "https://hooks.example.invalid/api/webhooks/SECRET-PATH-TOKEN"
+_SECRET_BODY = "BODY-SECRET-SENTINEL"
+
+_SECRET_SERVICES = {
+    "webhook": NotificationService(
+        name="svc", type="webhook", enabled=True, url=_SECRET_URL, headers={"X-Key": "HDR-SECRET"}
+    ),
+    "discord": NotificationService(name="svc", type="discord", enabled=True, url=_SECRET_URL),
+    "slack": NotificationService(name="svc", type="slack", enabled=True, url=_SECRET_URL),
+    "telegram": NotificationService(
+        name="svc", type="telegram", enabled=True, bot_token="BOT-SECRET-TOKEN", chat_id="1"
+    ),
+    "ntfy": NotificationService(
+        name="svc", type="ntfy", enabled=True, topic="SECRET-TOPIC", access_token="NTFY-SECRET"
+    ),
+    "gotify": NotificationService(
+        name="svc",
+        type="gotify",
+        enabled=True,
+        server_url="https://gotify.example.invalid",
+        app_token="GOTIFY-SECRET",
+    ),
+    "pushover": NotificationService(
+        name="svc", type="pushover", enabled=True, api_token="PUSH-SECRET", user_key="USER-SECRET"
+    ),
+}
+_SECRETS = (
+    "SECRET-PATH-TOKEN",
+    "HDR-SECRET",
+    "BOT-SECRET-TOKEN",
+    "SECRET-TOPIC",
+    "NTFY-SECRET",
+    "GOTIFY-SECRET",
+    "PUSH-SECRET",
+    "USER-SECRET",
+    _SECRET_BODY,
+)
+
+
+def _assert_no_secrets(text: str) -> None:
+    for secret in _SECRETS:
+        assert secret not in text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", list(_SECRET_SERVICES))
+async def test_send_test_http_failure_reports_provider_and_status_without_secrets(
+    kind, caplog, manager: NotificationManager
+):
+    manager._session = _FakeSession(status=404, body={"message": _SECRET_BODY})
+    service = _SECRET_SERVICES[kind]
+
+    with caplog.at_level(logging.DEBUG):
+        result = await manager.send_test(service)
+
+    assert result == {
+        "success": False,
+        "message": f"Test notification to 'svc' failed: {kind.capitalize()} rejected the "
+        "request (HTTP 404)",
+    }
+    _assert_no_secrets(result["message"])
+    _assert_no_secrets(caplog.text)
+    assert f"Test notification failed for 'svc' ({kind}): HTTP 404 from https://" in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", list(_SECRET_SERVICES))
+async def test_send_test_connection_error_is_masked_in_log_and_ui(
+    kind, caplog, manager: NotificationManager
+):
+    service = _SECRET_SERVICES[kind]
+    leaked = " ".join(
+        v
+        for v in (
+            service.url,
+            service.server_url,
+            service.topic,
+            service.bot_token,
+            service.api_token,
+        )
+        if v
+    )
+
+    class _ConnectFailSession:
+        def post(self, *args, **kwargs):
+            raise aiohttp.ClientConnectionError(f"cannot connect to host {leaked}")
+
+        async def close(self) -> None:
+            pass
+
+    manager._session = _ConnectFailSession()
+
+    with caplog.at_level(logging.DEBUG):
+        result = await manager.send_test(service)
+
+    assert result["message"] == (
+        "Test notification to 'svc' failed: could not connect to the server"
+    )
+    _assert_no_secrets(caplog.text)
+    assert "ClientConnectionError: cannot connect to host ***" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_send_test_timeout_and_unexpected_error_reasons(manager: NotificationManager):
+    class _Session:
+        def __init__(self, exc):
+            self.exc = exc
+
+        def post(self, *args, **kwargs):
+            raise self.exc
+
+        async def close(self) -> None:
+            pass
+
+    service = _SECRET_SERVICES["webhook"]
+    manager._session = _Session(TimeoutError("took too long"))
+    assert (await manager.send_test(service))["message"].endswith("the request timed out")
+    manager._session = _Session(ValueError(_SECRET_URL))
+    result = await manager.send_test(service)
+    assert result["message"].endswith("unexpected error (ValueError)")
+    _assert_no_secrets(result["message"])
+
+
+@pytest.mark.asyncio
+async def test_send_test_other_failure_categories(manager: NotificationManager):
+    unconfigured = NotificationService(name="svc", type="webhook", enabled=True, url="")
+    assert (await manager.send_test(unconfigured))["message"].endswith(
+        "Webhook settings are incomplete"
+    )
+
+    manager._session = _FakeSession(method="GET")
+    result = await manager.send_test(_SECRET_SERVICES["ntfy"])
+    assert result["message"].endswith("Ntfy redirected the request instead of accepting it")
+
+    manager._session = _FakeSession(body={"ok": False, "description": "x"})
+    result = await manager.send_test(_SECRET_SERVICES["telegram"])
+    assert result["message"].endswith("Telegram did not confirm delivery")
+
+    result = await NotificationManager().send_test(_SECRET_SERVICES["slack"])
+    assert result["message"].endswith("the notification manager is not running")
+
+
+@pytest.mark.asyncio
+async def test_send_test_does_not_reuse_a_previous_failure_reason(
+    manager: NotificationManager, monkeypatch
+):
+    manager._session = _FakeSession(status=500)
+    await manager.send_test(_SECRET_SERVICES["discord"])
+
+    monkeypatch.setattr(manager, "_send_webhook", AsyncMock(return_value=False))
+    result = await manager.send_test(_SECRET_SERVICES["webhook"])
+
+    assert result["message"].endswith("was not delivered, see logs")
