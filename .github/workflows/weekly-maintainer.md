@@ -19,9 +19,9 @@ engine:
   # Gemini CLI 0.60.0 to 0.64.0 exited 41 "Invalid auth method selected" under
   # AWF because AWF kept its settings under the runner-owned home
   # (gh-aw-firewall #10246). The fix (gh-aw-firewall #10260) shipped in AWF
-  # v0.28.70 and is in the v0.29.0 that gh-aw v1.0.1 pins, so this workflow can
-  # move past the 0.59.0 pin that issue-triage.md still has. 0.66.0 also stops rewriting explicit
-  # Flash model IDs: 0.59 sent every name ending in "flash" as gemini-3.5-flash,
+  # v0.28.70 and is in the v0.29.0 that gh-aw v1.0.1 pins, so the old 0.59.0
+  # pin is gone here and in issue-triage.md (#118). 0.66.0 also stops
+  # rewriting explicit Flash model IDs: 0.59 sent every name ending in "flash" as gemini-3.5-flash,
   # which Google served as gemini-3.6-flash. The default Pro-class model has no
   # free-tier quota for the existing GEMINI_API_KEY. Full Flash rather than
   # Flash Lite: a Flash Lite test run (40834249654) read 3 of the 35 source
@@ -31,7 +31,7 @@ engine:
   # included. Google serves some Flash names as another model and charges
   # that model's quota: in October 2026 gemini-3.5-flash ran as 3.6 Flash and
   # gemini-3.7-flash as 3.8 Flash, which was often overloaded (503). 3.6 Flash
-  # is the one that completed a run (41023115800). issue-triage stays on Flash
+  # is the one that completed a run (41023115800). issue-triage uses Flash
   # Lite, a separate quota.
   version: "0.66.0"
   model: gemini-3.6-flash
