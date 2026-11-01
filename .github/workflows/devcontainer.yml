@@ -32,7 +32,9 @@ concurrency:
 jobs:
   devcontainer:
     name: Build and test Dev Container
-    runs-on: ubuntu-latest
+    # Pinned: on ubuntu-latest (now Ubuntu 26.04) the Docker-in-Docker daemon in
+    # the Dev Container does not start. See issue #143 before moving this back.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
