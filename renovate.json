@@ -111,6 +111,12 @@
       "pinDigests": false
     },
     {
+      "description": "The Dev Container base image comes from mcr.microsoft.com, and Renovate only gets release timestamps for Docker Hub. With internalChecksFilter strict, its updates would wait on the release age check indefinitely and never join the Python runtime group. Keep the seven day age where a timestamp exists, and do not block when one is missing.",
+      "matchPackageNames": ["mcr.microsoft.com/devcontainers/python"],
+      "minimumReleaseAge": "7 days",
+      "minimumReleaseAgeBehaviour": "timestamp-optional"
+    },
+    {
       "description": "tommye123/docker-autoheal is this project's own published image, not a third-party dependency. Renovate should not manage it.",
       "matchDatasources": ["docker"],
       "matchPackageNames": ["tommye123/docker-autoheal"],

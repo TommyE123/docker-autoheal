@@ -171,6 +171,13 @@ pull request.
 The general digest pinning rule is switched off for `.sonarcloud.properties`, because
 SonarCloud needs a bare version number there and not `3.15@sha256:…`.
 
+Renovate groups the updates that are available but does not make their target versions match.
+The plain and `-slim` tags can clear the seven-day age check at different times, so before
+merging a "Python runtime" pull request, compare the versions in the `Dockerfile`,
+`.devcontainer/Dockerfile` and `.sonarcloud.properties`. The Dev Container image comes from
+`mcr.microsoft.com`, which gives Renovate no release timestamps, so a package rule makes the age
+check optional for it. It is still held back by the seven-day wait wherever a timestamp exists.
+
 Keep the `# renovate:` comment directly above the `sonar.python.version` line when editing
 `.sonarcloud.properties`, or Renovate stops tracking it.
 
