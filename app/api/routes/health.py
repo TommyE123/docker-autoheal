@@ -4,7 +4,7 @@ import asyncio
 import logging
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from fastapi.responses import FileResponse
 
 from app.api import state
@@ -45,42 +45,36 @@ async def get_system_status():
     """Get overall system status"""
     docker_client = state.docker_client
     monitoring_engine = state.monitoring_engine
-    try:
-        config = config_manager.get_config()
-        # Get ALL containers (including stopped) for accurate count
-        # One worker-thread hop for all Docker round trips (list + inspect each,
-        # then connectivity); the per-container inspect is already fresh from list.
-        inspected = (
-            await asyncio.to_thread(_inspect_containers, docker_client, True)
-            if docker_client
-            else []
-        )
-        docker_connected = (
-            await asyncio.to_thread(docker_client.is_connected) if docker_client else False
-        )
-        containers = [container for container, _info in inspected]
-        monitored_count = 0
+    config = config_manager.get_config()
+    # Get ALL containers (including stopped) for accurate count
+    # One worker-thread hop for all Docker round trips (list + inspect each,
+    # then connectivity); the per-container inspect is already fresh from list.
+    inspected = (
+        await asyncio.to_thread(_inspect_containers, docker_client, True) if docker_client else []
+    )
+    docker_connected = (
+        await asyncio.to_thread(docker_client.is_connected) if docker_client else False
+    )
+    containers = [container for container, _info in inspected]
+    monitored_count = 0
 
-        # Count monitored containers
-        for container, info in inspected:
-            if (
-                monitoring_engine
-                and info
-                and monitoring_engine.should_monitor_container(container, info)
-            ):
-                monitored_count += 1
+    # Count monitored containers
+    for container, info in inspected:
+        if (
+            monitoring_engine
+            and info
+            and monitoring_engine.should_monitor_container(container, info)
+        ):
+            monitored_count += 1
 
-        maintenance_start = config_manager.get_maintenance_start_time()
-        return SystemStatus(
-            monitoring_active=monitoring_engine.is_running if monitoring_engine else False,
-            docker_connected=docker_connected,
-            total_containers=len(containers),
-            monitored_containers=monitored_count,
-            quarantined_containers=len(config_manager.get_quarantined_containers()),
-            maintenance_mode=config_manager.is_maintenance_mode(),
-            maintenance_start_time=maintenance_start.isoformat() if maintenance_start else None,
-            config=config,
-        )
-    except Exception as e:
-        logger.error("Error getting system status: %s", e)
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    maintenance_start = config_manager.get_maintenance_start_time()
+    return SystemStatus(
+        monitoring_active=monitoring_engine.is_running if monitoring_engine else False,
+        docker_connected=docker_connected,
+        total_containers=len(containers),
+        monitored_containers=monitored_count,
+        quarantined_containers=len(config_manager.get_quarantined_containers()),
+        maintenance_mode=config_manager.is_maintenance_mode(),
+        maintenance_start_time=maintenance_start.isoformat() if maintenance_start else None,
+        config=config,
+    )

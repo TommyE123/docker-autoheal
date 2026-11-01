@@ -8,7 +8,6 @@ rather than through an HTTP client - ``config_manager`` is isolated per test
 """
 
 import pytest
-from fastapi import HTTPException
 
 from app.api.routes.maintenance import (
     disable_maintenance_mode,
@@ -73,16 +72,11 @@ class TestMaintenanceModePersistenceFailures:
             (get_maintenance_status, "get_maintenance_start_time"),
         ],
     )
-    async def test_config_manager_failure_becomes_http_500(
-        self, monkeypatch, endpoint, broken_method
-    ):
+    async def test_config_manager_failure_propagates(self, monkeypatch, endpoint, broken_method):
         def explode(*_args, **_kwargs):
             raise RuntimeError("disk full")
 
         monkeypatch.setattr(config_manager, broken_method, explode)
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(RuntimeError, match="disk full"):
             await endpoint()
-
-        assert exc_info.value.status_code == 500
-        assert "disk full" in str(exc_info.value.detail)

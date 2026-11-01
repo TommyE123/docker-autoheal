@@ -133,17 +133,14 @@ def test_get_static_file_path_resolution_error_raises_400(static_dir, monkeypatc
 
 
 @pytest.mark.asyncio
-async def test_serve_static_file_unexpected_error_becomes_500(static_dir, monkeypatch):
+async def test_serve_static_file_unexpected_error_propagates(static_dir, monkeypatch):
     def explode(_filename):
         raise OSError("filesystem went away")
 
     monkeypatch.setattr(api_module, "get_static_file_path", explode)
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(OSError, match="filesystem went away"):
         await serve_static_file("sw.js")
-
-    assert exc_info.value.status_code == 500
-    assert "filesystem went away" in str(exc_info.value.detail)
 
 
 # ---------------------------------------------------------------------------
@@ -401,19 +398,3 @@ async def test_serve_static_file_logs_success(static_dir, caplog):
         await serve_static_file("sw.js", "application/javascript")
 
     assert "Serving static file: sw.js (application/javascript)" in caplog.text
-
-
-@pytest.mark.asyncio
-async def test_serve_static_file_logs_unexpected_error(static_dir, monkeypatch, caplog):
-    def explode(_filename):
-        raise OSError("filesystem went away")
-
-    monkeypatch.setattr(api_module, "get_static_file_path", explode)
-
-    with (
-        caplog.at_level("ERROR", logger=api_module.logger.name),
-        pytest.raises(HTTPException),
-    ):
-        await serve_static_file("sw.js")
-
-    assert "Error serving static file sw.js: filesystem went away" in caplog.text

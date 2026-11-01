@@ -38,6 +38,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+from app.api.errors import get_docker_client
 from app.api.routes.containers import unquarantine_container
 from app.config.config_manager import AutoHealEvent, NotificationService, config_manager
 from app.notifications.notification_manager import NotificationManager
@@ -137,7 +138,7 @@ async def emit_one_event_of_each_type(engine, docker_client) -> None:
     container, info = make_container(name="unquarantine-target", container_id=UNQUARANTINE_ID)
     docker_client.add_container(container, info)
     config_manager.quarantine_container("unquarantine-target")
-    await unquarantine_container(UNQUARANTINE_ID)
+    await unquarantine_container(get_docker_client(), UNQUARANTINE_ID)
 
 
 async def drain_notification_queue(manager: NotificationManager) -> None:
