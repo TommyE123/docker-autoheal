@@ -12,7 +12,7 @@ from io import BytesIO
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi import HTTPException, UploadFile
+from fastapi import UploadFile
 
 from app.api.routes.config import (
     export_config,
@@ -99,12 +99,10 @@ class TestConfigurationEndpoints:
             MagicMock(side_effect=RuntimeError("disk error")),
         )
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(RuntimeError, match="disk error"):
             await endpoint(payload) if payload is not None else await endpoint(
                 config_manager.get_config()
             )
-
-        assert exc_info.value.status_code == 500
 
 
 @pytest.mark.asyncio
@@ -165,17 +163,15 @@ class TestObservabilityConfig:
 
         assert config_manager.get_config().restart.mode == original_restart_mode
 
-    async def test_update_observability_config_unexpected_error_returns_500(self, monkeypatch):
+    async def test_update_observability_config_unexpected_error_propagates(self, monkeypatch):
         monkeypatch.setattr(
             config_manager,
             "update_config",
             MagicMock(side_effect=RuntimeError("disk error")),
         )
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(RuntimeError, match="disk error"):
             await update_observability_config({"log_level": "DEBUG"})
-
-        assert exc_info.value.status_code == 500
 
 
 @pytest.mark.asyncio
@@ -192,17 +188,15 @@ class TestConfigExportImport:
         body = json.loads(bytes(response.body))
         assert body["monitor"]["interval_seconds"] == 77
 
-    async def test_export_config_failure_returns_500(self, monkeypatch):
+    async def test_export_config_failure_propagates(self, monkeypatch):
         monkeypatch.setattr(
             config_manager,
             "export_config",
             MagicMock(side_effect=RuntimeError("disk error")),
         )
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(RuntimeError, match="disk error"):
             await export_config()
-
-        assert exc_info.value.status_code == 500
 
     async def test_import_config_applies_uploaded_configuration(self):
         new_config = config_manager.get_config()
@@ -215,10 +209,8 @@ class TestConfigExportImport:
         assert result["status"] == "success"
         assert config_manager.get_config().monitor.interval_seconds == 123
 
-    async def test_import_config_invalid_json_returns_500(self):
+    async def test_import_config_invalid_json_propagates(self):
         upload = UploadFile(file=BytesIO(b"not valid json"), filename="config.json")
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(json.JSONDecodeError):
             await api_import_config(upload)
-
-        assert exc_info.value.status_code == 500

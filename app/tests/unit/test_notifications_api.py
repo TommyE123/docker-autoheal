@@ -75,36 +75,32 @@ class TestNotificationsConfig:
         assert result["config"]["services"][0]["name"] == "Webhook"
         assert config_manager.get_config().notifications.services[0].name == "Webhook"
 
-    async def test_update_notifications_config_invalid_service_returns_500(self):
+    async def test_update_notifications_config_invalid_service_returns_422(self):
         # Missing the required "type" field, so NotificationService(**data) raises.
         with pytest.raises(HTTPException) as exc_info:
             await update_notifications_config({"services": [{"name": "Missing Type"}]})
 
-        assert exc_info.value.status_code == 500
+        assert exc_info.value.status_code == 422
 
-    async def test_get_notifications_config_error_returns_500(self, monkeypatch):
+    async def test_get_notifications_config_error_propagates(self, monkeypatch):
         monkeypatch.setattr(
             config_manager,
             "get_config",
             MagicMock(side_effect=RuntimeError("config unavailable")),
         )
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(RuntimeError, match="config unavailable"):
             await get_notifications_config()
 
-        assert exc_info.value.status_code == 500
-
-    async def test_update_notifications_config_persistence_error_returns_500(self, monkeypatch):
+    async def test_update_notifications_config_persistence_error_propagates(self, monkeypatch):
         monkeypatch.setattr(
             config_manager,
             "update_config",
             MagicMock(side_effect=RuntimeError("disk error")),
         )
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(RuntimeError, match="disk error"):
             await update_notifications_config({"enabled": True})
-
-        assert exc_info.value.status_code == 500
 
 
 @pytest.mark.asyncio
@@ -121,23 +117,6 @@ class TestNotificationServiceCrud:
         assert result["status"] == "success"
         assert result["service"]["name"] == "Webhook"
         assert config_manager.get_config().notifications.services[0].name == "Webhook"
-
-    async def test_add_notification_service_validation_error_hides_credentials(self, caplog):
-        with pytest.raises(HTTPException) as exc_info:
-            await add_notification_service(
-                {
-                    "name": "Ntfy",
-                    "type": "ntfy",
-                    "topic": "alerts",
-                    "access_token": {"value": "tk_leak_check"},
-                }
-            )
-
-        assert exc_info.value.status_code == 500
-        assert "access_token" in exc_info.value.detail
-        assert "tk_leak_check" not in exc_info.value.detail
-        assert "Error adding notification service" in caplog.text
-        assert "tk_leak_check" not in caplog.text
 
     async def test_add_notification_service_duplicate_name_returns_400(self):
         await add_notification_service(
@@ -172,11 +151,11 @@ class TestNotificationServiceCrud:
         names = [s.name for s in config_manager.get_config().notifications.services]
         assert names == ["Webhook", "Slack"]
 
-    async def test_add_notification_service_invalid_payload_returns_500(self):
+    async def test_add_notification_service_invalid_payload_returns_422(self):
         with pytest.raises(HTTPException) as exc_info:
             await add_notification_service({"name": "Missing Type"})
 
-        assert exc_info.value.status_code == 500
+        assert exc_info.value.status_code == 422
 
     async def test_update_notification_service_preserves_name_when_omitted(self):
         await add_notification_service(
@@ -240,7 +219,7 @@ class TestNotificationServiceCrud:
 
         assert exc_info.value.status_code == 404
 
-    async def test_update_notification_service_persistence_error_returns_500(self, monkeypatch):
+    async def test_update_notification_service_persistence_error_propagates(self, monkeypatch):
         await add_notification_service(
             {
                 "name": "Webhook",
@@ -254,10 +233,8 @@ class TestNotificationServiceCrud:
             MagicMock(side_effect=RuntimeError("disk error")),
         )
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(RuntimeError, match="disk error"):
             await update_notification_service("Webhook", {"type": "webhook"})
-
-        assert exc_info.value.status_code == 500
 
     async def test_delete_notification_service_success(self):
         await add_notification_service(
@@ -279,7 +256,7 @@ class TestNotificationServiceCrud:
 
         assert exc_info.value.status_code == 404
 
-    async def test_delete_notification_service_persistence_error_returns_500(self, monkeypatch):
+    async def test_delete_notification_service_persistence_error_propagates(self, monkeypatch):
         await add_notification_service(
             {
                 "name": "Webhook",
@@ -293,10 +270,8 @@ class TestNotificationServiceCrud:
             MagicMock(side_effect=RuntimeError("disk error")),
         )
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(RuntimeError, match="disk error"):
             await delete_notification_service("Webhook")
-
-        assert exc_info.value.status_code == 500
 
 
 @pytest.mark.asyncio

@@ -11,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from app.api.errors import get_docker_client
 from app.api.routes.containers import (
     get_container_details,
     list_containers,
@@ -554,7 +555,9 @@ class TestApiReportsPerReplicaState:
         config_manager.quarantine_container("compose:myapp:web#2")
         config_manager.record_restart("compose:myapp:web#2")
 
-        result = {c.name: c for c in await list_containers(include_stopped=True)}
+        result = {
+            c.name: c for c in await list_containers(get_docker_client(), include_stopped=True)
+        }
 
         assert result["myapp-web-1"].quarantined is False
         assert result["myapp-web-1"].restart_count == 0
@@ -565,8 +568,8 @@ class TestApiReportsPerReplicaState:
         config_manager.quarantine_container("compose:myapp:web#1")
         config_manager.record_restart("compose:myapp:web#1")
 
-        replica_1 = await get_container_details("1" * 64)
-        replica_2 = await get_container_details("2" * 64)
+        replica_1 = await get_container_details(get_docker_client(), "1" * 64)
+        replica_2 = await get_container_details(get_docker_client(), "2" * 64)
 
         assert (replica_1["quarantined"], replica_1["total_restart_count"]) == (True, 1)
         assert replica_1["recent_restart_count"] == 1
@@ -581,7 +584,7 @@ class TestApiReportsPerReplicaState:
             config_manager.quarantine_container(key)
             config_manager.record_restart(key)
 
-        await unquarantine_container("2" * 64)
+        await unquarantine_container(get_docker_client(), "2" * 64)
 
         assert not config_manager.is_quarantined("compose:myapp:web#2")
         assert config_manager.get_total_restart_count("compose:myapp:web#2") == 0

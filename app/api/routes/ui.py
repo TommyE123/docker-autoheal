@@ -90,21 +90,14 @@ def get_static_file_path(filename: str) -> Path:
 
 async def serve_static_file(filename: str, media_type: str | None = None) -> FileResponse:
     """Generic handler for serving static files with validation"""
-    try:
-        file_path = get_static_file_path(filename)
+    file_path = get_static_file_path(filename)
 
-        # Auto-detect media type if not provided
-        if media_type is None:
-            media_type = get_media_type(filename)
+    # Auto-detect media type if not provided
+    if media_type is None:
+        media_type = get_media_type(filename)
 
-        logger.debug("Serving static file: %s (%s)", filename, media_type)
-        return FileResponse(file_path, media_type=media_type)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Error serving static file %s: %s", filename, e)
-        raise HTTPException(status_code=500, detail=f"Error serving file: {e!s}") from e
+    logger.debug("Serving static file: %s (%s)", filename, media_type)
+    return FileResponse(file_path, media_type=media_type)
 
 
 # Serve PWA files at root level (required for PWA installation)
