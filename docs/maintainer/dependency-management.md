@@ -174,13 +174,11 @@ now only holds acknowledged misconfigurations. The Trivy config uses `skip-files
 override the config file. `frontend/package-lock.json` stays in scope because it also holds the
 dependencies of the built web UI.
 
-osv-scanner has been removed (it is no longer in MegaLinter or `mise.toml`) because it
-duplicated Trivy without blocking anything, and its transitive Python results were false
-positives. SonarCloud's own dependency scan is switched off in the SonarCloud settings (under
-Advanced Security), for the same reason and because automatic analysis only sees direct
-dependencies where there is no lockfile. `.sonarcloud.properties` does not control this
-setting. The scan is not tracked in this repository, so check the SonarCloud settings if the
-`main` quality gate fails on "New dependency risks too severe".
+SonarCloud's own dependency scan is switched off in the SonarCloud settings (under Advanced
+Security), because Trivy already covers dependency vulnerabilities and because automatic
+analysis only sees direct dependencies where there is no lockfile. `.sonarcloud.properties`
+does not control this setting. The scan is not tracked in this repository, so check the
+SonarCloud settings if the `main` quality gate fails on "New dependency risks too severe".
 
 Python transitive dependencies are not pinned in `requirements.txt` and there is no Python
 lockfile, so a lockfile scan only sees the direct dependencies there. Scanning the built image
@@ -279,14 +277,11 @@ automatically merging them can still introduce compatibility or behavioural chan
   dependency is behaviourally risk-free.
 
 * **`checkov` as a Dev Container tool** — it is deliberately absent from
-  `mise.toml`. Installing it alongside `semgrep` used to hang
-  `osv-scanner`'s pip transitive-dependency resolver indefinitely (each resolved fine alone in
-  ~12–13s; together `osv-scanner` never returned, even with a 600s timeout). `osv-scanner` has
-  since been removed, so that reason no longer applies, but `checkov` is still left out. `semgrep` is the
-  one kept because it catches app-level issues nothing else in the local stack checks for,
-  whereas checkov's actual findings in this repo (Dockerfile non-root user, Actions
-  permissions) are already covered by Trivy and zizmor. Checkov still runs in CI through
-  MegaLinter's bundled `REPOSITORY_CHECKOV` linter, so CI coverage is unaffected.
+  `mise.toml`. Its actual findings in this repo (Dockerfile non-root user, Actions
+  permissions) are already covered by Trivy and zizmor, and it still runs in CI through
+  MegaLinter's bundled `REPOSITORY_CHECKOV` linter, so CI coverage is unaffected. `semgrep`
+  is the one kept in the Dev Container because it catches app-level issues nothing else in
+  the local stack checks for.
 
 ## Current policy summary
 
