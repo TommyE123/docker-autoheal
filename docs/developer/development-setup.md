@@ -360,8 +360,8 @@ formatter is CLI-only.
 | File type       | Linters (CI)              | Formatter (CI)           | Fails the build?                       |
 |-----------------|---------------------------|--------------------------|----------------------------------------|
 | `.py`, `.pyi`   | pyright, ruff             | ruff-format              | Yes                                    |
-| `.js`, `.jsx`   | eslint                    | prettier                 | eslint: Yes; prettier: No, report-only |
-| `.css`          | stylelint                 | none                     | No, report-only                        |
+| `.js`, `.jsx`   | eslint                    | prettier                 | Yes                                    |
+| `.css`          | stylelint                 | none                     | Yes                                    |
 | `.json`         | jsonlint, v8r             | prettier                 | Yes                                    |
 | `.yml`, `.yaml` | yamllint, v8r, actionlint | prettier                 | Yes                                    |
 | `.md`           | markdownlint              | markdown-table-formatter | Yes                                    |
