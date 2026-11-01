@@ -12,7 +12,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import HTTPException
-from pydantic import ValidationError
 
 from app.api.routes.notifications import (
     add_notification_service,
@@ -76,10 +75,12 @@ class TestNotificationsConfig:
         assert result["config"]["services"][0]["name"] == "Webhook"
         assert config_manager.get_config().notifications.services[0].name == "Webhook"
 
-    async def test_update_notifications_config_invalid_service_propagates(self):
+    async def test_update_notifications_config_invalid_service_returns_422(self):
         # Missing the required "type" field, so NotificationService(**data) raises.
-        with pytest.raises(ValidationError):
+        with pytest.raises(HTTPException) as exc_info:
             await update_notifications_config({"services": [{"name": "Missing Type"}]})
+
+        assert exc_info.value.status_code == 422
 
     async def test_get_notifications_config_error_propagates(self, monkeypatch):
         monkeypatch.setattr(
@@ -150,9 +151,11 @@ class TestNotificationServiceCrud:
         names = [s.name for s in config_manager.get_config().notifications.services]
         assert names == ["Webhook", "Slack"]
 
-    async def test_add_notification_service_invalid_payload_propagates(self):
-        with pytest.raises(ValidationError):
+    async def test_add_notification_service_invalid_payload_returns_422(self):
+        with pytest.raises(HTTPException) as exc_info:
             await add_notification_service({"name": "Missing Type"})
+
+        assert exc_info.value.status_code == 422
 
     async def test_update_notification_service_preserves_name_when_omitted(self):
         await add_notification_service(

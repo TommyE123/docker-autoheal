@@ -15,6 +15,7 @@ from typing import Annotated
 from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import JSONResponse
 
+from app.api.errors import invalid_input_as_422
 from app.config.config_manager import (
     AutoHealConfig,
     MonitorConfig,
@@ -78,7 +79,8 @@ async def import_config(file: Annotated[UploadFile, File()]):
     content = await file.read()
     config_json = content.decode("utf-8")
 
-    config_manager.import_config(config_json)
+    with invalid_input_as_422():
+        config_manager.import_config(config_json)
     return {"status": "success", "message": "Configuration imported successfully"}
 
 

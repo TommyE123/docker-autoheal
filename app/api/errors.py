@@ -9,7 +9,8 @@ handlers that need Docker.
 """
 
 import logging
-from typing import Annotated
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -17,6 +18,9 @@ from pydantic import ValidationError
 
 from app.api import state
 from app.docker_client.docker_client_wrapper import DockerClientWrapper
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 logger = logging.getLogger(__name__)
 
@@ -38,23 +42,24 @@ def get_docker_client() -> DockerClientWrapper:
 DockerClientDep = Annotated[DockerClientWrapper, Depends(get_docker_client)]
 
 
-async def validation_error_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Report a model validation failure raised inside a handler as 422.
+@contextmanager
+def invalid_input_as_422() -> Iterator[None]:
+    """Report a model validation failure on user-supplied data as 422.
 
+    Wrap only code that validates the request's own data. A ``ValidationError``
+    anywhere else is a server-side fault and falls through to the generic 500.
     Field locations and messages only: pydantic errors echo the submitted input,
     which can contain tokens and webhook URLs. The detail is a single string,
     which is what the UI displays.
     """
-    if not isinstance(exc, ValidationError):  # pragma: no cover - registered for this type only
-        raise exc
-    detail = "; ".join(
-        f"{'.'.join(str(part) for part in err['loc'])}: {err['msg']}"
-        for err in exc.errors(include_input=False)
-    )
-    logger.warning(
-        "Validation error on %s %s: %s", request.method, request.url.path, detail or "invalid"
-    )
-    return JSONResponse(status_code=422, content={"detail": detail or "Validation error"})
+    try:
+        yield
+    except ValidationError as exc:
+        detail = "; ".join(
+            f"{'.'.join(str(part) for part in err['loc'])}: {err['msg']}"
+            for err in exc.errors(include_input=False)
+        )
+        raise HTTPException(status_code=422, detail=detail or "Validation error") from None
 
 
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
@@ -70,5 +75,4 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 def register_exception_handlers(app: FastAPI) -> None:
     """Register the shared exception handlers on ``app``."""
-    app.add_exception_handler(ValidationError, validation_error_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)

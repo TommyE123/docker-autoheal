@@ -7,6 +7,7 @@ from fastapi import APIRouter, Body, HTTPException
 from pydantic import ValidationError
 
 from app.api import state
+from app.api.errors import invalid_input_as_422
 from app.config.config_manager import NotificationService, config_manager
 
 logger = logging.getLogger(__name__)
@@ -40,7 +41,8 @@ async def update_notifications_config(notifications_config: dict):
         # Parse and validate services
         services = []
         for service_data in notifications_config["services"]:
-            service = NotificationService(**service_data)
+            with invalid_input_as_422():
+                service = NotificationService(**service_data)
             services.append(service)
         config.notifications.services = services
 
@@ -63,7 +65,8 @@ async def add_notification_service(service: dict):
     config = config_manager.get_config()
 
     # Validate and create service
-    new_service = NotificationService(**service)
+    with invalid_input_as_422():
+        new_service = NotificationService(**service)
 
     # Check if service with same name already exists
     for existing in config.notifications.services:
@@ -95,7 +98,8 @@ async def update_notification_service(service_name: str, service: dict):
             # Preserve name if not provided
             if "name" not in service:
                 service["name"] = service_name
-            updated_service = NotificationService(**service)
+            with invalid_input_as_422():
+                updated_service = NotificationService(**service)
             config.notifications.services[i] = updated_service
             break
 

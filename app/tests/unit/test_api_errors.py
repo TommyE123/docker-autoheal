@@ -71,14 +71,6 @@ class TestUnexpectedErrors:
         assert record.exc_info is not None
         assert record.exc_info[0] is RuntimeError
 
-    @pytest.mark.asyncio
-    async def test_http_exceptions_keep_their_status_and_detail(self):
-        status, text = await _call("GET", "/api/healthchecks/unknown-container")
-
-        # Docker is unavailable in this test, so the dependency answers first.
-        assert status == 503
-        assert json.loads(text) == {"detail": "Docker client not initialized"}
-
 
 class TestDockerClientDependency:
     def test_returns_the_initialised_client(self, monkeypatch):
@@ -132,6 +124,48 @@ class TestDockerClientDependency:
 
 
 class TestModelValidationErrors:
+    @pytest.mark.asyncio
+    async def test_http_exceptions_keep_their_status_and_detail(self, monkeypatch):
+        monkeypatch.setattr(
+            "app.api.state.docker_client", MagicMock(get_container=lambda _id: None)
+        )
+
+        status, text = await _call("GET", "/api/containers/missing")
+
+        assert status == 404
+        assert json.loads(text) == {"detail": "Container not found"}
+
+    @pytest.mark.asyncio
+    async def test_server_side_validation_failure_is_a_generic_500(self, monkeypatch, caplog):
+        """A model built from server data failing validation is not the client's fault."""
+        docker_client = MagicMock()
+        docker_client.list_containers.return_value = [object()]
+        docker_client.get_container_info.return_value = {"stable_id": "web", "name": None}
+        monkeypatch.setattr("app.api.state.docker_client", docker_client)
+
+        with caplog.at_level(logging.ERROR, logger="app.api.errors"):
+            status, text = await _call("GET", "/api/containers")
+
+        assert status == 500
+        assert json.loads(text) == {"detail": INTERNAL_ERROR_DETAIL}
+        assert any(r.exc_info for r in caplog.records if r.name == "app.api.errors")
+
+    @pytest.mark.asyncio
+    async def test_invalid_config_import_is_422(self):
+        status, body, _headers = await _request(
+            "POST",
+            "/api/config/import",
+            request_headers={"content-type": "multipart/form-data; boundary=b"},
+            body=(
+                b'--b\r\nContent-Disposition: form-data; name="file"; filename="c.json"\r\n'
+                b'Content-Type: application/json\r\n\r\n{"monitor": {"interval_seconds": "x"}}\r\n--b--\r\n'
+            ),
+            raise_app_exceptions=False,
+        )
+
+        assert status == 422
+        assert "monitor.interval_seconds" in json.loads(body)["detail"]
+
     @pytest.mark.asyncio
     async def test_invalid_service_is_422_without_echoing_credentials(self, caplog):
         payload = {
