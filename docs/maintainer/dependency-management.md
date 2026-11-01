@@ -151,6 +151,27 @@ updates are not part of that group, and unrelated frontend dependencies such as 
 ESLint are not grouped with it. Manual review and merge, the seven-day minimum release age and
 disabled automerge apply to the group as usual.
 
+### SonarCloud dependency analysis scope
+
+SonarCloud also scans lockfiles for vulnerable dependencies (its "dependency risks" and the
+"New dependency risks too severe" quality gate condition). `.sonarcloud.properties` excludes
+the files that only describe development tooling through `sonar.exclusions`:
+
+* `.mise/locks/**`, the generated environments for tools such as Semgrep
+* `.devcontainer/package.json` and `.devcontainer/package-lock.json`, the Dev Container
+  linters
+
+None of these ship in the Docker image, and osv-scanner in MegaLinter still scans all of
+them, so the findings stay visible there without failing the SonarCloud gate.
+`frontend/package-lock.json` stays in scope because it also holds the dependencies of the
+built web UI. Its development-only findings, when SonarCloud reports them, are accepted in
+the SonarCloud UI with a short reason.
+
+Python transitive dependencies are not pinned in `requirements.txt`, and there is no Python
+lockfile. SonarCloud's documentation says automatic analysis only covers direct dependencies
+without a lockfile, so treat its Python results as incomplete and rely on osv-scanner and
+Renovate for the rest.
+
 ### Python version grouping
 
 The Python version is pinned in three places: the `python` image in the `Dockerfile`, the
