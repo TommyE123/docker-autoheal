@@ -58,7 +58,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 # as .devcontainer/verify-isolation.sh and frontend/e2e-ui/docker.js; they run before
 # Compose, and also for an already-running instance (the tests create containers on this
 # daemon either way), so a host or production daemon is never built on or acted on.
-if [ -n "${DOCKER_HOST:-}${DOCKER_CONTEXT:-}" ]; then
+if [[ -n "${DOCKER_HOST:-}${DOCKER_CONTEXT:-}" ]]; then
   echo "::error::UI E2E refused to start: DOCKER_HOST or DOCKER_CONTEXT is set, so Docker may not be the local daemon" >&2
   exit 3
 fi
@@ -67,13 +67,13 @@ if ! pgrep -x dockerd >/dev/null; then
   exit 3
 fi
 daemon_name="$(docker info --format '{{.Name}}' 2>/dev/null || true)"
-if [ "${daemon_name}" != "$(hostname)" ]; then
+if [[ "${daemon_name}" != "$(hostname)" ]]; then
   echo "::error::UI E2E refused to start: Docker daemon '${daemon_name}' is not this environment's own ('$(hostname)')" >&2
   exit 3
 fi
 
 status=0
-if [ -n "${UI_E2E_BASE_URL:-}" ]; then
+if [[ -n "${UI_E2E_BASE_URL:-}" ]]; then
   # An instance something else started, e.g. the built image in CI. It must monitor
   # autoheal.dev=true: the fixtures read that from /api/config and refuse otherwise.
   echo "UI E2E (${scope}, ${mode}) against ${UI_E2E_BASE_URL}; using the running instance"
@@ -85,7 +85,7 @@ compose=(docker compose -p docker-autoheal-dev -f docker-compose.yml -f docker-c
 
 # Leave a stack that was already running alone; remove one this script started.
 started_here=false
-if [ -z "$("${compose[@]}" ps -q autoheal)" ]; then
+if [[ -z "$("${compose[@]}" ps -q autoheal)" ]]; then
   started_here=true
   trap '"${compose[@]}" down' EXIT
 fi
@@ -93,7 +93,7 @@ fi
 # Build and start the stack only when this script owns it. A stack that was already running
 # is only waited on, so it is neither rebuilt nor recreated underneath its user.
 up_args=(up --build -d --wait autoheal)
-if [ "${started_here}" = false ]; then
+if [[ "${started_here}" = false ]]; then
   up_args=(up -d --no-build --no-recreate --wait autoheal)
 fi
 if ! "${compose[@]}" "${up_args[@]}"; then
@@ -107,7 +107,7 @@ export UI_E2E_BASE_URL="http://localhost:${port##*:}"
 echo "UI E2E (${scope}, ${mode}) against ${UI_E2E_BASE_URL}; stack started here: ${started_here}"
 
 npm --prefix frontend run test:ui-e2e -- "${args[@]}" || status=$?
-if [ "${status}" -ne 0 ]; then
+if [[ "${status}" -ne 0 ]]; then
   "${compose[@]}" logs --tail=50 autoheal || true
 fi
 exit "${status}"
