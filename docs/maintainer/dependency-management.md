@@ -165,8 +165,9 @@ Development tooling is not tracked for dependency vulnerabilities. That covers t
 tool environments under `.mise/locks/` (Semgrep, yamllint, djlint) and the Dev Container
 linters in `.devcontainer/package-lock.json`. None of them ship in the Docker image, and
 Renovate already ignores `.mise/locks/`. Trivy skips those lockfiles with `scan.skip-files` in
-`.linter-rules/.trivy.yaml`, so a vulnerability in one of those tools, or in its own
-dependencies, is not flagged. This avoids a per-CVE entry in
+`.linter-rules/.trivy.yaml`, so CI does not flag a vulnerability in one of those tools,
+or in its own dependencies. GitHub's Dependabot alerts can still report them, and Renovate
+updates the npm ones in `.devcontainer/package-lock.json` as normal. This avoids a per-CVE entry in
 `.linter-rules/.trivyignore.yaml` each time a tool dependency gets an advisory, and that file
 now only holds acknowledged misconfigurations. The Trivy config uses `skip-files`, not
 `skip-dirs`, because MegaLinter passes `--skip-dirs` on the command line and that would
