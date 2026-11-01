@@ -44,7 +44,8 @@
       "description": "Update the Python version everywhere it is pinned in one PR: the Dockerfile image, the Dev Container image and sonar.python.version in .sonarcloud.properties. Python releases are minor or major updates, so the grouped PR keeps automerge disabled and needs manual review.",
       "matchDatasources": ["docker"],
       "matchPackageNames": ["python", "mcr.microsoft.com/devcontainers/python"],
-      "groupName": "Python runtime"
+      "groupName": "Python runtime",
+      "minimumReleaseAge": "7 days"
     },
     {
       "description": "Keep automerge disabled by default for all dependency updates. A later, narrower rule enables it only for eligible patch updates. See docs/maintainer/dependency-management.md.",
