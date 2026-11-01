@@ -45,6 +45,7 @@
       "matchDatasources": ["docker"],
       "matchPackageNames": ["python", "mcr.microsoft.com/devcontainers/python"],
       "groupName": "Python runtime",
+      "minimumGroupSize": 3,
       "minimumReleaseAge": "7 days"
     },
     {
