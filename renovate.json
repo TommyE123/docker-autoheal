@@ -29,7 +29,24 @@
     "schedule": ["* 0-3 * * 6"],
     "automerge": false
   },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track the Python version that SonarCloud analyses against (sonar.python.version in .sonarcloud.properties), using the renovate: comment on the line above it.",
+      "managerFilePatterns": ["/^\\.sonarcloud\\.properties$/"],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s+versioning=(?<versioning>\\S+)\\s*\\nsonar\\.python\\.version=(?<currentValue>\\S+)"
+      ]
+    }
+  ],
   "packageRules": [
+    {
+      "description": "Update the Python version everywhere it is pinned in one PR: the Dockerfile image, the Dev Container image and sonar.python.version in .sonarcloud.properties. Python releases are minor or major updates, so the grouped PR keeps automerge disabled and needs manual review.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["python", "mcr.microsoft.com/devcontainers/python"],
+      "groupName": "Python runtime",
+      "minimumReleaseAge": "7 days"
+    },
     {
       "description": "Keep automerge disabled by default for all dependency updates. A later, narrower rule enables it only for eligible patch updates. See docs/maintainer/dependency-management.md.",
       "matchPackageNames": ["*"],
@@ -86,6 +103,18 @@
       "description": "Pin Docker image tags to an immutable SHA256 digest as well as their human-readable tag/version where the registry supports digests.",
       "matchDatasources": ["docker"],
       "pinDigests": true
+    },
+    {
+      "description": "sonar.python.version in .sonarcloud.properties is a bare version number that SonarCloud parses, so it must never get a digest appended. Keep this after the general digest pinning rule.",
+      "matchManagers": ["custom.regex"],
+      "matchFileNames": [".sonarcloud.properties"],
+      "pinDigests": false
+    },
+    {
+      "description": "The Dev Container base image comes from mcr.microsoft.com, and Renovate only gets release timestamps for Docker Hub. With internalChecksFilter strict, its updates would wait on the release age check indefinitely and never join the Python runtime group. Keep the seven day age where a timestamp exists, and do not block when one is missing.",
+      "matchPackageNames": ["mcr.microsoft.com/devcontainers/python"],
+      "minimumReleaseAge": "7 days",
+      "minimumReleaseAgeBehaviour": "timestamp-optional"
     },
     {
       "description": "tommye123/docker-autoheal is this project's own published image, not a third-party dependency. Renovate should not manage it.",
