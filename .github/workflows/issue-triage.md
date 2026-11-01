@@ -54,9 +54,11 @@ engine:
   version: "0.66.0"
   model: gemini-3.5-flash-lite
 # Top-level AWF cap on model requests (the default is 500). Test runs made 4 to
-# 9 requests; 12 leaves room for a retry and stops a runaway loop from spending
-# the 500 a day that Flash Lite allows.
-max-turns: 12
+# 9 requests, but Flash Lite often makes one tool call per request, and a run on
+# a new issue hit a cap of 12 before any write (run 41282434689, #129). 25 leaves
+# room for that while still stopping a runaway loop well inside the 500 a day
+# that Flash Lite allows.
+max-turns: 25
 features:
   # actionlint (as pinned by this repo's MegaLinter) doesn't yet recognize
   # the "queue" concurrency key gh-aw emits by default; disable it rather
@@ -132,8 +134,13 @@ you run from the shell:
 - **Reads: `github`**. `${{ github.repository }}` is `OWNER/REPO`. Split it
   at `/`: pass the part before the slash as `--owner` and the part after it as
   `--repo`. Never pass the combined `OWNER/REPO` value to either flag. To fetch
-  an issue, run
-  `github issue_read --method get --owner OWNER --repo REPO --issue_number N`.
+  an issue with its current labels, run
+  `github issue_read --method get --owner OWNER --repo REPO --issue_number N | jq '.[0] | {title, body, comments, labels: ((.labels // []) | map(if type == "object" then .name else . end))}'`.
+  The response leaves out a field that is empty: an issue with no labels has no
+  `labels` field and one with no comments has no `comments` field. The command
+  above prints `"labels": []` and `"comments": null` for those, which means
+  none; do not look for them another way. A `null` title means the fetch
+  failed. If the `jq` filter fails, run the command once more without the pipe.
   To fetch its comments, run the same command with
   `--method get_comments --perPage 100 --page 1`. Continue with `--page 2`,
   `--page 3` and so on only when the current page contains exactly 100
@@ -160,7 +167,8 @@ Keep the `|`. Without it nothing is sent.
 
 Run one command per shell call. Do not join commands with `&&`, `;`, or
 newlines, and do not use redirection (`>`, `<`, heredocs). The only allowed
-combination is the `jq ... | safeoutputs add_comment .` pipe above.
+combinations are the `github issue_read ... | jq ...` fetch pipe and the
+`jq ... | safeoutputs add_comment .` pipe above.
 
 ## Steps
 
@@ -169,7 +177,7 @@ combination is the `jq ... | safeoutputs add_comment .` pipe above.
    described under Tools. If you
    cannot fetch it, call `report_incomplete` with the reason and stop. Never
    call `noop` for this, because it hides the failure. If the `comments`
-   count in the response is present and non-zero, also fetch every page of
+   count in the response is a number above zero, also fetch every page of
    its comments with `--method get_comments` as described under Tools. Keep
    them for step 3: the reporter's replies (comments by the issue's author)
    count as classification input there, and the same comments are searched for
@@ -206,7 +214,7 @@ combination is the `jq ... | safeoutputs add_comment .` pipe above.
      complete HTML comment. To check for it, search each comment body for the
      token `gh-aw:issue-triage:needs-information`, not for the joined text.
      Use the comments fetched in step 1. If the `comments` count in the
-     issue response was absent or zero, treat the issue as having no comments.
+     issue response was absent, null or zero, treat the issue as having no comments.
      Otherwise inspect every page of them. Never infer that the marker is absent merely because
      it is not in the issue response.
    - If no comment contains the token, add one comment containing the joined
