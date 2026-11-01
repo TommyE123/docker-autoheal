@@ -335,6 +335,18 @@ class NotificationManager:
                 logger.exception("Error in notification worker: %s", e)
                 await asyncio.sleep(1)
 
+    def _senders(self) -> dict[str, Any]:
+        """Map each notification type to its send method"""
+        return {
+            NotificationType.WEBHOOK: self._send_webhook,
+            NotificationType.DISCORD: self._send_discord,
+            NotificationType.SLACK: self._send_slack,
+            NotificationType.TELEGRAM: self._send_telegram,
+            NotificationType.NTFY: self._send_ntfy,
+            NotificationType.GOTIFY: self._send_gotify,
+            NotificationType.PUSHOVER: self._send_pushover,
+        }
+
     async def _process_notification(self, event: AutoHealEvent) -> None:
         """
         Process and send notification for an event
@@ -356,22 +368,11 @@ class NotificationManager:
                 continue
 
             try:
-                if service.type == NotificationType.WEBHOOK:
-                    tasks.append(self._send_webhook(service, title, message, event, priority))
-                elif service.type == NotificationType.DISCORD:
-                    tasks.append(self._send_discord(service, title, message, event, priority))
-                elif service.type == NotificationType.SLACK:
-                    tasks.append(self._send_slack(service, title, message, event, priority))
-                elif service.type == NotificationType.TELEGRAM:
-                    tasks.append(self._send_telegram(service, title, message, event, priority))
-                elif service.type == NotificationType.NTFY:
-                    tasks.append(self._send_ntfy(service, title, message, event, priority))
-                elif service.type == NotificationType.GOTIFY:
-                    tasks.append(self._send_gotify(service, title, message, event, priority))
-                elif service.type == NotificationType.PUSHOVER:
-                    tasks.append(self._send_pushover(service, title, message, event, priority))
-                else:
+                sender = self._senders().get(service.type)
+                if sender is None:
                     logger.warning("Unsupported notification type: %s", service.type)
+                else:
+                    tasks.append(sender(service, title, message, event, priority))
 
             except Exception as e:
                 logger.error("Error preparing notification for %s: %s", service.type, e)
