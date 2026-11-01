@@ -308,11 +308,11 @@ test isolation works.
 `.github/workflows/mega-linter.yml` runs [MegaLinter](https://megalinter.io/) on every
 pull request targeting `main`, covering Python, JavaScript, YAML, Dockerfile,
 Markdown, and security checks provided by Ruff's `S` rules — see `.linter-rules/.mega-linter.yml`
-for the exact set. Several of those linters (`PYTHON_RUFF`,
-`JAVASCRIPT_PRETTIER`, and others listed in `.linter-rules/.mega-linter.yml`'s
-`DISABLE_ERRORS_LINTERS`) currently have pre-existing findings and are configured not
-to fail the build over them; they still run and report. There is no repository-wide Python
- formatter/import-sorter enforced beyond what MegaLinter reports.
+for the exact set. The linters listed in `.linter-rules/.mega-linter.yml`'s
+`DISABLE_ERRORS_LINTERS` currently have pre-existing findings and are configured not to
+fail the build over them; they still run and report. Ruff is not in that list, so any ruff
+finding fails the MegaLinter check. There is no
+repository-wide Python formatter/import-sorter enforced beyond what MegaLinter reports.
 On pull requests from branches in this repository, MegaLinter posts a PR comment and per-linter
 statuses. Fork pull requests get a read-only token, so there the results are only in
 the run's job summary, its check status, and the uploaded report artifact.
@@ -357,18 +357,18 @@ CSS uses Stylelint fixes on explicit save, while CI has no CSS formatter. Markdo
 markdownlint fixes on explicit save; format-on-save is disabled because CI's table
 formatter is CLI-only.
 
-| File type       | Linters (CI)              | Formatter (CI)           | Fails the build?                       |
-|-----------------|---------------------------|--------------------------|----------------------------------------|
-| `.py`, `.pyi`   | pyright, ruff             | ruff-format              | pyright: Yes; ruff: No, report-only    |
-| `.js`, `.jsx`   | eslint                    | prettier                 | eslint: Yes; prettier: No, report-only |
-| `.css`          | stylelint                 | none                     | No, report-only                        |
-| `.json`         | jsonlint, v8r             | prettier                 | Yes                                    |
-| `.yml`, `.yaml` | yamllint, v8r, actionlint | prettier                 | Yes                                    |
-| `.md`           | markdownlint              | markdown-table-formatter | Yes                                    |
-| `.html`, `.htm` | djlint, htmlhint          | none                     | Yes                                    |
-| `.sh`           | shellcheck, bash-exec     | shfmt                    | Yes                                    |
-| `Dockerfile*`   | hadolint                  | none                     | Yes                                    |
-| Every file      | editorconfig-checker      | —                        | Yes                                    |
+| File type       | Linters (CI)              | Formatter (CI)           | Fails the build? |
+|-----------------|---------------------------|--------------------------|------------------|
+| `.py`, `.pyi`   | pyright, ruff             | ruff-format              | Yes              |
+| `.js`, `.jsx`   | eslint                    | prettier                 | Yes              |
+| `.css`          | stylelint                 | none                     | Yes              |
+| `.json`         | jsonlint, v8r             | prettier                 | Yes              |
+| `.yml`, `.yaml` | yamllint, v8r, actionlint | prettier                 | Yes              |
+| `.md`           | markdownlint              | markdown-table-formatter | Yes              |
+| `.html`, `.htm` | djlint, htmlhint          | none                     | Yes              |
+| `.sh`           | shellcheck, bash-exec     | shfmt                    | Yes              |
+| `Dockerfile*`   | hadolint                  | none                     | Yes              |
+| Every file      | editorconfig-checker      | —                        | Yes              |
 
 Workflow files are additionally scanned by zizmor, which is report-only. Repository-wide
 scanners (checkov, semgrep, osv-scanner, trivy, trufflehog, betterleaks, secretlint,

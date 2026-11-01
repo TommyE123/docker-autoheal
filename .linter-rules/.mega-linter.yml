@@ -31,7 +31,6 @@ DISABLE_LINTERS:
 
 DISABLE_ERRORS_LINTERS:
   - ACTION_ZIZMOR
-  - PYTHON_RUFF
   - REPOSITORY_OSV_SCANNER
 
 # ---------------------------------------------------------------------------

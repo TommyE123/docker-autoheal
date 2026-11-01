@@ -721,7 +721,38 @@ async def test_process_notification_dispatches_only_to_enabled_known_services(
 
     assert len(fake_session(manager).calls) == 1
     assert fake_session(manager).calls[0]["url"] == "https://example.invalid/webhook"
-    assert any("Unsupported notification type" in r.message for r in caplog.records)
+    assert "Unsupported notification type: carrier-pigeon" in [
+        r.getMessage() for r in caplog.records
+    ]
+
+
+_NOTIFICATION_TYPES = ["webhook", "discord", "slack", "telegram", "ntfy", "gotify", "pushover"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("service_type", _NOTIFICATION_TYPES)
+async def test_process_notification_dispatches_each_type_to_its_sender(
+    monkeypatch, isolated_config_manager, manager, service_type
+):
+    """Each notification type must route to its own ``_send_<type>`` method."""
+    # Built from the fixed list, not manager._senders(), so a type missing from
+    # the sender map still has a mock that must be awaited.
+    senders = {t: AsyncMock(return_value=True) for t in _NOTIFICATION_TYPES}
+    for t, mock in senders.items():
+        monkeypatch.setattr(manager, f"_send_{t}", mock)
+    config = isolated_config_manager.get_config()
+    config.notifications.enabled = True
+    config.notifications.services = [
+        NotificationService(name="Svc", type=service_type, enabled=True)
+    ]
+    isolated_config_manager.update_config(config)
+
+    await manager._process_notification(_make_event("restart"))
+
+    senders[service_type].assert_awaited_once()
+    for t, mock in senders.items():
+        if t != service_type:
+            mock.assert_not_awaited()
 
 
 @pytest.mark.asyncio
