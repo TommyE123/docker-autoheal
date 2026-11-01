@@ -24,7 +24,7 @@ mutmut results | grep -v ': not checked$' || true
 # README badge data, and only when asked to: ordinary runs (local and pull request)
 # leave the tracked file alone. `mutmut badge` writes it; json.tool only re-indents
 # it to the repository's JSON style (Prettier).
-if [ "$#" -eq 0 ] && [ "${UPDATE_MUTATION_BADGE:-}" = "1" ]; then
+if [[ "$#" -eq 0 ]] && [[ "${UPDATE_MUTATION_BADGE:-}" = "1" ]]; then
   mutmut export-cicd-stats
   mutmut badge --label Mutation --output mutants/mutation-badge.json
   mkdir -p .github/badges
