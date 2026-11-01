@@ -104,6 +104,12 @@
       "pinDigests": true
     },
     {
+      "description": "sonar.python.version in .sonarcloud.properties is a bare version number that SonarCloud parses, so it must never get a digest appended. Keep this after the general digest pinning rule.",
+      "matchManagers": ["custom.regex"],
+      "matchFileNames": [".sonarcloud.properties"],
+      "pinDigests": false
+    },
+    {
       "description": "tommye123/docker-autoheal is this project's own published image, not a third-party dependency. Renovate should not manage it.",
       "matchDatasources": ["docker"],
       "matchPackageNames": ["tommye123/docker-autoheal"],

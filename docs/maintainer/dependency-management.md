@@ -168,6 +168,9 @@ manual review and merge like any other. If the Dev Container image has no tag fo
 version yet, the other pins can update first and the Dev Container image follows in a later
 pull request.
 
+The general digest pinning rule is switched off for `.sonarcloud.properties`, because
+SonarCloud needs a bare version number there and not `3.15@sha256:…`.
+
 Keep the `# renovate:` comment directly above the `sonar.python.version` line when editing
 `.sonarcloud.properties`, or Renovate stops tracking it.
 
