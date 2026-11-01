@@ -1568,7 +1568,7 @@ async def test_test_notification_reports_failure_when_service_is_not_configured(
 
 
 @pytest.mark.asyncio
-async def test_send_telegram_ok_false_with_http_200_is_failure_and_logs_description(
+async def test_send_telegram_ok_false_with_http_200_is_failure_and_does_not_log_description(
     caplog, isolated_config_manager, manager: NotificationManager
 ):
     class _TelegramRejectedResponse(_FakeResponse):
@@ -1590,7 +1590,8 @@ async def test_send_telegram_ok_false_with_http_200_is_failure_and_logs_descript
         )
 
     assert delivered is False
-    assert any("Bad Request: chat not found" in r.message for r in caplog.records)
+    assert "chat not found" not in caplog.text
+    assert "did not confirm notification" in caplog.text
 
 
 async def _send_via(manager: NotificationManager, label: str) -> bool:
@@ -1609,16 +1610,16 @@ async def _send_via(manager: NotificationManager, label: str) -> bool:
 @pytest.mark.parametrize(
     ("body", "expected_log"),
     [
-        (ValueError("not JSON"), "ok=true"),
-        ({}, "ok=true"),
-        ({"description": "no acknowledgement"}, "no acknowledgement"),
-        ({"ok": None}, "ok=true"),
-        ({"ok": "true"}, "ok=true"),
-        ({"ok": 1}, "ok=true"),
-        ({"ok": False, "description": "Bad Request: chat not found"}, "chat not found"),
-        ([], "ok=true"),
-        ("ok", "ok=true"),
-        (None, "ok=true"),
+        (ValueError("not JSON"), "ok=true missing"),
+        ({}, "ok=true missing"),
+        ({"description": "no acknowledgement"}, "ok=true missing"),
+        ({"ok": None}, "ok=true missing"),
+        ({"ok": "true"}, "ok=true missing"),
+        ({"ok": 1}, "ok=true missing"),
+        ({"ok": False, "description": "Bad Request: chat not found"}, "ok=true missing"),
+        ([], "ok=true missing"),
+        ("ok", "ok=true missing"),
+        (None, "ok=true missing"),
     ],
 )
 async def test_send_telegram_unconfirmed_http_200_is_failure_and_logged(
@@ -1739,7 +1740,8 @@ async def test_send_pushover_status_zero_with_http_200_is_failure(
         )
 
     assert delivered is False
-    assert any("user identifier is invalid" in r.message for r in caplog.records)
+    assert "user identifier is invalid" not in caplog.text
+    assert "did not accept notification" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -1951,3 +1953,20 @@ async def test_send_test_does_not_reuse_a_previous_failure_reason(
     result = await manager.send_test(_SECRET_SERVICES["webhook"])
 
     assert result["message"].endswith("was not delivered, see logs")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["telegram", "pushover"])
+async def test_send_test_unconfirmed_2xx_does_not_expose_response_body(
+    kind, caplog, manager: NotificationManager
+):
+    manager._session = _FakeSession(
+        body={"ok": False, "status": 0, "description": _SECRET_BODY, "errors": [_SECRET_BODY]}
+    )
+
+    with caplog.at_level(logging.DEBUG):
+        result = await manager.send_test(_SECRET_SERVICES[kind])
+
+    assert result["message"].endswith("did not confirm delivery")
+    _assert_no_secrets(result["message"])
+    _assert_no_secrets(caplog.text)

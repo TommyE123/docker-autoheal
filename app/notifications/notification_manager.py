@@ -610,11 +610,8 @@ class NotificationManager:
                 except ValueError:
                     body = None
                 if not isinstance(body, dict) or body.get("ok") is not True:
-                    detail = body.get("description") if isinstance(body, dict) else None
-                    logger.error(
-                        "Telegram API did not confirm notification: %s",
-                        detail or "response was not a JSON object with ok=true",
-                    )
+                    # The response body is not logged: it is provider-controlled text.
+                    logger.error("Telegram API did not confirm notification (ok=true missing)")
                     return self._fail(service, "unconfirmed")
                 logger.info("Telegram notification sent successfully to %s", service.name)
                 return True
@@ -785,7 +782,8 @@ class NotificationManager:
                 except ValueError:
                     body = None
                 if not isinstance(body, dict) or body.get("status") != 1:
-                    logger.error("Pushover did not accept notification: %s", body)
+                    # The response body is not logged: it is provider-controlled text.
+                    logger.error("Pushover did not accept notification (status 1 missing)")
                     return self._fail(service, "unconfirmed")
                 logger.info("Pushover notification sent successfully to %s", service.name)
                 return True
