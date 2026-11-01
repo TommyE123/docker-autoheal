@@ -8,9 +8,12 @@ import html
 import logging
 import re
 from contextlib import AbstractAsyncContextManager, suppress
+from contextvars import ContextVar
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Protocol
+from urllib.parse import urlsplit
 
 import aiohttp
 
@@ -23,6 +26,49 @@ _HTTP_SUCCESS = range(200, 300)
 
 # Field labels produced by ``_format_notification`` (``**Label:** value`` at line start).
 _BOLD_LABEL = re.compile(r"^\*\*([^*\n]+:)\*\*", re.MULTILINE)
+
+
+@dataclass(frozen=True)
+class _Failure:
+    """Why a send failed: ``reason`` is safe for the UI, ``detail`` is masked for the log."""
+
+    reason: str
+    detail: str
+
+
+# Set by the sender that just failed. A ContextVar keeps concurrent tests from sharing it.
+_last_failure: ContextVar[_Failure | None] = ContextVar("notification_last_failure", default=None)
+
+_URL_IN_TEXT = re.compile(r"""[a-z][a-z0-9+.-]*://[^\s'"<>]+""", re.IGNORECASE)
+
+# Fields that can hold credentials or a credential-bearing URL.
+_SECRET_FIELDS = (
+    "url",
+    "server_url",
+    "topic",
+    "bot_token",
+    "access_token",
+    "password",
+    "app_token",
+    "api_token",
+    "user_key",
+)
+
+
+def _mask_secrets(text: str, service: Any) -> str:
+    """Replace every secret value of ``service`` found in ``text`` with ``***``."""
+    secrets = [getattr(service, field, None) for field in _SECRET_FIELDS]
+    secrets.extend((getattr(service, "headers", None) or {}).values())
+    for secret in sorted({v for v in secrets if isinstance(v, str) and v}, key=len, reverse=True):
+        text = text.replace(secret, "***")
+    # Any other URL in an error can carry a token in its path or query.
+    return _URL_IN_TEXT.sub("***", text)
+
+
+def _origin(url: str | None) -> str:
+    """Scheme and host of ``url`` only; the path and query can hold a token."""
+    parts = urlsplit(url or "")
+    return f"{parts.scheme}://{parts.hostname}" if parts.scheme and parts.hostname else "***"
 
 
 class _HttpResponse(Protocol):
@@ -158,6 +204,45 @@ class NotificationManager:
                 self._session = None
 
         logger.info("Notification manager stopped")
+
+    def _fail(
+        self,
+        service: Any,
+        kind: str,
+        *,
+        status: int | None = None,
+        url: str | None = None,
+        exc: Exception | None = None,
+    ) -> bool:
+        """
+        Record why a send failed, for ``send_test`` to report, and return False.
+
+        The UI reason names the provider, a category and an HTTP status only. The log
+        detail adds the underlying error text with the service's secrets masked.
+        """
+        provider = str(service.type).capitalize()
+        if kind == "status":
+            reason = f"{provider} rejected the request (HTTP {status})"
+            detail = f"HTTP {status} from {_origin(url)}/***"
+        elif kind == "error":
+            error_name = type(exc).__name__
+            if isinstance(exc, TimeoutError):
+                reason = "the request timed out"
+            elif isinstance(exc, aiohttp.ClientConnectionError):
+                reason = "could not connect to the server"
+            else:
+                reason = f"unexpected error ({error_name})"
+            detail = _mask_secrets(f"{error_name}: {exc}", service)
+        else:
+            reason = {
+                "unconfigured": f"{provider} settings are incomplete",
+                "no_session": "the notification manager is not running",
+                "redirected": f"{provider} redirected the request instead of accepting it",
+                "unconfirmed": f"{provider} did not confirm delivery",
+            }[kind]
+            detail = reason
+        _last_failure.set(_Failure(reason, detail))
+        return False
 
     def _get_session(self, service_label: str) -> _HttpSession | None:
         """
@@ -352,7 +437,7 @@ class NotificationManager:
         """Send generic webhook notification"""
         if not service.url:
             logger.warning("Webhook URL not configured")
-            return False
+            return self._fail(service, "unconfigured")
 
         payload = {
             "title": title,
@@ -375,7 +460,7 @@ class NotificationManager:
 
         session = self._get_session("webhook")
         if session is None:
-            return False
+            return self._fail(service, "no_session")
 
         try:
             # Redirects are not followed: aiohttp would turn a redirected POST into a GET
@@ -387,7 +472,7 @@ class NotificationManager:
                     # Status only: a server can reflect the request path (which may hold a
                     # token) in its error body, so the body is not logged.
                     logger.error("Webhook failed with status %s", response.status)
-                    return False
+                    return self._fail(service, "status", status=response.status, url=service.url)
                 logger.info("Webhook notification sent successfully to %s", service.name)
                 return True
         except Exception as e:
@@ -395,7 +480,7 @@ class NotificationManager:
             logger.error(
                 "Failed to send webhook notification: %s", type(e).__name__, exc_info=False
             )
-            return False
+            return self._fail(service, "error", exc=e)
 
     async def _send_discord(
         self,
@@ -408,7 +493,7 @@ class NotificationManager:
         """Send Discord webhook notification"""
         if not service.url:
             logger.warning("Discord webhook URL not configured")
-            return False
+            return self._fail(service, "unconfigured")
 
         # Color based on priority
         color_map = {
@@ -433,20 +518,20 @@ class NotificationManager:
 
         session = self._get_session("Discord")
         if session is None:
-            return False
+            return self._fail(service, "no_session")
 
         try:
             async with session.post(service.url, json=payload, allow_redirects=False) as response:
                 if response.status not in _HTTP_SUCCESS:
                     logger.error("Discord webhook failed with status %s", response.status)
-                    return False
+                    return self._fail(service, "status", status=response.status, url=service.url)
                 logger.info("Discord notification sent successfully to %s", service.name)
                 return True
         except Exception as e:
             logger.error(
                 "Failed to send Discord notification: %s", type(e).__name__, exc_info=False
             )
-            return False
+            return self._fail(service, "error", exc=e)
 
     async def _send_slack(
         self,
@@ -459,7 +544,7 @@ class NotificationManager:
         """Send Slack webhook notification"""
         if not service.url:
             logger.warning("Slack webhook URL not configured")
-            return False
+            return self._fail(service, "unconfigured")
 
         # Format message for Slack
         slack_message = message.replace("**", "*")
@@ -474,18 +559,18 @@ class NotificationManager:
 
         session = self._get_session("Slack")
         if session is None:
-            return False
+            return self._fail(service, "no_session")
 
         try:
             async with session.post(service.url, json=payload, allow_redirects=False) as response:
                 if response.status not in _HTTP_SUCCESS:
                     logger.error("Slack webhook failed with status %s", response.status)
-                    return False
+                    return self._fail(service, "status", status=response.status, url=service.url)
                 logger.info("Slack notification sent successfully to %s", service.name)
                 return True
         except Exception as e:
             logger.error("Failed to send Slack notification: %s", type(e).__name__, exc_info=False)
-            return False
+            return self._fail(service, "error", exc=e)
 
     async def _send_telegram(
         self,
@@ -498,7 +583,7 @@ class NotificationManager:
         """Send Telegram notification"""
         if not service.bot_token or not service.chat_id:
             logger.warning("Telegram bot token or chat ID not configured")
-            return False
+            return self._fail(service, "unconfigured")
 
         # Telegram HTML mode only needs &, < and > escaped, unlike legacy Markdown,
         # which rejects unbalanced "_" or "*" in container names and event text.
@@ -514,31 +599,28 @@ class NotificationManager:
 
         session = self._get_session("Telegram")
         if session is None:
-            return False
+            return self._fail(service, "no_session")
 
         try:
             async with session.post(url, json=payload) as response:
                 if response.status not in _HTTP_SUCCESS:
                     logger.error("Telegram API failed with status %s", response.status)
-                    return False
+                    return self._fail(service, "status", status=response.status, url=url)
                 try:
                     body = await response.json(content_type=None)
                 except ValueError:
                     body = None
                 if not isinstance(body, dict) or body.get("ok") is not True:
-                    detail = body.get("description") if isinstance(body, dict) else None
-                    logger.error(
-                        "Telegram API did not confirm notification: %s",
-                        detail or "response was not a JSON object with ok=true",
-                    )
-                    return False
+                    # The response body is not logged: it is provider-controlled text.
+                    logger.error("Telegram API did not confirm notification (ok=true missing)")
+                    return self._fail(service, "unconfirmed")
                 logger.info("Telegram notification sent successfully to %s", service.name)
                 return True
         except Exception as e:
             logger.error(
                 "Failed to send Telegram notification: %s", type(e).__name__, exc_info=False
             )
-            return False
+            return self._fail(service, "error", exc=e)
 
     async def _send_ntfy(
         self,
@@ -551,7 +633,7 @@ class NotificationManager:
         """Send ntfy.sh notification"""
         if not service.topic:
             logger.warning("Ntfy topic not configured")
-            return False
+            return self._fail(service, "unconfigured")
 
         # Ntfy priority mapping (1-5)
         priority_map = {
@@ -582,7 +664,7 @@ class NotificationManager:
 
         session = self._get_session("Ntfy")
         if session is None:
-            return False
+            return self._fail(service, "no_session")
 
         try:
             async with session.post(
@@ -594,15 +676,15 @@ class NotificationManager:
                         "Ntfy request was redirected and is no longer a POST (final method %s)",
                         response.method,
                     )
-                    return False
+                    return self._fail(service, "redirected")
                 if response.status not in _HTTP_SUCCESS:
                     logger.error("Ntfy failed with status %s", response.status)
-                    return False
+                    return self._fail(service, "status", status=response.status, url=url)
                 logger.info("Ntfy notification sent successfully to %s", service.name)
                 return True
         except Exception as e:
             logger.error("Failed to send Ntfy notification: %s", type(e).__name__, exc_info=False)
-            return False
+            return self._fail(service, "error", exc=e)
 
     async def _send_gotify(
         self,
@@ -615,7 +697,7 @@ class NotificationManager:
         """Send Gotify notification"""
         if not service.server_url or not service.app_token:
             logger.warning("Gotify server URL or app token not configured")
-            return False
+            return self._fail(service, "unconfigured")
 
         # Gotify priority mapping (0-10)
         priority_map = {
@@ -636,7 +718,7 @@ class NotificationManager:
 
         session = self._get_session("Gotify")
         if session is None:
-            return False
+            return self._fail(service, "no_session")
 
         try:
             async with session.post(url, json=payload, headers=headers) as response:
@@ -646,15 +728,15 @@ class NotificationManager:
                         "Gotify request was redirected and is no longer a POST (final method %s)",
                         response.method,
                     )
-                    return False
+                    return self._fail(service, "redirected")
                 if response.status not in _HTTP_SUCCESS:
                     logger.error("Gotify failed with status %s", response.status)
-                    return False
+                    return self._fail(service, "status", status=response.status, url=url)
                 logger.info("Gotify notification sent successfully to %s", service.name)
                 return True
         except Exception as e:
             logger.error("Failed to send Gotify notification: %s", type(e).__name__, exc_info=False)
-            return False
+            return self._fail(service, "error", exc=e)
 
     async def _send_pushover(
         self,
@@ -667,7 +749,7 @@ class NotificationManager:
         """Send Pushover notification"""
         if not service.user_key or not service.api_token:
             logger.warning("Pushover user key or API token not configured")
-            return False
+            return self._fail(service, "unconfigured")
 
         # Pushover priority mapping. Priority 2 (emergency) is avoided because
         # the API rejects it unless `retry` and `expire` are also sent.
@@ -689,27 +771,28 @@ class NotificationManager:
 
         session = self._get_session("Pushover")
         if session is None:
-            return False
+            return self._fail(service, "no_session")
 
         try:
             async with session.post(url, data=payload) as response:
                 if response.status not in _HTTP_SUCCESS:
                     logger.error("Pushover failed with status %s", response.status)
-                    return False
+                    return self._fail(service, "status", status=response.status, url=url)
                 try:
                     body = await response.json(content_type=None)
                 except ValueError:
                     body = None
                 if not isinstance(body, dict) or body.get("status") != 1:
-                    logger.error("Pushover did not accept notification: %s", body)
-                    return False
+                    # The response body is not logged: it is provider-controlled text.
+                    logger.error("Pushover did not accept notification (status 1 missing)")
+                    return self._fail(service, "unconfirmed")
                 logger.info("Pushover notification sent successfully to %s", service.name)
                 return True
         except Exception as e:
             logger.error(
                 "Failed to send Pushover notification: %s", type(e).__name__, exc_info=False
             )
-            return False
+            return self._fail(service, "error", exc=e)
 
     async def test_notification(self, service_name: str) -> dict[str, Any]:
         """
@@ -768,6 +851,7 @@ class NotificationManager:
         message = "This is a test notification from Docker Auto-Heal. If you received this, your notification service is configured correctly!"
         priority = NotificationPriority.NORMAL
 
+        _last_failure.set(None)
         try:
             if service.type == NotificationType.WEBHOOK:
                 delivered = await self._send_webhook(service, title, message, test_event, priority)
@@ -790,9 +874,21 @@ class NotificationManager:
                 }
 
             if not delivered:
+                failure = _last_failure.get()
+                if failure is None:
+                    return {
+                        "success": False,
+                        "message": f"Test notification to '{service.name}' was not delivered, see logs",
+                    }
+                logger.error(
+                    "Test notification failed for '%s' (%s): %s",
+                    service.name,
+                    service.type,
+                    failure.detail,
+                )
                 return {
                     "success": False,
-                    "message": f"Test notification to '{service.name}' was not delivered, see logs",
+                    "message": f"Test notification to '{service.name}' failed: {failure.reason}",
                 }
 
             return {"success": True, "message": "Test notification sent successfully"}
