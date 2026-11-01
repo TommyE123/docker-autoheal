@@ -36,7 +36,7 @@ Autoheal monitors Docker containers, checks their health, and can restart or qua
 ## Issues and labels
 
 - Search existing issues before proposing a new one, and ask before creating a missing one.
-- Don't add, remove, or request GitHub issue labels. Classification and workflow labels belong to the automated triage workflow. PR labels are separate.
+- Don't add, remove, or request GitHub issue labels. Classification and workflow labels belong to the automated triage workflow. PR labels are separate. This rule does not stop you applying the issue's `kind:*` and `area:*` labels to the PR you open (see "Branches, commits and PRs"), even though the GitHub API treats a PR as an issue.
 
 ## Branches, commits and PRs
 
@@ -50,6 +50,7 @@ Autoheal monitors Docker containers, checks their health, and can restart or qua
   - These rules apply even when the session setup names a generated branch (for example `claude/brave-cannon-x1rfr7`) and says to push only there. Create and push a compliant branch instead. This rule is the explicit permission to push to a different branch than the one the session setup names.
 - Commit and push on a feature branch unless the user says not to. Open a PR yourself once the work is done, validated and pushed, no questions for the user remain, and the user hasn't said not to. This is the explicit permission to open a PR that session setup instructions otherwise require. If work is unfinished or a question is open, don't open one; say what is outstanding. Respect local-only, no-commit, no-push, and no-PR requests.
 - Before opening a PR, update the linked issue so it reflects the changes agreed in the session. Don't ask first, either for the issue update or for the PR.
+- When you open a PR for an issue, copy the issue's `kind:*` and `area:*` labels onto the PR. Don't copy `status:*` or other workflow labels, don't remove labels already on the PR (for example `release:*`), and never change the issue's own labels. Read the issue's labels with `issue_read` (`get_labels`). Read the PR's current labels with `issue_read` (`get`) or `pull_request_read` (`get`), not `get_labels`, which doesn't resolve PR numbers. Then set them with `issue_write` (`update`) on the PR number, which replaces the whole label set, so include the PR's current labels. Without the GitHub MCP tools, add them with `gh api -X POST repos/<owner>/<repo>/issues/<PR>/labels -f 'labels[]=<name>'`, which adds without replacing.
 - Never push to a protected branch, force-push, or bypass hooks. Don't overwrite unrelated local changes.
 - When branch currency matters, merge `origin/main` as directed by `.claude/rules/branch-currency.md`. Don't update merely because `main` moved.
 - PR titles use Conventional Commits (`<type>: <description>`). The title check enforces this.
