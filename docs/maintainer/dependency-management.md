@@ -161,8 +161,11 @@ the files that only describe development tooling through `sonar.exclusions`:
 * `.devcontainer/package.json` and `.devcontainer/package-lock.json`, the Dev Container
   linters
 
-None of these ship in the Docker image, and osv-scanner in MegaLinter still scans all of
-them, so the findings stay visible there without failing the SonarCloud gate.
+None of these ship in the Docker image. osv-scanner in MegaLinter still scans all of them
+and lists its findings in the MegaLinter log, but that linter is configured as non-blocking
+(`DISABLE_ERRORS_LINTERS` in `.linter-rules/.mega-linter.yml`), so nothing fails on them.
+Renovate ignores `.mise/locks/**`, so those pins only move when the tool itself, such as
+Semgrep in `mise.toml`, is updated.
 `frontend/package-lock.json` stays in scope because it also holds the dependencies of the
 built web UI. Its development-only findings, when SonarCloud reports them, are accepted in
 the SonarCloud UI with a short reason.
