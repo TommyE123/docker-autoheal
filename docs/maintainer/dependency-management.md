@@ -20,6 +20,7 @@ updates are reviewed and merged.
 | Docker Compose images           | `docker-compose.yml`                                            | `docker-compose`                    |
 | GitHub Actions                  | `.github/workflows/*.yml`                                       | `github-actions`                    |
 | Dockerfile apt package versions | `Dockerfile`                                                    | `customManagers:dockerfileVersions` |
+| SonarCloud Python version       | `.sonarcloud.properties`                                        | custom `regex` manager              |
 
 The standard `config:recommended` preset provides the managers for the main dependency
 ecosystems above, including `mise` for the developer CLI tools pinned in `mise.toml`
@@ -149,6 +150,36 @@ groups **major** updates to `vite`, `@vitejs/plugin-react`, `vitest` and
 updates are not part of that group, and unrelated frontend dependencies such as React or
 ESLint are not grouped with it. Manual review and merge, the seven-day minimum release age and
 disabled automerge apply to the group as usual.
+
+### Python version grouping
+
+The Python version is pinned in three places: the `python` image in the `Dockerfile`, the
+`mcr.microsoft.com/devcontainers/python` image in `.devcontainer/Dockerfile`, and
+`sonar.python.version` in `.sonarcloud.properties`. SonarCloud runs automatic analysis, which
+reads `.sonarcloud.properties` from the default branch and ignores `sonar-project.properties`.
+That file also sets the test file patterns and the source encoding.
+
+A custom regex manager in `renovate.json` reads `sonar.python.version` through the
+`# renovate:` comment above it, and a package rule groups all three pins into one
+"Python runtime" pull request, so a new Python version moves them together. The tag formats
+differ (`3.14-slim`, `3.14-bookworm` and plain `3.14`), but Renovate resolves each to the same
+release. A new Python version is a minor or major update, so the grouped pull request needs
+manual review and merge like any other. If the Dev Container image has no tag for the new
+version yet, the other pins can update first and the Dev Container image follows in a later
+pull request.
+
+The general digest pinning rule is switched off for `.sonarcloud.properties`, because
+SonarCloud needs a bare version number there and not `3.15@sha256:…`.
+
+Renovate groups the updates that are available but does not make their target versions match.
+The plain and `-slim` tags can clear the seven-day age check at different times, so before
+merging a "Python runtime" pull request, compare the versions in the `Dockerfile`,
+`.devcontainer/Dockerfile` and `.sonarcloud.properties`. The Dev Container image comes from
+`mcr.microsoft.com`, which gives Renovate no release timestamps, so a package rule makes the age
+check optional for it. It is still held back by the seven-day wait wherever a timestamp exists.
+
+Keep the `# renovate:` comment directly above the `sonar.python.version` line when editing
+`.sonarcloud.properties`, or Renovate stops tracking it.
 
 ### Rebasing
 
