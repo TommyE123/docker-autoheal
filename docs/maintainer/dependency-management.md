@@ -24,7 +24,7 @@ updates are reviewed and merged.
 
 The standard `config:recommended` preset provides the managers for the main dependency
 ecosystems above, including `mise` for the developer CLI tools pinned in `mise.toml`
-(`actionlint`, `hadolint`, `osv-scanner`, `trivy`, `trufflehog`, `betterleaks`,
+(`actionlint`, `hadolint`, `trivy`, `trufflehog`, `betterleaks`,
 `editorconfig-checker`, `ruff`, `shellcheck`, `shfmt`, `semgrep`, `yamllint`, `zizmor`
 and `djlint`). A custom Renovate manager is also enabled for
 pinned versions of apt packages in the Dockerfiles.
@@ -151,6 +151,43 @@ updates are not part of that group, and unrelated frontend dependencies such as 
 ESLint are not grouped with it. Manual review and merge, the seven-day minimum release age and
 disabled automerge apply to the group as usual.
 
+### Vulnerability scanning
+
+Each kind of check has one owner, so a finding is triaged in one place:
+
+| Check                                                                                | Owner                                      | Blocks a PR                                              |
+|--------------------------------------------------------------------------------------|--------------------------------------------|----------------------------------------------------------|
+| Dependency vulnerabilities in lockfiles, and Dockerfile or Compose misconfigurations | Trivy, run by MegaLinter                   | Yes, through the required MegaLinter check               |
+| Code quality, security hotspots and the new-code quality gate                        | SonarCloud                                 | Yes, once `SonarCloud Code Analysis` is a required check |
+| Fixing vulnerable dependencies                                                       | Renovate, using GitHub's Dependabot alerts | It opens the PRs                                         |
+
+Development tooling is not tracked for dependency vulnerabilities. That covers the generated
+tool environments under `.mise/locks/` (Semgrep, yamllint, djlint) and the Dev Container
+linters in `.devcontainer/package-lock.json`. None of them ship in the Docker image, and
+Renovate already ignores `.mise/locks/`. Trivy skips those lockfiles with `scan.skip-files` in
+`.linter-rules/.trivy.yaml`, so a vulnerability in one of those tools, or in its own
+dependencies, is not flagged. This avoids a per-CVE entry in
+`.linter-rules/.trivyignore.yaml` each time a tool dependency gets an advisory, and that file
+now only holds acknowledged misconfigurations. The Trivy config uses `skip-files`, not
+`skip-dirs`, because MegaLinter passes `--skip-dirs` on the command line and that would
+override the config file. `frontend/package-lock.json` stays in scope because it also holds the
+dependencies of the built web UI.
+
+osv-scanner has been removed (it is no longer in MegaLinter or `mise.toml`) because it
+duplicated Trivy without blocking anything, and its transitive Python results were false
+positives. SonarCloud's own dependency scan is switched off in the SonarCloud settings (under
+Advanced Security), for the same reason and because automatic analysis only sees direct
+dependencies where there is no lockfile. `.sonarcloud.properties` does not control this
+setting. The scan is not tracked in this repository, so check the SonarCloud settings if the
+`main` quality gate fails on "New dependency risks too severe".
+
+Python transitive dependencies are not pinned in `requirements.txt` and there is no Python
+lockfile, so a lockfile scan only sees the direct dependencies there. Scanning the built image
+is the planned way to cover them.
+
+[`SECURITY.md`](../../SECURITY.md) describes how to report a vulnerability, and states that
+development tooling is out of scope for dependency scanning.
+
 ### Python version grouping
 
 The Python version is pinned in three places: the `python` image in the `Dockerfile`, the
@@ -241,9 +278,10 @@ automatically merging them can still introduce compatibility or behavioural chan
   dependency is behaviourally risk-free.
 
 * **`checkov` as a Dev Container tool** — it is deliberately absent from
-  `mise.toml`. Installing it alongside `semgrep` hangs
-  `osv-scanner`'s pip transitive-dependency resolver indefinitely (each resolves fine alone in
-  ~12–13s; together `osv-scanner` never returns, even with a 600s timeout). `semgrep` is the
+  `mise.toml`. Installing it alongside `semgrep` used to hang
+  `osv-scanner`'s pip transitive-dependency resolver indefinitely (each resolved fine alone in
+  ~12–13s; together `osv-scanner` never returned, even with a 600s timeout). `osv-scanner` has
+  since been removed, so that reason no longer applies, but `checkov` is still left out. `semgrep` is the
   one kept because it catches app-level issues nothing else in the local stack checks for,
   whereas checkov's actual findings in this repo (Dockerfile non-root user, Actions
   permissions) are already covered by Trivy and zizmor. Checkov still runs in CI through
