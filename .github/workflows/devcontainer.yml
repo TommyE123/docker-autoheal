@@ -32,7 +32,7 @@ concurrency:
 jobs:
   devcontainer:
     name: Build and test Dev Container
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     env:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
