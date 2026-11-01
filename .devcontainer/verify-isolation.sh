@@ -26,12 +26,12 @@ remove_probes() {
 on_exit() {
   local status=$?
   remove_probes
-  if [ -n "${config_backup}" ]; then
+  if [[ -n "${config_backup}" ]]; then
     # The snapshot can hold tokens, so send it on stdin rather than in curl's argument list.
     if ! curl -fsS -X PUT -H 'Content-Type: application/json' --data-binary @- \
       "${base_url}/api/config" >/dev/null <<<"${config_backup}"; then
       echo "::error::Could not restore the original Autoheal configuration at ${base_url}/api/config" >&2
-      [ "${status}" -ne 0 ] || status=1
+      [[ "${status}" -ne 0 ]] || status=1
     fi
   fi
   exit "${status}"
@@ -46,7 +46,7 @@ pgrep -x dockerd >/dev/null || {
   exit 1
 }
 daemon_name="$(docker info --format '{{.Name}}')"
-if [ "${daemon_name}" != "$(hostname)" ]; then
+if [[ "${daemon_name}" != "$(hostname)" ]]; then
   echo "::error::Docker daemon '${daemon_name}' is not this container's own daemon ('$(hostname)')" >&2
   exit 1
 fi
@@ -73,7 +73,7 @@ curl -fsS "${base_url}/health" >/dev/null || {
 config="$(curl -fsS "${base_url}/api/config")"
 label_key="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["monitor"]["label_key"])' <<<"${config}")"
 label_value="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["monitor"]["label_value"])' <<<"${config}")"
-if [ "${label_key}=${label_value}" != "autoheal.dev=true" ]; then
+if [[ "${label_key}=${label_value}" != "autoheal.dev=true" ]]; then
   echo "::error::${base_url} monitors ${label_key}=${label_value}, not the dev label autoheal.dev=true" >&2
   exit 1
 fi
@@ -88,7 +88,7 @@ victim_id="$(docker run -d --name "${victim}" --restart no --label "${label_key}
 
 recovered=false
 deadline=$((SECONDS + timeout_seconds))
-while [ "${SECONDS}" -lt "${deadline}" ]; do
+while [[ "${SECONDS}" -lt "${deadline}" ]]; do
   if curl -fsS "${base_url}/api/events?event_type=restart&container=${victim}" |
     python3 -c 'import json,sys; sys.exit(0 if any(e["status"] == "success" and e["container_id"] == sys.argv[1] for e in json.load(sys.stdin)) else 1)' "${victim_id}"; then
     recovered=true
@@ -96,7 +96,7 @@ while [ "${SECONDS}" -lt "${deadline}" ]; do
   fi
   sleep 5
 done
-if [ "${recovered}" != "true" ]; then
+if [[ "${recovered}" != "true" ]]; then
   echo "::error::Autoheal did not restart ${victim} within ${timeout_seconds}s" >&2
   exit 1
 fi
