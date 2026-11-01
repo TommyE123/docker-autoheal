@@ -68,21 +68,6 @@ checksum = "sha256:44efaef3ed14c6ab52eb87481d78e5e5c204796dccf26e2f4598a61ba17f8
 url = "https://github.com/editorconfig-checker/editorconfig-checker/releases/download/v4.0.2/editorconfig-checker-linux-amd64.tar.gz"
 url_api = "https://api.github.com/repos/editorconfig-checker/editorconfig-checker/releases/assets/574675771"
 
-[[tools."aqua:google/osv-scanner"]]
-version = "2.7.0"
-backend = "aqua:google/osv-scanner"
-specifiers = ["2.7.0"]
-
-[tools."aqua:google/osv-scanner"."platforms.linux-arm64"]
-checksum = "sha256:4061ef4c021ed3c47f203b818f337e351336cc5cd67c0274fc36bd1dfc728dd7"
-url = "https://github.com/google/osv-scanner/releases/download/v2.7.0/osv-scanner_linux_arm64"
-url_api = "https://api.github.com/repos/google/osv-scanner/releases/assets/632251568"
-
-[tools."aqua:google/osv-scanner"."platforms.linux-x64"]
-checksum = "sha256:160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b"
-url = "https://github.com/google/osv-scanner/releases/download/v2.7.0/osv-scanner_linux_amd64"
-url_api = "https://api.github.com/repos/google/osv-scanner/releases/assets/632251666"
-
 [[tools."aqua:hadolint/hadolint"]]
 version = "2.15.1"
 backend = "aqua:hadolint/hadolint"

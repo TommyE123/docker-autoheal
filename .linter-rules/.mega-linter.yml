@@ -27,11 +27,11 @@ DISABLE_LINTERS:
   - PYTHON_MYPY
   - PYTHON_PYLINT
   - REPOSITORY_GRYPE
+  - REPOSITORY_OSV_SCANNER
   - REPOSITORY_SYFT
 
 DISABLE_ERRORS_LINTERS:
   - ACTION_ZIZMOR
-  - REPOSITORY_OSV_SCANNER
 
 # ---------------------------------------------------------------------------
 # Global MegaLinter configuration

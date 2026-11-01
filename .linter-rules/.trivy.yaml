@@ -1,1 +1,18 @@
 ignorefile: .linter-rules/.trivyignore.yaml
+
+# Development tooling is deliberately not scanned for dependency vulnerabilities
+# (see SECURITY.md). These lockfiles belong to linters and generated tool
+# environments that never ship in the Docker image:
+#   - .mise/locks/**: the Semgrep, yamllint and djlint environments mise installs
+#   - .devcontainer/package-lock.json: the npm linters MegaLinter uses
+# Skipping them avoids a per-CVE ignore entry every time a tool dependency gets an
+# advisory. Each pattern is listed with and without a leading **/ so it matches
+# at the repository root as well as in subfolders. Use skip-files and not
+# skip-dirs: MegaLinter passes --skip-dirs on the command line, which would
+# override a skip-dirs setting in this file.
+scan:
+  skip-files:
+    - ".mise/locks/**/uv.lock"
+    - "**/.mise/locks/**/uv.lock"
+    - ".devcontainer/package-lock.json"
+    - "**/.devcontainer/package-lock.json"
