@@ -11,6 +11,7 @@ and the fake Docker client/monitoring engine mean no real Docker daemon is
 ever touched.
 """
 
+import logging
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock
 
@@ -435,6 +436,45 @@ class TestUpdateContainerSelection:
         updated = config_manager.get_config()
         assert "ghost-container" in updated.containers.selected
         assert "ghost-container" not in updated.containers.excluded
+
+    @pytest.mark.parametrize(
+        ("enabled", "added_to", "removed_from"),
+        [(True, "selected", "excluded"), (False, "excluded", "selected")],
+    )
+    async def test_resolved_container_logs_which_list_it_moved_between(
+        self, wired_api, caplog, enabled, added_to, removed_from
+    ):
+        docker_client, _engine = wired_api
+        cid = "a" * 64
+        container, info = make_container(name="web", container_id=cid)
+        docker_client.add_container(container, info)
+        config = config_manager.get_config()
+        setattr(config.containers, removed_from, ["web", cid])
+        config_manager.update_config(config)
+
+        with caplog.at_level(logging.DEBUG, logger="app.api.routes.containers"):
+            await update_container_selection(
+                ContainerSelectionRequest(container_ids=[cid], enabled=enabled)
+            )
+
+        messages = [r.getMessage() for r in caplog.records if r.levelno == logging.DEBUG]
+        assert f"Added container 'web' with stable_id 'web' to {added_to} list (ID: {cid})" in (
+            messages
+        )
+        assert f"Removed 'web' from {removed_from} list" in messages
+        assert f"Removed '{cid}' from {removed_from} list" in messages
+
+    @pytest.mark.parametrize(("enabled", "added_to"), [(True, "selected"), (False, "excluded")])
+    async def test_unresolved_container_logs_which_list_it_was_added_to(
+        self, wired_api, caplog, enabled, added_to
+    ):
+        with caplog.at_level(logging.DEBUG, logger="app.api.routes.containers"):
+            await update_container_selection(
+                ContainerSelectionRequest(container_ids=["ghost"], enabled=enabled)
+            )
+
+        messages = [r.getMessage() for r in caplog.records if r.levelno == logging.DEBUG]
+        assert f"Added container ghost to {added_to} list (container not resolved)" in messages
 
     @pytest.mark.parametrize("enabled", [True, False])
     @pytest.mark.parametrize(

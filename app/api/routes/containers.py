@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.api import state
 from app.api.models import ContainerInfo, ContainerSelectionRequest
-from app.config.config_manager import AutoHealEvent, config_manager
+from app.config.config_manager import AutoHealEvent, ContainersConfig, config_manager
 
 if TYPE_CHECKING:
     from app.docker_client.docker_client_wrapper import DockerClientWrapper
@@ -208,6 +208,54 @@ def _stable_id_from_info(info: dict | None) -> str | None:
     return info.get("name")
 
 
+def _apply_selection(
+    containers: ContainersConfig,
+    cid: str,
+    info: dict | None,
+    enabled: bool,
+) -> None:
+    """
+    Move one container into the selected (``enabled``) or excluded list and
+    out of the opposite one.
+
+    The container is stored by its stable identifier so the choice survives
+    recreation. If it could not be resolved, the identifier is stored as-is.
+    """
+    if enabled:
+        add_to, remove_from = containers.selected, containers.excluded
+        add_label, remove_label = "selected", "excluded"
+    else:
+        add_to, remove_from = containers.excluded, containers.selected
+        add_label, remove_label = "excluded", "selected"
+
+    stable_id = _stable_id_from_info(info)
+    if info is None or stable_id is None:
+        # Fallback: store the identifier as-is
+        if cid not in add_to:
+            add_to.append(cid)
+            logger.debug("Added container %s to %s list (container not resolved)", cid, add_label)
+        if cid in remove_from:
+            remove_from.remove(cid)
+        return
+
+    container_name = info.get("name")
+    if stable_id not in add_to:
+        add_to.append(stable_id)
+        logger.debug(
+            "Added container '%s' with stable_id '%s' to %s list (ID: %s)",
+            container_name,
+            stable_id,
+            add_label,
+            cid,
+        )
+
+    # Remove from the opposite list if present (check stable_id, name, and ID)
+    for identifier in (i for i in (stable_id, container_name, cid) if i is not None):
+        if identifier in remove_from:
+            remove_from.remove(identifier)
+            logger.debug("Removed '%s' from %s list", identifier, remove_label)
+
+
 @router.post("/api/containers/select")
 async def update_container_selection(request: ContainerSelectionRequest):
     """Enable or disable auto-heal for specific containers"""
@@ -236,76 +284,8 @@ async def update_container_selection(request: ContainerSelectionRequest):
 
         config = config_manager.get_config()
 
-        if request.enabled:
-            # Add to selected list - resolve stable identifiers for persistence
-            for cid in request.container_ids:
-                # Try to get container to resolve its stable identifier
-                info = resolved[cid]
-                container_name = info.get("name") if info else None
-                stable_id = _stable_id_from_info(info)
-                if info is not None and stable_id is not None:
-                    # Store by stable_id for persistence across recreations
-                    if stable_id not in config.containers.selected:
-                        config.containers.selected.append(stable_id)
-                        logger.debug(
-                            "Added container '%s' with stable_id '%s' to selected list (ID: %s)",
-                            container_name,
-                            stable_id,
-                            cid,
-                        )
-
-                    # Remove from excluded if present (check stable_id, name, and ID)
-                    for identifier in [
-                        i for i in (stable_id, container_name, cid) if i is not None
-                    ]:
-                        if identifier in config.containers.excluded:
-                            config.containers.excluded.remove(identifier)
-                            logger.debug("Removed '%s' from excluded list", identifier)
-                else:
-                    # Fallback: store the identifier as-is
-                    if cid not in config.containers.selected:
-                        config.containers.selected.append(cid)
-                        logger.debug(
-                            "Added container %s to selected list (container not resolved)",
-                            cid,
-                        )
-                    if cid in config.containers.excluded:
-                        config.containers.excluded.remove(cid)
-        else:
-            # Add to excluded list - resolve stable identifiers for persistence
-            for cid in request.container_ids:
-                # Try to get container to resolve its stable identifier
-                info = resolved[cid]
-                container_name = info.get("name") if info else None
-                stable_id = _stable_id_from_info(info)
-                if info is not None and stable_id is not None:
-                    # Store by stable_id for persistence across recreations
-                    if stable_id not in config.containers.excluded:
-                        config.containers.excluded.append(stable_id)
-                        logger.debug(
-                            "Added container '%s' with stable_id '%s' to excluded list (ID: %s)",
-                            container_name,
-                            stable_id,
-                            cid,
-                        )
-
-                    # Remove from selected if present (check stable_id, name, and ID)
-                    for identifier in [
-                        i for i in (stable_id, container_name, cid) if i is not None
-                    ]:
-                        if identifier in config.containers.selected:
-                            config.containers.selected.remove(identifier)
-                            logger.debug("Removed '%s' from selected list", identifier)
-                else:
-                    # Fallback: store the identifier as-is
-                    if cid not in config.containers.excluded:
-                        config.containers.excluded.append(cid)
-                        logger.debug(
-                            "Added container %s to excluded list (container not resolved)",
-                            cid,
-                        )
-                    if cid in config.containers.selected:
-                        config.containers.selected.remove(cid)
+        for cid in request.container_ids:
+            _apply_selection(config.containers, cid, resolved[cid], request.enabled)
 
         config_manager.update_config(config)
 
