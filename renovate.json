@@ -45,7 +45,8 @@
       "matchDatasources": ["docker"],
       "matchPackageNames": ["python", "mcr.microsoft.com/devcontainers/python"],
       "matchUpdateTypes": ["major", "minor"],
-      "enabled": false
+      "groupName": "Python runtime",
+      "minimumGroupSize": 3
     },
     {
       "description": "Keep automerge disabled by default for all dependency updates. A later, narrower rule enables it only for eligible patch updates. See docs/maintainer/dependency-management.md.",
