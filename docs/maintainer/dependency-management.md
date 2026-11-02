@@ -185,6 +185,8 @@ When adopting a new Python release, update all three references in one PR:
 2. Update the Dev Container image tag and corresponding digest in
    `.devcontainer/Dockerfile`.
 3. Update `sonar.python.version` in `.sonarcloud.properties`.
+4. Update `target-version` in `.linter-rules/.ruff.toml`
+   to match the new Python version.
 
 The tag formats differ (for example, `3.15-slim`, `3.15-bookworm` and plain
 `3.15`), but all three must refer to the same Python release.
