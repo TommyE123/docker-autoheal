@@ -46,7 +46,8 @@
       "matchPackageNames": ["python", "mcr.microsoft.com/devcontainers/python"],
       "matchUpdateTypes": ["major", "minor"],
       "groupName": "Python runtime",
-      "minimumGroupSize": 3
+      "minimumGroupSize": 3,
+      "minimumReleaseAge": "7 days"
     },
     {
       "description": "Keep automerge disabled by default for all dependency updates. A later, narrower rule enables it only for eligible patch updates. See docs/maintainer/dependency-management.md.",
