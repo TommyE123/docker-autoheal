@@ -119,6 +119,7 @@ def test_python_runtime_versions_are_aligned():
     dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
     devcontainer = (REPO_ROOT / ".devcontainer" / "Dockerfile").read_text(encoding="utf-8")
     sonar = (REPO_ROOT / ".sonarcloud.properties").read_text(encoding="utf-8")
+    pyright = (REPO_ROOT / "pyrightconfig.json").read_text(encoding="utf-8")
     ruff = (REPO_ROOT / ".linter-rules" / ".ruff.toml").read_text(encoding="utf-8")
 
     docker_version = re.search(
@@ -137,6 +138,11 @@ def test_python_runtime_versions_are_aligned():
         sonar,
         re.MULTILINE,
     )
+    pyright_version = re.search(
+        r'^\s*"pythonVersion"\s*:\s*"(\d+\.\d+)"',
+        pyright,
+        re.MULTILINE,
+    )
     ruff_version = re.search(
         r'^target-version\s*=\s*"(py\d+)"$',
         ruff,
@@ -146,12 +152,14 @@ def test_python_runtime_versions_are_aligned():
     assert docker_version, "Python version not found in Dockerfile"
     assert devcontainer_version, "Python version not found in Dev Container"
     assert sonar_version, "Python version not found in SonarCloud configuration"
+    assert pyright_version, "Python version not found in pyrightconfig.json"
     assert ruff_version, "Ruff target-version not found"
 
     versions = {
         "Dockerfile": docker_version.group(1),
         "Dev Container": devcontainer_version.group(1),
         "SonarCloud": sonar_version.group(1),
+        "Pyright": pyright_version.group(1),
     }
 
     assert len(set(versions.values())) == 1, f"Python runtime versions are inconsistent: {versions}"
