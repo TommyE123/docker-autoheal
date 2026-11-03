@@ -37,14 +37,27 @@
       "matchStrings": [
         "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s+versioning=(?<versioning>\\S+)\\s*\\nsonar\\.python\\.version=(?<currentValue>\\S+)"
       ]
+    },
+    {
+      "customType": "regex",
+      "description": "Track the Python version Pyright checks against (pythonVersion in pyrightconfig.json), so it moves with the other Python runtime pins.",
+      "managerFilePatterns": ["/^pyrightconfig\\.json$/"],
+      "matchStrings": [
+        "\"pythonVersion\":\\s*\"(?<currentValue>\\d+\\.\\d+)\""
+      ],
+      "depNameTemplate": "python",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
     }
   ],
   "packageRules": [
     {
-      "description": "Update the Python version everywhere it is pinned in one PR: the Dockerfile image, the Dev Container image and sonar.python.version in .sonarcloud.properties. Python releases are minor or major updates, so the grouped PR keeps automerge disabled and needs manual review.",
+      "description": "Update the Python version everywhere Renovate can reach it in one PR: the Dockerfile image, the Dev Container image, sonar.python.version and pythonVersion in pyrightconfig.json. minimumGroupSize must equal the number of pins, so the PR is only created once all of them have an update. Ruff's target-version cannot be tracked by Renovate; the contract test in app/tests/unit/test_dev_stack_files.py fails until it is changed by hand. Only major and minor updates are grouped, so routine digest refreshes of the existing tags are not held back by the minimum. Python releases are minor or major updates, so automerge stays disabled.",
       "matchDatasources": ["docker"],
       "matchPackageNames": ["python", "mcr.microsoft.com/devcontainers/python"],
+      "matchUpdateTypes": ["major", "minor"],
       "groupName": "Python runtime",
+      "minimumGroupSize": 4,
       "minimumReleaseAge": "7 days"
     },
     {
@@ -105,9 +118,9 @@
       "pinDigests": true
     },
     {
-      "description": "sonar.python.version in .sonarcloud.properties is a bare version number that SonarCloud parses, so it must never get a digest appended. Keep this after the general digest pinning rule.",
+      "description": "sonar.python.version in .sonarcloud.properties and pythonVersion in pyrightconfig.json are bare version numbers that their tools parse, so they must never get a digest appended. Keep this after the general digest pinning rule.",
       "matchManagers": ["custom.regex"],
-      "matchFileNames": [".sonarcloud.properties"],
+      "matchFileNames": [".sonarcloud.properties", "pyrightconfig.json"],
       "pinDigests": false
     },
     {
