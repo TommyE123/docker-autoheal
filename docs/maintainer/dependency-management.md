@@ -221,7 +221,7 @@ into it. Do not tick the pull request's rebase/retry checkbox after editing: Ren
 the branch from scratch and discards the manual `target-version` change, and the unit test fails
 again until it is re-applied.
 
-Keep the `# renovate: comment directly above the `sonar.python.version` line when editing
+Keep the `# renovate:` comment directly above the `sonar.python.version` line when editing
 `.sonarcloud.properties`, or Renovate stops tracking it.
 
 Python versions in lock files are not tracked here. The `requires-python` constraints in
