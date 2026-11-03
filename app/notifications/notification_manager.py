@@ -59,8 +59,16 @@ def _mask_secrets(text: str, service: Any) -> str:
     """Replace every secret value of ``service`` found in ``text`` with ``***``."""
     secrets = [getattr(service, field, None) for field in _SECRET_FIELDS]
     secrets.extend((getattr(service, "headers", None) or {}).values())
+    # A bare host can carry a credential too (for example a per-endpoint subdomain), and
+    # connection errors print it without a scheme, so the URL replacement alone misses it.
+    secrets.extend(
+        urlsplit(u).hostname
+        for u in (getattr(service, f, None) for f in ("url", "server_url"))
+        if u
+    )
+    # Case-insensitive: a hostname is lowercased when parsed, but an error may print it as typed.
     for secret in sorted({v for v in secrets if isinstance(v, str) and v}, key=len, reverse=True):
-        text = text.replace(secret, "***")
+        text = re.sub(re.escape(secret), "***", text, flags=re.IGNORECASE)
     # Any other URL in an error can carry a token in its path or query.
     return _URL_IN_TEXT.sub("***", text)
 
@@ -68,7 +76,7 @@ def _mask_secrets(text: str, service: Any) -> str:
 def _origin(url: str | None) -> str:
     """Scheme and host of ``url`` only; the path and query can hold a token."""
     parts = urlsplit(url or "")
-    return f"{parts.scheme}://{parts.hostname}" if parts.scheme and parts.hostname else "***"
+    return f"{parts.scheme}://{parts.hostname}" if parts.scheme and parts.hostname else ""
 
 
 class _HttpResponse(Protocol):
@@ -223,7 +231,10 @@ class NotificationManager:
         provider = str(service.type).capitalize()
         if kind == "status":
             reason = f"{provider} rejected the request (HTTP {status})"
-            detail = f"HTTP {status} from {_origin(url)}/***"
+            # Only senders with a fixed provider URL pass ``url``: a host the user typed in can
+            # carry a credential, so it is never printed.
+            origin = _origin(url)
+            detail = f"HTTP {status} from {origin}/***" if origin else f"HTTP {status} from ***"
         elif kind == "error":
             error_name = type(exc).__name__
             if isinstance(exc, TimeoutError):
@@ -472,7 +483,7 @@ class NotificationManager:
                     # Status only: a server can reflect the request path (which may hold a
                     # token) in its error body, so the body is not logged.
                     logger.error("Webhook failed with status %s", response.status)
-                    return self._fail(service, "status", status=response.status, url=service.url)
+                    return self._fail(service, "status", status=response.status)
                 logger.info("Webhook notification sent successfully to %s", service.name)
                 return True
         except Exception as e:
@@ -524,7 +535,7 @@ class NotificationManager:
             async with session.post(service.url, json=payload, allow_redirects=False) as response:
                 if response.status not in _HTTP_SUCCESS:
                     logger.error("Discord webhook failed with status %s", response.status)
-                    return self._fail(service, "status", status=response.status, url=service.url)
+                    return self._fail(service, "status", status=response.status)
                 logger.info("Discord notification sent successfully to %s", service.name)
                 return True
         except Exception as e:
@@ -565,7 +576,7 @@ class NotificationManager:
             async with session.post(service.url, json=payload, allow_redirects=False) as response:
                 if response.status not in _HTTP_SUCCESS:
                     logger.error("Slack webhook failed with status %s", response.status)
-                    return self._fail(service, "status", status=response.status, url=service.url)
+                    return self._fail(service, "status", status=response.status)
                 logger.info("Slack notification sent successfully to %s", service.name)
                 return True
         except Exception as e:
@@ -679,7 +690,7 @@ class NotificationManager:
                     return self._fail(service, "redirected")
                 if response.status not in _HTTP_SUCCESS:
                     logger.error("Ntfy failed with status %s", response.status)
-                    return self._fail(service, "status", status=response.status, url=url)
+                    return self._fail(service, "status", status=response.status)
                 logger.info("Ntfy notification sent successfully to %s", service.name)
                 return True
         except Exception as e:
@@ -731,7 +742,7 @@ class NotificationManager:
                     return self._fail(service, "redirected")
                 if response.status not in _HTTP_SUCCESS:
                     logger.error("Gotify failed with status %s", response.status)
-                    return self._fail(service, "status", status=response.status, url=url)
+                    return self._fail(service, "status", status=response.status)
                 logger.info("Gotify notification sent successfully to %s", service.name)
                 return True
         except Exception as e:

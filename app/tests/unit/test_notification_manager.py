@@ -1893,7 +1893,8 @@ async def test_send_test_http_failure_reports_provider_and_status_without_secret
     }
     _assert_no_secrets(result["message"])
     _assert_no_secrets(caplog.text)
-    assert f"Test notification failed for 'svc' ({kind}): HTTP 404 from https://" in caplog.text
+    host = "https://api." if kind in ("telegram", "pushover") else "***"
+    assert f"Test notification failed for 'svc' ({kind}): HTTP 404 from {host}" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -2001,3 +2002,35 @@ async def test_send_test_unconfirmed_2xx_does_not_expose_response_body(
     assert result["message"].endswith("did not confirm delivery")
     _assert_no_secrets(result["message"])
     _assert_no_secrets(caplog.text)
+
+
+_SECRET_HOST = "SECRET-HOST-TOKEN.example.invalid"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["webhook", "discord", "slack", "ntfy", "gotify"])
+async def test_send_test_does_not_log_a_user_supplied_host(
+    kind, caplog, manager: NotificationManager
+):
+    """A host the user typed in can carry a credential, such as a per-endpoint subdomain."""
+    service = _SECRET_SERVICES[kind].model_copy(
+        update={"url": f"https://{_SECRET_HOST}/hook", "server_url": f"https://{_SECRET_HOST}"}
+    )
+
+    class _BareHostSession:
+        def post(self, *args, **kwargs):
+            raise aiohttp.ClientConnectionError(f"Cannot connect to host {_SECRET_HOST}:443 ssl")
+
+        async def close(self) -> None:
+            pass
+
+    with caplog.at_level(logging.DEBUG):
+        manager._session = _FakeSession(status=404)
+        status_result = await manager.send_test(service)
+        manager._session = _BareHostSession()
+        error_result = await manager.send_test(service)
+
+    assert "HTTP 404 from ***" in caplog.text
+    assert "Cannot connect to host ***:443 ssl" in caplog.text
+    for text in (caplog.text, status_result["message"], error_result["message"]):
+        assert "SECRET-HOST-TOKEN" not in text
