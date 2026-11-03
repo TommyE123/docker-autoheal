@@ -61,11 +61,9 @@ def _mask_secrets(text: str, service: Any) -> str:
     secrets.extend((getattr(service, "headers", None) or {}).values())
     # A bare host can carry a credential too (for example a per-endpoint subdomain), and
     # connection errors print it without a scheme, so the URL replacement alone misses it.
-    secrets.extend(
-        urlsplit(u).hostname
-        for u in (getattr(service, f, None) for f in ("url", "server_url"))
-        if u
-    )
+    for field in ("url", "server_url"):
+        with suppress(ValueError):  # a malformed URL must not hide the failure reason
+            secrets.append(urlsplit(getattr(service, field, None) or "").hostname)
     # Case-insensitive: a hostname is lowercased when parsed, but an error may print it as typed.
     for secret in sorted({v for v in secrets if isinstance(v, str) and v}, key=len, reverse=True):
         text = re.sub(re.escape(secret), "***", text, flags=re.IGNORECASE)

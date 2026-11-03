@@ -2034,3 +2034,26 @@ async def test_send_test_does_not_log_a_user_supplied_host(
     assert "Cannot connect to host ***:443 ssl" in caplog.text
     for text in (caplog.text, status_result["message"], error_result["message"]):
         assert "SECRET-HOST-TOKEN" not in text
+
+
+@pytest.mark.asyncio
+async def test_send_test_reports_the_reason_when_the_url_is_malformed(
+    caplog, manager: NotificationManager
+):
+    """urlsplit raises on a URL like this; the failure reason must still reach the user."""
+    service = NotificationService(name="svc", type="webhook", enabled=True, url="http://[bad/x")
+
+    class _FailingSession:
+        def post(self, *args, **kwargs):
+            raise aiohttp.ClientConnectionError("cannot connect")
+
+        async def close(self) -> None:
+            pass
+
+    manager._session = _FailingSession()
+
+    with caplog.at_level(logging.DEBUG):
+        result = await manager.send_test(service)
+
+    assert result["message"] == "Test notification to 'svc' failed: could not connect to the server"
+    assert "ClientConnectionError: cannot connect" in caplog.text
