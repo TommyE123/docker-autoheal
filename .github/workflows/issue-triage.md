@@ -181,7 +181,8 @@ combinations are the `github issue_read ... | jq ...` fetch pipe and the
    them for step 3: the reporter's replies (comments by the issue's author)
    count as classification input there, and the same comments are searched for
    the needs-information marker in outcome B.
-2. Your next call reads `.github/labels.yml` for the exact allowed `kind:*`, `area:*`, and
+2. Your next call (after any comment pages from step 1) reads
+   `.github/labels.yml` for the exact allowed `kind:*`, `area:*`, and
    `status:*` label names. The file is short, so read the whole file. If the
    read returns nothing, retry without a line range or run
    `cat .github/labels.yml`.
@@ -234,9 +235,10 @@ combinations are the `github issue_read ... | jq ...` fetch pipe and the
 
 You need only two things: the issue (step 1) and the label list (step 2), which
 describes every label. Decide as soon as you have both. Do not run `git`, do
-not list directories or search the repository, do not read any file other than
-`.github/labels.yml`, and do not call a tool that is not named in this prompt.
-Those calls are denied or only use up your request limit.
+not list directories or search the repository, and do not read any file other
+than `.github/labels.yml` and the comment file you write in outcome B. Do not
+call a tool that is not named in this prompt. Those calls are denied or only
+use up your request limit.
 
 ## Rules
 
