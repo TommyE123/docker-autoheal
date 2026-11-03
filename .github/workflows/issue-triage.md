@@ -64,21 +64,41 @@ features:
   # the "queue" concurrency key gh-aw emits by default; disable it rather
   # than exempt the compiled output from linting.
   group-concurrency-queue: false
+# The issue is fetched here, on the runner, before the agent starts, so the
+# agent does not have to find and call a GitHub read tool (Flash Lite spent its
+# requests hunting for labels on a new issue, run 41282434689, #129). The step
+# passes the issue number and repository through env, never into the script
+# text, and writes the issue text only to a file; it is read as data by the
+# agent. Runs outside the firewall with the default GITHUB_TOKEN
+# (issues: read). pre-agent-steps is used rather than steps because a steps
+# block replaces the default checkout, which the prompt needs for labels.yml.
+pre-agent-steps:
+  - name: Fetch issue for triage
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ISSUE_NUMBER: ${{ github.event.issue.number || github.event.inputs.issue_number }}
+      REPO: ${{ github.repository }}
+    run: |
+      set -euo pipefail
+      mkdir -p /tmp/gh-aw/agent
+      issue=$(gh api "repos/${REPO}/issues/${ISSUE_NUMBER}")
+      comments=$(gh api --paginate "repos/${REPO}/issues/${ISSUE_NUMBER}/comments" | jq -s 'add // []')
+      jq -n --argjson i "$issue" --argjson c "$comments" '{
+        title: $i.title,
+        body: $i.body,
+        author: $i.user.login,
+        labels: [$i.labels[].name],
+        comments: [$c[] | {author: .user.login, body: .body}]
+      }' > /tmp/gh-aw/agent/issue.json
 tools:
   # Explicit shell allow-list, required by strict mode when min-integrity is
-  # none. The prompt needs the github and safeoutputs CLIs, jq for the comment
-  # body, and read-only file inspection. Gemini CLI 0.66 denies shell
-  # redirection (> and heredocs) on allowed commands, so files are written with
-  # the write_file tool, not the shell.
-  bash: ["cat", "jq", "ls", "find", "grep", "head", "tail", "wc", "github", "safeoutputs"]
-  github:
-    toolsets: [issues]
-    # gh-aw applies min-integrity "approved" automatically on a public repo,
-    # and its access guard then filters every issue_read result (the resource
-    # shows as issue:<repo>#unknown), so the agent cannot read the issue it is
-    # triaging. Triage must read untrusted issue text by design; its writes are
-    # limited to the label and comment safe-outputs below.
-    min-integrity: none
+  # none. The prompt needs the safeoutputs CLI, jq for the comment body, and
+  # read-only file inspection. Gemini CLI 0.66 denies shell redirection (> and
+  # heredocs) on allowed commands, so files are written with the write_file
+  # tool, not the shell. The GitHub MCP server is turned off: the agent never
+  # reads from GitHub, and its writes are limited to the safe-outputs below.
+  bash: ["cat", "jq", "ls", "find", "grep", "head", "tail", "wc", "safeoutputs"]
+  github: false
 safe-outputs:
   threat-detection: false
   # Every write below is pinned to the issue being triaged: the triggering issue
@@ -128,24 +148,15 @@ needs-information request may supply the missing detail.
 
 There is no direct network access in this sandbox, and `gh` and `curl` are not
 authenticated. Do not use them, and do not call the GitHub REST API from
-Python. All GitHub reads and writes go through two CLIs on your `PATH`, which
-you run from the shell:
+Python. The issue has already been fetched for you, and all writes go through
+one CLI on your `PATH`, which you run from the shell:
 
-- **Reads: `github`**. `${{ github.repository }}` is `OWNER/REPO`. Split it
-  at `/`: pass the part before the slash as `--owner` and the part after it as
-  `--repo`. Never pass the combined `OWNER/REPO` value to either flag. To fetch
-  an issue with its current labels, run
-  `github issue_read --method get --owner OWNER --repo REPO --issue_number N | jq '.[0] | {title, body, comments, labels: ((.labels // []) | map(if type == "object" then .name else . end))}'`.
-  The response leaves out a field that is empty: an issue with no labels has no
-  `labels` field and one with no comments has no `comments` field. The command
-  above prints `"labels": []` and `"comments": null` for those, which means
-  none; do not look for them another way. A `null` title means the fetch
-  failed. If the `jq` filter fails, run the command once more without the pipe.
-  To fetch its comments, run the same command with
-  `--method get_comments --perPage 100 --page 1`. Continue with `--page 2`,
-  `--page 3` and so on only when the current page contains exactly 100
-  comments. Stop when a page contains fewer than 100. If a flag is rejected,
-  run `github issue_read --help` and use the flags it lists.
+- **Reads: the file `/tmp/gh-aw/agent/issue.json`.** It holds the issue's
+  `title`, `body`, `author`, `labels` (a list of label names, empty when the
+  issue has none) and `comments` (a list of `{author, body}`, empty when there
+  are none, oldest first). Read it with `cat /tmp/gh-aw/agent/issue.json`. This
+  is everything you need from GitHub; do not look for labels or comments any
+  other way.
 - **Writes: `safeoutputs`**. Pass one JSON object as a single quoted argument.
   Do not pass an issue number: the workflow fixes the target of every write to
   the issue being triaged, and a write cannot go anywhere else:
@@ -167,21 +178,18 @@ Keep the `|`. Without it nothing is sent.
 
 Run one command per shell call. Do not join commands with `&&`, `;`, or
 newlines, and do not use redirection (`>`, `<`, heredocs). The only allowed
-combinations are the `github issue_read ... | jq ...` fetch pipe and the
-`jq ... | safeoutputs add_comment .` pipe above.
+combination is the `jq ... | safeoutputs add_comment .` pipe above.
 
 ## Steps
 
-1. Fetch issue #${{ github.event.issue.number || github.event.inputs.issue_number }}
-   (its title, body, and its current labels) with `github issue_read` as
-   described under Tools. If you
-   cannot fetch it, call `report_incomplete` with the reason and stop. Never
-   call `noop` for this, because it hides the failure. If the `comments`
-   count in the response is a number above zero, also fetch every page of
-   its comments with `--method get_comments` as described under Tools. Keep
-   them for step 3: the reporter's replies (comments by the issue's author)
-   count as classification input there, and the same comments are searched for
-   the needs-information marker in outcome B.
+1. Your first call is `cat /tmp/gh-aw/agent/issue.json`, which holds issue
+   #${{ github.event.issue.number || github.event.inputs.issue_number }}
+   (its title, body, current labels and comments). Make no other call first. If
+   the file cannot be read or its `title` is null, call `report_incomplete`
+   with the reason and stop. Never call `noop` for this, because it hides the
+   failure. Keep the comments for step 3: the reporter's replies (comments by
+   the issue's `author`) count as classification input there, and the same
+   comments are searched for the needs-information marker in outcome B.
 2. Read `.github/labels.yml` for the exact allowed `kind:*`, `area:*`, and
    `status:*` label names. The file is short, so read the whole file. If the
    read returns nothing, retry without a line range or run
@@ -213,10 +221,8 @@ combinations are the `github issue_read ... | jq ...` fetch pipe and the
      then `>`. They are written apart because the prompt loader deletes any
      complete HTML comment. To check for it, search each comment body for the
      token `gh-aw:issue-triage:needs-information`, not for the joined text.
-     Use the comments fetched in step 1. If the `comments` count in the
-     issue response was absent, null or zero, treat the issue as having no comments.
-     Otherwise inspect every page of them. Never infer that the marker is absent merely because
-     it is not in the issue response.
+     Use the `comments` list read in step 1, and inspect every comment in it.
+     An empty list means the issue has no comments.
    - If no comment contains the token, add one comment containing the joined
      marker inside a backtick span, plus a short, friendly request for: what
      happened, what was expected, reproduction steps, the docker-autoheal
