@@ -123,13 +123,13 @@ def test_python_runtime_versions_are_aligned():
     ruff = (REPO_ROOT / ".linter-rules" / ".ruff.toml").read_text(encoding="utf-8")
 
     docker_version = re.search(
-        r"^FROM python:(\d+\.\d+)-slim(?:@|$)",
+        r"^FROM python:(\d+\.\d+)-slim(?:@|\s|$)",
         dockerfile,
         re.MULTILINE,
     )
     devcontainer_version = re.search(
         r"^FROM mcr\.microsoft\.com/devcontainers/python:"
-        r"(\d+\.\d+)-bookworm(?:@|$)",
+        r"(\d+\.\d+)-bookworm(?:@|\s|$)",
         devcontainer,
         re.MULTILINE,
     )
