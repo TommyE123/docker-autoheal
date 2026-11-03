@@ -170,9 +170,10 @@ combinations are the `github issue_read ... | jq ...` fetch pipe and the
 
 ## Steps
 
-1. Fetch issue #${{ github.event.issue.number || github.event.inputs.issue_number }}
+1. Your first call is the fetch of issue
+   #${{ github.event.issue.number || github.event.inputs.issue_number }}
    (its title, body, and its current labels) with `github issue_read` as
-   described under Tools. If you
+   described under Tools. Make no other call first. If you
    cannot fetch it, call `report_incomplete` with the reason and stop. Never
    call `noop` for this, because it hides the failure. If the `comments`
    count in the response is a number above zero, also fetch every page of
@@ -180,7 +181,7 @@ combinations are the `github issue_read ... | jq ...` fetch pipe and the
    them for step 3: the reporter's replies (comments by the issue's author)
    count as classification input there, and the same comments are searched for
    the needs-information marker in outcome B.
-2. Read `.github/labels.yml` for the exact allowed `kind:*`, `area:*`, and
+2. Your next call reads `.github/labels.yml` for the exact allowed `kind:*`, `area:*`, and
    `status:*` label names. The file is short, so read the whole file. If the
    read returns nothing, retry without a line range or run
    `cat .github/labels.yml`.
@@ -228,6 +229,14 @@ combinations are the `github issue_read ... | jq ...` fetch pipe and the
    - Add `status:needs-triage` if not already present.
    - Remove `status:needs-information` if present.
    - Do not add or remove any `kind:*` or `area:*` label.
+
+## Stay on task
+
+You need only two things: the issue (step 1) and the label list (step 2), which
+describes every label. Decide as soon as you have both. Do not run `git`, do
+not list directories or search the repository, do not read any file other than
+`.github/labels.yml`, and do not call a tool that is not named in this prompt.
+Those calls are denied or only use up your request limit.
 
 ## Rules
 
