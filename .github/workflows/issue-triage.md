@@ -55,7 +55,7 @@ engine:
   model: gemini-3.5-flash-lite
 # Top-level AWF cap on model requests (the default is 500). Test runs made 4 to
 # 9 requests, but Flash Lite often makes one tool call per request, and a run on
-# a new issue hit a cap of 12 before any write (run 41282434689, #129). 25 leaves
+# a new issue hit a cap of 12 before any write (run 41282434689, #128). 25 leaves
 # room for that while still stopping a runaway loop well inside the 500 a day
 # that Flash Lite allows.
 max-turns: 25
