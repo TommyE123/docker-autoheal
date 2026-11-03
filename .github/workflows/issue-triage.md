@@ -101,6 +101,7 @@ tools:
   github: false
 safe-outputs:
   threat-detection: false
+  staged: true
   # Every write below is pinned to the issue being triaged: the triggering issue
   # on an event run, the issue_number input on a dispatch. The agent does not
   # choose the target, so injected issue text cannot redirect a write to another
