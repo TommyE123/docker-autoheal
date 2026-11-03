@@ -26,7 +26,11 @@ From the **Notifications** tab in the web UI:
    bot token, API key, etc.).
 3. Use **Test** to send a sample notification from the values currently in the form,
    before saving. Nothing is saved by testing. The button is enabled once the required
-   fields are filled.
+   fields are filled. If the test fails, the message names the provider, the kind of
+   failure and the HTTP status where there is one, for example `Discord rejected the
+   request (HTTP 404)` or `could not connect to the server`. It never includes URLs,
+   tokens or response bodies. The log (`docker logs docker-autoheal`) adds the service
+   name and the underlying error with URLs and credentials masked as `***`.
 4. Choose which event types should trigger notifications.
 
 Or via the API:
