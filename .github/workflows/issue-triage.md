@@ -79,14 +79,16 @@ pre-agent-steps:
     run: |
       set -euo pipefail
       mkdir -p /tmp/gh-aw/agent
-      issue=$(gh api "repos/${REPO}/issues/${ISSUE_NUMBER}")
-      comments=$(gh api --paginate "repos/${REPO}/issues/${ISSUE_NUMBER}/comments" | jq -s 'add // []')
-      jq -n --argjson i "$issue" --argjson c "$comments" '{
-        title: $i.title,
-        body: $i.body,
-        author: $i.user.login,
-        labels: [$i.labels[].name],
-        comments: [$c[] | {author: .user.login, body: .body}]
+      # Files and --slurpfile, not --argjson: a long thread would exceed the
+      # 128 KiB limit on one command-line argument.
+      gh api "repos/${REPO}/issues/${ISSUE_NUMBER}" > "${RUNNER_TEMP}/issue.raw"
+      gh api --paginate "repos/${REPO}/issues/${ISSUE_NUMBER}/comments" | jq -s 'add // []' > "${RUNNER_TEMP}/comments.raw"
+      jq -n --slurpfile i "${RUNNER_TEMP}/issue.raw" --slurpfile c "${RUNNER_TEMP}/comments.raw" '{
+        title: $i[0].title,
+        body: $i[0].body,
+        author: $i[0].user.login,
+        labels: [$i[0].labels[].name],
+        comments: [$c[0][] | {author: .user.login, body: .body}]
       }' > /tmp/gh-aw/agent/issue.json
 tools:
   # Explicit shell allow-list, required by strict mode when min-integrity is
@@ -107,8 +109,8 @@ safe-outputs:
   # outputs write with the default GITHUB_TOKEN: pull-requests: false leaves it
   # without pull request access, so the label write fails (HTTP 403, test run
   # 41223807050) and nothing changes. A GH_AW_GITHUB_TOKEN secret with pull
-  # request write access would remove that protection, and the issue_read
-  # result carries no pull_request field for the agent to check. Do not add
+  # request write access would remove that protection, and the fetched
+  # issue.json carries no pull_request field for the agent to check. Do not add
   # such a token without also validating the input.
   add-labels:
     allowed: ["kind:*", "area:*", "status:needs-triage", "status:needs-information"]
@@ -176,8 +178,7 @@ Keep the `|`. Without it nothing is sent.
 
 Run one command per shell call. Do not join commands with `&&`, `;`, or
 newlines, and do not use redirection (`>`, `<`, heredocs). The only allowed
-combinations are the `github issue_read ... | jq ...` fetch pipe and the
-`jq ... | safeoutputs add_comment .` pipe above.
+combination is the `jq ... | safeoutputs add_comment .` pipe above.
 
 ## Steps
 
