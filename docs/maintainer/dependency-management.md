@@ -203,7 +203,7 @@ match. The plain and `-slim` tags can clear the age check at different times, so
 a "Python runtime" pull request, compare the versions in all five files.
 
 The general digest pinning rule is switched off for `.sonarcloud.properties` and
-`pyrightconfig.json`, because both tools need a bare version number and not `3.15@sha256:…`.
+`pyrightconfig.json` because both tools need a bare version number and not `3.15@sha256:…`.
 
 #### Finishing a Python runtime pull request
 
@@ -215,7 +215,13 @@ upgrade cannot be merged with any reference missed. It catches a pin that drifts
 reason, not only through Renovate. The workflows that run on Python read the version from the
 `Dockerfile`, so they follow it automatically.
 
-Keep the `# renovate:` comment directly above the `sonar.python.version` line when editing
+Once you push the Ruff change, Renovate treats the branch as modified and stops updating and
+rebasing it. If `main` moves on, bring the branch up to date yourself by merging `origin/main`
+into it. Do not tick the pull request's rebase/retry checkbox after editing: Renovate rebuilds
+the branch from scratch and discards the manual `target-version` change, and the unit test fails
+again until it is re-applied.
+
+Keep the `# renovate: comment directly above the `sonar.python.version` line when editing
 `.sonarcloud.properties`, or Renovate stops tracking it.
 
 Python versions in lock files are not tracked here. The `requires-python` constraints in
