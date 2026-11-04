@@ -210,6 +210,48 @@ class TestConfigExportImport:
         assert config_manager.get_config().monitor.interval_seconds == 123
 
     @pytest.mark.parametrize(
+        ("payload", "detail"),
+        [
+            ([], "Configuration must be a JSON object"),
+            ("just a string", "Configuration must be a JSON object"),
+            (
+                {"custom_health_checks": []},
+                "custom_health_checks must be an object whose values are health check objects",
+            ),
+            (
+                {"custom_health_checks": {"web": "not-an-object"}},
+                "custom_health_checks must be an object whose values are health check objects",
+            ),
+        ],
+        ids=["root-array", "root-string", "custom-checks-array", "custom-check-not-object"],
+    )
+    async def test_import_config_with_wrong_structure_returns_422(self, payload, detail):
+        before = config_manager.get_config()
+        upload = UploadFile(file=BytesIO(json.dumps(payload).encode()), filename="config.json")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await api_import_config(upload)
+
+        assert exc_info.value.status_code == 422
+        assert exc_info.value.detail == detail
+        assert config_manager.get_config() == before
+
+    async def test_import_config_422_does_not_echo_a_submitted_check_type(self):
+        payload = {
+            "custom_health_checks": {
+                "web": {"container_id": "web", "check_type": "SECRET-VALUE-123"}
+            }
+        }
+        upload = UploadFile(file=BytesIO(json.dumps(payload).encode()), filename="config.json")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await api_import_config(upload)
+
+        assert exc_info.value.status_code == 422
+        assert "Unknown check_type" in exc_info.value.detail
+        assert "SECRET-VALUE-123" not in exc_info.value.detail
+
+    @pytest.mark.parametrize(
         ("content", "detail"),
         [
             (b"not valid json", "File is not valid JSON"),

@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse
 from app.api.errors import invalid_input_as_422
 from app.config.config_manager import (
     AutoHealConfig,
+    ConfigImportError,
     MonitorConfig,
     RestartConfig,
     config_manager,
@@ -90,6 +91,8 @@ async def import_config(file: Annotated[UploadFile, File()]):
             config_manager.import_config(config_json)
     except json.JSONDecodeError:
         raise HTTPException(status_code=422, detail="File is not valid JSON") from None
+    except ConfigImportError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from None
     return {"status": "success", "message": "Configuration imported successfully"}
 
 
