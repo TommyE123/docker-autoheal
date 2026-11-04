@@ -196,7 +196,9 @@ Two things to know about the minimum:
 The seven-day minimum release age applies to the Docker Hub tags. The Dev Container image comes
 from `mcr.microsoft.com`, which gives Renovate no release timestamps, so a package rule makes
 the age check optional for it. It is still held back by the seven-day wait wherever a timestamp
-exists.
+exists. Everything on `ghcr.io` (the Dev Container features and the `mise` image) has the same
+problem and gets the same rule. Without it those updates sit under "Pending Status Checks" on
+the Dependency Dashboard and no pull request is created.
 
 `minimumGroupSize` guarantees how many updates are in the group, not that their target versions
 match. The plain and `-slim` tags can clear the age check at different times, so before merging

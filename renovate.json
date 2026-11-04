@@ -130,6 +130,12 @@
       "minimumReleaseAgeBehaviour": "timestamp-optional"
     },
     {
+      "description": "Packages from ghcr.io (the Dev Container features and the mise image) get no release timestamps from the registry, so with internalChecksFilter strict their updates (for example docker-in-docker 2 to 4) sat under Pending Status Checks and never became PRs. Keep the seven day age where a timestamp exists, and do not block when one is missing.",
+      "matchPackageNames": ["ghcr.io/**"],
+      "minimumReleaseAge": "7 days",
+      "minimumReleaseAgeBehaviour": "timestamp-optional"
+    },
+    {
       "description": "tommye123/docker-autoheal is this project's own published image, not a third-party dependency. Renovate should not manage it.",
       "matchDatasources": ["docker"],
       "matchPackageNames": ["tommye123/docker-autoheal"],
