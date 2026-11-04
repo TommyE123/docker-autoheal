@@ -139,10 +139,11 @@ you run from the shell:
   above prints `"labels": []` and `"comments": null` for those, which means
   none; do not look for them another way. A `null` title means the fetch
   failed. If the `jq` filter fails, run the command once more without the pipe.
-  To fetch its comments, run the same command with
-  `--method get_comments --perPage 100 --page 1`. Continue with `--page 2`,
-  `--page 3` and so on only when the current page contains exactly 100
-  comments. Stop when a page contains fewer than 100. If a flag is rejected,
+  To fetch its comments, run
+  `github issue_read --method get_comments --owner OWNER --repo REPO --issue_number N --perPage 100 --page 1`
+  without the `jq` pipe, so the whole page is kept (the filter above keeps
+  only the first item). Continue with `--page 2`, `--page 3` and so on only
+  when the current page contains exactly 100 comments. Stop when a page contains fewer than 100. If a flag is rejected,
   run `github issue_read --help` and use the flags it lists.
 - **Writes: `safeoutputs`**. Pass one JSON object as a single quoted argument.
   Do not pass an issue number: the workflow fixes the target of every write to
