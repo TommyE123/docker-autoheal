@@ -156,11 +156,11 @@ disabled automerge apply to the group as usual.
 
 Two scanners look at the dependency lockfiles, and each other check has one owner:
 
-| Check                                                                                       | Owner                                      | Blocks a PR                                              |
-|---------------------------------------------------------------------------------------------|--------------------------------------------|----------------------------------------------------------|
-| Dependency vulnerabilities in lockfiles, and Dockerfile or Compose misconfigurations        | Trivy, run by MegaLinter                   | Yes, through the required MegaLinter check               |
-| Code quality, security hotspots, dependency risks and the new-code quality gate             | SonarCloud                                 | Yes, once `SonarCloud Code Analysis` is a required check |
-| Fixing vulnerable dependencies                                                              | Renovate, using GitHub's Dependabot alerts | It opens the PRs                                         |
+| Check                                                                                | Owner                                      | Blocks a PR                                              |
+|--------------------------------------------------------------------------------------|--------------------------------------------|----------------------------------------------------------|
+| Dependency vulnerabilities in lockfiles, and Dockerfile or Compose misconfigurations | Trivy, run by MegaLinter                   | Yes, through the required MegaLinter check               |
+| Code quality, security hotspots, dependency risks and the new-code quality gate      | SonarCloud                                 | Yes, once `SonarCloud Code Analysis` is a required check |
+| Fixing vulnerable dependencies                                                       | Renovate, using GitHub's Dependabot alerts | It opens the PRs                                         |
 
 SonarCloud's dependency scan (its "dependency risks") is what replaced osv-scanner, which was
 removed from MegaLinter and `mise.toml` because it overlapped with both scanners without
