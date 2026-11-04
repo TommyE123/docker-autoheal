@@ -47,9 +47,9 @@ Out of scope:
   SonarCloud and GitHub's Dependabot alerts may still list them, and those findings are handled
   as ordinary dependency updates.
 * advisories in third-party dependencies that have no effect on Docker Auto-Heal. The
-  dependencies pinned in the repository are checked by Trivy in CI and updated by Renovate,
-  so please report a dependency problem only if you can show it is exploitable through
-  Docker Auto-Heal.
+  runtime dependencies in `requirements.txt` and the frontend lockfile are checked by Trivy in
+  CI and updated by Renovate, so please report a dependency problem only if you can show it is
+  exploitable through Docker Auto-Heal.
 
 For how dependency vulnerabilities are scanned and handled, see
 [Dependency management](docs/maintainer/dependency-management.md).

@@ -169,7 +169,7 @@ next to Trivy. The scan is a SonarCloud setting (under Advanced Security), not s
 `.sonarcloud.properties` controls, and it needs SonarCloud's Advanced Security entitlement. If
 that stops being available, Trivy still covers the lockfiles.
 
-Development tooling is not tracked for dependency vulnerabilities. That covers the generated
+Development tooling is excluded from the blocking dependency scan. That covers the generated
 tool environments under `.mise/locks/` (Semgrep, yamllint, djlint) and the Dev Container
 linters in `.devcontainer/package-lock.json`. None of them ship in the Docker image, and
 Renovate already ignores `.mise/locks/`. Trivy skips those lockfiles with `scan.skip-files` in
