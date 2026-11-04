@@ -12,7 +12,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, File, UploadFile
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
 from app.api.errors import invalid_input_as_422
@@ -73,14 +73,23 @@ async def export_config():
     )
 
 
-@router.post("/api/config/import")
+@router.post(
+    "/api/config/import",
+    responses={422: {"description": "File is not UTF-8 JSON or is not a valid configuration"}},
+)
 async def import_config(file: Annotated[UploadFile, File()]):
     """Import configuration from JSON file"""
     content = await file.read()
-    config_json = content.decode("utf-8")
+    try:
+        config_json = content.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=422, detail="File must be UTF-8 encoded JSON") from None
 
-    with invalid_input_as_422():
-        config_manager.import_config(config_json)
+    try:
+        with invalid_input_as_422():
+            config_manager.import_config(config_json)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=422, detail="File is not valid JSON") from None
     return {"status": "success", "message": "Configuration imported successfully"}
 
 

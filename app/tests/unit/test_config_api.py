@@ -12,7 +12,7 @@ from io import BytesIO
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile
 
 from app.api.routes.config import (
     export_config,
@@ -209,8 +209,19 @@ class TestConfigExportImport:
         assert result["status"] == "success"
         assert config_manager.get_config().monitor.interval_seconds == 123
 
-    async def test_import_config_invalid_json_propagates(self):
-        upload = UploadFile(file=BytesIO(b"not valid json"), filename="config.json")
+    @pytest.mark.parametrize(
+        ("content", "detail"),
+        [
+            (b"not valid json", "File is not valid JSON"),
+            (b"\xff\xfe not utf-8", "File must be UTF-8 encoded JSON"),
+        ],
+        ids=["not-json", "not-utf8"],
+    )
+    async def test_import_config_unreadable_file_returns_422(self, content, detail):
+        upload = UploadFile(file=BytesIO(content), filename="config.json")
 
-        with pytest.raises(json.JSONDecodeError):
+        with pytest.raises(HTTPException) as exc_info:
             await api_import_config(upload)
+
+        assert exc_info.value.status_code == 422
+        assert exc_info.value.detail == detail

@@ -64,10 +64,13 @@ def invalid_input_as_422() -> Iterator[None]:
 
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Log an unexpected error with its traceback and return a generic 500."""
+    # The path is percent-decoded, so escape control characters to stop a crafted
+    # request from forging log lines.
+    path = request.url.path.encode("unicode_escape").decode("ascii")
     logger.error(
         "Unhandled error on %s %s",
         request.method,
-        request.url.path,
+        path,
         exc_info=(type(exc), exc, exc.__traceback__),
     )
     return JSONResponse(status_code=500, content={"detail": INTERNAL_ERROR_DETAIL})

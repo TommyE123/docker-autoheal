@@ -469,6 +469,34 @@ class TestUptimeKumaIntegration:
         assert deleted["success"] is True
         assert (await get_uptime_kuma_mappings())["mappings"] == []
 
+    @pytest.mark.parametrize(
+        "body",
+        [
+            {},
+            {"container_id": "web"},
+            {"monitor_friendly_name": "Monitor"},
+            {"container_id": "", "monitor_friendly_name": "Monitor"},
+            {"container_id": "web", "monitor_friendly_name": "   "},
+            {"container_id": 7, "monitor_friendly_name": "Monitor"},
+            {"container_id": "web", "monitor_friendly_name": None},
+        ],
+        ids=[
+            "empty",
+            "missing-monitor",
+            "missing-container",
+            "blank-container",
+            "blank-monitor",
+            "non-string-container",
+            "null-monitor",
+        ],
+    )
+    async def test_create_mapping_without_valid_fields_returns_400(self, wired_api, body):
+        with pytest.raises(HTTPException) as exc_info:
+            await create_uptime_kuma_mapping(get_docker_client(), body)
+
+        assert exc_info.value.status_code == 400
+        assert (await get_uptime_kuma_mappings())["mappings"] == []
+
     async def test_create_mapping_for_unknown_container_returns_404(self, wired_api):
         with pytest.raises(HTTPException) as exc_info:
             await create_uptime_kuma_mapping(

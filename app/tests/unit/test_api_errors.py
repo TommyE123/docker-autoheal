@@ -71,6 +71,19 @@ class TestUnexpectedErrors:
         assert record.exc_info is not None
         assert record.exc_info[0] is RuntimeError
 
+    @pytest.mark.asyncio
+    async def test_control_characters_in_the_path_are_escaped_in_the_logged_path(
+        self, monkeypatch, caplog
+    ):
+        monkeypatch.setattr("app.api.state.docker_client", MagicMock(get_container=_boom))
+
+        with caplog.at_level(logging.ERROR, logger="app.api.errors"):
+            await _call("POST", "/api/containers/x\x1b[31mforged/restart")
+
+        message = next(r for r in caplog.records if r.name == "app.api.errors").getMessage()
+        assert "\x1b" not in message
+        assert "x\\x1b[31mforged" in message
+
 
 class TestDockerClientDependency:
     def test_returns_the_initialised_client(self, monkeypatch):

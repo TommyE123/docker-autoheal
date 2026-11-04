@@ -177,14 +177,27 @@ async def get_uptime_kuma_mappings():
 @router.post(
     "/api/uptime-kuma/mappings",
     responses={
+        400: {"description": "container_id and monitor_friendly_name are required"},
         404: {"description": "Container not found"},
         500: {"description": "Container could not be mapped"},
     },
 )
 async def create_uptime_kuma_mapping(docker_client: DockerClientDep, mapping: dict):
     """Create a new container-to-monitor mapping"""
+    container_ref = mapping.get("container_id")
+    monitor_name = mapping.get("monitor_friendly_name")
+    if not (
+        isinstance(container_ref, str)
+        and container_ref.strip()
+        and isinstance(monitor_name, str)
+        and monitor_name.strip()
+    ):
+        raise HTTPException(
+            status_code=400, detail="container_id and monitor_friendly_name are required"
+        )
+
     # Get the container to resolve stable_id
-    container = await asyncio.to_thread(docker_client.get_container, mapping["container_id"])
+    container = await asyncio.to_thread(docker_client.get_container, container_ref)
     if not container:
         raise HTTPException(status_code=404, detail="Container not found")
 
@@ -196,7 +209,7 @@ async def create_uptime_kuma_mapping(docker_client: DockerClientDep, mapping: di
     config = config_manager.get_config()
     new_mapping = UptimeKumaMapping(
         container_id=stable_id,
-        monitor_friendly_name=mapping["monitor_friendly_name"],
+        monitor_friendly_name=monitor_name,
         auto_mapped=False,
     )
 
@@ -205,8 +218,8 @@ async def create_uptime_kuma_mapping(docker_client: DockerClientDep, mapping: di
 
     logger.info(
         "Created Uptime-Kuma mapping: %s -> %s",
-        mapping["container_id"],
-        mapping["monitor_friendly_name"],
+        container_ref,
+        monitor_name,
     )
 
     return {"success": True, "mapping": new_mapping.model_dump()}
