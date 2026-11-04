@@ -139,10 +139,11 @@ you run from the shell:
   above prints `"labels": []` and `"comments": null` for those, which means
   none; do not look for them another way. A `null` title means the fetch
   failed. If the `jq` filter fails, run the command once more without the pipe.
-  To fetch its comments, run the same command with
-  `--method get_comments --perPage 100 --page 1`. Continue with `--page 2`,
-  `--page 3` and so on only when the current page contains exactly 100
-  comments. Stop when a page contains fewer than 100. If a flag is rejected,
+  To fetch its comments, run
+  `github issue_read --method get_comments --owner OWNER --repo REPO --issue_number N --perPage 100 --page 1`
+  without the `jq` pipe, so the whole page is kept (the filter above keeps
+  only the first item). Continue with `--page 2`, `--page 3` and so on only
+  when the current page contains exactly 100 comments. Stop when a page contains fewer than 100. If a flag is rejected,
   run `github issue_read --help` and use the flags it lists.
 - **Writes: `safeoutputs`**. Pass one JSON object as a single quoted argument.
   Do not pass an issue number: the workflow fixes the target of every write to
@@ -170,22 +171,32 @@ combinations are the `github issue_read ... | jq ...` fetch pipe and the
 
 ## Steps
 
-1. Fetch issue #${{ github.event.issue.number || github.event.inputs.issue_number }}
+1. Your first call is the fetch of issue
+   #${{ github.event.issue.number || github.event.inputs.issue_number }}
    (its title, body, and its current labels) with `github issue_read` as
-   described under Tools. If you
-   cannot fetch it, call `report_incomplete` with the reason and stop. Never
-   call `noop` for this, because it hides the failure. If the `comments`
-   count in the response is a number above zero, also fetch every page of
-   its comments with `--method get_comments` as described under Tools. Keep
-   them for step 3: the reporter's replies (comments by the issue's author)
-   count as classification input there, and the same comments are searched for
-   the needs-information marker in outcome B.
-2. Read `.github/labels.yml` for the exact allowed `kind:*`, `area:*`, and
+   described under Tools. Make no other call first. If the fetch fails, run it
+   once more (the rerun without the `jq` pipe counts as that retry). If it
+   still fails, call `report_incomplete` with the reason and stop. Never call
+   `noop` for this, because it hides the failure. If the `comments` count in
+   the response is a number above zero, also fetch every page of its comments
+   with `--method get_comments` as described under Tools. Keep them for step
+   3: the reporter's replies (comments by the issue's author) count as
+   classification input there, and the same comments are searched for the
+   needs-information marker in outcome B. If a comment page fetch fails, run
+   it once more. If it still fails, call `add_labels` with
+   `status:needs-triage` so the issue is flagged for review (leave its other
+   labels as they are), then call `report_incomplete` with the reason and
+   stop. Never call `noop` for this.
+2. Your next call (after any comment pages from step 1) reads
+   `.github/labels.yml` for the exact allowed `kind:*`, `area:*`, and
    `status:*` label names. The file is short, so read the whole file. If the
-   read returns nothing, retry without a line range or run
-   `cat .github/labels.yml`.
-3. Decide which of these three outcomes applies. Do not take any label action
-   until you have decided, and do not partially apply an outcome.
+   read fails or returns nothing, retry once without a line range or run
+   `cat .github/labels.yml`. If it still fails, do not guess label names: call
+   `add_labels` with `status:needs-triage`, then call `report_incomplete` with
+   the reason and stop. Never call `noop` for this.
+3. Decide which of these three outcomes applies. Apart from the failure
+   handling in steps 1 and 2, do not take any label action until you have
+   decided, and do not partially apply an outcome.
 
    **A. Confident classification** — you can determine exactly one `kind:*`
    and exactly one `area:*` label with reasonable confidence. A title-only
@@ -229,6 +240,15 @@ combinations are the `github issue_read ... | jq ...` fetch pipe and the
    - Remove `status:needs-information` if present.
    - Do not add or remove any `kind:*` or `area:*` label.
 
+## Stay on task
+
+You need only two things: the issue (step 1) and the label list (step 2), which
+describes every label. Decide as soon as you have both. Do not run `git`, do
+not list directories or search the repository, and do not read any file other
+than `.github/labels.yml` and the comment file you write in outcome B. Do not
+call a tool that is not named in this prompt. Those calls are denied or only
+use up your request limit.
+
 ## Rules
 
 - Only ever request labels from the taxonomy in `.github/labels.yml`:
@@ -246,4 +266,4 @@ combinations are the `github issue_read ... | jq ...` fetch pipe and the
   in outcome B, and never when that exact marker is already present on the
   issue.
 - Take no action other than the labels (and, at most, the one comment)
-  described above.
+  described above, and the failure handling in steps 1 and 2.
