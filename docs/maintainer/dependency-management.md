@@ -199,7 +199,7 @@ the age check optional for it. It is still held back by the seven-day wait where
 exists. Everything on `ghcr.io` (the Dev Container features and the `mise` image) has the same
 problem and gets the same rule. Without it those updates sit under "Pending Status Checks" on
 the Dependency Dashboard and no pull request is created. The trade-off is that a `ghcr.io`
-update with no timestamp gets no seven-day delay, so CI and review are the only gate.
+update with no timestamp gets no seven-day delay, so CI and the automerge or manual-review policy are the gates.
 
 `minimumGroupSize` guarantees how many updates are in the group, not that their target versions
 match. The plain and `-slim` tags can clear the age check at different times, so before merging
