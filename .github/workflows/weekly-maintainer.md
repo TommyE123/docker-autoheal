@@ -129,12 +129,15 @@ it is the audited revision. Each run reads the whole app source.
 
 There is no direct network access, and `gh` and `curl` are not authenticated.
 Do not use them. Only these shell commands work: `cat`, `grep`, `find`, `ls`,
-`head`, `tail`, `wc`, `jq`, `sort`, `uniq`, `date`, `printf`, `echo`, `github` and
-`safeoutputs`. Every other command, such as `git` or `python3`, is denied by
+`head`, `tail`, `wc`, `jq`, `sort`, `uniq`, `date`, `printf`, `echo`, `sleep`,
+`github` and `safeoutputs`. Every other command, such as `git` or `python3`, is denied by
 policy, and so is any command chained to one of them with `&&` or `|`. Never try
 them (a previous run lost about half of its tool calls retrying `git log` and
 `python3` wrappers around it). Use `find` only to list or locate files, and
-never with `-exec`, `-execdir`, `-delete` or `-fprint`. Read GitHub state with
+never with `-exec`, `-execdir`, `-delete` or `-fprint`. Call only
+`run_shell_command`, plus `write_file` once for the summary. Do not call any
+other tool, such as `read_file`, `list_directory`, `replace` or `update_topic`:
+only `run_shell_command` calls are counted as reading the source. Read GitHub state with
 the `github` CLI; if a flag is rejected, run `github <tool> --help`. There are
 no GitHub write tools. Shell redirection (`>`, `>>`, `<`, heredocs) is denied
 by policy. The Gemini CLI also exposes `write_file` and `replace`, which this
@@ -221,10 +224,17 @@ turn).** In one turn, make two calls
 side by side: `write_file` for the summary, and the final call, `create_issue`
 or `noop` (see Reporting). Your final message after them is one short line.
 
-If a call fails, fix it once and carry on. If you have used 9 turns and have
+If a call fails, run it once more, fixed if the error says what is wrong. A
+`jq` pipe that prints an empty list or `null` for the commit, issue or pull
+request lists is a failed read, not an empty repository: rerun it without the
+pipe (a long unpiped result that is cut in the middle still counts as read; a
+`[]` is an empty list). If the head of `main`, the open issues or the open pull
+requests still cannot be read, stop and report an **Incomplete audit**; never treat an
+unread list as empty. Carry on without any other non-source read
+(such as the closed-work searches) that fails twice, and name it in the summary.
+A source `cat -n` that fails twice makes the audit incomplete. If you have used 9 turns and have
 not reported yet, stop: write the summary as an **Incomplete audit** that says
-how far you got, and call `noop`. If the source or the issue and pull
-request lists cannot be read, stop and report an **Incomplete audit**.
+how far you got, and call `noop`. If the source cannot be read, stop and report an **Incomplete audit**.
 
 ## Reporting
 
