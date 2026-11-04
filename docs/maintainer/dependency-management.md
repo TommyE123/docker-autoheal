@@ -154,41 +154,46 @@ disabled automerge apply to the group as usual.
 
 ### Vulnerability scanning
 
-Each kind of check has one owner, so a finding is triaged in one place:
+Two scanners look at the dependency lockfiles, and each other check has one owner:
 
-| Check                                                                                | Owner                                      | Blocks a PR                                              |
-|--------------------------------------------------------------------------------------|--------------------------------------------|----------------------------------------------------------|
-| Dependency vulnerabilities in lockfiles, and Dockerfile or Compose misconfigurations | Trivy, run by MegaLinter                   | Yes, through the required MegaLinter check               |
-| Code quality, security hotspots and the new-code quality gate                        | SonarCloud                                 | Yes, once `SonarCloud Code Analysis` is a required check |
-| Fixing vulnerable dependencies                                                       | Renovate, using GitHub's Dependabot alerts | It opens the PRs                                         |
+| Check                                                                                       | Owner                                      | Blocks a PR                                              |
+|---------------------------------------------------------------------------------------------|--------------------------------------------|----------------------------------------------------------|
+| Dependency vulnerabilities in lockfiles, and Dockerfile or Compose misconfigurations        | Trivy, run by MegaLinter                   | Yes, through the required MegaLinter check               |
+| Code quality, security hotspots, dependency risks and the new-code quality gate             | SonarCloud                                 | Yes, once `SonarCloud Code Analysis` is a required check |
+| Fixing vulnerable dependencies                                                              | Renovate, using GitHub's Dependabot alerts | It opens the PRs                                         |
+
+SonarCloud's dependency scan (its "dependency risks") is what replaced osv-scanner, which was
+removed from MegaLinter and `mise.toml` because it overlapped with both scanners without
+blocking anything. SonarCloud uses its own advisory database, so it also gives a second opinion
+next to Trivy. The scan is a SonarCloud setting (under Advanced Security), not something
+`.sonarcloud.properties` controls, and it needs SonarCloud's Advanced Security entitlement. If
+that stops being available, Trivy still covers the lockfiles.
 
 Development tooling is not tracked for dependency vulnerabilities. That covers the generated
 tool environments under `.mise/locks/` (Semgrep, yamllint, djlint) and the Dev Container
 linters in `.devcontainer/package-lock.json`. None of them ship in the Docker image, and
 Renovate already ignores `.mise/locks/`. Trivy skips those lockfiles with `scan.skip-files` in
-`.linter-rules/.trivy.yaml`, so CI does not flag a vulnerability in one of those tools,
-or in its own dependencies. GitHub's Dependabot alerts can still report them, and Renovate
-updates the npm ones in `.devcontainer/package-lock.json` as normal. This avoids a per-CVE entry in
+`.linter-rules/.trivy.yaml`, so MegaLinter does not flag them. This avoids a per-CVE entry in
 `.linter-rules/.trivyignore.yaml` each time a tool dependency gets an advisory, and that file
 now only holds acknowledged misconfigurations. The Trivy config uses `skip-files`, not
 `skip-dirs`, because MegaLinter passes `--skip-dirs` on the command line and that would
 override the config file. `frontend/package-lock.json` stays in scope because it also holds the
 dependencies of the built web UI.
 
-SonarCloud's own dependency scan is switched off in the SonarCloud settings (under Advanced
-Security), because Trivy already covers dependency vulnerabilities and because automatic
-analysis only sees direct dependencies where there is no lockfile. `.sonarcloud.properties`
-does not control this setting. The scan is not tracked in this repository, so check the
-SonarCloud settings if the `main` quality gate fails on "New dependency risks too severe".
+SonarCloud's dependency scan does list the development tooling, because it reads every lockfile
+it finds, and it can fail the `main` quality gate with "New dependency risks too severe". The
+project cannot fix most of those findings itself, so they are accepted in the SonarCloud UI with
+a short reason, for example "dev-only tooling, not shipped". GitHub's Dependabot alerts can also
+report them, and Renovate updates the npm ones in `.devcontainer/package-lock.json` as normal.
 
 Python transitive dependencies are not pinned in `requirements.txt` and there is no Python
-lockfile, so a lockfile scan only sees the direct dependencies there. The transitive Python
+lockfile, so a lockfile scan, from Trivy or SonarCloud, only sees the direct dependencies there. The transitive Python
 packages and the operating system packages in the built image are not scanned. They are
 resolved at build time, and a finding in them is rarely something the project can fix itself.
 Renovate keeps the base image and the shipped dependencies current instead.
 
 [`SECURITY.md`](../../SECURITY.md) describes how to report a vulnerability, and states that
-development tooling is out of scope for dependency scanning.
+development tooling is out of scope for dependency vulnerabilities.
 
 ### Python runtime version updates
 
