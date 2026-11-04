@@ -1,8 +1,8 @@
 # Test-only dependencies (see pytest.ini / .coveragerc).
 # Lint/security tooling lives in mise.toml.
 -r requirements.txt
-pytest==9.1.1
+pytest==9.2.0
 pytest-asyncio==1.4.1
 pytest-cov==7.1.0
 # Mutation testing (see docs/developer/mutation-testing.md)
-mutmut==3.8.0
+mutmut==3.8.1
