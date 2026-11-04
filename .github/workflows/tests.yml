@@ -39,6 +39,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0 # SonarCloud needs the full history for new-code and blame data
 
       - name: Validate the mutation badge file
         if: ${{ needs.changes.outputs.badge-only == 'true' }}
@@ -84,6 +85,21 @@ jobs:
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           report_type: coverage
+
+      # CI-based SonarCloud analysis, which imports coverage.xml from the pytest run above
+      # (sonar.python.coverage.reportPaths in .sonarcloud.properties). Needs the SONAR_TOKEN
+      # secret and the SONAR_ORGANIZATION and SONAR_PROJECT_KEY repository variables, so it is
+      # skipped for forked pull requests, which get no secrets. Setup: docs/maintainer/sonarcloud.md.
+      - name: SonarCloud scan
+        if: ${{ needs.changes.outputs.badge-only != 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: SonarSource/sonarqube-scan-action@e805d875275f728fac1885b413934be6d7c63f65 # v8.4.1
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dproject.settings=.sonarcloud.properties
+            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
+            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
 
       - name: Upload Python coverage artifact
         if: ${{ !cancelled() && hashFiles('coverage.xml') != '' }}

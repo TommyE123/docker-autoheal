@@ -164,9 +164,9 @@ The Python version is set in five places. Renovate can update four of them:
 The fifth, `target-version` in `.linter-rules/.ruff.toml`, uses the `py314` form, which Renovate
 cannot update. It is changed by hand on the Renovate branch.
 
-SonarCloud runs automatic analysis, which reads `.sonarcloud.properties` from the default
-branch and ignores `sonar-project.properties`. That file also sets the test file patterns and
-source encoding.
+SonarCloud analysis runs in CI (the `SonarCloud scan` step in `tests.yml`), which loads
+`.sonarcloud.properties` with `-Dproject.settings`. That file also sets the test file patterns,
+source encoding and the coverage report path. See [SonarCloud analysis](sonarcloud.md).
 
 Two custom regex managers in `renovate.json` track the pins that are not Dockerfiles. The
 SonarCloud pin is found through the `# renovate:` comment immediately above it. The Pyright pin
