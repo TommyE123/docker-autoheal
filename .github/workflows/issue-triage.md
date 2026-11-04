@@ -180,7 +180,9 @@ combinations are the `github issue_read ... | jq ...` fetch pipe and the
    its comments with `--method get_comments` as described under Tools. Keep
    them for step 3: the reporter's replies (comments by the issue's author)
    count as classification input there, and the same comments are searched for
-   the needs-information marker in outcome B.
+   the needs-information marker in outcome B. If a comment page fetch fails,
+   call `report_incomplete` with the reason and stop. Never call `noop` for
+   this, because it hides the failure.
 2. Your next call (after any comment pages from step 1) reads
    `.github/labels.yml` for the exact allowed `kind:*`, `area:*`, and
    `status:*` label names. The file is short, so read the whole file. If the
