@@ -34,7 +34,7 @@ engine:
   # is the one that completed a run (41023115800). issue-triage uses Flash
   # Lite, a separate quota.
   version: "0.66.0"
-  model: gemini-3.6-flash
+  model: gemini-3.5-flash-lite
 # Top-level AWF invocation cap on model requests; gh-aw's engines reference
 # lists it as supported for Gemini. The default is 500, and the agent step has a
 # 20-minute timeout. The prompt plans about five requests without a candidate
@@ -80,6 +80,7 @@ tools:
     # safe output below.
     min-integrity: none
 safe-outputs:
+  staged: true
   threat-detection: false
   # The agent job stays read-only. A finding is filed as one issue by the
   # separate safe_outputs job, from the agent's validated output. gh-aw also
