@@ -92,7 +92,7 @@ class TestConfigurationEndpoints:
             (update_restart_config, RestartConfig(mode="both", max_restarts=7)),
         ],
     )
-    async def test_configuration_update_errors_return_500(self, monkeypatch, endpoint, payload):
+    async def test_configuration_update_errors_propagate(self, monkeypatch, endpoint, payload):
         monkeypatch.setattr(
             config_manager,
             "update_config",
@@ -162,6 +162,20 @@ class TestObservabilityConfig:
         await update_observability_config({"log_level": "WARNING"})
 
         assert config_manager.get_config().restart.mode == original_restart_mode
+
+    @pytest.mark.parametrize(
+        "body",
+        [{"log_level": 5}, {"prometheus_enabled": "abc"}, {"log_format": ["json"]}],
+        ids=["log-level-not-string", "prometheus-not-bool", "log-format-not-string"],
+    )
+    async def test_update_observability_config_with_invalid_body_returns_422(self, body):
+        before = config_manager.get_config().observability.model_dump()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await update_observability_config(body)
+
+        assert exc_info.value.status_code == 422
+        assert config_manager.get_config().observability.model_dump() == before
 
     async def test_update_observability_config_unexpected_error_propagates(self, monkeypatch):
         monkeypatch.setattr(

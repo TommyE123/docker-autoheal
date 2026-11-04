@@ -75,6 +75,48 @@ class TestNotificationsConfig:
         assert result["config"]["services"][0]["name"] == "Webhook"
         assert config_manager.get_config().notifications.services[0].name == "Webhook"
 
+    @pytest.mark.parametrize(
+        "body",
+        [
+            {"enabled": "abc"},
+            {"event_filters": "restart"},
+            {"services": [5]},
+            {"services": "webhook"},
+            {"services": [{"name": "Missing Type"}]},
+        ],
+        ids=[
+            "enabled-not-bool",
+            "filters-not-list",
+            "service-not-object",
+            "services-not-list",
+            "service-missing-type",
+        ],
+    )
+    async def test_update_notifications_config_with_invalid_body_returns_422_and_changes_nothing(
+        self, body
+    ):
+        await add_notification_service(
+            {"name": "Hook", "type": "webhook", "url": "https://example.invalid/hook"}
+        )
+        before = config_manager.get_config().notifications.model_dump()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await update_notifications_config(body)
+
+        assert exc_info.value.status_code == 422
+        assert config_manager.get_config().notifications.model_dump() == before
+
+    async def test_update_notifications_config_keeps_omitted_fields(self):
+        await add_notification_service(
+            {"name": "Hook", "type": "webhook", "url": "https://example.invalid/hook"}
+        )
+
+        await update_notifications_config({"enabled": True})
+
+        config = config_manager.get_config().notifications
+        assert config.enabled is True
+        assert [service.name for service in config.services] == ["Hook"]
+
     async def test_update_notifications_config_invalid_service_returns_422(self):
         # Missing the required "type" field, so NotificationService(**data) raises.
         with pytest.raises(HTTPException) as exc_info:

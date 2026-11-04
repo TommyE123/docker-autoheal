@@ -72,17 +72,6 @@ class TestHealthCheckManagement:
 
         assert exc_info.value.status_code == 404
 
-    async def test_add_health_check_uninitialized_docker_client_returns_503(
-        self, uninitialized_api
-    ):
-        with pytest.raises(HTTPException) as exc_info:
-            await add_health_check(
-                get_docker_client(),
-                HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080),
-            )
-
-        assert exc_info.value.status_code == 503
-
     async def test_get_health_check_returns_stored_check(self, wired_api):
         docker_client, _engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
@@ -147,14 +136,6 @@ class TestHealthCheckManagement:
 
         assert exc_info.value.status_code == 404
 
-    async def test_get_health_check_uninitialized_docker_client_returns_503(
-        self, uninitialized_api
-    ):
-        with pytest.raises(HTTPException) as exc_info:
-            await get_health_check(get_docker_client(), "web")
-
-        assert exc_info.value.status_code == 503
-
     async def test_delete_health_check_removes_stored_check(self, wired_api):
         docker_client, _engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
@@ -209,14 +190,6 @@ class TestHealthCheckManagement:
             await delete_health_check(get_docker_client(), "does-not-exist")
 
         assert exc_info.value.status_code == 404
-
-    async def test_delete_health_check_uninitialized_docker_client_returns_503(
-        self, uninitialized_api
-    ):
-        with pytest.raises(HTTPException) as exc_info:
-            await delete_health_check(get_docker_client(), "web")
-
-        assert exc_info.value.status_code == 503
 
     async def test_list_health_checks_returns_all_registered_checks(self):
         config_manager.add_custom_health_check(

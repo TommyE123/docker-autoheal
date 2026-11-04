@@ -20,6 +20,7 @@ from app.config.config_manager import (
     AutoHealConfig,
     ConfigImportError,
     MonitorConfig,
+    ObservabilityConfig,
     RestartConfig,
     config_manager,
 )
@@ -101,10 +102,20 @@ async def update_observability_config(observability_config: dict):
     """Update observability configuration including log level"""
     config = config_manager.get_config()
 
-    # Update observability config
-    if "log_level" in observability_config:
-        level_name = observability_config["log_level"]
-        config.observability.log_level = level_name
+    # Validate the merged section as one model, so a bad value is rejected here instead of
+    # being saved and then reset the next time the config loads.
+    updates = {
+        key: observability_config[key]
+        for key in ("log_level", "prometheus_enabled", "log_format")
+        if key in observability_config
+    }
+    with invalid_input_as_422():
+        config.observability = ObservabilityConfig.model_validate(
+            {**config.observability.model_dump(), **updates}
+        )
+
+    if "log_level" in updates:
+        level_name = config.observability.log_level
 
         # Update log level directly without importing main
         level_map = {
@@ -125,12 +136,6 @@ async def update_observability_config(observability_config: dict):
         logging.getLogger("uvicorn").setLevel(logging.WARNING)
 
         logger.info("Log level changed to: %s", level_name)
-
-    if "prometheus_enabled" in observability_config:
-        config.observability.prometheus_enabled = observability_config["prometheus_enabled"]
-
-    if "log_format" in observability_config:
-        config.observability.log_format = observability_config["log_format"]
 
     config_manager.update_config(config)
     return {"status": "success", "message": "Observability configuration updated"}

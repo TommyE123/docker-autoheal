@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from app.api import state
 from app.api.errors import invalid_input_as_422
-from app.config.config_manager import NotificationService, config_manager
+from app.config.config_manager import NotificationsConfig, NotificationService, config_manager
 
 logger = logging.getLogger(__name__)
 
@@ -31,20 +31,17 @@ async def update_notifications_config(notifications_config: dict):
     """Update notification configuration"""
     config = config_manager.get_config()
 
-    if "enabled" in notifications_config:
-        config.notifications.enabled = notifications_config["enabled"]
-
-    if "event_filters" in notifications_config:
-        config.notifications.event_filters = notifications_config["event_filters"]
-
-    if "services" in notifications_config:
-        # Parse and validate services
-        services = []
-        for service_data in notifications_config["services"]:
-            with invalid_input_as_422():
-                service = NotificationService(**service_data)
-            services.append(service)
-        config.notifications.services = services
+    updates = {
+        key: notifications_config[key]
+        for key in ("enabled", "event_filters", "services")
+        if key in notifications_config
+    }
+    # Validate the merged section as one model, so a bad value is rejected here instead of
+    # being saved and then reset (with every configured service) the next time the config loads.
+    with invalid_input_as_422():
+        config.notifications = NotificationsConfig.model_validate(
+            {**config.notifications.model_dump(), **updates}
+        )
 
     config_manager.update_config(config)
 

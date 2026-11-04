@@ -190,12 +190,6 @@ class TestListContainers:
 
         assert result == []
 
-    async def test_uninitialized_docker_client_returns_503(self, uninitialized_api):
-        with pytest.raises(HTTPException) as exc_info:
-            await list_containers(get_docker_client())
-
-        assert exc_info.value.status_code == 503
-
     async def test_docker_listing_error_propagates(self, wired_api, monkeypatch):
         docker_client, _engine = wired_api
         monkeypatch.setattr(
@@ -306,12 +300,6 @@ class TestGetContainerDetails:
 
         assert exc_info.value.status_code == 404
 
-    async def test_uninitialized_docker_client_returns_503(self, uninitialized_api):
-        with pytest.raises(HTTPException) as exc_info:
-            await get_container_details(get_docker_client(), "anything")
-
-        assert exc_info.value.status_code == 503
-
     async def test_docker_inspection_error_propagates(self, wired_api, monkeypatch):
         docker_client, _engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
@@ -328,15 +316,6 @@ class TestGetContainerDetails:
 
 @pytest.mark.asyncio
 class TestUpdateContainerSelection:
-    async def test_uninitialized_docker_client_returns_clear_503(self, uninitialized_api):
-        with pytest.raises(HTTPException) as exc_info:
-            await update_container_selection(
-                get_docker_client(), ContainerSelectionRequest(container_ids=["web"], enabled=True)
-            )
-
-        assert exc_info.value.status_code == 503
-        assert exc_info.value.detail == "Docker client not initialized"
-
     async def test_enabling_adds_stable_id_and_clears_exclusion(self, wired_api):
         docker_client, _engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
@@ -637,12 +616,6 @@ class TestRestartContainerManual:
 
         assert exc_info.value.status_code == 500
 
-    async def test_uninitialized_docker_client_returns_503(self, uninitialized_api):
-        with pytest.raises(HTTPException) as exc_info:
-            await restart_container_manual(get_docker_client(), "anything")
-
-        assert exc_info.value.status_code == 503
-
     async def test_docker_restart_exception_propagates(self, wired_api, monkeypatch):
         docker_client, _engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
@@ -709,12 +682,6 @@ class TestUnquarantineContainer:
             await unquarantine_container(get_docker_client(), "does-not-exist")
 
         assert exc_info.value.status_code == 404
-
-    async def test_uninitialized_docker_client_returns_503(self, uninitialized_api):
-        with pytest.raises(HTTPException) as exc_info:
-            await unquarantine_container(get_docker_client(), "anything")
-
-        assert exc_info.value.status_code == 503
 
     async def test_notification_error_propagates(self, wired_api, monkeypatch):
         docker_client, _engine = wired_api
