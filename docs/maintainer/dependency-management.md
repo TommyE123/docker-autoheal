@@ -21,6 +21,7 @@ updates are reviewed and merged.
 | GitHub Actions                  | `.github/workflows/*.yml`                                       | `github-actions`                    |
 | Dockerfile apt package versions | `Dockerfile`                                                    | `customManagers:dockerfileVersions` |
 | SonarCloud Python version       | `.sonarcloud.properties`                                        | custom `regex` manager              |
+| Pyright Python version          | `pyrightconfig.json`                                            | custom `regex` manager              |
 
 The standard `config:recommended` preset provides the managers for the main dependency
 ecosystems above, including `mise` for the developer CLI tools pinned in `mise.toml`
@@ -151,35 +152,81 @@ updates are not part of that group, and unrelated frontend dependencies such as 
 ESLint are not grouped with it. Manual review and merge, the seven-day minimum release age and
 disabled automerge apply to the group as usual.
 
-### Python version grouping
+### Python runtime version updates
 
-The Python version is pinned in three places: the `python` image in the `Dockerfile`, the
-`mcr.microsoft.com/devcontainers/python` image in `.devcontainer/Dockerfile`, and
-`sonar.python.version` in `.sonarcloud.properties`. SonarCloud runs automatic analysis, which
-reads `.sonarcloud.properties` from the default branch and ignores `sonar-project.properties`.
-That file also sets the test file patterns and the source encoding.
+The Python version is set in five places. Renovate can update four of them:
 
-A custom regex manager in `renovate.json` reads `sonar.python.version` through the
-`# renovate:` comment above it, and a package rule groups all three pins into one
-"Python runtime" pull request, so a new Python version moves them together. The tag formats
-differ (`3.14-slim`, `3.14-bookworm` and plain `3.14`), but Renovate resolves each to the same
-release. A new Python version is a minor or major update, so the grouped pull request needs
-manual review and merge like any other. If the Dev Container image has no tag for the new
-version yet, the other pins can update first and the Dev Container image follows in a later
-pull request.
+* `Dockerfile` — the `python` base image.
+* `.devcontainer/Dockerfile` — the Dev Container Python image.
+* `.sonarcloud.properties` — `sonar.python.version`, used by SonarCloud.
+* `pyrightconfig.json` — `pythonVersion`, used by Pyright.
 
-The general digest pinning rule is switched off for `.sonarcloud.properties`, because
-SonarCloud needs a bare version number there and not `3.15@sha256:…`.
+The fifth, `target-version` in `.linter-rules/.ruff.toml`, uses the `py314` form, which Renovate
+cannot update. It is changed by hand on the Renovate branch.
 
-Renovate groups the updates that are available but does not make their target versions match.
-The plain and `-slim` tags can clear the seven-day age check at different times, so before
-merging a "Python runtime" pull request, compare the versions in the `Dockerfile`,
-`.devcontainer/Dockerfile` and `.sonarcloud.properties`. The Dev Container image comes from
-`mcr.microsoft.com`, which gives Renovate no release timestamps, so a package rule makes the age
-check optional for it. It is still held back by the seven-day wait wherever a timestamp exists.
+SonarCloud runs automatic analysis, which reads `.sonarcloud.properties` from the default
+branch and ignores `sonar-project.properties`. That file also sets the test file patterns and
+source encoding.
+
+Two custom regex managers in `renovate.json` track the pins that are not Dockerfiles. The
+SonarCloud pin is found through the `# renovate:` comment immediately above it. The Pyright pin
+is found by matching the `pythonVersion` key. Both use the `docker` datasource with the
+dependency name `python`, so they follow the same releases as the `Dockerfile` image.
+
+A package rule groups all four updates into one "Python runtime" pull request, so a new Python
+version moves them together. The tag formats differ (`3.15-slim`, `3.15-bookworm` and plain
+`3.15`), but Renovate resolves each to the same release. A new Python version is a minor or
+major update, so the grouped pull request needs manual review and merge like any other, and
+automerge stays disabled.
+
+The rule sets `minimumGroupSize: 4`, the number of pins Renovate manages. Renovate does not
+create the branch until all four have an update available. One, two or three available updates
+create no branch and no pull request, so a partial runtime upgrade cannot be proposed. This
+also covers the case where the registries publish a new Python version at different times, such
+as the Dev Container image on `mcr.microsoft.com` arriving after Docker Hub.
+
+Two things to know about the minimum:
+
+* It is a count, not a list of files. If a Python pin is added to or removed from Renovate's
+  management, change `minimumGroupSize` to match. Set too high, the group never forms and no
+  error is shown. Set too low, partial upgrades are possible again.
+* The rule applies to major and minor updates only. Digest refreshes for the existing tags are
+  not grouped, so they are not held back by the minimum.
+
+The seven-day minimum release age applies to the Docker Hub tags. The Dev Container image comes
+from `mcr.microsoft.com`, which gives Renovate no release timestamps, so a package rule makes
+the age check optional for it. It is still held back by the seven-day wait wherever a timestamp
+exists.
+
+`minimumGroupSize` guarantees how many updates are in the group, not that their target versions
+match. The plain and `-slim` tags can clear the age check at different times, so before merging
+a "Python runtime" pull request, compare the versions in all five files.
+
+The general digest pinning rule is switched off for `.sonarcloud.properties` and
+`pyrightconfig.json` because both tools need a bare version number and not `3.15@sha256:…`.
+
+#### Finishing a Python runtime pull request
+
+When the "Python runtime" pull request appears, the unit tests fail until `target-version` in
+`.linter-rules/.ruff.toml` matches the new version (for example `py315`). Push that change to
+the Renovate branch. A contract test in `app/tests/unit/test_dev_stack_files.py` checks that
+the `Dockerfile`, the Dev Container image, SonarCloud, Pyright and Ruff all agree, so a runtime
+upgrade cannot be merged with any reference missed. It catches a pin that drifts for any
+reason, not only through Renovate. The workflows that run on Python read the version from the
+`Dockerfile`, so they follow it automatically.
+
+Once you push the Ruff change, Renovate treats the branch as modified and stops updating and
+rebasing it. If `main` moves on, bring the branch up to date yourself by merging `origin/main`
+into it. Do not tick the pull request's rebase/retry checkbox after editing: Renovate rebuilds
+the branch from scratch and discards the manual `target-version` change, and the unit test fails
+again until it is re-applied.
 
 Keep the `# renovate:` comment directly above the `sonar.python.version` line when editing
 `.sonarcloud.properties`, or Renovate stops tracking it.
+
+Python versions in lock files are not tracked here. The `requires-python` constraints in
+`.mise/locks/` are the minimum versions of the developer tools themselves, not this project's
+runtime, and Renovate ignores that directory.
 
 ### Rebasing
 
