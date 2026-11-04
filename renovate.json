@@ -130,7 +130,8 @@
       "minimumReleaseAgeBehaviour": "timestamp-optional"
     },
     {
-      "description": "ghcr.io gives Renovate no release timestamps, so with internalChecksFilter strict its updates wait on the age check forever. Keep the seven day age where a timestamp exists, and do not block when one is missing.",
+      "description": "ghcr.io gives Renovate no release timestamps, so with internalChecksFilter strict its updates wait on the age check forever. Do not block when a timestamp is missing. Those updates get no seven day delay, so CI and review are the only gate.",
+      "matchDatasources": ["docker"],
       "matchPackageNames": ["ghcr.io/**"],
       "minimumReleaseAge": "7 days",
       "minimumReleaseAgeBehaviour": "timestamp-optional"
