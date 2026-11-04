@@ -130,7 +130,7 @@
       "minimumReleaseAgeBehaviour": "timestamp-optional"
     },
     {
-      "description": "Packages from ghcr.io (the Dev Container features and the mise image) get no release timestamps from the registry, so with internalChecksFilter strict their updates (for example docker-in-docker 2 to 4) sat under Pending Status Checks and never became PRs. Keep the seven day age where a timestamp exists, and do not block when one is missing.",
+      "description": "ghcr.io gives Renovate no release timestamps, so with internalChecksFilter strict its updates wait on the age check forever. Keep the seven day age where a timestamp exists, and do not block when one is missing.",
       "matchPackageNames": ["ghcr.io/**"],
       "minimumReleaseAge": "7 days",
       "minimumReleaseAgeBehaviour": "timestamp-optional"
