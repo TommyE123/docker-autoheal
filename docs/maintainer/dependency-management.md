@@ -182,8 +182,10 @@ does not control this setting. The scan is not tracked in this repository, so ch
 SonarCloud settings if the `main` quality gate fails on "New dependency risks too severe".
 
 Python transitive dependencies are not pinned in `requirements.txt` and there is no Python
-lockfile, so a lockfile scan only sees the direct dependencies there. Scanning the built image
-is the planned way to cover them.
+lockfile, so a lockfile scan only sees the direct dependencies there. The transitive Python
+packages and the operating system packages in the built image are not scanned. They are
+resolved at build time, and a finding in them is rarely something the project can fix itself.
+Renovate keeps the base image and the shipped dependencies current instead.
 
 [`SECURITY.md`](../../SECURITY.md) describes how to report a vulnerability, and states that
 development tooling is out of scope for dependency scanning.
