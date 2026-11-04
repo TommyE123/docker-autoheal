@@ -34,13 +34,6 @@ def wired_api(monkeypatch, docker_client, engine):
     return docker_client, engine
 
 
-@pytest.fixture
-def uninitialized_api(monkeypatch):
-    """Simulate the API being called before ``init_api`` has run."""
-    monkeypatch.setattr("app.api.state.docker_client", None)
-    monkeypatch.setattr("app.api.state.monitoring_engine", None)
-
-
 @pytest.mark.asyncio
 class TestHealthCheckManagement:
     async def test_add_health_check_resolves_full_container_id(self, wired_api):
