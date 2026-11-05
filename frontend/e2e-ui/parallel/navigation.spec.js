@@ -66,3 +66,34 @@ for (const { path, heading } of pages) {
     },
   );
 }
+
+test("the theme toggle switches between light and dark and persists across reloads", async ({
+  page,
+}) => {
+  await page.goto("/containers");
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-bs-theme", "light");
+
+  await page.getByRole("button", { name: "Switch to dark mode" }).click();
+  await expect(html).toHaveAttribute("data-bs-theme", "dark");
+  await expect(
+    page.getByRole("button", { name: "Switch to light mode" }),
+  ).toHaveAttribute("aria-pressed", "true");
+
+  await page.reload();
+  await expect(html).toHaveAttribute("data-bs-theme", "dark");
+  await expect(page.getByText("Total Containers")).toBeVisible();
+
+  await page.getByRole("button", { name: "Switch to light mode" }).click();
+  await expect(html).toHaveAttribute("data-bs-theme", "light");
+});
+
+test("a saved theme is applied before the app renders", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("theme", "dark"));
+  // Block the app bundle so only the inline <head> script can have set the theme.
+  await page.route(/\/assets\/.*\.js$/, (route) => route.abort());
+  await page.goto("/containers");
+
+  await expect(page.locator("html")).toHaveAttribute("data-bs-theme", "dark");
+  await expect(page.getByText("Docker Auto-Heal Service")).toHaveCount(0);
+});
