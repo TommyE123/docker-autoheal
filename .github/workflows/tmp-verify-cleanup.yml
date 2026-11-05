@@ -1,0 +1,51 @@
+# Throwaway: runs the cleanup step from mega-linter.yml on Ubuntu 24.04 (issue #176). Delete after use.
+name: Verify cleanup 24.04
+on:
+  push:
+    branches:
+      - ci/176-verify-ubuntu-2404
+permissions: {}
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Runner image
+        run: grep -E "^(PRETTY_NAME|VERSION)=" /etc/os-release; echo "ImageVersion=${ImageVersion:-unknown} ImageOS=${ImageOS:-unknown}"
+      - name: Free Disk Space & Verify
+        run: |
+          echo "=== Initial Free Disk Space ==="
+          df -h /
+
+          # Ordered from lowest file count (fastest delete) to highest.
+          # The gradle entry is a glob because the directory name carries the version.
+          TARGETS=(
+            "/usr/local/share/chromium"   # 480 files (~650 MB)
+            "/usr/local/share/powershell" # 551 files (~1.3 GB)
+            "/opt/microsoft"              # 952 files (~813 MB)
+            "/usr/share/swift"            # 2,025 files (~3.3 GB)
+            "/usr/local/aws-cli"          # AWS CLI v2 (install-aws-tools.sh)
+            "/usr/local/aws-sam-cli"      # AWS SAM CLI (installer default dir)
+            "/usr/share/gradle-*"         # Gradle (install-java-tools.sh)
+            "/opt/az"                     # Azure CLI (apt package)
+          )
+
+          echo ""
+          echo "=== Removing Unused Directories ==="
+          for target in "${TARGETS[@]}"; do
+            # Unquoted so the glob expands; an unmatched glob stays literal and is "not found".
+            # shellcheck disable=SC2086
+            for dir in $target; do
+              if [ ! -d "$dir" ]; then
+                echo "Not found, skipping: $dir"
+                continue
+              fi
+              # A failing rm aborts the step (bash -e) so real errors stay visible.
+              sudo rm -rf "$dir"
+              echo "Removed: $dir"
+            done
+          done
+
+          echo ""
+          echo "=== Post-Cleanup Free Disk Space ==="
+          df -h /
