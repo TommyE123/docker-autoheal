@@ -130,6 +130,13 @@
       "minimumReleaseAgeBehaviour": "timestamp-optional"
     },
     {
+      "description": "ghcr.io gives Renovate no release timestamps, so with internalChecksFilter strict its updates wait on the age check forever. Do not block when a timestamp is missing. Those updates get no seven day delay, so CI and the automerge or manual-review policy are the gates.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["ghcr.io/**"],
+      "minimumReleaseAge": "7 days",
+      "minimumReleaseAgeBehaviour": "timestamp-optional"
+    },
+    {
       "description": "tommye123/docker-autoheal is this project's own published image, not a third-party dependency. Renovate should not manage it.",
       "matchDatasources": ["docker"],
       "matchPackageNames": ["tommye123/docker-autoheal"],
