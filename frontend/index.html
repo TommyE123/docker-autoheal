@@ -20,8 +20,9 @@
     <meta name="apple-mobile-web-app-title" content="AutoHeal" />
 
     <title>Docker Auto-Heal Service</title>
-
-    <!-- Apply the saved theme before first paint to avoid a flash of the wrong one. -->
+  </head>
+  <body>
+    <!-- Apply the saved theme before the app renders to avoid a flash of the wrong one. -->
     <script>
       (function () {
         var theme = "light";
@@ -33,8 +34,6 @@
         document.documentElement.setAttribute("data-bs-theme", theme);
       })();
     </script>
-  </head>
-  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

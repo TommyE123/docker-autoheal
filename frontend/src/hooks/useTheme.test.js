@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { useTheme } from "./useTheme";
 
@@ -47,5 +47,25 @@ describe("useTheme", () => {
     const { result } = renderHook(() => useTheme());
 
     expect(result.current.theme).toBe("light");
+  });
+});
+
+describe("useTheme without usable storage", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("falls back to light and still toggles when storage throws", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+
+    const { result } = renderHook(() => useTheme());
+    expect(result.current.theme).toBe("light");
+
+    act(() => result.current.toggleTheme());
+    expect(result.current.theme).toBe("dark");
+    expect(html).toHaveAttribute("data-bs-theme", "dark");
   });
 });
