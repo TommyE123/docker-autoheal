@@ -5,14 +5,19 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 bash .devcontainer/prepare-volumes.sh
 
-mise install --locked
+# Tools float to the latest release with no lockfile. `install` fetches anything missing;
+# `upgrade` moves tools already installed on the persisted volume to the newest release.
+mise install
+mise upgrade --yes
 # Only mise's tool installs grow without bound (each version bump leaves the old
 # install behind); prune is a no-op when nothing is superseded.
 mise prune --yes || echo "Warning: mise prune failed; superseded tool versions were kept"
 
 python -m pip install -r requirements-dev.txt
 npm ci --prefer-offline --no-audit --prefix frontend
-npm ci --prefer-offline --ignore-scripts --no-audit --prefix .devcontainer
+npm install --no-package-lock --ignore-scripts --no-audit --prefix .devcontainer
+# `install` leaves packages already in the workspace's node_modules alone, so update them too.
+npm update --no-package-lock --ignore-scripts --no-audit --prefix .devcontainer
 # Chromium plus its system libraries for the Playwright E2E task. The browser lands in
 # ~/.cache/ms-playwright (a persisted volume); the apt libraries are reinstalled on rebuild.
 npm exec --prefix frontend -- playwright install --with-deps chromium
