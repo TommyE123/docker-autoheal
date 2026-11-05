@@ -11,8 +11,7 @@
     "**/node_modules/**",
     "**/bower_components/**",
     ".github/workflows/issue-triage.lock.yml",
-    ".github/workflows/weekly-maintainer.lock.yml",
-    "**/.mise/locks/**"
+    ".github/workflows/weekly-maintainer.lock.yml"
   ],
   "description": "Dependency-update policy for docker-autoheal. Renovate creates and maintains dependency PRs. Patch updates are automerged once required checks pass; all other updates require manual review and merge. See docs/maintainer/dependency-management.md for the full explanation.",
   "timezone": "Europe/London",
@@ -52,12 +51,12 @@
   ],
   "packageRules": [
     {
-      "description": "Update the Python version everywhere Renovate can reach it in one PR: the Dockerfile image, the Dev Container image, sonar.python.version and pythonVersion in pyrightconfig.json. minimumGroupSize must equal the number of pins, so the PR is only created once all of them have an update. Ruff's target-version cannot be tracked by Renovate; the contract test in app/tests/unit/test_dev_stack_files.py fails until it is changed by hand. Only major and minor updates are grouped, so routine digest refreshes of the existing tags are not held back by the minimum. Python releases are minor or major updates, so automerge stays disabled.",
+      "description": "Update the Python version everywhere Renovate can reach it in one PR: the Dockerfile image, sonar.python.version and pythonVersion in pyrightconfig.json. minimumGroupSize must equal the number of pins, so the PR is only created once all of them have an update. The Dev Container image and Ruff's target-version cannot be tracked by Renovate; the contract test in app/tests/unit/test_dev_stack_files.py fails until it is changed by hand. Only major and minor updates are grouped, so routine digest refreshes of the existing tags are not held back by the minimum. Python releases are minor or major updates, so automerge stays disabled.",
       "matchDatasources": ["docker"],
-      "matchPackageNames": ["python", "mcr.microsoft.com/devcontainers/python"],
+      "matchPackageNames": ["python"],
       "matchUpdateTypes": ["major", "minor"],
       "groupName": "Python runtime",
-      "minimumGroupSize": 4,
+      "minimumGroupSize": 3,
       "minimumReleaseAge": "7 days"
     },
     {
@@ -124,17 +123,9 @@
       "pinDigests": false
     },
     {
-      "description": "The Dev Container base image comes from mcr.microsoft.com, and Renovate only gets release timestamps for Docker Hub. With internalChecksFilter strict, its updates would wait on the release age check indefinitely and never join the Python runtime group. Keep the seven day age where a timestamp exists, and do not block when one is missing.",
-      "matchPackageNames": ["mcr.microsoft.com/devcontainers/python"],
-      "minimumReleaseAge": "7 days",
-      "minimumReleaseAgeBehaviour": "timestamp-optional"
-    },
-    {
-      "description": "ghcr.io gives Renovate no release timestamps, so with internalChecksFilter strict its updates wait on the age check forever. Do not block when a timestamp is missing. Those updates get no seven day delay, so CI and the automerge or manual-review policy are the gates.",
-      "matchDatasources": ["docker"],
-      "matchPackageNames": ["ghcr.io/**"],
-      "minimumReleaseAge": "7 days",
-      "minimumReleaseAgeBehaviour": "timestamp-optional"
+      "description": "Local Dev Container tooling floats with no pins and no lockfiles, so Renovate leaves it alone: the mise tools, the Dev Container image and features, and the npm linters in .devcontainer/package.json. See docs/maintainer/dependency-management.md.",
+      "matchFileNames": ["mise.toml", ".devcontainer/**"],
+      "enabled": false
     },
     {
       "description": "tommye123/docker-autoheal is this project's own published image, not a third-party dependency. Renovate should not manage it.",

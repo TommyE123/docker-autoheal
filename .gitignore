@@ -84,7 +84,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-# package-lock.json is committed intentionally (Renovate manages it; see renovate.json)
+# frontend/package-lock.json is committed intentionally (Renovate manages it; see renovate.json).
+# The Dev Container tooling floats with no lockfile, so its lockfile is never committed.
+.devcontainer/package-lock.json
+mise.lock
 yarn.lock
 pnpm-lock.yaml
 *.dylib
