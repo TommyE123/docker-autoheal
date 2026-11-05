@@ -63,6 +63,8 @@ Do not add `mise.lock`, `.mise/locks/`, `.devcontainer/package-lock.json` or
 `.devcontainer/devcontainer-lock.json` back. `mise.lock` and the npm lockfile are in
 `.gitignore`, and `renovate.json` lists `mise.toml` and `.devcontainer/**` under
 `ignorePaths`, so Renovate does not extract them at all.
+SonarCloud's rule `text:S8564` flags the missing npm lockfile, so `.sonarcloud.properties`
+excludes `.devcontainer/package.json` from analysis (`sonar.exclusions`).
 
 ## Version pinning policy
 
