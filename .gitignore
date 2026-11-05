@@ -87,6 +87,7 @@ pnpm-debug.log*
 # frontend/package-lock.json is committed intentionally (Renovate manages it; see renovate.json).
 # The Dev Container tooling floats with no lockfile, so its lockfile is never committed.
 .devcontainer/package-lock.json
+.devcontainer/devcontainer-lock.json
 mise.lock
 uv.lock
 yarn.lock
