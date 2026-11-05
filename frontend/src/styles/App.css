@@ -160,7 +160,6 @@ body {
 /* Code blocks */
 pre {
   background-color: var(--bs-tertiary-bg);
-  color: var(--bs-body-color);
   padding: 1rem;
   border-radius: 0.25rem;
   overflow-x: auto;
@@ -169,7 +168,6 @@ pre {
 
 code {
   background-color: var(--bs-tertiary-bg);
-  color: var(--bs-body-color);
   padding: 0.2rem 0.4rem;
   border-radius: 0.25rem;
   font-size: 0.875em;
