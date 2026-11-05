@@ -187,12 +187,13 @@ entitlement. If that stops being available, Trivy still covers the lockfiles.
 Development tooling has no lockfiles any more (see "Pinned and floating dependencies"), so
 neither scanner has anything to read for the Dev Container tools, and they are not tracked for
 dependency vulnerabilities. `.linter-rules/.trivyignore.yaml` only holds acknowledged
-misconfigurations. `frontend/package-lock.json` is still scanned, including the devDependencies
-of the build chain, because the same lockfile holds the dependencies of the built web UI.
+misconfigurations. Trivy scans `frontend/package-lock.json` for the production dependencies of
+the built web UI. By default Trivy does not report devDependencies, and this repository does not
+set `--include-dev-deps`, so the build chain's devDependencies are not checked by Trivy.
 
-SonarCloud's dependency scan can still list devDependencies from that lockfile, such as
-`deepmerge` and `uri-js` pulled in by the build tooling, and fail the `main` quality gate with
-"New dependency risks too severe". The project cannot fix most of those findings itself, so they
+SonarCloud's dependency scan does list devDependencies from that lockfile, such as
+`deepmerge` and `uri-js` pulled in by the build tooling, and can fail the `main` quality gate
+with "New dependency risks too severe". The project cannot fix most of those findings itself, so they
 are accepted in the SonarCloud UI with a short reason, for example "dev-only build tooling, not
 shipped". GitHub's Dependabot alerts can also report them.
 

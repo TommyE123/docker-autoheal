@@ -45,10 +45,11 @@ Out of scope:
 * vulnerabilities in development tooling, such as the linters and scanners used by the
   Dev Container and MegaLinter. They never ship in the image, they float to the latest
   release, and the repository does not pin or scan them for dependency vulnerabilities.
-* advisories in third-party dependencies that have no effect on Docker Auto-Heal. The
-  runtime dependencies in `requirements.txt` and the frontend lockfile are checked by Trivy in
-  CI and updated by Renovate, so please report a dependency problem only if you can show it is
-  exploitable through Docker Auto-Heal.
+* advisories in third-party dependencies that have no effect on Docker Auto-Heal. The direct
+  runtime dependencies in `requirements.txt` and the production dependencies in the frontend
+  lockfile are checked by Trivy in CI and updated by Renovate. The transitive Python packages and
+  the operating system packages in the image are not scanned. Please report a dependency problem
+  only if you can show it is exploitable through Docker Auto-Heal.
 
 For how dependency vulnerabilities are scanned and handled, see
 [Dependency management](docs/maintainer/dependency-management.md).
