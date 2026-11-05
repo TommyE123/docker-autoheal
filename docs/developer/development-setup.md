@@ -384,7 +384,8 @@ scripts use two spaces.
 
 These tools float: `mise.toml` and `.devcontainer/package.json` use `latest`, and there are
 no lockfiles, so versions can differ from run to run and from what MegaLinter checks in CI.
-To get the newest versions in an existing container, run `mise upgrade`. See
+To get the newest versions in an existing container, run `mise upgrade` and
+`npm update --no-package-lock --prefix .devcontainer`. See
 [Pinned and floating dependencies](../maintainer/dependency-management.md#pinned-and-floating-dependencies)
 for what stays pinned and why.
 

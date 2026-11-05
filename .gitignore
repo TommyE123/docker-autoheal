@@ -88,6 +88,7 @@ pnpm-debug.log*
 # The Dev Container tooling floats with no lockfile, so its lockfile is never committed.
 .devcontainer/package-lock.json
 mise.lock
+uv.lock
 yarn.lock
 pnpm-lock.yaml
 *.dylib

@@ -15,7 +15,9 @@ mise prune --yes || echo "Warning: mise prune failed; superseded tool versions w
 
 python -m pip install -r requirements-dev.txt
 npm ci --prefer-offline --no-audit --prefix frontend
-npm install --no-package-lock --prefer-offline --ignore-scripts --no-audit --prefix .devcontainer
+npm install --no-package-lock --ignore-scripts --no-audit --prefix .devcontainer
+# `install` leaves packages already in the workspace's node_modules alone, so update them too.
+npm update --no-package-lock --ignore-scripts --no-audit --prefix .devcontainer
 # Chromium plus its system libraries for the Playwright E2E task. The browser lands in
 # ~/.cache/ms-playwright (a persisted volume); the apt libraries are reinstalled on rebuild.
 npm exec --prefix frontend -- playwright install --with-deps chromium

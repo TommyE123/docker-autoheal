@@ -11,7 +11,9 @@
     "**/node_modules/**",
     "**/bower_components/**",
     ".github/workflows/issue-triage.lock.yml",
-    ".github/workflows/weekly-maintainer.lock.yml"
+    ".github/workflows/weekly-maintainer.lock.yml",
+    "mise.toml",
+    ".devcontainer/**"
   ],
   "description": "Dependency-update policy for docker-autoheal. Renovate creates and maintains dependency PRs. Patch updates are automerged once required checks pass; all other updates require manual review and merge. See docs/maintainer/dependency-management.md for the full explanation.",
   "timezone": "Europe/London",
@@ -121,11 +123,6 @@
       "matchManagers": ["custom.regex"],
       "matchFileNames": [".sonarcloud.properties", "pyrightconfig.json"],
       "pinDigests": false
-    },
-    {
-      "description": "Local Dev Container tooling floats with no pins and no lockfiles, so Renovate leaves it alone: the mise tools, the Dev Container image and features, and the npm linters in .devcontainer/package.json. See docs/maintainer/dependency-management.md.",
-      "matchFileNames": ["mise.toml", ".devcontainer/**"],
-      "enabled": false
     },
     {
       "description": "tommye123/docker-autoheal is this project's own published image, not a third-party dependency. Renovate should not manage it.",

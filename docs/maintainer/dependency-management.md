@@ -61,8 +61,8 @@ Trade-offs:
 
 Do not add `mise.lock`, `.mise/locks/`, `.devcontainer/package-lock.json` or
 `.devcontainer/devcontainer-lock.json` back. `mise.lock` and the npm lockfile are in
-`.gitignore`, and one rule in `renovate.json` disables Renovate for `mise.toml` and
-`.devcontainer/**`.
+`.gitignore`, and `renovate.json` lists `mise.toml` and `.devcontainer/**` under
+`ignorePaths`, so Renovate does not extract them at all.
 
 ## Version pinning policy
 
@@ -214,14 +214,15 @@ The general digest pinning rule is switched off for `.sonarcloud.properties` and
 #### Finishing a Python runtime pull request
 
 When the "Python runtime" pull request appears, the unit tests fail until `target-version` in
-`.linter-rules/.ruff.toml` matches the new version (for example `py315`). Push that change to
-the Renovate branch. A contract test in `app/tests/unit/test_dev_stack_files.py` checks that
+`.linter-rules/.ruff.toml` matches the new version (for example `py315`), and until the Python tag in
+`.devcontainer/Dockerfile` (ignored by Renovate) is bumped by hand to match. Push those changes
+to the Renovate branch. A contract test in `app/tests/unit/test_dev_stack_files.py` checks that
 the `Dockerfile`, the Dev Container image, SonarCloud, Pyright and Ruff all agree, so a runtime
 upgrade cannot be merged with any reference missed. It catches a pin that drifts for any
 reason, not only through Renovate. The workflows that run on Python read the version from the
 `Dockerfile`, so they follow it automatically.
 
-Once you push the Ruff change, Renovate treats the branch as modified and stops updating and
+Once you push those changes, Renovate treats the branch as modified and stops updating and
 rebasing it. If `main` moves on, bring the branch up to date yourself by merging `origin/main`
 into it. Do not tick the pull request's rebase/retry checkbox after editing: Renovate rebuilds
 the branch from scratch and discards the manual `target-version` change, and the unit test fails
