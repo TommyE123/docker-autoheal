@@ -42,9 +42,13 @@ In scope:
 
 Out of scope:
 
-* vulnerabilities in development tooling, such as the linters and scanners used by the
-  Dev Container and MegaLinter. They never ship in the image, they float to the latest
+* vulnerabilities in the development tooling bundled by the Dev Container and MegaLinter,
+  such as the linters and scanners. They never ship in the image, they float to the latest
   release, and the repository does not pin or scan them for dependency vulnerabilities.
+* vulnerabilities in the frontend build tools, such as ESLint and Vite, unless they affect the
+  built web UI. They are installed from the pinned `frontend/package-lock.json` and run at build
+  time, not in the image. Trivy does not report them, but SonarCloud and GitHub's Dependabot
+  alerts may, and those findings are handled as ordinary dependency updates.
 * advisories in third-party dependencies that have no effect on Docker Auto-Heal. The direct
   runtime dependencies in `requirements.txt` and the production dependencies in the frontend
   lockfile are checked by Trivy in CI and updated by Renovate. The transitive Python packages and

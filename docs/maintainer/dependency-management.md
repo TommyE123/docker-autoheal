@@ -193,9 +193,12 @@ set `--include-dev-deps`, so the build chain's devDependencies are not checked b
 
 SonarCloud's dependency scan does list devDependencies from that lockfile, such as
 `deepmerge` and `uri-js` pulled in by the build tooling, and can fail the `main` quality gate
-with "New dependency risks too severe". The project cannot fix most of those findings itself, so they
-are accepted in the SonarCloud UI with a short reason, for example "dev-only build tooling, not
-shipped". GitHub's Dependabot alerts can also report them.
+with "New dependency risks too severe". These tools run during `npm run build`, before the
+generated files enter the production image, so each finding is assessed before it is accepted:
+is the vulnerable code reachable during the build, and is a fixed version available, often
+through a lockfile update or a major bump of the build tool? A finding with no fix, or with no
+build-time exposure, is accepted in the SonarCloud UI with a short reason, for example "no fix
+available, not reachable in the build". GitHub's Dependabot alerts can also report them.
 
 Python transitive dependencies are not pinned in `requirements.txt` and there is no Python
 lockfile, so a lockfile scan, from Trivy or SonarCloud, only sees the direct dependencies
@@ -331,9 +334,10 @@ automatically merging them can still introduce compatibility or behavioural chan
   dependency is behaviourally risk-free.
 
 * **`checkov` as a Dev Container tool** — it is deliberately absent from
-  `mise.toml`. Its actual findings in this repo (Dockerfile non-root user, Actions
-  permissions) are already covered by Trivy and zizmor, and it still runs in CI through
-  MegaLinter's bundled `REPOSITORY_CHECKOV` linter, so CI coverage is unaffected. `semgrep`
+  `mise.toml`. Its findings in this repo are covered elsewhere or deferred: Actions
+  permission findings are covered by zizmor, and the Dockerfile non-root finding is deferred
+  to issue #2, so Trivy ignores `DS-0002` and Checkov skips `CKV_DOCKER_3`. It still runs in CI
+  through MegaLinter's bundled `REPOSITORY_CHECKOV` linter, so CI coverage is unaffected. `semgrep`
   is the one kept in the Dev Container because it catches app-level issues nothing else in
   the local stack checks for.
 
