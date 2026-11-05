@@ -8,52 +8,69 @@ updates are reviewed and merged.
 
 ## What Renovate manages
 
-| Ecosystem                       | Files                                                           | Renovate manager                    |
-|---------------------------------|-----------------------------------------------------------------|-------------------------------------|
-| Python runtime dependencies     | `requirements.txt`                                              | `pip_requirements`                  |
-| Python test dependencies        | `requirements-dev.txt`                                          | `pip_requirements`                  |
-| npm dependencies + lockfile     | `frontend/package.json`, `frontend/package-lock.json`           | `npm`                               |
-| Dev Container npm lint tools    | `.devcontainer/package.json`, `.devcontainer/package-lock.json` | `npm`                               |
-| Dev Container CLI tools         | `mise.toml`, `mise.lock`                                        | `mise`                              |
-| Dev Container base image        | `.devcontainer/Dockerfile`                                      | `dockerfile`                        |
-| Docker base images              | `Dockerfile`                                                    | `dockerfile`                        |
-| Docker Compose images           | `docker-compose.yml`                                            | `docker-compose`                    |
-| GitHub Actions                  | `.github/workflows/*.yml`                                       | `github-actions`                    |
-| Dockerfile apt package versions | `Dockerfile`                                                    | `customManagers:dockerfileVersions` |
-| SonarCloud Python version       | `.sonarcloud.properties`                                        | custom `regex` manager              |
-| Pyright Python version          | `pyrightconfig.json`                                            | custom `regex` manager              |
+| Ecosystem                       | Files                                                 | Renovate manager                    |
+|---------------------------------|-------------------------------------------------------|-------------------------------------|
+| Python runtime dependencies     | `requirements.txt`                                    | `pip_requirements`                  |
+| Python test dependencies        | `requirements-dev.txt`                                | `pip_requirements`                  |
+| npm dependencies + lockfile     | `frontend/package.json`, `frontend/package-lock.json` | `npm`                               |
+| Docker base images              | `Dockerfile`                                          | `dockerfile`                        |
+| Docker Compose images           | `docker-compose.yml`                                  | `docker-compose`                    |
+| GitHub Actions                  | `.github/workflows/*.yml`                             | `github-actions`                    |
+| Dockerfile apt package versions | `Dockerfile`                                          | `customManagers:dockerfileVersions` |
+| SonarCloud Python version       | `.sonarcloud.properties`                              | custom `regex` manager              |
+| Pyright Python version          | `pyrightconfig.json`                                  | custom `regex` manager              |
 
 The standard `config:recommended` preset provides the managers for the main dependency
-ecosystems above, including `mise` for the developer CLI tools pinned in `mise.toml`
-(`actionlint`, `hadolint`, `trivy`, `trufflehog`, `betterleaks`,
-`editorconfig-checker`, `ruff`, `shellcheck`, `shfmt`, `semgrep`, `yamllint`, `zizmor`
-and `djlint`). A custom Renovate manager is also enabled for
+ecosystems above. A custom Renovate manager is also enabled for
 pinned versions of apt packages in the Dockerfiles.
 
-Two Dev Container pins need manual attention:
-
-* **`mise.lock` and `.mise/locks/`.** A Renovate update to `mise.toml` must come with a
-  regenerated lock. If the PR changes `mise.toml` alone, `mise install --locked` fails and
-  the Dev Container workflow goes red; run
-  `mise lock --platform linux-x64,linux-arm64` on the branch and commit the result.
-  `.mise/locks/` contains generated sidecars (`pyproject.toml` and `uv.lock`) managed by
-  mise, with their digests recorded in `mise.lock`. Renovate ignores that directory
-  (`ignorePaths` in `renovate.json`) so its Python/uv managers don't modify generated files
-  independently of the corresponding `mise.lock` state.
-* **Dev Container features.** Renovate's `devcontainer` manager updates the feature
-  versions in `.devcontainer/devcontainer.json` but not the digests pinned in
-  `.devcontainer/devcontainer-lock.json`. Refresh those periodically with
-  `devcontainer upgrade --workspace-folder .` from the Dev Containers CLI.
+Local Dev Container tooling is deliberately not managed. See
+[Pinned and floating dependencies](#pinned-and-floating-dependencies).
 
 Currently, `curl` is pinned in the Dockerfiles so that its version can be tracked and updated
 by Renovate. This allows the Dockerfile dependency to receive a normal Renovate PR rather than
 floating to whatever version happens to be available from the Debian package repository at
 build time.
 
+## Pinned and floating dependencies
+
+Pin what ships in the production image and what gates a merge. Let the local Dev Container
+tooling float to the latest release, with no pins and no lockfiles.
+
+| Pinned (Renovate raises PRs)                                            | Floating (Renovate ignores it)                                          |
+|-------------------------------------------------------------------------|-------------------------------------------------------------------------|
+| `requirements.txt`, the `Dockerfile` base images and apt pins           | `mise.toml` tools, set to `latest`, with no `mise.lock`                 |
+| `frontend/package-lock.json`, including the build chain devDependencies | `.devcontainer/package.json` linters, set to `latest`, with no lockfile |
+| `docker-compose` images                                                 | Dev Container features (major tag only) and the `mise` image            |
+| `requirements-dev.txt`, which feeds the required `unit-tests` check     | The Dev Container base image (a tag, not a digest)                      |
+| SHA-pinned GitHub Actions and the MegaLinter version                    |                                                                         |
+
+Why: the Dev Container exists for local convenience, and MegaLinter in CI uses its own bundled
+linter versions, so these versions do not control what CI checks. Dev tooling is also
+deliberately not tracked for dependency vulnerabilities, and this applies the same decision
+to versions. Pinning it only produced constant Renovate PRs and a `mise.lock` that had to be
+regenerated by hand.
+
+Trade-offs:
+
+* The `Build and test Dev Container` check can go red when an upstream tool releases something
+  breaking, unrelated to the PR. It is not a required check.
+* Local tool versions can drift from run to run, and from what CI checks.
+* A compromised new release of a dev tool is picked up automatically by the Dev Container
+  build, with no review step. This is accepted for local tooling.
+
+Do not add `mise.lock`, `.mise/locks/`, `.devcontainer/package-lock.json` or
+`.devcontainer/devcontainer-lock.json` back. `mise.lock`, the npm lockfile and any
+editor-generated `devcontainer-lock.json` are in
+`.gitignore`, and `renovate.json` lists `mise.toml` and `.devcontainer/**` under
+`ignorePaths`, so Renovate does not extract them at all.
+SonarCloud's rule `text:S8564` flags the missing npm lockfile, so `.sonarcloud.properties`
+excludes `.devcontainer/package.json` from analysis (`sonar.exclusions`).
+
 ## Version pinning policy
 
 * **Python**: exact versions (`==`) are used throughout `requirements.txt`
-  and `requirements-dev.txt`. Developer CLI tools in `mise.toml` are pinned exactly too.
+  and `requirements-dev.txt`.
 
   The packages that previously used `~=` (`pydantic`, `aiohttp`) were switched
   to `==` at their already-installed versions rather than being upgraded. Every subsequent
@@ -162,33 +179,26 @@ Two scanners look at the dependency lockfiles, and each other check has one owne
 | Code quality, security hotspots, dependency risks and the new-code quality gate      | SonarCloud                                 | Yes, once `SonarCloud Code Analysis` is a required check |
 | Fixing vulnerable dependencies                                                       | Renovate, using GitHub's Dependabot alerts | It opens the PRs                                         |
 
-SonarCloud's dependency scan (its "dependency risks") is what replaced osv-scanner, which was
-removed from MegaLinter and `mise.toml` because it overlapped with both scanners without
-blocking anything. SonarCloud uses its own advisory database, so it also gives a second opinion
-next to Trivy. The scan is a SonarCloud setting (under Advanced Security), not something
-`.sonarcloud.properties` controls, and it needs SonarCloud's Advanced Security entitlement. If
-that stops being available, Trivy still covers the lockfiles.
+SonarCloud's dependency scan (its "dependency risks") gives a second opinion next to Trivy,
+using its own advisory database. The scan is a SonarCloud setting (under Advanced Security), not
+something `.sonarcloud.properties` controls, and it needs SonarCloud's Advanced Security
+entitlement. If that stops being available, Trivy still covers the lockfiles.
 
-Development tooling is excluded from the blocking dependency scan. That covers the generated
-tool environments under `.mise/locks/` (Semgrep, yamllint, djlint) and the Dev Container
-linters in `.devcontainer/package-lock.json`. None of them ship in the Docker image, and
-Renovate already ignores `.mise/locks/`. Trivy skips those lockfiles with `scan.skip-files` in
-`.linter-rules/.trivy.yaml`, so MegaLinter does not flag them. This avoids a per-CVE entry in
-`.linter-rules/.trivyignore.yaml` each time a tool dependency gets an advisory, and that file
-now only holds acknowledged misconfigurations. The Trivy config uses `skip-files`, not
-`skip-dirs`, because MegaLinter passes `--skip-dirs` on the command line and that would
-override the config file. `frontend/package-lock.json` stays in scope because it also holds the
-dependencies of the built web UI.
+Development tooling has no lockfiles any more (see "Pinned and floating dependencies"), so
+neither scanner has anything to read for the Dev Container tools, and they are not tracked for
+dependency vulnerabilities. `.linter-rules/.trivyignore.yaml` only holds acknowledged
+misconfigurations. `frontend/package-lock.json` is still scanned, including the devDependencies
+of the build chain, because the same lockfile holds the dependencies of the built web UI.
 
-SonarCloud's dependency scan does list the development tooling, because it reads every lockfile
-it finds, and it can fail the `main` quality gate with "New dependency risks too severe". The
-project cannot fix most of those findings itself, so they are accepted in the SonarCloud UI with
-a short reason, for example "dev-only tooling, not shipped". GitHub's Dependabot alerts can also
-report them, and Renovate updates the npm ones in `.devcontainer/package-lock.json` as normal.
+SonarCloud's dependency scan can still list devDependencies from that lockfile, such as
+`deepmerge` and `uri-js` pulled in by the build tooling, and fail the `main` quality gate with
+"New dependency risks too severe". The project cannot fix most of those findings itself, so they
+are accepted in the SonarCloud UI with a short reason, for example "dev-only build tooling, not
+shipped". GitHub's Dependabot alerts can also report them.
 
 Python transitive dependencies are not pinned in `requirements.txt` and there is no Python
-lockfile, so a lockfile scan, from Trivy or SonarCloud, only sees the direct dependencies there. The transitive Python
-packages and the operating system packages in the built image are not scanned. They are
+lockfile, so a lockfile scan, from Trivy or SonarCloud, only sees the direct dependencies
+there. The transitive Python packages and the operating system packages in the built image are not scanned. They are
 resolved at build time, and a finding in them is rarely something the project can fix itself.
 Renovate keeps the base image and the shipped dependencies current instead.
 
@@ -197,15 +207,15 @@ development tooling is out of scope for dependency vulnerabilities.
 
 ### Python runtime version updates
 
-The Python version is set in five places. Renovate can update four of them:
+The Python version is set in five places. Renovate can update three of them:
 
 * `Dockerfile` — the `python` base image.
-* `.devcontainer/Dockerfile` — the Dev Container Python image.
 * `.sonarcloud.properties` — `sonar.python.version`, used by SonarCloud.
 * `pyrightconfig.json` — `pythonVersion`, used by Pyright.
 
-The fifth, `target-version` in `.linter-rules/.ruff.toml`, uses the `py314` form, which Renovate
-cannot update. It is changed by hand on the Renovate branch.
+The other two, `target-version` in `.linter-rules/.ruff.toml` (the `py314` form) and the Python
+tag in `.devcontainer/Dockerfile` (floating Dev Container tooling, so Renovate ignores it), are
+changed by hand on the Renovate branch.
 
 SonarCloud runs automatic analysis, which reads `.sonarcloud.properties` from the default
 branch and ignores `sonar-project.properties`. That file also sets the test file patterns and
@@ -216,17 +226,14 @@ SonarCloud pin is found through the `# renovate:` comment immediately above it. 
 is found by matching the `pythonVersion` key. Both use the `docker` datasource with the
 dependency name `python`, so they follow the same releases as the `Dockerfile` image.
 
-A package rule groups all four updates into one "Python runtime" pull request, so a new Python
-version moves them together. The tag formats differ (`3.15-slim`, `3.15-bookworm` and plain
-`3.15`), but Renovate resolves each to the same release. A new Python version is a minor or
+A package rule groups all three updates into one "Python runtime" pull request, so a new Python
+version moves them together. The tag formats differ (`3.15-slim` and plain `3.15`), but Renovate resolves each to the same release. A new Python version is a minor or
 major update, so the grouped pull request needs manual review and merge like any other, and
 automerge stays disabled.
 
-The rule sets `minimumGroupSize: 4`, the number of pins Renovate manages. Renovate does not
-create the branch until all four have an update available. One, two or three available updates
-create no branch and no pull request, so a partial runtime upgrade cannot be proposed. This
-also covers the case where the registries publish a new Python version at different times, such
-as the Dev Container image on `mcr.microsoft.com` arriving after Docker Hub.
+The rule sets `minimumGroupSize: 3`, the number of pins Renovate manages. Renovate does not
+create the branch until all three have an update available. One or two available updates
+create no branch and no pull request, so a partial runtime upgrade cannot be proposed.
 
 Two things to know about the minimum:
 
@@ -235,11 +242,6 @@ Two things to know about the minimum:
   error is shown. Set too low, partial upgrades are possible again.
 * The rule applies to major and minor updates only. Digest refreshes for the existing tags are
   not grouped, so they are not held back by the minimum.
-
-The seven-day minimum release age applies to the Docker Hub tags. The Dev Container image comes
-from `mcr.microsoft.com`, which gives Renovate no release timestamps, so a package rule makes
-the age check optional for it. It is still held back by the seven-day wait wherever a timestamp
-exists.
 
 `minimumGroupSize` guarantees how many updates are in the group, not that their target versions
 match. The plain and `-slim` tags can clear the age check at different times, so before merging
@@ -251,14 +253,15 @@ The general digest pinning rule is switched off for `.sonarcloud.properties` and
 #### Finishing a Python runtime pull request
 
 When the "Python runtime" pull request appears, the unit tests fail until `target-version` in
-`.linter-rules/.ruff.toml` matches the new version (for example `py315`). Push that change to
-the Renovate branch. A contract test in `app/tests/unit/test_dev_stack_files.py` checks that
+`.linter-rules/.ruff.toml` matches the new version (for example `py315`), and until the Python tag in
+`.devcontainer/Dockerfile` (ignored by Renovate) is bumped by hand to match. Push those changes
+to the Renovate branch. A contract test in `app/tests/unit/test_dev_stack_files.py` checks that
 the `Dockerfile`, the Dev Container image, SonarCloud, Pyright and Ruff all agree, so a runtime
 upgrade cannot be merged with any reference missed. It catches a pin that drifts for any
 reason, not only through Renovate. The workflows that run on Python read the version from the
 `Dockerfile`, so they follow it automatically.
 
-Once you push the Ruff change, Renovate treats the branch as modified and stops updating and
+Once you push those changes, Renovate treats the branch as modified and stops updating and
 rebasing it. If `main` moves on, bring the branch up to date yourself by merging `origin/main`
 into it. Do not tick the pull request's rebase/retry checkbox after editing: Renovate rebuilds
 the branch from scratch and discards the manual `target-version` change, and the unit test fails
@@ -266,10 +269,6 @@ again until it is re-applied.
 
 Keep the `# renovate:` comment directly above the `sonar.python.version` line when editing
 `.sonarcloud.properties`, or Renovate stops tracking it.
-
-Python versions in lock files are not tracked here. The `requires-python` constraints in
-`.mise/locks/` are the minimum versions of the developer tools themselves, not this project's
-runtime, and Renovate ignores that directory.
 
 ### Rebasing
 

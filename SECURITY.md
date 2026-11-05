@@ -43,9 +43,8 @@ In scope:
 Out of scope:
 
 * vulnerabilities in development tooling, such as the linters and scanners used by the
-  Dev Container and MegaLinter. They never ship in the image. Dependency scanners such as
-  SonarCloud and GitHub's Dependabot alerts may still list them, and those findings are handled
-  as ordinary dependency updates.
+  Dev Container and MegaLinter. They never ship in the image, they float to the latest
+  release, and the repository does not pin or scan them for dependency vulnerabilities.
 * advisories in third-party dependencies that have no effect on Docker Auto-Heal. The
   runtime dependencies in `requirements.txt` and the frontend lockfile are checked by Trivy in
   CI and updated by Renovate, so please report a dependency problem only if you can show it is
