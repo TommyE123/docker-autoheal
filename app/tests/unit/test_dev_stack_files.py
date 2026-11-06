@@ -187,9 +187,12 @@ def test_node_runtime_versions_are_aligned():
     devcontainer = (REPO_ROOT / ".devcontainer" / "devcontainer.json").read_text(encoding="utf-8")
 
     docker_version = re.search(r"^FROM node:(\d+)-alpine(?:@|\s|$)", dockerfile, re.MULTILINE)
-    feature_version = re.search(
-        r'"ghcr\.io/devcontainers/features/node:\d+"\s*:\s*\{\s*"version"\s*:\s*"(\d+)"',
+    feature_options = re.search(
+        r'"ghcr\.io/devcontainers/features/node:\d+"\s*:\s*\{([^}]*)\}',
         devcontainer,
+    )
+    feature_version = (
+        re.search(r'"version"\s*:\s*"(\d+)"', feature_options.group(1)) if feature_options else None
     )
 
     assert docker_version, "Node version not found in Dockerfile"
@@ -232,4 +235,28 @@ def test_renovate_does_not_ignore_files_holding_runtime_pins(path):
 
     assert not hiding, (
         f"renovate.json ignorePaths {hiding} hides {path}, so Renovate cannot update it"
+    )
+
+
+def test_renovate_ruff_manager_finds_the_ruff_target_version():
+    """The group minimum counts Ruff's pin, so Renovate's patterns must really match its file."""
+    config = json.loads((REPO_ROOT / "renovate.json").read_text(encoding="utf-8"))
+    manager = next(
+        m for m in config["customManagers"] if any("ruff" in p for p in m["managerFilePatterns"])
+    )
+    ruff = (REPO_ROOT / ".linter-rules" / ".ruff.toml").read_text(encoding="utf-8")
+
+    # Renovate wraps file patterns in slashes and uses JavaScript named groups (?<name>...).
+    file_pattern = manager["managerFilePatterns"][0]
+    assert file_pattern.startswith("/")
+    assert file_pattern.endswith("/")
+    assert re.search(file_pattern[1:-1], ".linter-rules/.ruff.toml")
+
+    pattern = re.sub(r"\(\?<(?![=!])", "(?P<", manager["matchStrings"][0])
+    found = re.search(pattern, ruff)
+    assert found, "Renovate's matchStrings do not match target-version in .ruff.toml"
+    assert re.search(
+        rf'^target-version\s*=\s*"py{found.group("major")}{found.group("minor")}"',
+        ruff,
+        re.MULTILINE,
     )
