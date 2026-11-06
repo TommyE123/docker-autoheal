@@ -169,6 +169,46 @@ updates are not part of that group, and unrelated frontend dependencies such as 
 ESLint are not grouped with it. Manual review and merge, the seven-day minimum release age and
 disabled automerge apply to the group as usual.
 
+### Vulnerability scanning
+
+Two scanners look at the dependency lockfiles, and each other check has one owner:
+
+| Check                                                                                | Owner                                      | Blocks a PR                                              |
+|--------------------------------------------------------------------------------------|--------------------------------------------|----------------------------------------------------------|
+| Dependency vulnerabilities in lockfiles, and Dockerfile or Compose misconfigurations | Trivy, run by MegaLinter                   | Yes, through the required MegaLinter check               |
+| Code quality, security hotspots, dependency risks and the new-code quality gate      | SonarCloud                                 | Yes, once `SonarCloud Code Analysis` is a required check |
+| Fixing vulnerable dependencies                                                       | Renovate, using GitHub's Dependabot alerts | It opens the PRs                                         |
+
+SonarCloud's dependency scan (its "dependency risks") gives a second opinion next to Trivy,
+using its own advisory database. The scan is a SonarCloud setting (under Advanced Security), not
+something `.sonarcloud.properties` controls, and it needs SonarCloud's Advanced Security
+entitlement. If that stops being available, Trivy still covers the lockfiles.
+
+Development tooling has no lockfiles any more (see "Pinned and floating dependencies"), so
+neither scanner has anything to read for the Dev Container tools, and they are not tracked for
+dependency vulnerabilities. `.linter-rules/.trivyignore.yaml` only holds acknowledged
+misconfigurations. Trivy scans `frontend/package-lock.json` for the production dependencies of
+the built web UI. By default Trivy does not report devDependencies, and this repository does not
+set `--include-dev-deps`, so the build chain's devDependencies are not checked by Trivy.
+
+SonarCloud's dependency scan does list devDependencies from that lockfile, such as
+`deepmerge` and `uri-js` pulled in by the build tooling, and can fail the `main` quality gate
+with "New dependency risks too severe". These tools run during `npm run build`, before the
+generated files enter the production image, so each finding is assessed before it is accepted:
+is the vulnerable code reachable during the build, and is a fixed version available, often
+through a lockfile update or a major bump of the build tool? A finding with no fix, or with no
+build-time exposure, is accepted in the SonarCloud UI with a short reason, for example "no fix
+available, not reachable in the build". GitHub's Dependabot alerts can also report them.
+
+Python transitive dependencies are not pinned in `requirements.txt` and there is no Python
+lockfile, so a lockfile scan, from Trivy or SonarCloud, only sees the direct dependencies
+there. The transitive Python packages and the operating system packages in the built image are not scanned. They are
+resolved at build time, and a finding in them is rarely something the project can fix itself.
+Renovate keeps the base image and the shipped dependencies current instead.
+
+[`SECURITY.md`](../../SECURITY.md) describes how to report a vulnerability, and states that
+development tooling is out of scope for dependency vulnerabilities.
+
 ### Python runtime version updates
 
 The Python version is set in five places. Renovate can update three of them:
@@ -294,13 +334,12 @@ automatically merging them can still introduce compatibility or behavioural chan
   dependency is behaviourally risk-free.
 
 * **`checkov` as a Dev Container tool** — it is deliberately absent from
-  `mise.toml`. Installing it alongside `semgrep` hangs
-  `osv-scanner`'s pip transitive-dependency resolver indefinitely (each resolves fine alone in
-  ~12–13s; together `osv-scanner` never returns, even with a 600s timeout). `semgrep` is the
-  one kept because it catches app-level issues nothing else in the local stack checks for,
-  whereas checkov's actual findings in this repo (Dockerfile non-root user, Actions
-  permissions) are already covered by Trivy and zizmor. Checkov still runs in CI through
-  MegaLinter's bundled `REPOSITORY_CHECKOV` linter, so CI coverage is unaffected.
+  `mise.toml`. Its findings in this repo are covered elsewhere or deferred: Actions
+  permission findings are covered by zizmor, and the Dockerfile non-root finding is deferred
+  to issue #2, so Trivy ignores `DS-0002` and Checkov skips `CKV_DOCKER_3`. It still runs in CI
+  through MegaLinter's bundled `REPOSITORY_CHECKOV` linter, so CI coverage is unaffected. `semgrep`
+  is the one kept in the Dev Container because it catches app-level issues nothing else in
+  the local stack checks for.
 
 ## Current policy summary
 

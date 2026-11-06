@@ -219,6 +219,24 @@ describe("ContainersPage", () => {
       expect(await screen.findByText(text)).toHaveAttribute("title", "mon");
     });
 
+    it("styles the Disabled Uptime Kuma badge like other disabled badges so it stays visible in dark mode", async () => {
+      getContainers.mockResolvedValue({
+        data: [
+          {
+            ...containers[0],
+            uptime_kuma_status: 5,
+            uptime_kuma_monitor_name: "mon",
+          },
+        ],
+      });
+
+      render(<ContainersPage />);
+
+      const badge = await screen.findByText("Disabled");
+      expect(badge).toHaveClass("bg-secondary");
+      expect(badge).not.toHaveClass("bg-dark");
+    });
+
     it("shows Not Mapped when there is no status and no monitor", async () => {
       getContainers.mockResolvedValue({ data: containers });
 
