@@ -44,8 +44,8 @@ does documentation drift only: other maintenance is the Weekly Maintainer's job.
 - **Editing.** The agent edits documents with `replace`, creates a branch with
   `git checkout -b` and commits only the files it edited with `git commit -m ... -- FILES`,
   then calls the `create_pull_request` safe output. gh-aw builds the pull request from that
-  commit (and rewrites its message to "Apply filtered changes", because it drops `.github`
-  from the patch). If creation fails twice, the run reports an incomplete audit.
+  commit (and rewrites its message to "Apply filtered changes", because the workflow sets
+  `excluded-files` to keep `.github` out of the patch). If creation fails twice, the run reports an incomplete audit.
 - **Evidence.** A correction needs the documentation statement, the contradicting code,
   configuration or test with file and line, and no disagreement between code and tests. Those
   four items go in the pull request for each correction. Uncertain or conflicting cases are
