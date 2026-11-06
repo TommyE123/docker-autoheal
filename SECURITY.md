@@ -42,9 +42,10 @@ In scope:
 
 Out of scope:
 
-* vulnerabilities in the development tooling bundled by the Dev Container and MegaLinter,
-  such as the linters and scanners. They never ship in the image, they float to the latest
-  release, and the repository does not pin or scan them for dependency vulnerabilities.
+* vulnerabilities in the development tooling, such as the linters and scanners. The Dev Container
+  tools float to the latest release, and the tools bundled with MegaLinter are fixed by the
+  pinned MegaLinter release. None of it ships in the image, and the repository does not scan it
+  for dependency vulnerabilities.
 * vulnerabilities in the frontend build tools, such as ESLint and Vite, unless they affect the
   built web UI. They are installed from the pinned `frontend/package-lock.json` and run at build
   time, not in the image. Trivy does not report them, but SonarCloud and GitHub's Dependabot
