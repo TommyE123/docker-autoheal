@@ -12,6 +12,7 @@
     "**/bower_components/**",
     ".github/workflows/issue-triage.lock.yml",
     ".github/workflows/weekly-maintainer.lock.yml",
+    ".github/workflows/docs-drift.lock.yml",
     "mise.toml",
     ".devcontainer/**"
   ],
