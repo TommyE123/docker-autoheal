@@ -80,6 +80,7 @@ tools:
     # safe output below.
     min-integrity: none
 safe-outputs:
+  staged: true
   threat-detection: false
   # The agent job stays read-only. A finding is filed as one issue by the
   # separate safe_outputs job, from the agent's validated output. gh-aw also
