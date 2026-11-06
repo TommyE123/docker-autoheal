@@ -189,7 +189,8 @@ all in one turn, together with the commands of part 1 of the read plan:
 - the GitHub state, each piped through `jq` so the result stays short (the
   raw results run to over 100,000 characters and would be cut):
   - `github list_commits --owner OWNER --repo REPO --sha main --perPage 30 | jq -r '.[] | "\(.sha[0:12]) \(.commit.message | split("\n")[0])"'`
-    (the first line is the head of `main`)
+    (the head of `main` is the very first line of the output, and only that
+    line's SHA is the `main` SHA you report; the lines below it are older commits)
   - `github list_issues --owner OWNER --repo REPO --state OPEN --perPage 100 | jq -r '.[] | "#\(.number) \(.title) | \(.body // "" | .[0:300] | gsub("\\s+"; " "))"'`
   - `github list_pull_requests --owner OWNER --repo REPO --state open --perPage 50 | jq -r '.[] | "#\(.number) \(.title) [\(.head.ref // "")]"'`
 
