@@ -176,7 +176,8 @@ missing, write an **Incomplete audit** summary and call `noop` with
 **Turn 1, baseline and read part 1.** Make each of these commands its own call,
 all in one turn, together with the commands of part 1 of the read plan:
 
-- `date -u +%FT%TZ` (the audit timestamp) and `date -u -d "30 days ago" +%F`
+- `date -u +%FT%TZ` (the audit timestamp), `date -u +%V` (the ISO week number,
+  which sets this week's focus area, see Assess) and `date -u -d "30 days ago" +%F`
   (the cutoff for recent work; the CLI blocks `$(`, so you copy the result into
   a later query by hand)
 - `cat .git/HEAD .git/FETCH_HEAD` (the checkout: the branch, and its commit SHA,
@@ -295,6 +296,22 @@ plan; a finding about CI rests on the workflow files themselves.
 
 ## Assess
 
+**This week's focus area.** Take the last digit of the week number from turn 1
+and look up the area below. You still read the whole source and may report a
+candidate from anywhere, but give the focus area your closest attention first,
+take your candidates and your rejected candidates from it where you can, and
+if you have a candidate there, spend the check turn on it (with no candidate,
+skip the check turn as usual). A candidate elsewhere must be clearly stronger.
+The Safety rules still apply in the focus area, restart and quarantine logic
+included: there only a missing or weak test is reportable, and a rejected
+candidate from that code is fine. Name the area in the summary.
+
+- 0 or 5: `app/monitor/`
+- 1 or 6: `app/api/`
+- 2 or 7: `app/config/`, `app/models/` and `app/utils/`
+- 3 or 8: `app/docker_client/` and `app/services/`
+- 4 or 9: `app/notifications/` and `app/uptime_kuma/`
+
 Look across the whole app source, then `app/tests/unit/`, `frontend/src/` and
 the CI workflows as needed, for a small, low-risk maintenance improvement within
 Scope. Use the real implementation, tests and configuration as evidence, not the
@@ -332,7 +349,8 @@ beneficial low-risk maintenance. Avoid anything whose benefit is subjective.
 
 Write the summary once, with `write_file`.
 Start it with one of these headings so the run page shows the outcome, then the
-baseline (timestamp, checkout SHA and `main` SHA) and a line
+baseline (timestamp, checkout SHA and `main` SHA), a line "Focus area: <the
+area>" and a line
 "Source coverage: X of Y app source files read", where Y is the number of files
 in the read plan:
 
