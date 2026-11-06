@@ -37,6 +37,23 @@ class TestStableIdentifier:
 
         assert engine.get_stable_identifier(info) == "stack_web"
 
+    def test_empty_monitoring_id_falls_back_to_compose_identity(self, engine):
+        _, info = make_container(
+            name="stack-web-1",
+            labels={
+                "monitoring.id": "",
+                "com.docker.compose.project": "stack",
+                "com.docker.compose.service": "web",
+            },
+        )
+
+        assert engine.get_stable_identifier(info) == "stack_web"
+
+    def test_empty_monitoring_id_falls_back_to_container_name(self, engine):
+        _, info = make_container(name="web", labels={"monitoring.id": ""})
+
+        assert engine.get_stable_identifier(info) == "web"
+
     def test_falls_back_to_container_name(self, engine):
         _, info = make_container(name="lonely-container", labels={"autoheal": "true"})
 
