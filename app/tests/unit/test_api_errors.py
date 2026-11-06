@@ -135,6 +135,28 @@ class TestDockerClientDependency:
         assert status == 503
         assert json.loads(text) == {"detail": "Docker client not initialized"}
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("method", "path", "payload"),
+        [
+            ("POST", "/api/containers/select", {"container_ids": "not-a-list", "enabled": "x"}),
+            ("POST", "/api/healthchecks", {"container_id": "web", "check_type": "carrier-pigeon"}),
+            ("POST", "/api/uptime-kuma/mappings", {}),
+            ("POST", "/api/uptime-kuma/enable", {}),
+        ],
+        ids=["select", "healthchecks", "mappings", "enable"],
+    )
+    async def test_docker_availability_is_checked_before_the_request_body(
+        self, monkeypatch, method, path, payload
+    ):
+        """An invalid body gets 503, not 422 or 400, while Docker is unavailable."""
+        monkeypatch.setattr("app.api.state.docker_client", None)
+
+        status, text = await _call(method, path, payload)
+
+        assert status == 503
+        assert json.loads(text) == {"detail": "Docker client not initialized"}
+
 
 class TestModelValidationErrors:
     @pytest.mark.asyncio
