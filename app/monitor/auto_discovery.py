@@ -129,9 +129,9 @@ class AutoDiscovery:
         """
         Stable ID stored in the selected list when a container is auto-monitored.
 
-        Unlike ``get_stable_identifier``, an empty ``monitoring.id`` label is
-        ignored here, so it falls back to the Compose identity or the name rather
-        than storing an empty key that every other empty-label container would match.
+        An empty ``monitoring.id`` label is ignored, so it falls back to the
+        Compose identity or the name rather than storing an empty key that every
+        other empty-label container would match. This matches ``get_stable_identifier``.
 
         Args:
             labels: Container labels

@@ -130,14 +130,14 @@ class MonitoringEngine:
             to fall back to
 
         Note:
-            An empty ``monitoring.id`` label is returned as-is. Container
-            discovery must not use this method for that reason; it uses
-            ``AutoDiscovery``, which ignores an empty label.
+            An empty ``monitoring.id`` label is treated as missing, so the
+            identifier falls back to the Compose identity or the name, matching
+            container discovery and the containers API.
         """
         labels = info.get("labels", {})
 
         # Priority 1: Explicit monitoring.id label
-        if "monitoring.id" in labels:
+        if labels.get("monitoring.id"):
             return labels["monitoring.id"]
 
         # Priority 2: Docker Compose service name
