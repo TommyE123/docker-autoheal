@@ -12,8 +12,9 @@ does documentation drift only: other maintenance is the Weekly Maintainer's job.
 - It runs on `workflow_dispatch` only. Call it weekly from cron-job.org, as for the Upgrade
   gh-aw and Weekly Maintainer workflows. It uses Gemini CLI 0.66.0 with `gemini-3.6-flash`
   through the existing `GEMINI_API_KEY` secret. The free tier allows 20 requests a day per
-  model and a run takes about seven, so schedule it on a different day from the Weekly
-  Maintainer, which uses the same model and key.
+  model, and a run takes four requests without drift and up to eight with it, so don't run it
+  on the same day as another workflow that uses `gemini-3.6-flash` on the same key, such as the
+  Weekly Maintainer once it moves to that model.
 - **Focus area.** The last digit of the ISO week number, modulo 5, picks one of five areas.
   Each pairs documents with the source that implements them, and every run also reads
   `README.md`:
@@ -26,17 +27,24 @@ does documentation drift only: other maintenance is the Weekly Maintainer's job.
   | Metrics, logging and troubleshooting | monitoring and metrics, troubleshooting | `app/main.py`, `app/config/config_manager.py`, health routes                   |
   | Notifications and Uptime Kuma        | notifications                           | `app/notifications/`, `app/uptime_kuma/`, `app/monitor/uptime_kuma_monitor.py` |
 
-  The table is in `.github/scripts/docs-drift-reads.sh`. Over five weeks every document under
-  `docs/user/` and every app source directory is covered. The developer and maintainer
-  documents other than architecture and project structure are not audited yet. A unit test fails
-  if a mapped file is renamed or removed, so update the table in the same change.
+  The table is in `.github/scripts/docs-drift-areas.sh`. Over five weeks every document under
+  `docs/user/` and every app source directory that holds code is covered. The developer and
+  maintainer documents other than architecture and project structure are not audited yet. A
+  unit test fails if a mapped file is renamed or removed, so update the table in the same
+  change.
 - **Read plan.** A pre-agent step appends the area's files to the prompt as the exact
   `cat -n` commands to run, in three parts. The agent must read the files; a step after it
   checks that it did.
-- **Coverage check.** A post-step (`.github/scripts/docs-drift-coverage.sh`) counts the
-  successful `cat -n` reads in the agent's own tool log against the files in the plan. If any
-  file was not read in full, it replaces the pull request with a no-op and fails the run, so
-  nothing is opened from an incomplete audit. The agent's own claim of coverage is not trusted.
+- **Coverage check.** A post-step (`.github/scripts/docs-drift-coverage.sh`) rebuilds the same
+  file list from the checkout and the week number (passed on through `GITHUB_ENV`, so nothing
+  the agent can write changes it) and counts the successful `cat -n` reads in the agent's own
+  tool log against it. If any file was not read in full, it replaces the pull request with a
+  no-op and fails the run, so nothing is opened from an incomplete audit. The agent's own claim
+  of coverage is not trusted.
+- **Editing.** The agent edits documents with `replace`, creates a branch with
+  `git checkout -b` and commits only the files it edited with `git commit -m ... -- FILES`,
+  then calls the `create_pull_request` safe output. gh-aw builds the pull request from that
+  commit. If it fails twice, the run reports an incomplete audit.
 - **Evidence.** A correction needs the documentation statement, the contradicting code,
   configuration or test with file and line, and no disagreement between code and tests. Those
   four items go in the pull request for each correction. Uncertain or conflicting cases are
@@ -52,9 +60,11 @@ The agent job has read-only `contents`, `issues` and `pull-requests` permissions
 write path is the `create-pull-request` safe output, applied by a separate job: one draft
 pull request titled `[docs] ...`, limited to `README.md`, `docs/user/**`,
 `docs/developer/architecture.md` and `docs/developer/project-structure.md`. A patch touching
-anything else is rejected. gh-aw treats `README.md` as a protected file, so a pull request
-that edits it is still created, but gh-aw requests changes on it for a person to review. No
-issues are opened, and nothing is merged automatically.
+anything else is rejected, except changes under `.github`, which are dropped from the patch
+(gh-aw restores that folder before the run, which can change the mode of scripts in it).
+gh-aw treats `README.md` as a protected file, so a pull request that edits it is still
+created, with a review comment from gh-aw saying the protected file needs a person's review.
+No issues are opened, and nothing is merged automatically.
 
 A pull request created with the default `GITHUB_TOKEN` does not start CI. Run the checks on
 it before treating it as ready.
@@ -67,9 +77,15 @@ Actions → **Documentation Drift Detection** → **Run workflow** on `main`, or
 gh workflow run docs-drift.lock.yml --ref main
 ```
 
-To audit a particular area, run it in a week whose last digit selects that area, or run the
-read plan script locally with `WEEK=<number>` to see which files it picks. Review any draft pull
-request as normal: check each cited piece of evidence, and that only documentation changed.
+The area follows the week the run starts in. To see which files a week would read, run the
+read plan script locally and read the file it appends to:
+
+```bash
+PROMPT_FILE=$(mktemp) WEEK=<number> bash .github/scripts/docs-drift-reads.sh
+```
+
+Review any draft pull request as normal: check each cited piece of evidence, and that only
+documentation changed.
 
 ## Changing it
 

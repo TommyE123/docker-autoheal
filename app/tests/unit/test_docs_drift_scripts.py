@@ -1,9 +1,10 @@
 """Behaviour checks for the Documentation Drift Detection read plan and coverage scripts.
 
 The read plan script picks one focus area a week, appends the exact "cat -n" commands that read
-its documentation and source files to the agent's prompt, and records the same files in a
-manifest. The coverage script counts, from the agent's own tool log, which of those files were
-really read, and withholds a pull request when the audit is incomplete. These tests run both
+its documentation and source files to the agent's prompt, and passes the week number on through
+GITHUB_ENV. The coverage script rebuilds the same file list from that week number and the
+checkout (nothing the agent can write decides it), counts from the agent's own tool log which
+of those files were really read, and withholds a pull request when the audit is incomplete. These tests run both
 against the real repository (so a renamed document or module breaks here, not in a weekly run)
 and against a small synthetic checkout, and pin down what the workflow relies on.
 """
@@ -67,7 +68,7 @@ def checkout(tmp_path: Path) -> Path:
 
 
 def _reads(cwd: Path, week: int | str, work: Path) -> subprocess.CompletedProcess[str]:
-    """Runs the read plan script in cwd, writing the prompt and the manifest under work."""
+    """Runs the read plan script in cwd, writing the prompt and the job environment file under work."""
     prompt = work / "prompt.txt"
     if not prompt.exists():
         prompt.write_text("ORIGINAL PROMPT\n", encoding="utf-8")
@@ -77,7 +78,7 @@ def _reads(cwd: Path, week: int | str, work: Path) -> subprocess.CompletedProces
         env={
             "PATH": "/usr/bin:/bin",
             "PROMPT_FILE": str(prompt),
-            "MANIFEST": str(work / "manifest.txt"),
+            "GITHUB_ENV": str(work / "env.txt"),
             "WEEK": str(week),
         },
         capture_output=True,
@@ -108,9 +109,16 @@ def _parts(plan: str) -> list[list[str]]:
 
 
 def _manifest(work: Path) -> tuple[str, list[str]]:
-    lines = (work / "manifest.txt").read_text(encoding="utf-8").splitlines()
-    assert lines[0].startswith("AREA ")
-    return lines[0].removeprefix("AREA "), lines[1:]
+    """The focus area name and the files of the plan, in reading order, from the prompt."""
+    plan = _plan(work)
+    heading = re.search(r"Focus area this week: (.+) \(ISO week \d+\)\.", plan)
+    assert heading
+    files: list[str] = []
+    for command in _commands(plan):
+        name = re.match(r"cat -n (\S+)", command).group(1)  # type: ignore[union-attr]
+        if name not in files:
+            files.append(name)
+    return heading.group(1), files
 
 
 @pytest.mark.parametrize(("week", "area"), AREAS.items())
@@ -124,9 +132,8 @@ def test_every_area_resolves_against_the_real_repository(tmp_path: Path, week: i
     assert all((ROOT / f).is_file() for f in files)
     assert not any(f.startswith("app/tests") for f in files)
     assert len(files) == len(set(files))
-    planned = {re.match(r"cat -n (\S+)", c).group(1) for c in _commands(_plan(tmp_path))}  # type: ignore[union-attr]
-    assert planned == set(files)
     assert f"Focus area this week: {area} (ISO week {week})." in _plan(tmp_path)
+    assert (tmp_path / "env.txt").read_text(encoding="utf-8") == f"DOCS_DRIFT_WEEK={week}\n"
 
 
 def test_areas_together_cover_every_user_document_and_source_directory(tmp_path: Path):
@@ -274,13 +281,15 @@ def _log(work: Path, *calls: tuple[str, str]) -> None:
     (work / "agent.log").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _coverage(checkout: Path, work: Path) -> subprocess.CompletedProcess[str]:
+def _coverage(
+    checkout: Path, work: Path, week: str | None = "4"
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(  # noqa: S603
         ["bash", str(COVERAGE)],  # noqa: S607 - PATH is fixed to /usr/bin:/bin below
         cwd=checkout,
         env={
             "PATH": "/usr/bin:/bin",
-            "MANIFEST": str(work / "manifest.txt"),
+            **({"DOCS_DRIFT_WEEK": week} if week is not None else {}),
             "AGENT_LOG": str(work / "agent.log"),
             "AGENT_OUTPUT": str(checkout / "output.json"),
             "GITHUB_STEP_SUMMARY": str(work / "summary.md"),
@@ -422,18 +431,31 @@ def test_missing_log_counts_as_nothing_read(checkout: Path, planned: Path):
     assert "Read 0 of 6 files" in _summary(planned)
 
 
-def test_missing_manifest_fails_the_step(checkout: Path, tmp_path: Path):
-    result = _coverage(checkout, tmp_path)
+def test_missing_week_fails_the_step(checkout: Path, tmp_path: Path):
+    result = _coverage(checkout, tmp_path, week=None)
 
     assert result.returncode == 1
-    assert "manifest" in result.stderr
+    assert "DOCS_DRIFT_WEEK is not set" in result.stderr
     assert "the read plan step did not run" in result.stderr
 
 
-def test_empty_manifest_fails_the_step(checkout: Path, tmp_path: Path):
-    (tmp_path / "manifest.txt").write_text("AREA Nothing\n", encoding="utf-8")
-
-    result = _coverage(checkout, tmp_path)
+def test_non_numeric_week_fails_the_coverage_step(checkout: Path, tmp_path: Path):
+    result = _coverage(checkout, tmp_path, week="abc")
 
     assert result.returncode == 1
-    assert "lists no files" in result.stderr
+    assert "Week 'abc' is not a number" in result.stderr
+
+
+def test_the_file_list_comes_from_the_checkout_not_from_anything_written_to_the_job(
+    checkout: Path, planned: Path
+):
+    # Whatever else the agent writes (a shorter plan, a manifest, the prompt), the files that
+    # must have been read are rebuilt from the checkout and the week number.
+    (planned / "prompt.txt").write_text("ORIGINAL PROMPT\n", encoding="utf-8")
+    (planned / "manifest.txt").write_text("AREA Nothing\nREADME.md\n", encoding="utf-8")
+    _log(planned, ("cat -n README.md", "success"))
+
+    result = _coverage(checkout, planned)
+
+    assert result.returncode == 1
+    assert "Read 1 of 6 files" in _summary(planned)

@@ -2,11 +2,12 @@
 name: Documentation Drift Detection
 description: Weekly audit of one focus area of the documentation against the implementation, using Gemini. Opens one draft documentation-only pull request for evidence-backed drift, or reports no drift or an incomplete audit. It never changes source code, tests, workflows or dependencies.
 # No schedule here: run manually, later called weekly through workflow_dispatch by
-# cron-job.org, as gh-aw-upgrade.yml and weekly-maintainer.md are. Pick a different day
-# from the Weekly Maintainer: both use gemini-3.6-flash on the same key, whose free tier
-# allows 20 requests a day per model (see the comment on the engine below), and a run here
-# takes about seven. Time of day: the same advice as weekly-maintainer.md (about 20
-# minutes after the quota resets at midnight Pacific, ideally at a weekend).
+# cron-job.org, as gh-aw-upgrade.yml is. The free tier allows 20 requests a day per model
+# on this key (see the engine comment below) and a run here takes up to eight, so do not
+# run it on the same day as another workflow that uses gemini-3.6-flash on the same key.
+# Time of day: shortly after the daily quota resets at midnight Pacific (00:20
+# America/Los_Angeles), ideally at a weekend; test runs of a similar workflow in October 2026
+# met far fewer 503 "high demand" refusals then than in the US working day.
 on:
   workflow_dispatch:
 permissions:
@@ -15,16 +16,19 @@ permissions:
   pull-requests: read
 engine:
   id: gemini
-  # The pins, and why, are the Weekly Maintainer's (see the engine comment in
-  # weekly-maintainer.md): Gemini CLI 0.66.0 because 0.60 to 0.64 failed to log in under AWF
-  # and 0.59 rewrote every Flash model name; the full Flash model because Flash Lite read 3
-  # of 35 files and reported them all read; free-tier limits per project and per model of
-  # 5 requests and 250K input tokens a minute and 20 requests a day, failed requests included.
+  # Gemini CLI 0.66.0: versions 0.60 to 0.64 exited 41 "Invalid auth method selected" under
+  # AWF (gh-aw-firewall #10246, fixed in the AWF that gh-aw v1.0.1 pins), and 0.59 rewrote
+  # every model name ending in "flash" to gemini-3.5-flash. The full Flash model rather than
+  # Flash Lite: a Flash Lite test run of a similar audit read 3 of 35 files and reported them
+  # all read. The default Pro-class model has no free-tier quota for this key. Free-tier
+  # limits (AI Studio, October 2026) are per project and per model: 5 requests and 250K input
+  # tokens a minute and 20 requests a day, failed requests included.
   version: "0.66.0"
   model: gemini-3.6-flash
-# Top-level AWF invocation cap on model requests. The prompt plans about five requests
-# without drift and seven with it (several tool calls go out in one request); 14 leaves room
-# for retries and an extra check turn while keeping one run well inside the daily quota.
+# Top-level AWF invocation cap on model requests. The prompt plans about four requests
+# without drift and seven with it (several tool calls go out in one request), and one more if
+# the pull request cannot be created; 14 leaves room for retries while keeping one run well
+# inside the daily quota.
 max-turns: 14
 features:
   # actionlint (as pinned by this repo's MegaLinter) doesn't yet recognize
@@ -49,11 +53,13 @@ post-steps:
     run: bash .github/scripts/docs-drift-coverage.sh
 tools:
   # Explicit shell allow-list, required by strict mode when min-integrity is none. Inspection
-  # commands plus the github and safeoutputs CLIs. gh-aw adds the git subcommands the pull
-  # request safe output needs (checkout, commit, status and others); git push is not among
-  # them, and the agent job has a read-only token, so the only write path is the
+  # commands plus the github and safeoutputs CLIs, and sleep to pace the requests under the
+  # free tier's 5 a minute. "git checkout" and "git commit" are listed as plain prefixes
+  # because the git entries gh-aw adds for the pull request safe output end in ":*", which
+  # Gemini CLI 0.66 matches literally, so those never allow the real commands. git push is
+  # allowed by neither, and the agent job has a read-only token, so the only write path is the
   # create-pull-request safe output applied by the separate safe_outputs job.
-  bash: ["cat", "jq", "ls", "find", "grep", "head", "tail", "wc", "sort", "uniq", "date", "printf", "echo", "github", "safeoutputs"]
+  bash: ["cat", "jq", "ls", "find", "grep", "head", "tail", "wc", "sort", "uniq", "date", "printf", "echo", "sleep", "git checkout", "git commit", "github", "safeoutputs"]
   edit:
   github:
     toolsets: [repos, issues, pull_requests]
@@ -74,6 +80,10 @@ safe-outputs:
     max: 1
     if-no-changes: ignore
     fallback-as-issue: false
+    # gh-aw restores .github from the base branch before the agent runs, which can change the
+    # file mode of scripts there. Such changes are dropped from the patch, not rejected.
+    excluded-files:
+      - ".github/**"
     allowed-files:
       - README.md
       - "docs/user/**"
@@ -110,12 +120,12 @@ another. All evidence comes from that checkout, so it is the audited revision.
 
 There is no direct network access, and `gh` and `curl` are not authenticated. Do not use
 them. Only these shell commands work: `cat`, `grep`, `find`, `ls`, `head`, `tail`, `wc`,
-`jq`, `sort`, `uniq`, `date`, `printf`, `echo`, `github` and `safeoutputs`, plus the `git`
-commands `git checkout -b`, `git commit -a -m` and `git status`. Every other command, such
+`jq`, `sort`, `uniq`, `date`, `printf`, `echo`, `sleep`, `github` and `safeoutputs`, plus the
+`git` commands `git checkout -b`, `git commit -m` and `git status`. Every other command, such
 as `python3` or `git log`, is denied by policy, and so is any command chained to one of them
 with `&&` or `|`. Never try them. Use `find` only to list or locate files, and never with
 `-exec`, `-execdir`, `-delete` or `-fprint`. Call only `run_shell_command`, `replace` (to
-edit a documentation file, see Edits) and `write_file` (once, for the run summary). Do not
+edit a documentation file, see Edits) and `write_file` (for the run summary, see Reporting). Do not
 call any other tool, such as `read_file`, `list_directory` or `update_topic`: only
 `run_shell_command` calls are counted as reading the files. Read GitHub state with the
 `github` CLI; if a flag is rejected, run `github <tool> --help`. There are no GitHub write
@@ -129,7 +139,7 @@ the calls of a step side by side in the same turn instead.
 Any single tool result longer than 40,000 characters is cut: you see only its start and end,
 and the middle is lost. Keep each command's output well under that, as the plan below does.
 
-## Plan: about five model turns without drift, seven with it
+## Plan: about four model turns without drift, seven with it
 
 You have at most 14 model turns. Put every independent tool call of a step into the **same
 turn**: several tool calls in one turn cost one model request. Follow this plan and do not
@@ -180,18 +190,25 @@ cause of drift):
 have no candidate worth checking, skip to the report. For your candidates, make every
 remaining check in this one turn: open any further file that settles the question (for
 example the unit test of the code in question, in `app/tests/unit/`, with `cat -n`), and
-run any `grep` you need. Do not split these checks across turns.
+run any `grep` you need, together with one `sleep 60` call (it costs no request: it holds
+back the next one so the earlier requests leave the free tier's one-minute window of 5).
+Do not split these checks across turns.
 
 **Turn 5, only with drift: edit.** Make the first call `git checkout -b docs-drift-YYYYMMDD`
 (today's date from turn 1), and in the same turn one `replace` call per correction (see
 Edits).
 
-**Turn 6, only with drift: commit.** One call: `git commit -a -m "docs: SHORT SUMMARY"`
-(no apostrophes, backticks or `$(` in the message). Then `git status` in the same turn.
+**Turn 6, only with drift: commit.** One call, naming only the files you edited:
+`git commit -m "docs: SHORT SUMMARY" -- FILE1 FILE2` (no apostrophes, backticks or `$(` in the
+message). Never use `-a`: the checkout may show unrelated mode changes under `.github` that
+must not be committed. Then `git status` in the same turn.
 
 **Turn 7, report (turn 4 without drift).** In one turn, make two calls side by side:
 `write_file` for the summary, and the final call, `create_pull_request` or `noop` (see
-Reporting). Your final message after them is one short line.
+Reporting). Your final message after them is one short line. If `create_pull_request` returns an
+error, run it once more, fixed if the error says what is wrong. If it fails twice, do not
+claim a pull request: in one more turn write the summary again with `write_file` as an
+**Incomplete audit** that names the error and keeps the findings, and call `noop`.
 
 If a call fails, run it once more, fixed if the error says what is wrong. A `jq` pipe that
 prints an empty list or `null` for the commit, issue or pull request lists is a failed
@@ -279,8 +296,9 @@ You report through these only:
 
 - **The run summary.** Write a short Markdown report with the `write_file` tool to the
   literal path `/tmp/gh-aw/agent-step-summary.md` (the variable `GITHUB_STEP_SUMMARY` is empty
-  in your shell). The workflow appends this file to the run page. Write it once, and do not
-  also print it to the screen or repeat it in your final message. Start it with one heading,
+  in your shell). The workflow appends this file to the run page. Write it once (again only as
+  the fallback in the plan says), and do not also print it to the screen or repeat it in your
+  final message. Start it with one heading,
   then the baseline (timestamp, checkout SHA and `main` SHA; if they differ, say so and refer
   every finding to the checkout SHA), a line "Focus area:" with the area name, and a line
   "Coverage: X of Y planned files read", where Y is the number of files in the read plan:

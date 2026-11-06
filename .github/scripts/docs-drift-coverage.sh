@@ -4,8 +4,9 @@
 # written the agent output and before it is uploaded for the safe_outputs job.
 #
 # The Weekly Maintainer's test runs showed that an agent's own coverage claim is not trusted
-# (one reported "27 of 27 app source files read" after reading 3 of 35). This script reads the
-# manifest that .github/scripts/docs-drift-reads.sh wrote for this run, finds the successful
+# (one reported "27 of 27 app source files read" after reading 3 of 35). This script rebuilds
+# the file list of this run's focus area (the week number that .github/scripts/docs-drift-reads.sh
+# put in DOCS_DRIFT_WEEK, and the table in .github/scripts/docs-drift-areas.sh), finds the successful
 # "cat -n FILE" shell calls in the agent log, and writes the result to the step summary. Each
 # call covers a line range: the whole file, "| head -n H", "| tail -n +K", or
 # "| head -n H | tail -n +K". A range counts only if its output stays under Gemini CLI's
@@ -13,25 +14,24 @@
 # line.
 # If any file was not read, a create_pull_request in the agent output is replaced by a noop, so
 # no pull request is opened from an incomplete audit, and the step fails so the run shows red.
-# Optional environment: AGENT_LOG, AGENT_OUTPUT, MANIFEST, GITHUB_STEP_SUMMARY.
+# Required environment: DOCS_DRIFT_WEEK. Optional: AGENT_LOG, AGENT_OUTPUT, GITHUB_STEP_SUMMARY.
 set -euo pipefail
 
 log=${AGENT_LOG:-/tmp/gh-aw/agent-stdio.log}
 output=${AGENT_OUTPUT:-/tmp/gh-aw/agent_output.json}
 summary=${GITHUB_STEP_SUMMARY:-/dev/null}
-manifest=${MANIFEST:-/tmp/gh-aw/docs-drift-plan.txt}
-
-if [[ ! -f "$manifest" ]]; then
-  echo "::error::Read plan manifest $manifest not found; the read plan step did not run" >&2
+if [[ -z ${DOCS_DRIFT_WEEK:-} ]]; then
+  echo "::error::DOCS_DRIFT_WEEK is not set; the read plan step did not run" >&2
   exit 1
 fi
-
-area=$(sed -n 's/^AREA //p' "$manifest")
-mapfile -t sources < <(grep -v '^AREA ' "$manifest")
-if ((${#sources[@]} == 0)); then
-  echo "::error::Manifest $manifest lists no files" >&2
-  exit 1
-fi
+# Rebuilt from the checkout and the week number, the same way the read plan was, so nothing the
+# agent can write decides which files count.
+area_name="" files=() # set by docs_drift_area
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/docs-drift-areas.sh"
+docs_drift_area "$DOCS_DRIFT_WEEK"
+area=$area_name
+sources=("${files[@]}")
 
 # Successful shell commands, one per line. The log mixes plain text with stream-json lines;
 # lines that do not parse as JSON are skipped.
