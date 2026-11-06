@@ -1,8 +1,11 @@
 import { Navbar, Nav, Container, Badge } from "react-bootstrap";
 import { Link, useLocation } from "react-router-dom";
+import { useTheme } from "../hooks";
 
 function Navigation({ systemStatus }) {
   const location = useLocation();
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === "dark";
 
   const isActive = (path) => location.pathname === path;
 
@@ -55,7 +58,7 @@ function Navigation({ systemStatus }) {
             </Nav.Link>
           </Nav>
 
-          <Nav>
+          <Nav className="align-items-lg-center">
             {systemStatus && (
               <Nav.Item className="d-flex align-items-center text-light">
                 <Badge
@@ -78,6 +81,15 @@ function Navigation({ systemStatus }) {
                 </span>
               </Nav.Item>
             )}
+            <button
+              type="button"
+              className="btn btn-outline-light btn-sm ms-lg-3"
+              onClick={toggleTheme}
+              aria-pressed={isDark}
+              aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
+            >
+              <i className={`bi ${isDark ? "bi-sun" : "bi-moon"}`}></i>
+            </button>
           </Nav>
         </Navbar.Collapse>
       </Container>
