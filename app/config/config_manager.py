@@ -437,6 +437,7 @@ def _atomic_write_json(path: Path, data: Any, **dump_kwargs: Any) -> None:
 _CONFIG_FILENAME = "config.json"
 _EVENTS_FILENAME = "events.json"
 _QUARANTINE_FILENAME = "quarantine.json"
+_LEGACY_EMPTY_MONITORING_ID_KEY = "monitoring.id:"
 _MAINTENANCE_FILENAME = "maintenance.json"
 _ATOMIC_WRITE_TARGETS = (
     _CONFIG_FILENAME,
@@ -710,6 +711,9 @@ class ConfigManager:
                 with self.QUARANTINE_FILE.open("r") as f:
                     data = json.load(f)
                     quarantine = set(data)
+                    # An empty monitoring.id label is now treated as missing, so no
+                    # container maps to the old shared key any more; drop it.
+                    quarantine.discard(_LEGACY_EMPTY_MONITORING_ID_KEY)
                     logger.info("Loaded %s quarantined containers from disk", len(quarantine))
                     return quarantine
         except Exception as e:

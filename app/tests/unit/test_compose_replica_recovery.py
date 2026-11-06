@@ -103,14 +103,14 @@ class TestRecoveryIdentifier:
 
         assert recovery_identifier("shared", labels) == "monitoring.id:shared"
 
-    def test_empty_monitoring_id_label_is_still_never_suffixed(self):
+    def test_empty_monitoring_id_label_is_treated_as_missing(self):
         labels = {
             **COMPOSE,
             "monitoring.id": "",
             "com.docker.compose.container-number": "3",
         }
 
-        assert recovery_identifier("", labels) == "monitoring.id:"
+        assert recovery_identifier("myapp_web", labels) == "compose:myapp:web#3"
 
     @pytest.mark.parametrize(
         "labels",
