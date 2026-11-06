@@ -99,7 +99,6 @@ jobs:
             hadolint --version
             node --version
             npm --version
-            osv-scanner --version
             python --version
             trivy --version
             trufflehog --version
