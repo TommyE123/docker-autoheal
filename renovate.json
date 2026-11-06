@@ -13,7 +13,7 @@
     ".github/workflows/issue-triage.lock.yml",
     ".github/workflows/weekly-maintainer.lock.yml",
     "mise.toml",
-    ".devcontainer/**"
+    ".devcontainer/package.json"
   ],
   "description": "Dependency-update policy for docker-autoheal. Renovate creates and maintains dependency PRs. Patch updates are automerged once required checks pass; all other updates require manual review and merge. See docs/maintainer/dependency-management.md for the full explanation.",
   "timezone": "Europe/London",
@@ -49,16 +49,37 @@
       "depNameTemplate": "python",
       "datasourceTemplate": "docker",
       "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "Track the Python version Ruff targets (target-version in .linter-rules/.ruff.toml, written as py314), so it moves with the other Python runtime pins. The py prefix and the dot are rebuilt around the version Renovate reads and writes.",
+      "managerFilePatterns": ["/^\\.linter-rules/\\.ruff\\.toml$/"],
+      "matchStrings": [
+        "target-version\\s*=\\s*\"py(?<major>\\d)(?<minor>\\d+)\""
+      ],
+      "currentValueTemplate": "{{{major}}}.{{{minor}}}",
+      "autoReplaceStringTemplate": "target-version = \"py{{{replace '\\.' '' newValue}}}\"",
+      "depNameTemplate": "python",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
     }
   ],
   "packageRules": [
     {
-      "description": "Update the Python version everywhere Renovate can reach it in one PR: the Dockerfile image, sonar.python.version and pythonVersion in pyrightconfig.json. minimumGroupSize must equal the number of pins, so the PR is only created once all of them have an update. The Dev Container image and Ruff's target-version cannot be tracked by Renovate; the contract test in app/tests/unit/test_dev_stack_files.py fails until it is changed by hand. Only major and minor updates are grouped, so routine digest refreshes of the existing tags are not held back by the minimum. Python releases are minor or major updates, so automerge stays disabled.",
+      "description": "Update the Python version everywhere in one PR: the Dockerfile image, the Dev Container image, sonar.python.version, pythonVersion in pyrightconfig.json and target-version in .linter-rules/.ruff.toml. minimumGroupSize must equal the number of pins, so the PR is only created once all of them have an update (the Dev Container image can lag a new Python release). The contract test in app/tests/unit/test_dev_stack_files.py checks that they agree. Only major and minor updates are grouped, so routine digest refreshes of the existing tags are not held back by the minimum. Python releases are minor or major updates, so automerge stays disabled.",
       "matchDatasources": ["docker"],
-      "matchPackageNames": ["python"],
+      "matchPackageNames": ["python", "mcr.microsoft.com/devcontainers/python"],
       "matchUpdateTypes": ["major", "minor"],
       "groupName": "Python runtime",
-      "minimumGroupSize": 3,
+      "minimumGroupSize": 5,
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Update the Node major everywhere in one PR: the Dockerfile image, node-version in tests.yml and production-smoke-test.yml, and the node feature's version option in devcontainer.json (read by Renovate's built-in devcontainer manager). minimumGroupSize must equal the number of pins, so the PR is only created once all of them have an update. The contract test in app/tests/unit/test_dev_stack_files.py checks that they agree. Only major updates are grouped, so digest refreshes are not held back by the minimum. Node majors need a manual merge.",
+      "matchPackageNames": ["node"],
+      "matchUpdateTypes": ["major"],
+      "groupName": "Node runtime",
+      "minimumGroupSize": 4,
       "minimumReleaseAge": "7 days"
     },
     {
@@ -119,10 +140,23 @@
       "pinDigests": true
     },
     {
-      "description": "sonar.python.version in .sonarcloud.properties and pythonVersion in pyrightconfig.json are bare version numbers that their tools parse, so they must never get a digest appended. Keep this after the general digest pinning rule.",
+      "description": "sonar.python.version in .sonarcloud.properties, pythonVersion in pyrightconfig.json and target-version in .linter-rules/.ruff.toml are values that their tools parse, so they must never get a digest appended. Keep this after the general digest pinning rule.",
       "matchManagers": ["custom.regex"],
-      "matchFileNames": [".sonarcloud.properties", "pyrightconfig.json"],
+      "matchFileNames": [
+        ".sonarcloud.properties",
+        "pyrightconfig.json",
+        ".linter-rules/.ruff.toml"
+      ],
       "pinDigests": false
+    },
+    {
+      "description": "Dev Container features and the Dev Container base image are tracked by tag, not by digest, because local tooling floats within its tag. ghcr.io and mcr.microsoft.com give Renovate no release timestamps, so with internalChecksFilter strict their updates would wait in Pending Status Checks forever; timestamp-optional lets them through. This is scoped to the Dev Container files so production images keep the full minimumReleaseAge. Keep this after the general digest pinning rule.",
+      "matchFileNames": [
+        ".devcontainer/devcontainer.json",
+        ".devcontainer/Dockerfile"
+      ],
+      "pinDigests": false,
+      "minimumReleaseAgeBehaviour": "timestamp-optional"
     },
     {
       "description": "tommye123/docker-autoheal is this project's own published image, not a third-party dependency. Renovate should not manage it.",
