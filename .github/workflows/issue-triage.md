@@ -24,10 +24,13 @@ on:
 # to issues (not pull requests) and to comments by the issue's reporter: the
 # workflow's own needs-information comment (a bot) would otherwise retrigger it,
 # and other people's comments would spend Gemini quota without new detail.
-# On workflow_dispatch github.event.issue is unset, so both checks pass and the
+# Events on a closed issue are skipped too. A comment that closes the issue is
+# posted just before the close, so it can still show the issue as open.
+# On workflow_dispatch github.event.issue is unset, so these checks pass and the
 # run proceeds; the dispatcher chooses the issue.
 if: >-
   ${{ github.event.issue.user.login != 'renovate[bot]' &&
+  github.event.issue.state != 'closed' &&
   (github.event_name != 'issue_comment' ||
   (!github.event.issue.pull_request &&
   github.event.comment.user.type != 'Bot' &&
@@ -53,10 +56,10 @@ engine:
   # 15/minute.
   version: "0.66.0"
   model: gemini-3.5-flash-lite
-# Top-level AWF cap on model requests (the default is 500). Test runs made 4 to
-# 9 requests; 12 leaves room for a retry and stops a runaway loop from spending
-# the 500 a day that Flash Lite allows.
-max-turns: 12
+# Top-level AWF cap on model requests for one run (the default is 500). Flash
+# Lite often makes one tool call per request, so a run needs headroom, while a
+# runaway loop is still stopped well inside its 500 a day.
+max-turns: 25
 features:
   # actionlint (as pinned by this repo's MegaLinter) doesn't yet recognize
   # the "queue" concurrency key gh-aw emits by default; disable it rather
@@ -132,12 +135,18 @@ you run from the shell:
 - **Reads: `github`**. `${{ github.repository }}` is `OWNER/REPO`. Split it
   at `/`: pass the part before the slash as `--owner` and the part after it as
   `--repo`. Never pass the combined `OWNER/REPO` value to either flag. To fetch
-  an issue, run
-  `github issue_read --method get --owner OWNER --repo REPO --issue_number N`.
-  To fetch its comments, run the same command with
-  `--method get_comments --perPage 100 --page 1`. Continue with `--page 2`,
-  `--page 3` and so on only when the current page contains exactly 100
-  comments. Stop when a page contains fewer than 100. If a flag is rejected,
+  an issue with its current labels, run
+  `github issue_read --method get --owner OWNER --repo REPO --issue_number N | jq '.[0] | {title, body, comments, labels: ((.labels // []) | map(if type == "object" then .name else . end))}'`.
+  The response leaves out a field that is empty: an issue with no labels has no
+  `labels` field and one with no comments has no `comments` field. The command
+  above prints `"labels": []` and `"comments": null` for those, which means
+  none; do not look for them another way. A `null` title means the fetch
+  failed. If the `jq` filter fails, run the command once more without the pipe.
+  To fetch its comments, run
+  `github issue_read --method get_comments --owner OWNER --repo REPO --issue_number N --perPage 100 --page 1`
+  without the `jq` pipe, so the whole page is kept (the filter above keeps
+  only the first item). Continue with `--page 2`, `--page 3` and so on only
+  when the current page contains exactly 100 comments. Stop when a page contains fewer than 100. If a flag is rejected,
   run `github issue_read --help` and use the flags it lists.
 - **Writes: `safeoutputs`**. Pass one JSON object as a single quoted argument.
   Do not pass an issue number: the workflow fixes the target of every write to
@@ -160,26 +169,37 @@ Keep the `|`. Without it nothing is sent.
 
 Run one command per shell call. Do not join commands with `&&`, `;`, or
 newlines, and do not use redirection (`>`, `<`, heredocs). The only allowed
-combination is the `jq ... | safeoutputs add_comment .` pipe above.
+combinations are the `github issue_read ... | jq ...` fetch pipe and the
+`jq ... | safeoutputs add_comment .` pipe above.
 
 ## Steps
 
-1. Fetch issue #${{ github.event.issue.number || github.event.inputs.issue_number }}
+1. Your first call is the fetch of issue
+   #${{ github.event.issue.number || github.event.inputs.issue_number }}
    (its title, body, and its current labels) with `github issue_read` as
-   described under Tools. If you
-   cannot fetch it, call `report_incomplete` with the reason and stop. Never
-   call `noop` for this, because it hides the failure. If the `comments`
-   count in the response is present and non-zero, also fetch every page of
-   its comments with `--method get_comments` as described under Tools. Keep
-   them for step 3: the reporter's replies (comments by the issue's author)
-   count as classification input there, and the same comments are searched for
-   the needs-information marker in outcome B.
-2. Read `.github/labels.yml` for the exact allowed `kind:*`, `area:*`, and
+   described under Tools. Make no other call first. If the fetch fails, run it
+   once more (the rerun without the `jq` pipe counts as that retry). If it
+   still fails, call `report_incomplete` with the reason and stop. Never call
+   `noop` for this, because it hides the failure. If the `comments` count in
+   the response is a number above zero, also fetch every page of its comments
+   with `--method get_comments` as described under Tools. Keep them for step
+   3: the reporter's replies (comments by the issue's author) count as
+   classification input there, and the same comments are searched for the
+   needs-information marker in outcome B. If a comment page fetch fails, run
+   it once more. If it still fails, call `add_labels` with
+   `status:needs-triage` so the issue is flagged for review (leave its other
+   labels as they are), then call `report_incomplete` with the reason and
+   stop. Never call `noop` for this.
+2. Your next call (after any comment pages from step 1) reads
+   `.github/labels.yml` for the exact allowed `kind:*`, `area:*`, and
    `status:*` label names. The file is short, so read the whole file. If the
-   read returns nothing, retry without a line range or run
-   `cat .github/labels.yml`.
-3. Decide which of these three outcomes applies. Do not take any label action
-   until you have decided, and do not partially apply an outcome.
+   read fails or returns nothing, retry once without a line range or run
+   `cat .github/labels.yml`. If it still fails, do not guess label names: call
+   `add_labels` with `status:needs-triage`, then call `report_incomplete` with
+   the reason and stop. Never call `noop` for this.
+3. Decide which of these three outcomes applies. Apart from the failure
+   handling in steps 1 and 2, do not take any label action until you have
+   decided, and do not partially apply an outcome.
 
    **A. Confident classification** — you can determine exactly one `kind:*`
    and exactly one `area:*` label with reasonable confidence. A title-only
@@ -206,7 +226,7 @@ combination is the `jq ... | safeoutputs add_comment .` pipe above.
      complete HTML comment. To check for it, search each comment body for the
      token `gh-aw:issue-triage:needs-information`, not for the joined text.
      Use the comments fetched in step 1. If the `comments` count in the
-     issue response was absent or zero, treat the issue as having no comments.
+     issue response was absent, null or zero, treat the issue as having no comments.
      Otherwise inspect every page of them. Never infer that the marker is absent merely because
      it is not in the issue response.
    - If no comment contains the token, add one comment containing the joined
@@ -222,6 +242,15 @@ combination is the `jq ... | safeoutputs add_comment .` pipe above.
    - Add `status:needs-triage` if not already present.
    - Remove `status:needs-information` if present.
    - Do not add or remove any `kind:*` or `area:*` label.
+
+## Stay on task
+
+You need only two things: the issue (step 1) and the label list (step 2), which
+describes every label. Decide as soon as you have both. Do not run `git`, do
+not list directories or search the repository, and do not read any file other
+than `.github/labels.yml` and the comment file you write in outcome B. Do not
+call a tool that is not named in this prompt. Those calls are denied or only
+use up your request limit.
 
 ## Rules
 
@@ -240,4 +269,4 @@ combination is the `jq ... | safeoutputs add_comment .` pipe above.
   in outcome B, and never when that exact marker is already present on the
   issue.
 - Take no action other than the labels (and, at most, the one comment)
-  described above.
+  described above, and the failure handling in steps 1 and 2.

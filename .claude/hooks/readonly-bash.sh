@@ -11,7 +11,7 @@ block() {
 command -v jq >/dev/null 2>&1 || block "jq is not installed"
 
 cmd=$(jq -r '.tool_input.command // empty')
-[ -n "$cmd" ] || exit 0
+[[ -n "$cmd" ]] || exit 0
 
 case "$cmd" in
 *$'\n'*) block "multi-line commands are not allowed" ;;

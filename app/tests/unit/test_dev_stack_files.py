@@ -112,3 +112,59 @@ class TestDevBootstrapFailsClosed:
 
         assert result.returncode != 0
         assert "STARTED" not in result.stdout
+
+
+def test_python_runtime_versions_are_aligned():
+    """All Python runtime and tooling targets must use the same version."""
+    dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
+    devcontainer = (REPO_ROOT / ".devcontainer" / "Dockerfile").read_text(encoding="utf-8")
+    sonar = (REPO_ROOT / ".sonarcloud.properties").read_text(encoding="utf-8")
+    pyright = (REPO_ROOT / "pyrightconfig.json").read_text(encoding="utf-8")
+    ruff = (REPO_ROOT / ".linter-rules" / ".ruff.toml").read_text(encoding="utf-8")
+
+    docker_version = re.search(
+        r"^FROM python:(\d+\.\d+)-slim(?:@|\s|$)",
+        dockerfile,
+        re.MULTILINE,
+    )
+    devcontainer_version = re.search(
+        r"^FROM mcr\.microsoft\.com/devcontainers/python:"
+        r"(\d+\.\d+)-bookworm(?:@|\s|$)",
+        devcontainer,
+        re.MULTILINE,
+    )
+    sonar_version = re.search(
+        r"^sonar\.python\.version=(\d+\.\d+)$",
+        sonar,
+        re.MULTILINE,
+    )
+    pyright_version = re.search(
+        r'^\s*"pythonVersion"\s*:\s*"(\d+\.\d+)"',
+        pyright,
+        re.MULTILINE,
+    )
+    ruff_version = re.search(
+        r'^target-version\s*=\s*"(py\d+)"$',
+        ruff,
+        re.MULTILINE,
+    )
+
+    assert docker_version, "Python version not found in Dockerfile"
+    assert devcontainer_version, "Python version not found in Dev Container"
+    assert sonar_version, "Python version not found in SonarCloud configuration"
+    assert pyright_version, "Python version not found in pyrightconfig.json"
+    assert ruff_version, "Ruff target-version not found"
+
+    versions = {
+        "Dockerfile": docker_version.group(1),
+        "Dev Container": devcontainer_version.group(1),
+        "SonarCloud": sonar_version.group(1),
+        "Pyright": pyright_version.group(1),
+    }
+
+    assert len(set(versions.values())) == 1, f"Python runtime versions are inconsistent: {versions}"
+
+    expected_ruff_version = f"py{docker_version.group(1).replace('.', '')}"
+    assert ruff_version.group(1) == expected_ruff_version, (
+        f"Ruff target-version is {ruff_version.group(1)}, expected {expected_ruff_version}"
+    )

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import Navigation from "./Navigation";
 
@@ -42,5 +43,21 @@ describe("Navigation", () => {
     });
 
     expect(screen.getByText("Inactive")).toBeInTheDocument();
+  });
+
+  it("toggles the theme from an accessible button", async () => {
+    localStorage.clear();
+    renderAt("/containers", null);
+
+    const button = screen.getByRole("button", { name: "Switch to dark mode" });
+    expect(button).toHaveAttribute("aria-pressed", "false");
+
+    await userEvent.click(button);
+
+    expect(
+      screen.getByRole("button", { name: "Switch to light mode" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(document.documentElement).toHaveAttribute("data-bs-theme", "dark");
+    localStorage.clear();
   });
 });

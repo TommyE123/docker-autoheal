@@ -319,12 +319,6 @@
       "problemMatcher": []
     },
     {
-      "label": "Autoheal: Run OSV Scanner",
-      "type": "shell",
-      "command": "mkdir -p .lint && osv-scanner scan source -r . --format json --output-file .lint/osv.json",
-      "problemMatcher": []
-    },
-    {
       "label": "Autoheal: Run Trivy",
       "type": "shell",
       "command": "trivy fs --config .linter-rules/.trivy.yaml --scanners vuln,misconfig,secret --skip-dirs '.lint' .",
@@ -353,7 +347,6 @@
       "dependsOrder": "parallel",
       "dependsOn": [
         "Autoheal: Run Semgrep",
-        "Autoheal: Run OSV Scanner",
         "Autoheal: Run Trivy",
         "Autoheal: Run TruffleHog",
         "Autoheal: Run Betterleaks"

@@ -34,7 +34,7 @@ function UptimeKumaMonitorsList({ monitors, mappings, containers }) {
 
   return (
     <Card className="mb-3">
-      <Card.Header className="bg-light">
+      <Card.Header className="bg-body-tertiary">
         <strong>Available Uptime-Kuma Monitors</strong>
       </Card.Header>
       <Card.Body>

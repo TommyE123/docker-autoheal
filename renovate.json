@@ -12,7 +12,8 @@
     "**/bower_components/**",
     ".github/workflows/issue-triage.lock.yml",
     ".github/workflows/weekly-maintainer.lock.yml",
-    "**/.mise/locks/**"
+    "mise.toml",
+    ".devcontainer/**"
   ],
   "description": "Dependency-update policy for docker-autoheal. Renovate creates and maintains dependency PRs. Patch updates are automerged once required checks pass; all other updates require manual review and merge. See docs/maintainer/dependency-management.md for the full explanation.",
   "timezone": "Europe/London",
@@ -29,7 +30,37 @@
     "schedule": ["* 0-3 * * 6"],
     "automerge": false
   },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track the Python version that SonarCloud analyses against (sonar.python.version in .sonarcloud.properties), using the renovate: comment on the line above it.",
+      "managerFilePatterns": ["/^\\.sonarcloud\\.properties$/"],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s+versioning=(?<versioning>\\S+)\\s*\\nsonar\\.python\\.version=(?<currentValue>\\S+)"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "Track the Python version Pyright checks against (pythonVersion in pyrightconfig.json), so it moves with the other Python runtime pins.",
+      "managerFilePatterns": ["/^pyrightconfig\\.json$/"],
+      "matchStrings": [
+        "\"pythonVersion\":\\s*\"(?<currentValue>\\d+\\.\\d+)\""
+      ],
+      "depNameTemplate": "python",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    }
+  ],
   "packageRules": [
+    {
+      "description": "Update the Python version everywhere Renovate can reach it in one PR: the Dockerfile image, sonar.python.version and pythonVersion in pyrightconfig.json. minimumGroupSize must equal the number of pins, so the PR is only created once all of them have an update. The Dev Container image and Ruff's target-version cannot be tracked by Renovate; the contract test in app/tests/unit/test_dev_stack_files.py fails until it is changed by hand. Only major and minor updates are grouped, so routine digest refreshes of the existing tags are not held back by the minimum. Python releases are minor or major updates, so automerge stays disabled.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["python"],
+      "matchUpdateTypes": ["major", "minor"],
+      "groupName": "Python runtime",
+      "minimumGroupSize": 3,
+      "minimumReleaseAge": "7 days"
+    },
     {
       "description": "Keep automerge disabled by default for all dependency updates. A later, narrower rule enables it only for eligible patch updates. See docs/maintainer/dependency-management.md.",
       "matchPackageNames": ["*"],
@@ -86,6 +117,12 @@
       "description": "Pin Docker image tags to an immutable SHA256 digest as well as their human-readable tag/version where the registry supports digests.",
       "matchDatasources": ["docker"],
       "pinDigests": true
+    },
+    {
+      "description": "sonar.python.version in .sonarcloud.properties and pythonVersion in pyrightconfig.json are bare version numbers that their tools parse, so they must never get a digest appended. Keep this after the general digest pinning rule.",
+      "matchManagers": ["custom.regex"],
+      "matchFileNames": [".sonarcloud.properties", "pyrightconfig.json"],
+      "pinDigests": false
     },
     {
       "description": "tommye123/docker-autoheal is this project's own published image, not a third-party dependency. Renovate should not manage it.",
