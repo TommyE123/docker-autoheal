@@ -210,7 +210,7 @@ function ContainersPage() {
       2: { variant: "warning", icon: "bi-clock-fill", text: "Pending" },
       3: { variant: "info", icon: "bi-tools", text: "Maintenance" },
       4: { variant: "secondary", icon: "bi-link-45deg", text: "Not Mapped" },
-      5: { variant: "dark", icon: "bi-slash-circle", text: "Disabled" },
+      5: { variant: "secondary", icon: "bi-slash-circle", text: "Disabled" },
       6: { variant: "secondary", icon: "bi-question-circle", text: "Unknown" },
     };
 
