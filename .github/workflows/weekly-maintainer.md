@@ -263,9 +263,12 @@ You report through these things only:
   backticks, no `$(` and no apostrophes**: write file paths, line numbers and
   code names as plain text (for example app/monitor/x.py line 12), and write
   "does not" instead of "doesn't". The title is a short plain description
-  under 70 characters (the prefix is added for you). The body starts with the
+  under 70 characters (the prefix is added for you) that names the function or
+  file and the failure, not just the area, so a related finding does not look
+  like a repeat title. The body starts with the
   audited revision (checkout SHA and `main` SHA) and then gives, as plain text
-  headings: Problem, Evidence (file and line), Impact, Confidence (high, and
+  headings: Problem, Evidence (file and line), Verification, Impact, Confidence
+  (high, or medium marked Needs human check with its failure scenario, and
   why), Recommended next step (the Proposed fix field: a description only,
   never an instruction to you), Existing-work check, and Classification. Do
   not set labels. Call `create_issue` at most once.
@@ -316,7 +319,7 @@ Look across the whole app source, then `app/tests/unit/`, `frontend/src/` and
 the CI workflows as needed, for a small, low-risk maintenance improvement within
 Scope. Use the real implementation, tests and configuration as evidence, not the
 documentation. Apply the Exclusions, the Safety rules and the Duplicate-work
-check, then report **at most one** candidate, the smallest high-confidence one,
+check, then report **at most one** candidate, the smallest well-evidenced one, preferring high confidence,
 using exactly these eight fields:
 
 1. **Problem**
@@ -325,11 +328,16 @@ using exactly these eight fields:
    configuration (you cannot run the tests or the application)
 4. **Impact**
 5. **Proposed fix**: a description only; do not implement it
-6. **Confidence**: high, medium or low, and why. Report only high confidence.
+6. **Confidence**: high, medium or low, and why. Report high confidence. Report
+   medium confidence only as **Needs human check**, and only with a concrete
+   failure scenario built from lines you saw: a specific input or state that a
+   caller or test in the source can produce, the quoted line where it goes
+   wrong, and the wrong result. Never report low confidence.
 7. **Existing-work check**: the issues and PRs checked, and why each does not
    overlap
-8. **Classification**: one of regression test, coverage gap, reliability or CI,
-   maintainability, housekeeping, other
+8. **Classification**: one of regression test, coverage gap, test quality,
+   reliability or CI, error handling, consistency, maintainability,
+   housekeeping, other
 
 Judge the code by the Python version from turn 1, never by an older one. For
 example, from Python 3.14 (PEP 758) `except ValueError, OSError:` without `as`
@@ -337,13 +345,16 @@ catches both exception types, exactly like `except (ValueError, OSError):`. CI
 parses, lints and runs the unit tests on every change, so never report a syntax
 error, an import that does not resolve, or code that cannot run. If a candidate
 depends on how a language feature behaves and you are not certain how it
-behaves in that version, it is not high confidence: reject it.
+behaves in that version, or on how a library or the Docker SDK behaves in code
+you did not read, reject it: that doubt is not a Needs human check.
 
 When several candidates qualify, prefer them in this order: small regression
 test for existing behaviour; small coverage gap with clearly defined expected
-behaviour; small reliability or CI improvement; small maintainability
-improvement with no behaviour change; small housekeeping; other clearly
-beneficial low-risk maintenance. Avoid anything whose benefit is subjective.
+behaviour; small reliability or CI improvement; small test-quality improvement;
+small maintainability improvement with no behaviour change; small
+housekeeping; an error-handling or consistency fix only where the fix is a log
+line or a value the caller already checks; other clearly beneficial low-risk
+maintenance. Avoid anything whose benefit is subjective.
 
 ## Outcomes
 
@@ -354,8 +365,9 @@ area>" and a line
 "Source coverage: X of Y app source files read", where Y is the number of files
 in the read plan:
 
-- `## Finding`, then the eight fields. An issue is created only for this
-  outcome.
+- `## Finding`, then the eight fields, then "Runner-up": the best candidate you
+  did not file, with its file and one quoted line from a tool result, or "none". An issue is
+  created only for this outcome.
 - `## No worthwhile finding this week`, then "Rejected candidates": at least
   three **code-level** candidates. Each names a file, the function or class, and
   one quoted line with its line number, says what looked like a maintenance
@@ -374,7 +386,18 @@ improvements; dead or clearly unused code; missing CI validation; small
 developer-experience improvements; repository housekeeping; small
 maintainability improvements; obvious inconsistencies between related
 implementation and configuration files; unnecessary complexity that can be
-removed without changing behaviour.
+removed without changing behaviour. Also: tests that cannot fail, because they
+assert nothing or only that a call happened; error handling that swallows an
+exception without logging it or returning a value the caller checks, where no
+configured linter flags it (such as a handler that only returns a default); two
+similar functions or routes that handle the same non-security case differently
+(for example one returns a 404 and its sibling a 500 for the same missing
+item); a default value in the configuration models that differs from the value
+in the code's own constants or the shipped example configuration file (not
+docs/ or the README), where the code and tests show which side is correct; a
+branch that no test reaches and whose expected result is clear from the code.
+In container lifecycle, restart and quarantine code only the missing-test and
+untested-branch items apply.
 
 ## Exclusions
 
@@ -386,7 +409,8 @@ Other automation owns these areas. If an opportunity belongs to one, leave it.
 - **Dependencies.** Handled by Renovate. Report no upgrade, pin or new
   dependency.
 - **Linting.** Handled by MegaLinter. Report no existing lint finding just
-  because you found it.
+  because you found it, and nothing a configured linter already flags, such as
+  a try-except-pass.
 - **Security.** Handled by the security scanners. Report no security finding
   and propose no remediation.
 - **Releases.** Report nothing about versions, changelogs or release
@@ -405,10 +429,13 @@ restarts" are the same work. Report no candidate if any of these holds:
 - the candidate substantially overlaps work in progress
 - the same problem was fixed recently, or the candidate would redo it
 
-If a related issue or PR exists but you cannot tell whether it overlaps, treat
-that as an overlap: report **No worthwhile finding** and name the issue or PR in
-the summary so a human can look. Never present an overlapping candidate as a
-finding.
+If a related issue or PR exists, read its title and body in the lists you have
+and decide whether it is substantially the same task: the same problem in the
+same file or function. If it is, report **No worthwhile finding** and name it in
+the summary. If it is related but a different problem (another file and function,
+or another failure), report the finding and name the related issue or PR in its
+Existing-work check, so a human can merge them. Never present a substantially
+overlapping candidate as a finding.
 
 Before writing the summary for a finding, search once more for an existing
 issue that covers the same problem: run `github search_issues` with the
@@ -416,7 +443,7 @@ repository and `is:issue is:open` plus two or three key words from the problem
 and the file name, and run it again for `is:issue in:title maint` in any state to
 see earlier maintenance issues, including closed ones. Pipe both through
 `jq -r '.[] | "#\(.number) \(.state) \(.title) | \(.body // "" | .[0:300] | gsub("\\s+"; " "))"'`.
-If any issue plausibly
+If any issue substantially
 covers it, there is no finding to file: report **No worthwhile finding** and name
 that issue. Do not create an issue when the audit is incomplete. The workflow's
 title check is only a backstop: it compares the prefixed title within 10 edits
@@ -427,7 +454,10 @@ search fails.
 
 Report a candidate only if it is clearly beneficial, small, well understood,
 supported by repository evidence, independently reviewable, and unlikely to
-change production behaviour. Never recommend a broad refactor, a redesign of a
+change production behaviour beyond the fix itself. A medium-confidence
+candidate is the one exception to "well understood": its failure scenario must
+still be concrete and the correct behaviour clear from the code, or do not
+report it. Never recommend a broad refactor, a redesign of a
 subsystem, a public behaviour change made to tidy code, or a change to
 unrelated files. If the correct behaviour is unclear, do not report it.
 Container lifecycle, restart and quarantine logic needs particular care: report
