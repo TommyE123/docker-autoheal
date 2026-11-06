@@ -7,8 +7,11 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 
 from app.api import state
-from app.api.errors import DockerClientDep  # noqa: TC001  (FastAPI resolves it at runtime)
-from app.config.config_manager import UptimeKumaMapping, config_manager
+from app.api.errors import (
+    DockerClientDep,
+    invalid_input_as_422,
+)
+from app.config.config_manager import UptimeKumaConfig, UptimeKumaMapping, config_manager
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +77,12 @@ async def enable_uptime_kuma_integration(docker_client: DockerClientDep, integra
         raise HTTPException(status_code=400, detail="server_url and api_token are required")
     server_url = server_url.strip()
     api_token = api_token.strip()
+    # Validate before contacting Uptime-Kuma: mutate() does not validate, so a bad value would
+    # be saved and then reset the whole section (URL and token included) on the next load.
+    with invalid_input_as_422():
+        auto_restart_on_down = UptimeKumaConfig(
+            auto_restart_on_down=integration_config.get("auto_restart_on_down", True)
+        ).auto_restart_on_down
 
     monitoring_engine = state.monitoring_engine
     username = _stripped(integration_config.get("username", ""))
@@ -114,9 +123,7 @@ async def enable_uptime_kuma_integration(docker_client: DockerClientDep, integra
         config.uptime_kuma.server_url = server_url
         config.uptime_kuma.username = username
         config.uptime_kuma.api_token = api_token
-        config.uptime_kuma.auto_restart_on_down = integration_config.get(
-            "auto_restart_on_down", True
-        )
+        config.uptime_kuma.auto_restart_on_down = auto_restart_on_down
 
         # Manual mappings are explicit user decisions: keep them and let them
         # win over any freshly generated auto-mapping for the same container.

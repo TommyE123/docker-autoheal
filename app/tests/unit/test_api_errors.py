@@ -12,6 +12,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from fastapi import HTTPException
+from pydantic import ValidationError
 
 from app.api.errors import INTERNAL_ERROR_DETAIL, get_docker_client
 from app.config.config_manager import config_manager
@@ -36,6 +37,19 @@ def _boom(*_args, **_kwargs):
 
 
 class TestUnexpectedErrors:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("path", ["/api/containers", "/api/status"])
+    async def test_docker_failure_returns_generic_500(self, monkeypatch, path):
+        docker_client = MagicMock()
+        docker_client.list_containers.side_effect = RuntimeError(SECRET)
+        monkeypatch.setattr("app.api.state.docker_client", docker_client)
+
+        status, text = await _call("GET", path)
+
+        assert status == 500
+        assert json.loads(text) == {"detail": INTERNAL_ERROR_DETAIL}
+        assert SECRET not in text
+
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
         ("method", "path", "broken_method"),
@@ -183,7 +197,11 @@ class TestModelValidationErrors:
 
         assert status == 500
         assert json.loads(text) == {"detail": INTERNAL_ERROR_DETAIL}
-        assert any(r.exc_info for r in caplog.records if r.name == "app.api.errors")
+        assert any(
+            r.exc_info and r.exc_info[0] is ValidationError
+            for r in caplog.records
+            if r.name == "app.api.errors"
+        )
 
     @pytest.mark.asyncio
     async def test_invalid_config_import_is_422(self):

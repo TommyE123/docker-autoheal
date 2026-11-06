@@ -261,6 +261,23 @@ class TestNotificationServiceCrud:
 
         assert exc_info.value.status_code == 404
 
+    async def test_update_notification_service_with_invalid_replacement_returns_422(self):
+        await add_notification_service(
+            {"name": "Ntfy", "type": "ntfy", "topic": "alerts", "access_token": "tk_original"}
+        )
+        before = config_manager.get_config().notifications.model_dump()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await update_notification_service(
+                "Ntfy",
+                {"type": "ntfy", "topic": "alerts", "access_token": {"value": "tk_leak_check"}},
+            )
+
+        assert exc_info.value.status_code == 422
+        assert "access_token" in exc_info.value.detail
+        assert "tk_leak_check" not in exc_info.value.detail
+        assert config_manager.get_config().notifications.model_dump() == before
+
     async def test_update_notification_service_persistence_error_propagates(self, monkeypatch):
         await add_notification_service(
             {
