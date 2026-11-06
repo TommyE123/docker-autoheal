@@ -315,12 +315,10 @@ class TestHealthCheckManagement:
         docker_client.add_container(container, info)
 
         # Mock config_manager.add_custom_health_check to raise an exception
-        original_add = config_manager.add_custom_health_check
-
         def mock_add_raises(health_check):
             raise ValueError("Unexpected config error")
 
-        config_manager.add_custom_health_check = mock_add_raises
+        monkeypatch.setitem(vars(config_manager), "add_custom_health_check", mock_add_raises)
 
         with pytest.raises(ValueError, match="Unexpected config error"):
             await add_health_check(
@@ -328,25 +326,19 @@ class TestHealthCheckManagement:
                 HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080),
             )
 
-        config_manager.add_custom_health_check = original_add
-
     async def test_get_health_check_handles_unexpected_error(self, wired_api, monkeypatch):
         docker_client, _engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, info)
 
         # Mock config_manager.get_custom_health_check to raise an exception
-        original_get = config_manager.get_custom_health_check
-
         def mock_get_raises(container_id):
             raise ValueError("Unexpected config error")
 
-        config_manager.get_custom_health_check = mock_get_raises
+        monkeypatch.setitem(vars(config_manager), "get_custom_health_check", mock_get_raises)
 
         with pytest.raises(ValueError, match="Unexpected config error"):
             await get_health_check(get_docker_client(), "web")
-
-        config_manager.get_custom_health_check = original_get
 
     async def test_delete_health_check_handles_unexpected_error(self, wired_api, monkeypatch):
         docker_client, _engine = wired_api
@@ -354,17 +346,13 @@ class TestHealthCheckManagement:
         docker_client.add_container(container, info)
 
         # Mock config_manager.remove_custom_health_check to raise an exception
-        original_remove = config_manager.remove_custom_health_check
-
         def mock_remove_raises(container_id):
             raise ValueError("Unexpected config error")
 
-        config_manager.remove_custom_health_check = mock_remove_raises
+        monkeypatch.setitem(vars(config_manager), "remove_custom_health_check", mock_remove_raises)
 
         with pytest.raises(ValueError, match="Unexpected config error"):
             await delete_health_check(get_docker_client(), "web")
-
-        config_manager.remove_custom_health_check = original_remove
 
     async def test_add_health_check_rejects_when_monitoring_engine_not_initialized(
         self, monkeypatch, docker_client

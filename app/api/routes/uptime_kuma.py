@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException
 from app.api import state
 from app.api.errors import (
     DockerClientDep,
+    escape_for_log,
     invalid_input_as_422,
 )
 from app.config.config_manager import UptimeKumaConfig, UptimeKumaMapping, config_manager
@@ -230,8 +231,8 @@ async def create_uptime_kuma_mapping(docker_client: DockerClientDep, mapping: di
 
     logger.info(
         "Created Uptime-Kuma mapping: %s -> %s",
-        container_ref,
-        monitor_name,
+        escape_for_log(container_ref),
+        escape_for_log(monitor_name),
     )
 
     return {"success": True, "mapping": new_mapping.model_dump()}

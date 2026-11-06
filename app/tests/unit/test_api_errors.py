@@ -14,7 +14,7 @@ import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
 
-from app.api.errors import INTERNAL_ERROR_DETAIL, get_docker_client
+from app.api.errors import INTERNAL_ERROR_DETAIL, escape_for_log, get_docker_client
 from app.config.config_manager import config_manager
 from app.tests.unit.test_api_routing import _request
 
@@ -97,6 +97,23 @@ class TestUnexpectedErrors:
         message = next(r for r in caplog.records if r.name == "app.api.errors").getMessage()
         assert "\x1b" not in message
         assert "x\\x1b[31mforged" in message
+
+
+class TestEscapeForLog:
+    @pytest.mark.parametrize(
+        ("raw", "escaped"),
+        [
+            ("plain text", "plain text"),
+            ("line1\nline2", "line1\\nline2"),
+            ("a\r\nb", "a\\r\\nb"),
+            ("\x1b[31mred", "\\x1b[31mred"),
+            ("tab\there", "tab\\there"),
+            ("Café ☕ 監視", "Café ☕ 監視"),
+        ],
+        ids=["plain", "newline", "crlf", "escape", "tab", "non-ascii-kept"],
+    )
+    def test_escapes_control_characters_and_keeps_printable_text(self, raw, escaped):
+        assert escape_for_log(raw) == escaped
 
 
 class TestDockerClientDependency:

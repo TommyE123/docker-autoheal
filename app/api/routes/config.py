@@ -15,7 +15,7 @@ from typing import Annotated
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
-from app.api.errors import invalid_input_as_422
+from app.api.errors import escape_for_log, invalid_input_as_422
 from app.config.config_manager import (
     AutoHealConfig,
     ConfigImportError,
@@ -135,7 +135,7 @@ async def update_observability_config(observability_config: dict):
         logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
         logging.getLogger("uvicorn").setLevel(logging.WARNING)
 
-        logger.info("Log level changed to: %s", level_name)
+        logger.info("Log level changed to: %s", escape_for_log(level_name))
 
     config_manager.update_config(config)
     return {"status": "success", "message": "Observability configuration updated"}

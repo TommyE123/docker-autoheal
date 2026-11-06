@@ -177,6 +177,16 @@ class TestObservabilityConfig:
         assert exc_info.value.status_code == 422
         assert config_manager.get_config().observability.model_dump() == before
 
+    async def test_log_level_change_log_line_cannot_be_forged(self, caplog):
+        with caplog.at_level("INFO", logger="app.api.routes.config"):
+            await update_observability_config({"log_level": "INFO\nFORGED log line"})
+
+        message = next(
+            r.getMessage() for r in caplog.records if "Log level changed" in r.getMessage()
+        )
+        assert "\n" not in message
+        assert "INFO\\nFORGED log line" in message
+
     async def test_update_observability_config_unexpected_error_propagates(self, monkeypatch):
         monkeypatch.setattr(
             config_manager,

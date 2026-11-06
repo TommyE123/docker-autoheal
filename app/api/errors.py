@@ -9,6 +9,7 @@ handlers that need Docker.
 """
 
 import logging
+import re
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Annotated
 
@@ -25,6 +26,19 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 INTERNAL_ERROR_DETAIL = "Internal server error, see logs"
+
+_CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+
+
+def escape_for_log(value: str) -> str:
+    """Escape control characters in request-supplied text before logging it.
+
+    A newline or escape sequence in a logged value could otherwise forge log lines.
+    Printable text, including non-ASCII, is left readable.
+    """
+    return _CONTROL_CHARACTERS.sub(
+        lambda match: match.group().encode("unicode_escape").decode(), value
+    )
 
 
 def get_docker_client() -> DockerClientWrapper:
@@ -66,7 +80,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     """Log an unexpected error with its traceback and return a generic 500."""
     # The path is percent-decoded, so escape control characters to stop a crafted
     # request from forging log lines.
-    path = request.url.path.encode("unicode_escape").decode("ascii")
+    path = escape_for_log(request.url.path)
     logger.error(
         "Unhandled error on %s %s",
         request.method,
