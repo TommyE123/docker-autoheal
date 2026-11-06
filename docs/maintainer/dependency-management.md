@@ -303,12 +303,14 @@ The Node major is set in four places, and Renovate updates all of them in one pu
 * `.devcontainer/devcontainer.json` — the `version` option of the `node` feature. Renovate's
   built-in `devcontainer` manager reads it, so it needs no custom manager.
 
-A package rule groups them into one "Node runtime" pull request with `minimumGroupSize: 4`. As
-with Python, the minimum is a count, not a list of files: change it if a Node pin is added or
-removed, and note that set too high the group never forms and no error is shown. Only major
-updates are grouped, so digest refreshes are not held back, and a Node major needs a manual
-merge. `test_node_runtime_versions_are_aligned` in `app/tests/unit/test_dev_stack_files.py`
-fails if the four places disagree.
+A package rule groups them into one "Node runtime" pull request with `minimumGroupSize: 4`. It
+matches the dependency name `node` (`matchDepNames`), not the package name, because the
+`setup-node` pins have the package name `actions/node-versions` while the `Dockerfile` and Dev
+Container pins are named `node`. As with Python, the minimum is a count, not a list of files:
+change it if a Node pin is added or removed, and note that set too high the group never forms and
+no error is shown. Only major updates are grouped, so digest refreshes are not held back, and a
+Node major needs a manual merge. `test_node_runtime_versions_are_aligned` in
+`app/tests/unit/test_dev_stack_files.py` fails if the four places disagree.
 
 ### Rebasing
 

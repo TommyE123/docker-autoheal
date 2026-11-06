@@ -229,9 +229,10 @@ def test_renovate_does_not_ignore_files_holding_runtime_pins(path):
     """A runtime pin in an ignored file is never updated, and silently falls behind."""
     config = json.loads((REPO_ROOT / "renovate.json").read_text(encoding="utf-8"))
 
-    # fnmatch is not Renovate's minimatch (``*`` also crosses ``/`` here), but it agrees for the
-    # globs used in ignorePaths, which is enough to catch ``.devcontainer/**`` coming back.
-    hiding = [glob for glob in config["ignorePaths"] if fnmatch.fnmatch(path, glob)]
+    # Renovate ignores a file when the pattern is a substring of its path or a minimatch glob.
+    # fnmatch is not minimatch (``*`` also crosses ``/`` here), but it agrees for the globs used
+    # in ignorePaths, which is enough to catch ``.devcontainer/**`` or ``.devcontainer`` coming back.
+    hiding = [glob for glob in config["ignorePaths"] if glob in path or fnmatch.fnmatch(path, glob)]
 
     assert not hiding, (
         f"renovate.json ignorePaths {hiding} hides {path}, so Renovate cannot update it"
