@@ -371,7 +371,7 @@ formatter is CLI-only.
 | Every file      | editorconfig-checker      | —                        | Yes              |
 
 Workflow files are additionally scanned by zizmor, which is report-only. Repository-wide
-scanners (checkov, semgrep, osv-scanner, trivy, trufflehog, betterleaks, secretlint,
+scanners (checkov, semgrep, trivy, trufflehog, betterleaks, secretlint,
 ls-lint, git_diff) run against the project rather than a file type. The report-only
 linters are the ones listed in `.linter-rules/.mega-linter.yml`'s `DISABLE_ERRORS_LINTERS`.
 

@@ -87,7 +87,7 @@ function UptimeKumaIntegration({
           />
         ) : (
           <>
-            <div className="mb-3 p-3 bg-light rounded">
+            <div className="mb-3 p-3 bg-body-tertiary rounded">
               <div className="mt-2 small text-muted">
                 <div>
                   <strong>Server:</strong> {config.server_url}

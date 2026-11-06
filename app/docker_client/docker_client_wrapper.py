@@ -35,7 +35,7 @@ def recovery_identifier[S](stable_id: S, labels: dict) -> S | str:
     and service are taken from their separate labels rather than from the stable
     ID, because ``project_service`` is ambiguous (project ``foo_bar`` with service
     ``baz`` and project ``foo`` with service ``bar_baz`` both give ``foo_bar_baz``).
-    An explicit ``monitoring.id`` label is the user's chosen identity: it is never
+    An explicit, non-empty ``monitoring.id`` label is the user's chosen identity: it is never
     suffixed, and it is keyed under a ``monitoring.id:`` prefix so it can never equal
     a generated key. Compose project and service names cannot contain ``:`` or ``#``,
     so the delimiters of a generated key are unambiguous.
@@ -49,7 +49,7 @@ def recovery_identifier[S](stable_id: S, labels: dict) -> S | str:
         ``"compose:{project}:{service}#{N}"`` for Compose container number N,
         otherwise ``stable_id``
     """
-    if "monitoring.id" in labels:
+    if labels.get("monitoring.id"):
         return f"monitoring.id:{stable_id}"
     project = labels.get("com.docker.compose.project")
     service = labels.get("com.docker.compose.service")
@@ -187,7 +187,7 @@ class DockerClientWrapper:
 
             # Get stable identifier with same logic as monitoring_engine
             # Priority 1: Explicit monitoring.id label
-            if "monitoring.id" in labels:
+            if labels.get("monitoring.id"):
                 stable_id = labels["monitoring.id"]
             else:
                 # Priority 2: Docker Compose service name (project_service format)

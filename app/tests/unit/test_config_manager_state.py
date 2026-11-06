@@ -393,6 +393,19 @@ def test_maintenance_mode_write_failure_is_logged_and_does_not_escape(
     assert "Failed to save maintenance mode to disk: disk full" in caplog.text
 
 
+def test_legacy_empty_monitoring_id_quarantine_key_is_dropped_on_load(
+    isolated_config_manager, monkeypatch
+):
+    """The shared ``monitoring.id:`` key from empty labels no longer matches any container."""
+    isolated_config_manager.QUARANTINE_FILE.write_text(
+        json.dumps(["monitoring.id:", "monitoring.id:real", "web"])
+    )
+
+    reloaded = _reloaded(monkeypatch, isolated_config_manager)
+
+    assert reloaded.get_quarantined_containers() == {"monitoring.id:real", "web"}
+
+
 def test_corrupt_auxiliary_state_falls_back_to_safe_defaults(
     isolated_config_manager, monkeypatch, caplog
 ):
