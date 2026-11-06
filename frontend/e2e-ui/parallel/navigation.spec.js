@@ -90,7 +90,7 @@ test("the theme toggle switches between light and dark and persists across reloa
 
 test("a saved theme is applied before the app renders", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("theme", "dark"));
-  // Block the app bundle so only the inline <head> script can have set the theme.
+  // Block the app bundle so only the inline script can have set the theme.
   await page.route(/\/assets\/.*\.js$/, (route) => route.abort());
   await page.goto("/containers");
 
