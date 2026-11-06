@@ -41,7 +41,7 @@ tooling float to the latest release, with no pins and no lockfiles.
 |-------------------------------------------------------------------------|-------------------------------------------------------------------------|
 | `requirements.txt`, the `Dockerfile` base images and apt pins           | `mise.toml` tools, set to `latest`, with no `mise.lock`                 |
 | `frontend/package-lock.json`, including the build chain devDependencies | `.devcontainer/package.json` linters, set to `latest`, with no lockfile |
-| `docker-compose` images                                                 | Dev Container features (major tag only) and the `mise` image            |
+| `docker-compose` images                                                 | Dev Container features (`latest`; `node` on a major) and `mise`         |
 | `requirements-dev.txt`, which feeds the required `unit-tests` check     | The Dev Container base image (a tag, not a digest)                      |
 | SHA-pinned GitHub Actions and the MegaLinter version                    |                                                                         |
 
