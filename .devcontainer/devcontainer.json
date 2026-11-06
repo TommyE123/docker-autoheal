@@ -3,7 +3,8 @@
   "runArgs": ["--name", "docker-autoheal-devcontainer"],
   "privileged": true,
   "build": {
-    "dockerfile": "Dockerfile"
+    "dockerfile": "Dockerfile",
+    "options": ["--pull"]
   },
 
   "features": {

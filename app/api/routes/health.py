@@ -27,7 +27,9 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now(UTC).isoformat(),
         "docker_connected": docker_connected,
-        "monitoring_active": state.monitoring_engine._running if state.monitoring_engine else False,
+        "monitoring_active": state.monitoring_engine.is_running
+        if state.monitoring_engine
+        else False,
     }
 
 
@@ -70,7 +72,7 @@ async def get_system_status():
 
         maintenance_start = config_manager.get_maintenance_start_time()
         return SystemStatus(
-            monitoring_active=monitoring_engine._running if monitoring_engine else False,
+            monitoring_active=monitoring_engine.is_running if monitoring_engine else False,
             docker_connected=docker_connected,
             total_containers=len(containers),
             monitored_containers=monitored_count,

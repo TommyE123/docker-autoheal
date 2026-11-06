@@ -215,7 +215,7 @@ class TestCustomHealthChecks:
         )
 
         assert (
-            await engine._perform_custom_health_check(
+            await engine._health_evaluator.perform_custom_health_check(
                 container, config_manager.get_custom_health_check("web")
             )
             is True
@@ -300,7 +300,9 @@ class TestCustomHealthChecks:
         check_type = method.removeprefix("check_").removesuffix("_health")
         health_check = HealthCheckConfig(container_id="web", check_type=check_type, **fields)
 
-        healthy = await engine._perform_custom_health_check(container, health_check)
+        healthy = await engine._health_evaluator.perform_custom_health_check(
+            container, health_check
+        )
 
         assert healthy is True
         check.assert_called_once_with(container, *expected_args)

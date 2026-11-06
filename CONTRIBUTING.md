@@ -49,9 +49,8 @@ backend and frontend dev servers, and building a local Docker image — are in
    npm run format:check
    ```
 
-   The frontend has pre-existing ESLint and Prettier findings that predate this tooling
-   being wired up; MegaLinter reports them without failing the build — see
-   [docs/developer/frontend.md](docs/developer/frontend.md#linting-and-formatting.
+   MegaLinter runs ESLint and Prettier on the frontend and fails the check on any finding
+   — see [docs/developer/frontend.md](docs/developer/frontend.md#linting-and-formatting).
 
 3. **Keep documentation in sync.** If your change affects user-facing behavior
    (configuration fields, API endpoints, ports, labels), update the relevant page under

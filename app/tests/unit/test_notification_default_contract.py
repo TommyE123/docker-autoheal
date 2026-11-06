@@ -72,6 +72,7 @@ def real_notification_manager(monkeypatch, docker_client) -> NotificationManager
     manager = NotificationManager()
     manager._session = _FakeSession()
     monkeypatch.setattr("app.monitor.monitoring_engine.notification_manager", manager)
+    monkeypatch.setattr("app.monitor.auto_discovery.notification_manager", manager)
     monkeypatch.setattr("app.api.state.notification_manager", manager)
     monkeypatch.setattr("app.api.state.docker_client", docker_client)
     return manager
@@ -128,7 +129,9 @@ async def emit_one_event_of_each_type(engine, docker_client) -> None:
     # "auto_monitor": a labelled container starting while the engine runs.
     container, info = make_container(name="auto-monitor-target", container_id=AUTO_MONITOR_ID)
     docker_client.add_container(container, info)
-    await engine._process_container_start_event(start_event(container.id, "auto-monitor-target"))
+    await engine._auto_discovery.process_start_event(
+        start_event(container.id, "auto-monitor-target")
+    )
 
     # "unquarantine": user-initiated, emitted by the API rather than the engine.
     container, info = make_container(name="unquarantine-target", container_id=UNQUARANTINE_ID)

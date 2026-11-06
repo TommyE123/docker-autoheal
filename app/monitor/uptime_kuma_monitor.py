@@ -4,7 +4,7 @@ This module only handles Uptime Kuma-specific operations (SOLID principles):
 - Uptime Kuma API communication
 - Monitor status retrieval
 - Mapping configuration
-- Providing health status to monitoring engine
+- Providing health status to the health evaluator (HealthEvaluator) and the containers API
 
 Core functionality (restarts, quarantine, events, etc.) is delegated to MonitoringEngine
 """
@@ -23,7 +23,8 @@ class UptimeKumaMonitor:
     """
     Uptime-Kuma integration service
     Provides container health status from Uptime Kuma monitors
-    Does NOT perform core actions - only reports status to MonitoringEngine
+    Does NOT perform core actions - only reports status to HealthEvaluator, which
+    decides whether the monitoring engine restarts a container
     """
 
     def __init__(self) -> None:

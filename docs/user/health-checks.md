@@ -97,7 +97,10 @@ and `DELETE /api/healthchecks/{id}`.
    `monitor.interval_seconds`, the effective wait is rounded up to a whole interval. If the
    container is seen healthy at any check during the wait, the wait is cancelled and a later
    failure starts a new one, so a container that alternates between healthy and unhealthy on
-   every check is not restarted.
+   every check is not restarted. The same holds if the failure wasn't observed on every
+   cycle, for example while the container was quarantined, during maintenance mode, or when
+   the Docker connection was unavailable: the old wait is dropped and the next failure
+   starts a fresh one, with the same delay, instead of restarting at once.
 3. **Threshold and quarantine** — once a container has been restarted `max_restarts`
    times within `max_restarts_window_seconds`, it's **quarantined**: Auto-Heal stops
    trying to restart it until you intervene, or until it becomes healthy on its own (see

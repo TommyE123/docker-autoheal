@@ -15,8 +15,10 @@ docker-autoheal/
 │   ├── docker_client/
 │   │   └── docker_client_wrapper.py  # Thin wrapper around the `docker` SDK
 │   ├── monitor/
+│   │   ├── auto_discovery.py     # Adds labelled containers to monitoring (startup scan, start-event listener)
 │   │   ├── health.py             # Whether a container needs a restart (exit status, health checks)
-│   │   ├── monitoring_engine.py  # Core monitoring loop, restart/backoff/quarantine logic
+│   │   ├── monitoring_engine.py  # Core monitoring loop, restarts and quarantine
+│   │   ├── recovery.py           # In-memory cooldown, backoff, restart-wait and quarantine-release state
 │   │   ├── selection.py          # Which containers are monitored (selected/excluded, labels, filters)
 │   │   └── uptime_kuma_monitor.py
 │   ├── notifications/
@@ -46,14 +48,13 @@ docker-autoheal/
 │
 ├── .devcontainer/                # Dev Container definition (see docs/developer/development-setup.md)
 │   ├── devcontainer.json         # Build, features, mounts, ports, VS Code customisations
-│   ├── devcontainer-lock.json    # Pinned digests for the Dev Container features
-│   ├── Dockerfile                # Pinned Python base image plus the mise binary
+│   ├── Dockerfile                # Python base image tag plus the mise binary
 │   ├── post-create.sh            # Installs dependencies and tooling on container creation
 │   ├── verify-isolation.sh       # Proves the inner Docker daemon is isolated and Autoheal recovers a probe
 │   ├── prepare-volumes.sh        # Makes the cache, `gh` and mise volumes writable by the container user
-│   └── package.json              # Pinned npm-based linters used by the local tasks
+│   └── package.json              # Unpinned npm-based linters used by the local tasks
 │
-├── mise.toml / mise.lock         # Pinned developer CLI tools, installed by mise (with .mise/locks/)
+├── mise.toml                     # Unpinned developer CLI tools, installed by mise
 │
 ├── requirements.txt              # Runtime Python dependencies
 ├── requirements-dev.txt          # Test dependencies (pytest, coverage, mutmut)
@@ -89,7 +90,14 @@ suites (see [Testing](testing.md#legacy-script-triage) for what happened to each
   `docker` SDK: listing containers, restarting/stopping them, HTTP/TCP/exec health checks,
   and reading Docker's native health status.
 - **`app/monitor/monitoring_engine.py`** — the core auto-healing logic described in
-  [Architecture](architecture.md).
+  [Architecture](architecture.md): the monitoring loop, restarts, quarantine, events and
+  notifications.
+- **`app/monitor/recovery.py`** — `RecoveryPolicy`, the synchronous in-memory restart state:
+  cooldown, backoff, pending restart waits, the healthy runs that reset backoff, and the
+  streaks of healthy checks that release a quarantined container.
+- **`app/monitor/auto_discovery.py`** — `AutoDiscovery`, which adds containers carrying the
+  monitoring label to the monitored list, from the startup scan and from Docker start events,
+  including the reconnecting event-stream listener.
 - **`app/monitor/health.py`** — `HealthEvaluator`, which decides from a container's exit status,
   custom health checks, Docker's native health and the Uptime Kuma monitor whether it needs a
   restart.

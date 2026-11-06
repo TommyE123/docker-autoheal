@@ -315,13 +315,7 @@
     {
       "label": "Autoheal: Run Semgrep",
       "type": "shell",
-      "command": "mkdir -p .lint && semgrep scan --error --config p/command-injection --config p/docker-compose --config p/insecure-transport --config p/javascript --config p/owasp-top-ten --config p/python --config p/react --exclude .github/workflows/issue-triage.lock.yml --exclude 'Dockerfile*' --exclude .lint --json-output .lint/semgrep.json .",
-      "problemMatcher": []
-    },
-    {
-      "label": "Autoheal: Run OSV Scanner",
-      "type": "shell",
-      "command": "mkdir -p .lint && osv-scanner scan source -r . --format json --output-file .lint/osv.json",
+      "command": "mkdir -p .lint && semgrep scan --error --config p/command-injection --config p/docker-compose --config p/insecure-transport --config p/javascript --config p/owasp-top-ten --config p/python --config p/react --exclude .github/workflows/issue-triage.lock.yml --exclude .github/workflows/weekly-maintainer.lock.yml --exclude 'Dockerfile*' --exclude .lint --json-output .lint/semgrep.json .",
       "problemMatcher": []
     },
     {
@@ -353,7 +347,6 @@
       "dependsOrder": "parallel",
       "dependsOn": [
         "Autoheal: Run Semgrep",
-        "Autoheal: Run OSV Scanner",
         "Autoheal: Run Trivy",
         "Autoheal: Run TruffleHog",
         "Autoheal: Run Betterleaks"

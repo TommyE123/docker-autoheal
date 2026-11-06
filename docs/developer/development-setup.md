@@ -20,16 +20,16 @@ Container**. It also works as a GitHub Codespace.
 
 The container provides:
 
-- Python (matching the pinned base image in `.devcontainer/Dockerfile`) and Node.js 24
+- Python (matching the base image tag in `.devcontainer/Dockerfile`) and Node.js 24
 - Its own, isolated Docker daemon, via the `docker-in-docker` feature (see
   [Docker isolation](#docker-isolation))
 - The GitHub CLI (`gh`). The `github/gh-aw` extension, for working on the agentic
   workflows, is not installed automatically: run **Autoheal: Install gh-aw** after
   `gh auth login` (see below)
 - [mise](https://mise.jdx.dev), which installs the linter and security-scanning tools used
-  by the Dev Container tasks at the versions pinned in `mise.toml` and `mise.lock`. The
-  npm-based linters (markdownlint, prettier, stylelint and the rest) stay pinned in
-  `.devcontainer/package.json`
+  by the Dev Container tasks. The tools in `mise.toml` and the npm-based linters
+  (markdownlint, prettier, stylelint and the rest) in `.devcontainer/package.json` are
+  unpinned and have no lockfile, so each rebuild installs the latest releases
 - Shared VS Code settings, a shared set of installed VS Code extensions, and forwarded
   ports for the frontend (3000), the dev stack's UI/API (3132) and metrics (9091), and
   Playwright's UI (9323)
@@ -37,7 +37,7 @@ The container provides:
 Application services are **not** started automatically — use the tasks below.
 
 `postCreateCommand` runs `.devcontainer/post-create.sh`, which installs the dependencies
-and tooling (`mise install --locked` for the pinned tools, then `mise prune` to remove
+and tooling (`mise install` and `mise upgrade` for the tools, then `mise prune` to remove
 superseded versions). Three named Docker volumes keep downloads and installs across
 rebuilds: `~/.cache` (the pip and npm caches, plus other tools' caches such as Trivy's
 vulnerability database; npm is pointed at `~/.cache/npm` by `NPM_CONFIG_CACHE`), `gh`'s
@@ -57,7 +57,7 @@ To reclaim space sooner, run these inside the container:
 
 - `mise prune` removes superseded tool versions. Run it from the repository folder: it
   keeps only the versions that configurations mise has already seen require, so run
-  anywhere else it can remove every installed tool until `mise install --locked` is run
+  anywhere else it can remove every installed tool until `mise install` is run
   again.
 - `pip cache purge` and `npm cache clean --force` empty the pip and npm caches. The next
   install downloads what it needs again.
@@ -66,7 +66,7 @@ To reset a volume completely, stop the container and remove the volume from the 
 `docker volume rm`. The volumes are `docker-autoheal-cache`, `docker-autoheal-gh-cache` and
 `docker-autoheal-mise-data`; removing `docker-autoheal-cache` clears every cache under
 `~/.cache` at once, and removing `docker-autoheal-mise-data` uninstalls the mise tools until
-`mise install --locked` runs again. If you used an earlier version of this Dev Container,
+`mise install` runs again. If you used an earlier version of this Dev Container,
 its `docker-autoheal-pip-cache` and `docker-autoheal-npm-cache` volumes are no longer used
 and can be removed the same way. The inner Docker daemon has its own volume,
 `docker-autoheal-dind-<devcontainerId>`, which holds its images, volumes and containers; it
@@ -308,11 +308,11 @@ test isolation works.
 `.github/workflows/mega-linter.yml` runs [MegaLinter](https://megalinter.io/) on every
 pull request targeting `main`, covering Python, JavaScript, YAML, Dockerfile,
 Markdown, and security checks provided by Ruff's `S` rules — see `.linter-rules/.mega-linter.yml`
-for the exact set. Several of those linters (`PYTHON_RUFF`,
-`JAVASCRIPT_PRETTIER`, and others listed in `.linter-rules/.mega-linter.yml`'s
-`DISABLE_ERRORS_LINTERS`) currently have pre-existing findings and are configured not
-to fail the build over them; they still run and report. There is no repository-wide Python
- formatter/import-sorter enforced beyond what MegaLinter reports.
+for the exact set. The linters listed in `.linter-rules/.mega-linter.yml`'s
+`DISABLE_ERRORS_LINTERS` currently have pre-existing findings and are configured not to
+fail the build over them; they still run and report. Ruff is not in that list, so any ruff
+finding fails the MegaLinter check. There is no
+repository-wide Python formatter/import-sorter enforced beyond what MegaLinter reports.
 On pull requests from branches in this repository, MegaLinter posts a PR comment and per-linter
 statuses. Fork pull requests get a read-only token, so there the results are only in
 the run's job summary, its check status, and the uploaded report artifact.
@@ -357,33 +357,40 @@ CSS uses Stylelint fixes on explicit save, while CI has no CSS formatter. Markdo
 markdownlint fixes on explicit save; format-on-save is disabled because CI's table
 formatter is CLI-only.
 
-| File type       | Linters (CI)              | Formatter (CI)           | Fails the build?                       |
-|-----------------|---------------------------|--------------------------|----------------------------------------|
-| `.py`, `.pyi`   | pyright, ruff             | ruff-format              | pyright: Yes; ruff: No, report-only    |
-| `.js`, `.jsx`   | eslint                    | prettier                 | eslint: Yes; prettier: No, report-only |
-| `.css`          | stylelint                 | none                     | No, report-only                        |
-| `.json`         | jsonlint, v8r             | prettier                 | Yes                                    |
-| `.yml`, `.yaml` | yamllint, v8r, actionlint | prettier                 | Yes                                    |
-| `.md`           | markdownlint              | markdown-table-formatter | Yes                                    |
-| `.html`, `.htm` | djlint, htmlhint          | none                     | Yes                                    |
-| `.sh`           | shellcheck, bash-exec     | shfmt                    | Yes                                    |
-| `Dockerfile*`   | hadolint                  | none                     | Yes                                    |
-| Every file      | editorconfig-checker      | —                        | Yes                                    |
+| File type       | Linters (CI)              | Formatter (CI)           | Fails the build? |
+|-----------------|---------------------------|--------------------------|------------------|
+| `.py`, `.pyi`   | pyright, ruff             | ruff-format              | Yes              |
+| `.js`, `.jsx`   | eslint                    | prettier                 | Yes              |
+| `.css`          | stylelint                 | none                     | Yes              |
+| `.json`         | jsonlint, v8r             | prettier                 | Yes              |
+| `.yml`, `.yaml` | yamllint, v8r, actionlint | prettier                 | Yes              |
+| `.md`           | markdownlint              | markdown-table-formatter | Yes              |
+| `.html`, `.htm` | djlint, htmlhint          | none                     | Yes              |
+| `.sh`           | shellcheck, bash-exec     | shfmt                    | Yes              |
+| `Dockerfile*`   | hadolint                  | none                     | Yes              |
+| Every file      | editorconfig-checker      | —                        | Yes              |
 
 Workflow files are additionally scanned by zizmor, which is report-only. Repository-wide
-scanners (checkov, semgrep, osv-scanner, trivy, trufflehog, betterleaks, secretlint,
+scanners (checkov, semgrep, trivy, trufflehog, betterleaks, secretlint,
 ls-lint, git_diff) run against the project rather than a file type. The report-only
 linters are the ones listed in `.linter-rules/.mega-linter.yml`'s `DISABLE_ERRORS_LINTERS`.
 
 The Dev Container installs an equivalent of each of these, so every row above has a
 matching `Autoheal:` task. The binaries and Python tools are installed by mise from
 `mise.toml`; the npm linters come from `.devcontainer/package.json`. editorconfig-checker
-is exposed as `ec`, and reports its own version as 3.11.1 even though `mise.toml` pins the
-3.11.2 release. shfmt reads indentation from `.editorconfig`, which is why the shell
+is exposed as `ec`, and may report a slightly different version from the release mise
+installed. shfmt reads indentation from `.editorconfig`, which is why the shell
 scripts use two spaces.
 
-To change a tool version, edit `mise.toml`, then run `mise lock --platform
-linux-x64,linux-arm64` and commit `mise.lock` and the `.mise/locks/` directory with it.
+These tools float: `mise.toml` and `.devcontainer/package.json` use `latest`, and there are
+no lockfiles, so versions can differ from run to run and from what MegaLinter checks in CI.
+To get the newest versions in an existing container, run `mise upgrade` and
+`npm update --no-package-lock --ignore-scripts --prefix .devcontainer`. See
+[Pinned and floating dependencies](../maintainer/dependency-management.md#pinned-and-floating-dependencies)
+for what stays pinned and why. Rebuilds pass `--pull`, so the base image and the `mise` binary
+are refreshed too. Your editor may generate `.devcontainer/devcontainer-lock.json`, which pins
+the Dev Container features at their first-built versions; it is gitignored, so delete it to let
+the features float again.
 
 ## Data directory when developing locally
 

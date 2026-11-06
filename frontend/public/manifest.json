@@ -2,6 +2,7 @@
   "name": "Docker Auto-Heal Service",
   "short_name": "AutoHeal",
   "description": "Monitor and automatically heal Docker containers",
+  "id": "/",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -34,13 +35,13 @@
   "screenshots": [
     {
       "src": "/screenshot-wide.png",
-      "sizes": "1280x720",
+      "sizes": "2554x1180",
       "type": "image/png",
       "form_factor": "wide"
     },
     {
       "src": "/screenshot-narrow.png",
-      "sizes": "750x1334",
+      "sizes": "388x846",
       "type": "image/png",
       "form_factor": "narrow"
     }

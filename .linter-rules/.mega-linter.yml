@@ -27,18 +27,17 @@ DISABLE_LINTERS:
   - PYTHON_MYPY
   - PYTHON_PYLINT
   - REPOSITORY_GRYPE
+  - REPOSITORY_OSV_SCANNER
   - REPOSITORY_SYFT
 
 DISABLE_ERRORS_LINTERS:
   - ACTION_ZIZMOR
-  - PYTHON_RUFF
-  - REPOSITORY_OSV_SCANNER
 
 # ---------------------------------------------------------------------------
 # Global MegaLinter configuration
 # ---------------------------------------------------------------------------
 
-FILTER_REGEX_EXCLUDE: '(^|/)\.github/workflows/issue-triage\.lock\.yml$'
+FILTER_REGEX_EXCLUDE: '(^|/)\.github/workflows/(issue-triage|weekly-maintainer)\.lock\.yml$'
 FLAVOR_SUGGESTIONS: false
 LINTER_RULES_PATH: .linter-rules
 FORMATTERS_DISABLE_ERRORS: false
@@ -122,6 +121,8 @@ REPOSITORY_SEMGREP_ARGUMENTS:
   [
     "--exclude",
     ".github/workflows/issue-triage.lock.yml",
+    "--exclude",
+    ".github/workflows/weekly-maintainer.lock.yml",
     "--exclude",
     "Dockerfile*",
   ]

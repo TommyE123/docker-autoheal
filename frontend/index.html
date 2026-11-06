@@ -14,6 +14,7 @@
     <link rel="apple-touch-icon" href="/pwa-192x192.png" />
 
     <!-- iOS Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="AutoHeal" />
@@ -21,6 +22,18 @@
     <title>Docker Auto-Heal Service</title>
   </head>
   <body>
+    <!-- Apply the saved theme before the app renders to avoid a flash of the wrong one. -->
+    <script>
+      (function () {
+        var theme = "light";
+        try {
+          if (localStorage.getItem("theme") === "dark") theme = "dark";
+        } catch (e) {
+          // Storage unavailable: keep the light default.
+        }
+        document.documentElement.setAttribute("data-bs-theme", theme);
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
