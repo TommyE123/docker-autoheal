@@ -20,6 +20,27 @@ set -euo pipefail
 log=${AGENT_LOG:-/tmp/gh-aw/agent-stdio.log}
 output=${AGENT_OUTPUT:-/tmp/gh-aw/agent_output.json}
 summary=${GITHUB_STEP_SUMMARY:-/dev/null}
+
+# Replaces a create_pull_request in the agent output with a noop carrying message. Does nothing
+# when there is none, so it is safe to call twice.
+withhold() {
+  local message=$1 updated
+  [[ -f "$output" ]] || return 0
+  jq -e '.items // [] | any(.type == "create_pull_request")' "$output" >/dev/null 2>&1 || return 0
+  updated=$(mktemp)
+  jq --arg message "$message" \
+    '.items |= map(if .type == "create_pull_request" then {type: "noop", message: $message} else . end)' \
+    "$output" >"$updated"
+  mv "$updated" "$output"
+  echo "Withheld the create_pull_request output: $message" | tee -a "$summary"
+}
+
+# This check is the only guard between an incomplete audit and a pull request, and safe_outputs
+# still runs when this step fails. So any failure at all, not only unread files, withholds it.
+commands=$(mktemp)
+status=0 # set by the trap below
+trap 'status=$?; rm -f "$commands"; ((status == 0)) || withhold "INCOMPLETE AUDIT: the coverage check failed (exit $status), so its pull request was withheld." || true' EXIT
+
 if [[ -z ${DOCS_DRIFT_WEEK:-} ]]; then
   echo "::error::DOCS_DRIFT_WEEK is not set; the read plan step did not run" >&2
   exit 1
@@ -35,8 +56,6 @@ sources=("${files[@]}")
 
 # Successful shell commands, one per line. The log mixes plain text with stream-json lines;
 # lines that do not parse as JSON are skipped.
-commands=$(mktemp)
-trap 'rm -f "$commands"' EXIT
 if [[ -f "$log" ]]; then
   grep '^{' "$log" | jq -nrR '
     [inputs | fromjson? | objects] as $events
@@ -116,15 +135,7 @@ if ((${#missing[@]} == 0)); then
   exit 0
 fi
 
-if [[ -f "$output" ]] && jq -e '.items // [] | any(.type == "create_pull_request")' "$output" >/dev/null; then
-  message="INCOMPLETE AUDIT: the agent read $read_count of $total files, so its pull request was withheld."
-  updated=$(mktemp)
-  jq --arg message "$message" \
-    '.items |= map(if .type == "create_pull_request" then {type: "noop", message: $message} else . end)' \
-    "$output" >"$updated"
-  mv "$updated" "$output"
-  echo "Withheld the create_pull_request output: coverage incomplete." | tee -a "$summary"
-fi
+withhold "INCOMPLETE AUDIT: the agent read $read_count of $total files, so its pull request was withheld."
 
 echo "::error::Incomplete audit: the agent read $read_count of $total files" >&2
 exit 1

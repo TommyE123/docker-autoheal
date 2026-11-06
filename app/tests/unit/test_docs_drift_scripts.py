@@ -282,7 +282,7 @@ def _log(work: Path, *calls: tuple[str, str]) -> None:
 
 
 def _coverage(
-    checkout: Path, work: Path, week: str | None = "4"
+    checkout: Path, work: Path, week: str | None = "4", output: Path | None = None
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(  # noqa: S603
         ["bash", str(COVERAGE)],  # noqa: S607 - PATH is fixed to /usr/bin:/bin below
@@ -291,7 +291,7 @@ def _coverage(
             "PATH": "/usr/bin:/bin",
             **({"DOCS_DRIFT_WEEK": week} if week is not None else {}),
             "AGENT_LOG": str(work / "agent.log"),
-            "AGENT_OUTPUT": str(checkout / "output.json"),
+            "AGENT_OUTPUT": str(output or checkout / "output.json"),
             "GITHUB_STEP_SUMMARY": str(work / "summary.md"),
         },
         capture_output=True,
@@ -437,6 +437,7 @@ def test_missing_week_fails_the_step(checkout: Path, tmp_path: Path):
     assert result.returncode == 1
     assert "DOCS_DRIFT_WEEK is not set" in result.stderr
     assert "the read plan step did not run" in result.stderr
+    assert [item["type"] for item in _items(checkout)] == ["noop"]
 
 
 def test_non_numeric_week_fails_the_coverage_step(checkout: Path, tmp_path: Path):
@@ -444,6 +445,45 @@ def test_non_numeric_week_fails_the_coverage_step(checkout: Path, tmp_path: Path
 
     assert result.returncode == 1
     assert "Week 'abc' is not a number" in result.stderr
+    assert [item["type"] for item in _items(checkout)] == ["noop"]
+
+
+def test_a_mapped_file_missing_from_the_checkout_fails_closed(checkout: Path, planned: Path):
+    # The check cannot rebuild the list, but it is the only guard, so the pull request must
+    # still be withheld.
+    (checkout / "docs/user/notifications.md").unlink()
+    _log(planned, *ALL_READS)
+
+    result = _coverage(checkout, planned)
+
+    assert result.returncode == 1
+    assert "File docs/user/notifications.md of focus area" in result.stderr
+    items = _items(checkout)
+    assert [item["type"] for item in items] == ["noop"]
+    assert "the coverage check failed" in items[0]["message"]
+
+
+def test_a_failure_leaves_other_outputs_and_a_noop_alone(checkout: Path, planned: Path):
+    noop = {"type": "noop", "message": "NO DRIFT: nothing"}
+    (checkout / "output.json").write_text(json.dumps({"items": [noop]}), encoding="utf-8")
+
+    assert _coverage(checkout, planned, week=None).returncode == 1
+    assert _items(checkout) == [noop]
+
+
+@pytest.mark.parametrize("week", AREAS)
+def test_every_real_area_is_fully_covered_by_exactly_its_planned_commands(
+    tmp_path: Path, week: int
+):
+    assert _reads(ROOT, week, tmp_path).returncode == 0
+    _log(tmp_path, *[(command, "success") for command in _commands(_plan(tmp_path))])
+    _write(tmp_path, "output.json", json.dumps({"items": [PR]}))
+
+    result = _coverage(ROOT, tmp_path, week=str(week), output=tmp_path / "output.json")
+
+    assert result.returncode == 0, result.stderr
+    name, files = _manifest(tmp_path)
+    assert f"Focus area: {name}. Read {len(files)} of {len(files)} files" in _summary(tmp_path)
 
 
 def test_the_file_list_comes_from_the_checkout_not_from_anything_written_to_the_job(

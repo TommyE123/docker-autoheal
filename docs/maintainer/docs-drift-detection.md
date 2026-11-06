@@ -12,8 +12,8 @@ does documentation drift only: other maintenance is the Weekly Maintainer's job.
 - It runs on `workflow_dispatch` only. Call it weekly from cron-job.org, as for the Upgrade
   gh-aw and Weekly Maintainer workflows. It uses Gemini CLI 0.66.0 with `gemini-3.6-flash`
   through the existing `GEMINI_API_KEY` secret. The free tier allows 20 requests a day per
-  model, and a run takes four requests without drift and up to eight with it, so don't run it
-  on the same day as another workflow that uses `gemini-3.6-flash` on the same key, such as the
+  model, and a run takes five requests without drift, eight with it and ten if the pull request
+  cannot be created, so don't run it on the same day as another workflow that uses `gemini-3.6-flash` on the same key, such as the
   Weekly Maintainer once it moves to that model.
 - **Focus area.** The last digit of the ISO week number, modulo 5, picks one of five areas.
   Each pairs documents with the source that implements them, and every run also reads
@@ -44,7 +44,8 @@ does documentation drift only: other maintenance is the Weekly Maintainer's job.
 - **Editing.** The agent edits documents with `replace`, creates a branch with
   `git checkout -b` and commits only the files it edited with `git commit -m ... -- FILES`,
   then calls the `create_pull_request` safe output. gh-aw builds the pull request from that
-  commit. If it fails twice, the run reports an incomplete audit.
+  commit (and rewrites its message to "Apply filtered changes", because it drops `.github`
+  from the patch). If creation fails twice, the run reports an incomplete audit.
 - **Evidence.** A correction needs the documentation statement, the contradicting code,
   configuration or test with file and line, and no disagreement between code and tests. Those
   four items go in the pull request for each correction. Uncertain or conflicting cases are
@@ -78,10 +79,10 @@ gh workflow run docs-drift.lock.yml --ref main
 ```
 
 The area follows the week the run starts in. To see which files a week would read, run the
-read plan script locally and read the file it appends to:
+read plan script locally; the temporary file it appends to lists the files:
 
 ```bash
-PROMPT_FILE=$(mktemp) WEEK=<number> bash .github/scripts/docs-drift-reads.sh
+plan=$(mktemp); PROMPT_FILE=$plan WEEK=<number> bash .github/scripts/docs-drift-reads.sh; cat "$plan"
 ```
 
 Review any draft pull request as normal: check each cited piece of evidence, and that only

@@ -3,8 +3,9 @@ name: Documentation Drift Detection
 description: Weekly audit of one focus area of the documentation against the implementation, using Gemini. Opens one draft documentation-only pull request for evidence-backed drift, or reports no drift or an incomplete audit. It never changes source code, tests, workflows or dependencies.
 # No schedule here: run manually, later called weekly through workflow_dispatch by
 # cron-job.org, as gh-aw-upgrade.yml is. The free tier allows 20 requests a day per model
-# on this key (see the engine comment below) and a run here takes up to eight, so do not
-# run it on the same day as another workflow that uses gemini-3.6-flash on the same key.
+# on this key (see the engine comment below) and a run here takes five requests without drift,
+# eight with it and ten if the pull request cannot be created, so do not run it on the same
+# day as another workflow that uses gemini-3.6-flash on the same key.
 # Time of day: shortly after the daily quota resets at midnight Pacific (00:20
 # America/Los_Angeles), ideally at a weekend; test runs of a similar workflow in October 2026
 # met far fewer 503 "high demand" refusals then than in the US working day.
@@ -25,10 +26,10 @@ engine:
   # tokens a minute and 20 requests a day, failed requests included.
   version: "0.66.0"
   model: gemini-3.6-flash
-# Top-level AWF invocation cap on model requests. The prompt plans about four requests
-# without drift and seven with it (several tool calls go out in one request), and one more if
-# the pull request cannot be created; 14 leaves room for retries while keeping one run well
-# inside the daily quota.
+# Top-level AWF invocation cap on model requests. The prompt plans five requests without drift,
+# eight with it and ten if the pull request cannot be created, counting the closing message
+# (several tool calls go out in one request); 14 leaves room for retries while keeping one
+# run well inside the daily quota.
 max-turns: 14
 features:
   # actionlint (as pinned by this repo's MegaLinter) doesn't yet recognize
@@ -139,9 +140,10 @@ the calls of a step side by side in the same turn instead.
 Any single tool result longer than 40,000 characters is cut: you see only its start and end,
 and the middle is lost. Keep each command's output well under that, as the plan below does.
 
-## Plan: about four model turns without drift, seven with it
+## Plan: about five model requests without drift, eight with it
 
-You have at most 14 model turns. Put every independent tool call of a step into the **same
+You have at most 14 model turns (each turn is one request, and your closing message is one
+more). Put every independent tool call of a step into the **same
 turn**: several tool calls in one turn cost one model request. Follow this plan and do not
 spend turns on anything else.
 
@@ -311,8 +313,8 @@ You report through these only:
     audit**. Then "Needs human review" and "Not verified".
   - `## Incomplete audit`: exactly what could not be retrieved or read. This is never a clean
     result.
-- **`safeoutputs create_pull_request`**, only for drift, as your single final call, after the
-  commit. Pass one JSON object inline, in single quotes, with the title and the body:
+- **`safeoutputs create_pull_request`**, only for drift, as your final call (unless it fails
+  twice, see the plan), after the commit. Pass one JSON object inline, in single quotes, with the title and the body:
 
   ```bash
   safeoutputs create_pull_request '{"title":"SHORT TITLE","body":"Audited revision: ...\n\n### ..."}'
@@ -335,4 +337,5 @@ You report through these only:
   `safeoutputs noop '{"message":"NO DRIFT: <focus area>"}'` or
   `'{"message":"INCOMPLETE AUDIT: <what could not be retrieved>"}'`, under the same character
   rules. Never call `report_incomplete`, `report_missing_tool` or `report_missing_data`. Call
-  exactly one of `create_pull_request` or `noop`, once.
+  exactly one of `create_pull_request` or `noop`, once; the only exception is the plan's
+  fallback after two failed `create_pull_request` calls, which ends in a `noop`.
