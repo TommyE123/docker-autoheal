@@ -8,7 +8,6 @@
 uv = "latest"
 "aqua:rhysd/actionlint" = "latest"
 "aqua:hadolint/hadolint" = "latest"
-"aqua:google/osv-scanner" = "latest"
 "aqua:aquasecurity/trivy" = "latest"
 "aqua:trufflesecurity/trufflehog" = "latest"
 "aqua:betterleaks/betterleaks" = "latest"
