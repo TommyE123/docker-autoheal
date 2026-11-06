@@ -22,6 +22,18 @@
     <title>Docker Auto-Heal Service</title>
   </head>
   <body>
+    <!-- Apply the saved theme before the app renders to avoid a flash of the wrong one. -->
+    <script>
+      (function () {
+        var theme = "light";
+        try {
+          if (localStorage.getItem("theme") === "dark") theme = "dark";
+        } catch (e) {
+          // Storage unavailable: keep the light default.
+        }
+        document.documentElement.setAttribute("data-bs-theme", theme);
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
