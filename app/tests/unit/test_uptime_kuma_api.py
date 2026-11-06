@@ -158,8 +158,13 @@ class TestUptimeKumaIntegration:
         assert exc_info.value.status_code == 400
         assert config_manager.get_config().uptime_kuma.enabled is False
 
-    async def test_enable_with_invalid_auto_restart_returns_422_before_contacting_kuma(
-        self, wired_api, monkeypatch
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [("auto_restart_on_down", "abc"), ("username", None), ("username", 5)],
+        ids=["auto-restart-not-bool", "username-null", "username-not-string"],
+    )
+    async def test_enable_with_invalid_field_returns_422_before_contacting_kuma(
+        self, wired_api, monkeypatch, field, value
     ):
         def build_client(*_args):
             raise AssertionError("Uptime-Kuma must not be contacted for an invalid body")
@@ -170,16 +175,11 @@ class TestUptimeKumaIntegration:
         with pytest.raises(HTTPException) as exc_info:
             await enable_uptime_kuma_integration(
                 get_docker_client(),
-                {
-                    "server_url": "http://kuma.example",
-                    "api_token": "token",
-                    "auto_restart_on_down": "abc",
-                },
+                {"server_url": "http://kuma.example", "api_token": "token", field: value},
             )
 
         assert exc_info.value.status_code == 422
-        assert "auto_restart_on_down" in exc_info.value.detail
-        assert "abc" not in exc_info.value.detail
+        assert field in exc_info.value.detail
         assert config_manager.get_config().uptime_kuma.model_dump() == before
 
     async def test_enable_strips_surrounding_whitespace_before_saving(self, wired_api, monkeypatch):

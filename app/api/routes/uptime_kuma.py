@@ -77,15 +77,20 @@ async def enable_uptime_kuma_integration(docker_client: DockerClientDep, integra
         raise HTTPException(status_code=400, detail="server_url and api_token are required")
     server_url = server_url.strip()
     api_token = api_token.strip()
-    # Validate before contacting Uptime-Kuma: mutate() does not validate, so a bad value would
-    # be saved and then reset the whole section (URL and token included) on the next load.
+    # Validate every supplied field before contacting Uptime-Kuma: mutate() does not validate,
+    # so a bad value would be saved and then reset the whole section (URL and token included)
+    # on the next load.
     with invalid_input_as_422():
-        auto_restart_on_down = UptimeKumaConfig(
-            auto_restart_on_down=integration_config.get("auto_restart_on_down", True)
-        ).auto_restart_on_down
+        validated = UptimeKumaConfig(
+            server_url=server_url,
+            api_token=api_token,
+            username=_stripped(integration_config.get("username", "")),
+            auto_restart_on_down=integration_config.get("auto_restart_on_down", True),
+        )
+    username = validated.username
+    auto_restart_on_down = validated.auto_restart_on_down
 
     monitoring_engine = state.monitoring_engine
-    username = _stripped(integration_config.get("username", ""))
 
     # Fetch monitors
     client = UptimeKumaClient(
