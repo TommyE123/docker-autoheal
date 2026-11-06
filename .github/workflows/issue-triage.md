@@ -24,10 +24,13 @@ on:
 # to issues (not pull requests) and to comments by the issue's reporter: the
 # workflow's own needs-information comment (a bot) would otherwise retrigger it,
 # and other people's comments would spend Gemini quota without new detail.
-# On workflow_dispatch github.event.issue is unset, so both checks pass and the
+# Events on a closed issue are skipped too. A comment that closes the issue is
+# posted just before the close, so it can still show the issue as open.
+# On workflow_dispatch github.event.issue is unset, so these checks pass and the
 # run proceeds; the dispatcher chooses the issue.
 if: >-
   ${{ github.event.issue.user.login != 'renovate[bot]' &&
+  github.event.issue.state != 'closed' &&
   (github.event_name != 'issue_comment' ||
   (!github.event.issue.pull_request &&
   github.event.comment.user.type != 'Bot' &&
