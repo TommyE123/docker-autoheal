@@ -125,12 +125,19 @@ function fnmatch(name, pattern) {
     if (ch === "*") regex += ".*";
     else if (ch === "?") regex += ".";
     else if (ch === "[") {
-      const end = pattern.indexOf("]", i + 1);
+      // As in Python's fnmatch.translate: a "]" first in the set is literal,
+      // "!" negates, and any other character (including "^") is literal.
+      let j = i + 1;
+      if (pattern[j] === "!") j++;
+      if (pattern[j] === "]") j++;
+      const end = pattern.indexOf("]", j);
       if (end === -1) regex += "\\[";
       else {
         let set = pattern.slice(i + 1, end);
-        if (set.startsWith("!")) set = "^" + set.slice(1);
-        regex += `[${set.replace(/\\/g, "\\\\")}]`;
+        const negate = set.startsWith("!");
+        if (negate) set = set.slice(1);
+        set = set.replace(/[\\\]^]/g, "\\$&");
+        regex += `[${negate ? "^" : ""}${set}]`;
         i = end;
       }
     } else regex += ch.replace(/[.+^${}()|\\]/g, "\\$&");
@@ -564,12 +571,15 @@ export class DemoEngine {
       const check = [info.stable_id, info.name, info.full_id]
         .map((key) => this.customHealthChecks[key])
         .find(Boolean);
-      // Custom checks can't really probe anything here; they pass while the
-      // simulated app is running and healthy, like a real probe would.
-      if (
-        check &&
-        (status !== "running" || info.health?.status === "unhealthy")
-      ) {
+      // Custom checks can't really probe anything here. A "docker" check
+      // reads Docker's health (passing when there is none), as in health.py;
+      // the others pass while the simulated app is running and healthy, like
+      // a real probe would.
+      const checkPasses =
+        check?.check_type === "docker"
+          ? !info.health || info.health.status === "healthy"
+          : status === "running" && info.health?.status !== "unhealthy";
+      if (check && !checkPasses) {
         return [true, `Custom health check failed (${check.check_type})`];
       }
       if (info.health?.status === "unhealthy") {

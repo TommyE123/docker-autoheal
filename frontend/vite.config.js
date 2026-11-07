@@ -18,6 +18,15 @@ export default defineConfig(({ mode }) => ({
   base: mode === "demo" ? DEMO_BASE : "/",
   plugins: [
     react(),
+    // The demo has no PWA: drop the manifest link, whose root-relative URLs
+    // would point outside the Pages sub-path.
+    {
+      name: "demo-no-manifest",
+      transformIndexHtml: (html) =>
+        mode === "demo"
+          ? html.replace(/\s*<link rel="manifest"[^>]*>/, "")
+          : html,
+    },
     VitePWA({
       disable: mode === "demo",
       // The client registers the service worker itself (src/main.jsx), so the

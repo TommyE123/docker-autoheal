@@ -251,6 +251,21 @@ describe("health check failures", () => {
     expect(eventsFor("api")).toEqual([["restart", 5]]);
   });
 
+  it("evaluates a custom docker check from Docker's health, like health.py", () => {
+    engine.config.restart.mode = "health";
+    engine.customHealthChecks["shop-worker-1"] = { check_type: "docker" };
+    // No Docker HEALTHCHECK: passes even though the container has exited.
+    expect(engine.evaluateHealth(infoOf("shop-worker-1"))).toEqual([false, ""]);
+    engine.customHealthChecks.shop_web = { check_type: "docker" };
+    engine._dockerRestart(byName("shop-web-1"));
+    expect(engine.evaluateHealth(infoOf("shop-web-1"))).toEqual([
+      true,
+      "Custom health check failed (docker)",
+    ]);
+    now += HEALTH_STARTING_MS;
+    expect(engine.evaluateHealth(infoOf("shop-web-1"))).toEqual([false, ""]);
+  });
+
   it("fails a custom health check while the app is down", () => {
     engine.customHealthChecks.shop_db = { check_type: "http" };
     expect(engine.evaluateHealth(infoOf("shop-db-1"))).toEqual([false, ""]);
@@ -440,6 +455,14 @@ describe("selection.py port", () => {
     expect(shouldMonitor(config, info("axb"), "x")).toBe(false);
     expect(shouldMonitor(config, info("a.b"), "x")).toBe(true);
     expect(shouldMonitor(config, info("q["), "x")).toBe(true);
+    // Python's fnmatch: "]" first in a set and "^" inside one are literal.
+    config.filters.whitelist_names = ["a[]b]", "c[^d]", "e[!]]"];
+    expect(shouldMonitor(config, info("a]"), "x")).toBe(true);
+    expect(shouldMonitor(config, info("ab"), "x")).toBe(true);
+    expect(shouldMonitor(config, info("c^"), "x")).toBe(true);
+    expect(shouldMonitor(config, info("cx"), "x")).toBe(false);
+    expect(shouldMonitor(config, info("ex"), "x")).toBe(true);
+    expect(shouldMonitor(config, info("e]"), "x")).toBe(false);
     config.filters.whitelist_names = [];
     config.filters.whitelist_labels = [{ tier: "web" }];
     expect(

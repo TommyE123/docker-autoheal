@@ -698,12 +698,16 @@ describe("edge cases", () => {
     );
   });
 
-  it("ignores malformed config sections like AutoHealConfig would reject", async () => {
+  it("rejects malformed config sections like AutoHealConfig", async () => {
     const config = (await api.get("/config")).data;
     config.uptime_kuma_mappings = "x";
     config.ui = "x";
-    await api.put("/config", config);
-    expect(engine.config.uptime_kuma_mappings).toEqual([]);
+    const e = await error(api.put("/config", config));
+    expect(e.response.status).toBe(422);
+    expect(e.response.data.detail.map((d) => d.loc)).toEqual([
+      ["body", "ui"],
+      ["body", "uptime_kuma_mappings"],
+    ]);
     expect(engine.config.ui.listen_port).toBe(3131);
   });
 

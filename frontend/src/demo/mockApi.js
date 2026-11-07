@@ -158,8 +158,21 @@ function validateFullConfig(data, loc = ["body"]) {
       );
     } else if (section === "uptime_kuma_mappings") {
       if (Array.isArray(data[section])) config[section] = clone(data[section]);
+      else {
+        errors.push({
+          type: "list_type",
+          loc: [...loc, section],
+          msg: "Input should be a valid list",
+        });
+      }
     } else if (isObject(data[section])) {
       Object.assign(config[section], clone(data[section]));
+    } else {
+      errors.push({
+        type: "model_type",
+        loc: [...loc, section],
+        msg: "Input should be a valid dictionary",
+      });
     }
   }
   raiseIfInvalid(errors);
