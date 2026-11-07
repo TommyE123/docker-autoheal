@@ -118,7 +118,9 @@ class TestDevBootstrapFailsClosed:
 def _renovate_group_minimum(group_name):
     """Return minimumGroupSize of the Renovate rule that sets ``group_name``."""
     rules = json.loads((REPO_ROOT / "renovate.json").read_text(encoding="utf-8"))["packageRules"]
-    return next(rule["minimumGroupSize"] for rule in rules if rule.get("groupName") == group_name)
+    sizes = [rule["minimumGroupSize"] for rule in rules if rule.get("groupName") == group_name]
+    assert sizes, f"No Renovate rule with groupName {group_name!r} found in renovate.json"
+    return sizes[0]
 
 
 def test_python_runtime_versions_are_aligned():
