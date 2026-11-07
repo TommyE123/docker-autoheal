@@ -1,11 +1,11 @@
 # Documentation Index
 
-New to Docker Auto-Heal? Start with the [root README](../README.md) — it has a quick
+New to Docker Autoheal? Start with the [root README](../README.md) — it has a quick
 start and links into everything below.
 
 ## Users
 
-How to install, configure, and use Docker Auto-Heal.
+How to install, configure, and use Docker Autoheal.
 
 - [Installation](user/installation.md)
 - [Configuration](user/configuration.md)

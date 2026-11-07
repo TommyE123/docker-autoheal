@@ -6,7 +6,7 @@ specifically a count of restarts performed by Docker's own restart policy.
 Use a container with `--restart on-failure` that exits immediately, and let
 Docker restart it, to produce a real, deterministic increment.
 
-Requires a real Docker daemon; does not require a running Auto-Heal service.
+Requires a real Docker daemon; does not require a running Docker Autoheal instance.
 """
 
 import time

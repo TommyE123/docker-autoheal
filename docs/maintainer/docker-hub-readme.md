@@ -1,11 +1,11 @@
-# Docker Auto-Heal Service
+# Docker Autoheal
 
 [![Docker Pulls](https://img.shields.io/docker/pulls/tommye123/docker-autoheal)](https://hub.docker.com/r/tommye123/docker-autoheal)
 [![Docker Image Size](https://img.shields.io/docker/image-size/tommye123/docker-autoheal/latest)](https://hub.docker.com/r/tommye123/docker-autoheal)
 [![GitHub](https://img.shields.io/badge/GitHub-repository-181717?logo=github)](https://github.com/TommyE123/docker-autoheal)
 
 A container monitoring and auto-healing service with a web dashboard, REST API, and
-Prometheus metrics. Docker Auto-Heal watches your containers and restarts the ones that
+Prometheus metrics. Docker Autoheal watches your containers and restarts the ones that
 fail or go unhealthy, with cooldowns, exponential backoff, and automatic quarantine for
 containers that keep failing.
 
@@ -97,7 +97,7 @@ docker compose up -d
 ```
 
 Any container labelled `autoheal=true` is picked up automatically — both containers
-already running when Auto-Heal starts, and new ones as they start.
+already running when Docker Autoheal starts, and new ones as they start.
 
 ## Configuration
 
@@ -157,7 +157,7 @@ Recommended for production:
 
 - Mount the socket read-only (`:ro`, as shown above)
 - Put the web UI behind a reverse proxy with authentication and TLS if exposing it beyond
-  a trusted network — Auto-Heal does not implement its own authentication
+  a trusted network — Docker Autoheal does not implement its own authentication
 - Restrict access to the Prometheus metrics port similarly
 - Keep regular configuration backups (export from the UI)
 

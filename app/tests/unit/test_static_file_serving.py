@@ -80,7 +80,7 @@ async def test_serve_static_file_serves_sw_js(static_dir):
 
 @pytest.mark.asyncio
 async def test_serve_static_file_serves_manifest_json(static_dir):
-    content = b'{"name": "Docker Auto-Heal"}'
+    content = b'{"name": "Docker Autoheal"}'
     (static_dir / "manifest.json").write_bytes(content)
 
     response = await serve_static_file("manifest.json", "application/manifest+json")
@@ -305,7 +305,7 @@ def test_serve_react_app_fallback_page_is_exact(tmp_path, monkeypatch):
     response = api_module.serve_react_app()
 
     assert bytes(response.body).decode() == (
-        "<h1>Docker Auto-Heal Service</h1>"
+        "<h1>Docker Autoheal</h1>"
         "<p>React UI not found. Please build the frontend first:</p>"
         "<pre>cd frontend && npm install && npm run build</pre>"
         "<p>API documentation is available at <a href='/api/swagger'>/api/swagger</a></p>"

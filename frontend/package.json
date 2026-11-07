@@ -1,6 +1,6 @@
 {
   "name": "docker-autoheal-ui",
-  "description": "React frontend for Docker Auto-Heal Service",
+  "description": "React frontend for Docker Autoheal",
   "private": true,
   "type": "module",
   "scripts": {

@@ -14,7 +14,7 @@ function Navigation({ systemStatus }) {
       <Container fluid>
         <Navbar.Brand>
           <i className="bi bi-shield-check me-2"></i>
-          Docker Auto-Heal Service
+          Docker Autoheal
         </Navbar.Brand>
 
         <Navbar.Toggle aria-controls="basic-navbar-nav" />

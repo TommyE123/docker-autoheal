@@ -1,5 +1,5 @@
 """
-Notification services for Docker Auto-Heal
+Notification services for Docker Autoheal
 """
 
 from app.notifications.notification_manager import NotificationManager

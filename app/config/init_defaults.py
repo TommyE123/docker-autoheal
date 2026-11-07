@@ -222,7 +222,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-    parser = argparse.ArgumentParser(description="Initialize or reset Docker Auto-Heal data files")
+    parser = argparse.ArgumentParser(description="Initialize or reset Docker Autoheal data files")
     parser.add_argument(
         "--reset",
         action="store_true",

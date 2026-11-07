@@ -1,5 +1,5 @@
 """
-Configuration management for Docker Auto-Heal Service
+Configuration management for Docker Autoheal
 Handles in-memory configuration state with JSON export/import support
 """
 

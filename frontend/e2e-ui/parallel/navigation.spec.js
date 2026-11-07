@@ -27,7 +27,7 @@ test(
 
     // "/" redirects to /containers client-side.
     await expect(page).toHaveURL(/\/containers$/);
-    await expect(page.getByText("Docker Auto-Heal Service")).toBeVisible();
+    await expect(page.getByText("Docker Autoheal")).toBeVisible();
     // The Dashboard only renders once /api/status has succeeded.
     await expect(
       page.getByRole("heading", { name: "Dashboard" }),
@@ -95,5 +95,5 @@ test("a saved theme is applied before the app renders", async ({ page }) => {
   await page.goto("/containers");
 
   await expect(page.locator("html")).toHaveAttribute("data-bs-theme", "dark");
-  await expect(page.getByText("Docker Auto-Heal Service")).toHaveCount(0);
+  await expect(page.getByText("Docker Autoheal")).toHaveCount(0);
 });

@@ -1,6 +1,6 @@
 # Configuration
 
-Docker Auto-Heal has **no environment-variable configuration**. All settings live in
+Docker Autoheal has **no environment-variable configuration**. All settings live in
 `/data/config.json` and can be changed through the web UI, the REST API, or by editing
 the file directly (the service reloads it on restart). Sensible defaults are written to
 `/data/config.json` the first time the service starts.
@@ -120,7 +120,7 @@ precedence.
 
 ### `uptime_kuma` (optional integration)
 
-Docker Auto-Heal can optionally treat an [Uptime Kuma](https://github.com/louislam/uptime-kuma)
+Docker Autoheal can optionally treat an [Uptime Kuma](https://github.com/louislam/uptime-kuma)
 monitor's status as an additional health signal. Configure it from **Configuration →
 Uptime Kuma** in the UI, or via `/api/uptime-kuma/*`:
 
@@ -144,7 +144,7 @@ it manually instead. The same applies to a scaled Compose service, whose replica
 one stable identifier: if they match different monitors, none of them is mapped.
 
 A mapping identifies its monitor by name only, so give every mapped monitor a unique name
-in Uptime Kuma. If several monitors share the mapped name, Docker Auto-Heal cannot tell
+in Uptime Kuma. If several monitors share the mapped name, Docker Autoheal cannot tell
 which one belongs to the container: until the name is unique again it ignores their status,
 so Uptime Kuma cannot trigger a restart for that container, and logs a warning.
 
