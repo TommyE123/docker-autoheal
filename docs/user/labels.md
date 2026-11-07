@@ -2,7 +2,7 @@
 
 ## Enabling auto-healing
 
-Add the `autoheal` label to any container you want Docker Auto-Heal to monitor:
+Add the `autoheal` label to any container you want Docker Autoheal to monitor:
 
 ```yaml
 services:

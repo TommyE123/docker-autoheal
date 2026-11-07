@@ -5,7 +5,7 @@
 [![GitHub](https://img.shields.io/badge/GitHub-repository-181717?logo=github)](https://github.com/TommyE123/docker-autoheal)
 
 A container monitoring and auto-healing service with a web dashboard, REST API, and
-Prometheus metrics. Docker Auto-Heal watches your containers and restarts the ones that
+Prometheus metrics. Docker Autoheal watches your containers and restarts the ones that
 fail or go unhealthy, with cooldowns, exponential backoff, and automatic quarantine for
 containers that keep failing.
 

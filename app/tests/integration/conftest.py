@@ -1,5 +1,5 @@
 """
-Shared fixtures for the Docker Auto-Heal integration suite.
+Shared fixtures for the Docker Autoheal integration suite.
 
 Unlike ``app/tests/unit``, these tests exercise the real Docker SDK and/or a
 running Auto-Heal service (the development stack on ``http://localhost:3132`` by default). They are never

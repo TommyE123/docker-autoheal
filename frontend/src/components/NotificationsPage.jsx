@@ -381,7 +381,7 @@ function NotificationsPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, username: e.target.value })
                 }
-                placeholder="Docker Auto-Heal"
+                placeholder="Docker Autoheal"
               />
             </Form.Group>
           </>

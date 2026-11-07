@@ -329,7 +329,7 @@ async def test_send_discord_builds_embed_payload(
     assert embed["title"] == "Container Quarantined"
     assert "**" not in embed["description"]
     assert embed["color"] == 0xF39C12  # HIGH priority -> orange
-    assert call["json"]["username"] == "Docker Auto-Heal"
+    assert call["json"]["username"] == "Docker Autoheal"
 
 
 @pytest.mark.asyncio

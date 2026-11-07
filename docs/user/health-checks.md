@@ -1,6 +1,6 @@
 # Health Checks
 
-Docker Auto-Heal decides whether a container needs healing based on `restart.mode`
+Docker Autoheal decides whether a container needs healing based on `restart.mode`
 (see [Configuration](configuration.md)):
 
 - **`on-failure`** — restart when the container exits with a non-zero code (and hasn't

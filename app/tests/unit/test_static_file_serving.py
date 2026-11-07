@@ -80,7 +80,7 @@ async def test_serve_static_file_serves_sw_js(static_dir):
 
 @pytest.mark.asyncio
 async def test_serve_static_file_serves_manifest_json(static_dir):
-    content = b'{"name": "Docker Auto-Heal"}'
+    content = b'{"name": "Docker Autoheal"}'
     (static_dir / "manifest.json").write_bytes(content)
 
     response = await serve_static_file("manifest.json", "application/manifest+json")

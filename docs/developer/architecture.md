@@ -2,7 +2,7 @@
 
 ## Overview
 
-Docker Auto-Heal is a single Python process (FastAPI + asyncio) that talks to the Docker
+Docker Autoheal is a single Python process (FastAPI + asyncio) that talks to the Docker
 Engine API, plus a React single-page app served by that same process. There's no
 database — all state is JSON files under `/data`.
 
