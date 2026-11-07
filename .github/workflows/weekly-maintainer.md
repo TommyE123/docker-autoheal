@@ -360,8 +360,8 @@ maintenance. Avoid anything whose benefit is subjective.
 
 Write the summary once, with `write_file`.
 Start it with one of these headings so the run page shows the outcome, then the
-baseline (timestamp, checkout SHA and `main` SHA), a line "Focus area: <the
-area>" and a line
+baseline (timestamp, checkout SHA and `main` SHA), a line "Focus area: AREA"
+(AREA is this week's focus area) and a line
 "Source coverage: X of Y app source files read", where Y is the number of files
 in the read plan:
 
