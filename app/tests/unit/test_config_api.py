@@ -23,7 +23,12 @@ from app.api.routes.config import (
 )
 from app.api.routes.config import import_config as api_import_config
 from app.api.routes.config import update_config as api_update_config
-from app.config.config_manager import MonitorConfig, RestartConfig, config_manager
+from app.config.config_manager import (
+    HealthCheckConfig,
+    MonitorConfig,
+    RestartConfig,
+    config_manager,
+)
 
 
 @pytest.mark.asyncio
@@ -250,7 +255,11 @@ class TestConfigExportImport:
         ids=["root-array", "root-string", "custom-checks-array", "custom-check-not-object"],
     )
     async def test_import_config_with_wrong_structure_returns_422(self, payload, detail):
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080)
+        )
         before = config_manager.get_config()
+        checks_before = config_manager.get_all_custom_health_checks()
         upload = UploadFile(file=BytesIO(json.dumps(payload).encode()), filename="config.json")
 
         with pytest.raises(HTTPException) as exc_info:
@@ -259,8 +268,13 @@ class TestConfigExportImport:
         assert exc_info.value.status_code == 422
         assert exc_info.value.detail == detail
         assert config_manager.get_config() == before
+        assert config_manager.get_all_custom_health_checks() == checks_before
 
     async def test_import_config_422_does_not_echo_a_submitted_check_type(self):
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080)
+        )
+        checks_before = config_manager.get_all_custom_health_checks()
         payload = {
             "custom_health_checks": {
                 "web": {"container_id": "web", "check_type": "SECRET-VALUE-123"}
@@ -274,6 +288,7 @@ class TestConfigExportImport:
         assert exc_info.value.status_code == 422
         assert "Unknown check_type" in exc_info.value.detail
         assert "SECRET-VALUE-123" not in exc_info.value.detail
+        assert config_manager.get_all_custom_health_checks() == checks_before
 
     @pytest.mark.parametrize(
         ("content", "detail"),

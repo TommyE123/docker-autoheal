@@ -477,6 +477,18 @@ class TestUptimeKumaIntegration:
         assert deleted["success"] is True
         assert (await get_uptime_kuma_mappings())["mappings"] == []
 
+    async def test_delete_mapping_log_line_cannot_be_forged(self, caplog):
+        with caplog.at_level("INFO", logger="app.api.routes.uptime_kuma"):
+            await delete_uptime_kuma_mapping("web\nFORGED log line")
+
+        message = next(
+            r.getMessage()
+            for r in caplog.records
+            if "Deleted Uptime-Kuma mapping" in r.getMessage()
+        )
+        assert "\n" not in message
+        assert "web\\nFORGED log line" in message
+
     async def test_create_mapping_log_line_cannot_be_forged(self, wired_api, caplog):
         docker_client, _engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)

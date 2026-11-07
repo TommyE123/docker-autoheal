@@ -247,7 +247,7 @@ async def delete_uptime_kuma_mapping(container_id: str):
     ]
     config_manager.update_config(config)
 
-    logger.info("Deleted Uptime-Kuma mapping for stable_id: %s", container_id)
+    logger.info("Deleted Uptime-Kuma mapping for stable_id: %s", escape_for_log(container_id))
     return {"success": True}
 
 

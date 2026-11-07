@@ -9,13 +9,16 @@ as ``httpx``/``TestClient`` as a test dependency.
 """
 
 import asyncio
+import json
 from typing import TYPE_CHECKING, Any
 
 import pytest
 from fastapi import HTTPException
 
+from app.api.errors import INTERNAL_ERROR_DETAIL
 from app.api.routes import ui as api_module
 from app.api.routes.ui import get_static_file_path, serve_static_file
+from app.tests.unit.test_api_routing import _request
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -130,6 +133,27 @@ def test_get_static_file_path_resolution_error_raises_400(static_dir, monkeypatc
         get_static_file_path("manifest.json")
 
     assert exc_info.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_static_file_error_returns_generic_500_and_logs_traceback(
+    static_dir, monkeypatch, caplog
+):
+    def explode(_filename):
+        raise OSError("filesystem went away")
+
+    monkeypatch.setattr(api_module, "get_static_file_path", explode)
+
+    with caplog.at_level("ERROR", logger="app.api.errors"):
+        status, body, _headers = await _request("GET", "/sw.js", raise_app_exceptions=False)
+
+    assert status == 500
+    assert json.loads(body) == {"detail": INTERNAL_ERROR_DETAIL}
+    assert b"filesystem went away" not in body
+    record = next(r for r in caplog.records if r.name == "app.api.errors")
+    assert record.getMessage() == "Unhandled error on GET /sw.js"
+    assert record.exc_info is not None
+    assert record.exc_info[0] is OSError
 
 
 @pytest.mark.asyncio
