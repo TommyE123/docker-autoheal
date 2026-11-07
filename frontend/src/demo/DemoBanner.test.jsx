@@ -101,10 +101,23 @@ describe("DemoBanner", () => {
     expect(
       within(row("shop-web-1")).getByText("quarantined"),
     ).toBeInTheDocument();
+  });
 
+  it("resets by reloading the page, so every page refetches", async () => {
+    const user = userEvent.setup();
+    const onReset = vi.fn();
+    render(<DemoBanner engine={engine} version="v" onReset={onReset} />);
     await user.click(screen.getByRole("button", { name: /Reset demo/ }));
-    expect(within(row("shop-web-1")).getByText("running")).toBeInTheDocument();
-    expect(within(row("shop-db-1")).getByText("running")).toBeInTheDocument();
+    expect(onReset).toHaveBeenCalledTimes(1);
+  });
+
+  it("reloads the page by default", async () => {
+    const user = userEvent.setup();
+    const reload = vi.fn();
+    vi.stubGlobal("location", { ...window.location, reload });
+    render(<DemoBanner engine={engine} version="v" />);
+    await user.click(screen.getByRole("button", { name: /Reset demo/ }));
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 
   it("hides and shows the controls", async () => {

@@ -34,7 +34,11 @@ function faultLabel(fault) {
  * Demo-only banner: says the environment is simulated, which version it shows,
  * and lets the visitor break or fix the simulated containers.
  */
-export default function DemoBanner({ engine, version }) {
+// The demo's state lives only in memory, so a reload is a reset to the seed
+// state, and every page (Events, Notifications, Config load once) refetches.
+const reloadPage = () => window.location.reload();
+
+export default function DemoBanner({ engine, version, onReset = reloadPage }) {
   useEngineVersion(engine);
   // Open on wide screens; on phones the controls would push the app off-screen.
   const [open, setOpen] = useState(
@@ -64,11 +68,7 @@ export default function DemoBanner({ engine, version }) {
           >
             {open ? "Hide controls" : "Try it"}
           </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            onClick={() => engine.reset()}
-          >
+          <Button size="sm" variant="outline-secondary" onClick={onReset}>
             <i
               className="bi bi-arrow-counterclockwise me-1"
               aria-hidden="true"
