@@ -384,7 +384,13 @@ async def run_api_server() -> None:
     )
 
     server = uvicorn.Server(uvicorn_config)
-    await server.serve()
+    try:
+        await server.serve()
+    except SystemExit as e:
+        # uvicorn calls sys.exit() on bind or startup failure. Surface it as an ordinary
+        # error so the supervising TaskGroup cancels the service and logs it once.
+        msg = f"API server exited during startup (code {e.code})"
+        raise RuntimeError(msg) from e
 
 
 async def main() -> int:

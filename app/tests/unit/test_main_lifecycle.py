@@ -1206,3 +1206,15 @@ class TestMain:
         assert exit_code == 1
         assert service_cancelled.is_set()
         fake_service.stop.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_run_api_server_converts_uvicorn_system_exit_to_an_error(self):
+        """uvicorn exits via sys.exit() on bind failure; that must not bypass the TaskGroup"""
+        fake_server = MagicMock()
+        fake_server.serve = AsyncMock(side_effect=SystemExit(3))
+
+        with (
+            patch("app.main.uvicorn.Server", return_value=fake_server),
+            pytest.raises(RuntimeError, match="code 3"),
+        ):
+            await main_module.run_api_server()
