@@ -894,15 +894,22 @@ const routes = [
   ],
 ];
 
+/** "a/b//" -> "a/b": a loop rather than /\/+$/, which backtracks. */
+export function trimTrailingSlashes(text) {
+  let end = text.length;
+  while (end > 0 && text[end - 1] === "/") end--;
+  return text.slice(0, end);
+}
+
 function requestPath(config) {
   let url = config.url ?? "";
   if (!/^[a-z]+:\/\//i.test(url) && config.baseURL) {
-    url = `${config.baseURL.replace(/\/+$/, "")}/${url.replace(/^\/+/, "")}`;
+    url = `${trimTrailingSlashes(config.baseURL)}/${url.replace(/^\/+/, "")}`;
   }
   // Absolute URLs (or a VITE_API_URL with a host) keep only their path.
   url = url.replace(/^[a-z]+:\/\/[^/]+/i, "");
   const [path, query = ""] = url.split("?");
-  return { path: path.replace(/\/+$/, "") || "/", query };
+  return { path: trimTrailingSlashes(path) || "/", query };
 }
 
 function parseBody(data) {

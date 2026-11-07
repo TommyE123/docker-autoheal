@@ -23,9 +23,7 @@ export default defineConfig(({ mode }) => ({
     {
       name: "demo-no-manifest",
       transformIndexHtml: (html) =>
-        mode === "demo"
-          ? html.replace(/\s*<link rel="manifest"[^>]*>/, "")
-          : html,
+        mode === "demo" ? html.replace(/<link rel="manifest"[^>]*>/, "") : html,
     },
     VitePWA({
       disable: mode === "demo",

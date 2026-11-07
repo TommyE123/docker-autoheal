@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import axios from "axios";
 import { DemoEngine } from "./engine.js";
-import { createMockAdapter, handleRequest } from "./mockApi.js";
+import {
+  createMockAdapter,
+  handleRequest,
+  trimTrailingSlashes,
+} from "./mockApi.js";
 
 // Field names of the backend's response models (app/api/models.py).
 const CONTAINER_INFO_FIELDS = [
@@ -734,5 +738,11 @@ describe("edge cases", () => {
       ],
     });
     expect(engine.config.notifications.services).toHaveLength(1);
+  });
+
+  it("trims any number of trailing slashes", () => {
+    expect(trimTrailingSlashes("/a/b//")).toBe("/a/b");
+    expect(trimTrailingSlashes("/a")).toBe("/a");
+    expect(trimTrailingSlashes("///")).toBe("");
   });
 });

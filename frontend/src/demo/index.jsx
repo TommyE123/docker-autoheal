@@ -8,7 +8,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "../App.jsx";
 import api from "../services/api";
 import { DemoEngine } from "./engine.js";
-import { createMockAdapter } from "./mockApi.js";
+import { createMockAdapter, trimTrailingSlashes } from "./mockApi.js";
 import DemoBanner from "./DemoBanner.jsx";
 
 /** Route every API request (shared instance and global axios) to the engine. */
@@ -37,7 +37,7 @@ export function renderDemo(root, env = import.meta.env) {
   document.title = "Docker Auto-Heal Demo";
 
   // BASE_URL is the Pages sub-path, e.g. "/docker-autoheal/".
-  const basename = (env.BASE_URL ?? "/").replace(/\/+$/, "") || "/";
+  const basename = trimTrailingSlashes(env.BASE_URL ?? "/") || "/";
   root.render(
     <React.StrictMode>
       <BrowserRouter basename={basename}>

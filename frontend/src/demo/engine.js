@@ -120,8 +120,10 @@ export const SEED_CONTAINERS = [
 
 function fnmatch(name, pattern) {
   let regex = "";
-  for (let i = 0; i < pattern.length; i++) {
+  let i = 0;
+  while (i < pattern.length) {
     const ch = pattern[i];
+    let next = i + 1;
     if (ch === "*") regex += ".*";
     else if (ch === "?") regex += ".";
     else if (ch === "[") {
@@ -130,17 +132,18 @@ function fnmatch(name, pattern) {
       let j = i + 1;
       if (pattern[j] === "!") j++;
       if (pattern[j] === "]") j++;
-      const end = pattern.indexOf("]", j);
-      if (end === -1) regex += "\\[";
+      const close = pattern.indexOf("]", j);
+      if (close === -1) regex += "\\[";
       else {
-        let set = pattern.slice(i + 1, end);
+        let set = pattern.slice(i + 1, close);
         const negate = set.startsWith("!");
         if (negate) set = set.slice(1);
         set = set.replace(/[\\\]^]/g, "\\$&");
         regex += `[${negate ? "^" : ""}${set}]`;
-        i = end;
+        next = close + 1;
       }
     } else regex += ch.replace(/[.+^${}()|\\]/g, "\\$&");
+    i = next;
   }
   return new RegExp(`^${regex}$`, "s").test(name);
 }
@@ -200,7 +203,7 @@ export function recoveryIdentifier(stableId, labels) {
   if (!(project && service)) return stableId;
   const number = labels["com.docker.compose.container-number"];
   if (typeof number === "string" && /^\d+$/.test(number)) {
-    return `compose:${project}:${service}#${parseInt(number, 10)}`;
+    return `compose:${project}:${service}#${Number.parseInt(number, 10)}`;
   }
   return stableId;
 }

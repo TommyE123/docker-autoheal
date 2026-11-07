@@ -56,9 +56,12 @@ jobs:
           # poisoned cache entry would reach the live site.
           package-manager-cache: false
 
+      # No install scripts: nothing the build needs runs one (Playwright's
+      # browser is installed by its own step), and it shuts out a compromised
+      # package's script from a job that publishes what it builds.
       - name: Install dependencies
         working-directory: frontend
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Build demo
         working-directory: frontend

@@ -9,6 +9,12 @@ source_paths = ["app"]
 # including the integration suite). Scope choice: .coveragerc also omits app/tests/*.
 do_not_mutate = ["app/tests/*"]
 
+# test_demo_default_config.py compares the browser demo's copy of the default
+# configuration with AutoHealConfig, so it can kill mutants in the defaults. Copy
+# the demo folder into mutants/ so the test can read it there. (A single file is
+# not copied: mutmut does not create its parent directories.)
+also_copy = ["frontend/src/demo"]
+
 # These modules read repository files (.github/workflows/*.yml, .vscode/tasks.json,
 # docker-compose.dev.yml, .github/scripts/*.sh)
 # via parents[3], which do not exist inside mutants/, so stats collection aborts if
