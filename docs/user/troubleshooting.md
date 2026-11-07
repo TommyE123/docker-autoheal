@@ -59,9 +59,7 @@ automatically. That almost always means the container has a real, recurring prob
 If containers are being quarantined too aggressively, increase `cooldown_seconds` or
 `max_restarts` in [Configuration](configuration.md).
 
-## Restart count looks wrong / doesn't match Docker
-
-Docker Autoheal tracks its own restart count per container (stored in `config.json`, keyed by
+## Restart count looks wrong / doesn't match Docker Autoheal tracks its own restart count per container (stored in `config.json`, keyed by
 the container's [stable identifier](labels.md#stable-container-identity)) — this is
 **not** the same as Docker's native `RestartCount` on the container object. Docker Autoheal's
 count only increases when *it* restarts a container, and it persists across container

@@ -1,7 +1,6 @@
 # Usage
 
-The web UI lives at `http://<host>:3131` and is the primary way to operate Docker
-Docker Autoheal day to day.
+The web UI lives at `http://<host>:3131` and is the primary way to operate Docker Autoheal day to day.
 
 ## Dashboard
 
