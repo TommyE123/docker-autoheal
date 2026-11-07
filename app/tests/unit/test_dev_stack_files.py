@@ -216,6 +216,28 @@ def test_node_runtime_versions_are_aligned():
     # Same reasoning as the Python group: the minimum must equal the number of pins.
     assert _renovate_group_minimum("Node runtime") == len(versions)
 
+    # The docs name the Node major too (prerequisites, Dev Container, build stage). Renovate does
+    # not edit prose, so a bump would otherwise leave them stale. Kept out of ``versions`` above
+    # because that mapping's size is the number of pins Renovate groups.
+    doc_files = [
+        REPO_ROOT / "README.md",
+        REPO_ROOT / "CONTRIBUTING.md",
+        *sorted((REPO_ROOT / "docs").rglob("*.md")),
+    ]
+    stale_docs = {}
+    mentions = 0
+    for doc in doc_files:
+        text = doc.read_text(encoding="utf-8")
+        for number in re.findall(r"\bNode(?:\.js)?\s+(\d+)\b", text):
+            mentions += 1
+            if number != docker_version.group(1):
+                stale_docs.setdefault(str(doc.relative_to(REPO_ROOT)), set()).add(number)
+
+    assert mentions, "no Node version found in the documentation"
+    assert not stale_docs, (
+        f"Documentation names a Node major other than {docker_version.group(1)}: {stale_docs}"
+    )
+
 
 @pytest.mark.parametrize(
     "path",
