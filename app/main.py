@@ -387,8 +387,15 @@ async def run_api_server() -> None:
     await server.serve()
 
 
-async def main() -> None:
-    """Main entry point"""
+async def main() -> int:
+    """
+    Main entry point; returns the process exit code.
+
+    The service and the API server are supervised together: if either fails, the other is
+    cancelled and the failure is reported as a non-zero exit code, so a crashed monitoring
+    service can't leave the API running while nothing is being healed, and Docker's restart
+    policy gets a chance to act.
+    """
     # Deliberate: the module-level signal handler reads ``service`` to stop it.
     global service  # noqa: PLW0603
 
@@ -398,25 +405,28 @@ async def main() -> None:
 
     # Create service instance
     service = AutoHealService()
+    exit_code = 0
 
     # Start service and API server concurrently
     try:
-        await asyncio.gather(
-            service.run(),
-            run_api_server(),
-            return_exceptions=True,  # Don't propagate CancelledError
-        )
+        async with asyncio.TaskGroup() as group:
+            group.create_task(service.run())
+            group.create_task(run_api_server())
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt")
     except asyncio.CancelledError:
         logger.info("Application cancelled, shutting down gracefully")
-    except Exception as e:
-        logger.exception("Service error: %s", e)
+    except ExceptionGroup as group_error:
+        # TaskGroup wraps task failures; log each one so the real cause is in the message
+        for error in group_error.exceptions:
+            logger.error("Service error: %s", error, exc_info=error)
+        exit_code = 1
     finally:
         if service and service.running:
             await service.stop()
+    return exit_code
 
 
 if __name__ == "__main__":
     # Run the service
-    asyncio.run(main())
+    sys.exit(asyncio.run(main()))

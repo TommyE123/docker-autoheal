@@ -1109,31 +1109,44 @@ class TestMain:
             fake_service.stop.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_main_swallows_cancelled_error_from_gather(self):
+    async def test_main_returns_zero_on_clean_shutdown(self):
         fake_service = MagicMock()
-        fake_service.run = MagicMock(return_value=None)
+        fake_service.run = AsyncMock()
         fake_service.running = False
 
         with (
             patch("app.main.signal.signal"),
             patch("app.main.AutoHealService", return_value=fake_service),
-            patch("app.main.run_api_server", new=MagicMock(return_value=None)),
-            patch("app.main.asyncio.gather", side_effect=asyncio.CancelledError),
+            patch("app.main.run_api_server", new=AsyncMock()),
         ):
-            await main_module.main()  # must not raise
+            assert await main_module.main() == 0
+
+    @pytest.mark.asyncio
+    async def test_main_swallows_cancellation_and_returns_zero(self):
+        fake_service = MagicMock()
+        fake_service.run = AsyncMock()
+        fake_service.running = False
+
+        with (
+            patch("app.main.signal.signal"),
+            patch("app.main.AutoHealService", return_value=fake_service),
+            patch("app.main.run_api_server", new=AsyncMock()),
+            patch("app.main.asyncio.TaskGroup", side_effect=asyncio.CancelledError),
+        ):
+            assert await main_module.main() == 0
 
     @pytest.mark.asyncio
     async def test_main_logs_keyboard_interrupt_and_stops_the_service(self, caplog):
         fake_service = MagicMock()
-        fake_service.run = MagicMock(return_value=None)
+        fake_service.run = AsyncMock()
         fake_service.stop = AsyncMock()
         fake_service.running = True
 
         with (
             patch("app.main.signal.signal"),
             patch("app.main.AutoHealService", return_value=fake_service),
-            patch("app.main.run_api_server", new=MagicMock(return_value=None)),
-            patch("app.main.asyncio.gather", side_effect=KeyboardInterrupt),
+            patch("app.main.run_api_server", new=AsyncMock()),
+            patch("app.main.asyncio.TaskGroup", side_effect=KeyboardInterrupt),
             caplog.at_level("INFO", logger="app.main"),
         ):
             await main_module.main()  # must not raise
@@ -1142,18 +1155,54 @@ class TestMain:
         fake_service.stop.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_main_stops_service_after_generic_exception_from_gather(self):
+    async def test_main_fails_and_cancels_api_when_service_run_raises(self):
+        """Regression: a crashed service must not leave the API server running"""
         fake_service = MagicMock()
-        fake_service.run = MagicMock(return_value=None)
+        fake_service.run = AsyncMock(side_effect=RuntimeError("docker unavailable"))
+        fake_service.stop = AsyncMock()
+        fake_service.running = False
+        api_cancelled = asyncio.Event()
+
+        async def fake_api_server() -> None:
+            try:
+                await asyncio.Event().wait()  # serves forever unless cancelled
+            except asyncio.CancelledError:
+                api_cancelled.set()
+                raise
+
+        with (
+            patch("app.main.signal.signal"),
+            patch("app.main.AutoHealService", return_value=fake_service),
+            patch("app.main.run_api_server", new=fake_api_server),
+        ):
+            exit_code = await asyncio.wait_for(main_module.main(), timeout=2)
+
+        assert exit_code == 1
+        assert api_cancelled.is_set()
+
+    @pytest.mark.asyncio
+    async def test_main_fails_and_stops_service_when_api_server_raises(self):
+        fake_service = MagicMock()
+        service_cancelled = asyncio.Event()
+
+        async def fake_run() -> None:
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                service_cancelled.set()
+                raise
+
+        fake_service.run = fake_run
         fake_service.stop = AsyncMock()
         fake_service.running = True
 
         with (
             patch("app.main.signal.signal"),
             patch("app.main.AutoHealService", return_value=fake_service),
-            patch("app.main.run_api_server", new=MagicMock(return_value=None)),
-            patch("app.main.asyncio.gather", side_effect=RuntimeError("gather boom")),
+            patch("app.main.run_api_server", new=AsyncMock(side_effect=OSError("port in use"))),
         ):
-            await main_module.main()  # must not raise
+            exit_code = await asyncio.wait_for(main_module.main(), timeout=2)
 
-            fake_service.stop.assert_awaited_once()
+        assert exit_code == 1
+        assert service_cancelled.is_set()
+        fake_service.stop.assert_awaited_once()
