@@ -31,8 +31,8 @@ The container provides:
   (markdownlint, prettier, stylelint and the rest) in `.devcontainer/package.json` are
   unpinned and have no lockfile, so each rebuild installs the latest releases
 - Shared VS Code settings, a shared set of installed VS Code extensions, and forwarded
-  ports for the frontend (3000), the dev stack's UI/API (3132) and metrics (9091), and
-  Playwright's UI (9323)
+  ports for the frontend (3000), the dev stack's UI/API (3132) and metrics (9091), the
+  browser demo (3133), and Playwright's UI (9323)
 
 Application services are **not** started automatically — use the tasks below.
 
