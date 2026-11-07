@@ -1,8 +1,8 @@
 """
-Smoke test for a running Auto-Heal service: health endpoint, API status,
+Smoke test for a running Docker Autoheal instance: health endpoint, API status,
 the React UI, and (best-effort) the Prometheus metrics endpoint.
 
-Requires a running Auto-Heal service reachable at AUTOHEAL_BASE_URL (default
+Requires a running Docker Autoheal instance reachable at AUTOHEAL_BASE_URL (default
 http://localhost:3132, the development stack).
 """
 

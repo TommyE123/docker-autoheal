@@ -8,7 +8,7 @@ describe("PWA manifest", () => {
   const manifest = JSON.parse(read("../public/manifest.json"));
 
   it("is installable: name, start_url, standalone display", () => {
-    expect(manifest.name).toBe("Docker Auto-Heal Service");
+    expect(manifest.name).toBe("Docker Autoheal");
     expect(manifest.start_url).toBe("/");
     expect(manifest.display).toBe("standalone");
   });

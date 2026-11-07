@@ -11,7 +11,7 @@ configuration-format change), it will be called out in that release's notes.
 The only "migration" documented anywhere in this repository is an internal, already-completed
 restructuring of the codebase (flat files → the current `app/` package layout) — see
 [Project restructuring](../historical/project-restructuring.md) if you're curious, but it has
-no bearing on how you run or upgrade Docker Auto-Heal today.
+no bearing on how you run or upgrade Docker Autoheal today.
 
 ## API documentation URLs
 

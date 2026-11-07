@@ -1,5 +1,5 @@
 """
-Container selection for Docker Auto-Heal Service
+Container selection for Docker Autoheal
 Decides, from configuration and container information alone, whether a container is monitored
 """
 

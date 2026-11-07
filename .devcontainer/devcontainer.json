@@ -1,5 +1,5 @@
 {
-  "name": "Docker Auto-Heal",
+  "name": "Docker Autoheal",
   "runArgs": ["--name", "docker-autoheal-devcontainer"],
   "privileged": true,
   "build": {

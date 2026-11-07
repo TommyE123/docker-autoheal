@@ -20,7 +20,7 @@ def serve_react_app() -> HTMLResponse:
             return HTMLResponse(content=f.read())
     except FileNotFoundError:
         return HTMLResponse(
-            content="<h1>Docker Auto-Heal Service</h1>"
+            content="<h1>Docker Autoheal</h1>"
             "<p>React UI not found. Please build the frontend first:</p>"
             "<pre>cd frontend && npm install && npm run build</pre>"
             "<p>API documentation is available at <a href='/api/swagger'>/api/swagger</a></p>"

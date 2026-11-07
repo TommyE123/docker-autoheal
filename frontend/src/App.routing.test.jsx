@@ -221,7 +221,7 @@ describe("App routing", () => {
     });
 
     expectOnlyStubsVisible([]);
-    expect(screen.getByText("Docker Auto-Heal Service")).toBeInTheDocument();
+    expect(screen.getByText("Docker Autoheal")).toBeInTheDocument();
   });
 
   it("works with a real BrowserRouter: click-navigation and back button update the URL", async () => {

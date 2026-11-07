@@ -1,5 +1,5 @@
 """
-FastAPI application - REST API endpoints for Docker Auto-Heal Service
+FastAPI application - REST API endpoints for Docker Autoheal
 
 Route handlers live in ``app/api/routes/`` (split from this module in issue
 #321), grouped by domain: health/status, containers, maintenance, config,
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app. The API documentation lives under /api/, with the rest of the API.
 app = FastAPI(
-    title="Docker Auto-Heal Service",
+    title="Docker Autoheal",
     description="Automated container monitoring and healing service",
     version="2.6.0",  # x-release-please-version
     docs_url="/api/swagger",

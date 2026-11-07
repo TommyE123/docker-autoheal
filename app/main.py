@@ -1,5 +1,5 @@
 """
-Main entry point for Docker Auto-Heal Service
+Main entry point for Docker Autoheal
 """
 
 import asyncio
@@ -116,9 +116,9 @@ class AutoHealService:
         self._startup_cancelled = False
 
     async def start(self) -> None:
-        """Start the auto-heal service"""
+        """Start Docker Autoheal"""
         try:
-            logger.info("Starting Docker Auto-Heal Service v%s", app.version)
+            logger.info("Starting Docker Autoheal v%s", app.version)
 
             # Load configuration
             config = config_manager.get_config()
@@ -182,7 +182,7 @@ class AutoHealService:
                     logger.warning("Uptime-Kuma failed to start: %s", e)
 
             self.running = True
-            logger.info("Docker Auto-Heal Service started successfully")
+            logger.info("Docker Autoheal started successfully")
             ui_url = get_ui_url(config)
             public_port = get_public_port()
             if ui_url:
@@ -228,7 +228,7 @@ class AutoHealService:
 
     async def stop(self) -> None:
         """
-        Stop the auto-heal service
+        Stop Docker Autoheal
 
         Safe to call concurrently (the signal handler and ``run()`` both do): later callers
         wait for the first shutdown to finish, then return without repeating it.
@@ -271,7 +271,7 @@ class AutoHealService:
 
     async def _shutdown(self) -> None:
         """Stop the components and release the Docker client and metrics server"""
-        logger.info("Stopping Docker Auto-Heal Service...")
+        logger.info("Stopping Docker Autoheal...")
 
         # Stop components gracefully with error handling. The Docker client is
         # closed in `finally` so a cancellation (not an Exception) during an
@@ -302,7 +302,7 @@ class AutoHealService:
                 except Exception as e:
                     logger.warning("Error closing Docker client: %s", e, exc_info=True)
 
-        logger.info("Docker Auto-Heal Service stopped")
+        logger.info("Docker Autoheal stopped")
 
     async def run(self) -> None:
         """Run the service (blocking)"""

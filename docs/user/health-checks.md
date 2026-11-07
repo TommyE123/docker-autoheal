@@ -1,6 +1,6 @@
 # Health Checks
 
-Docker Auto-Heal decides whether a container needs healing based on `restart.mode`
+Docker Autoheal decides whether a container needs healing based on `restart.mode`
 (see [Configuration](configuration.md)):
 
 - **`on-failure`** — restart when the container exits with a non-zero code (and hasn't
@@ -15,7 +15,7 @@ A container that exits cleanly (exit code `0`) is **not** restarted by default �
 ## Docker's native health check
 
 If a container defines a `HEALTHCHECK` (in its Dockerfile or Compose `healthcheck:`
-block), Auto-Heal reads Docker's reported health status directly — no extra
+block), Docker Autoheal reads Docker's reported health status directly — no extra
 configuration needed:
 
 ```yaml
@@ -31,7 +31,7 @@ services:
       retries: 3
 ```
 
-The `test` command runs inside `webapp`'s own container, not inside Auto-Heal's — make sure
+The `test` command runs inside `webapp`'s own container, not inside Docker Autoheal's — make sure
 whatever tool you use is actually installed in that image (`wget` here, because it ships
 with `nginx:alpine`'s BusyBox base; the common `nginx:latest`/Debian image has neither
 `curl` nor `wget` installed by default).
@@ -85,8 +85,8 @@ and `DELETE /api/healthchecks/{id}`.
 ## Restart behavior once a check fails
 
 1. **Cooldown** — if the container was restarted more recently than
-   `restart.cooldown_seconds` ago, Auto-Heal waits.
-2. **Backoff** — if `restart.backoff.enabled`, Auto-Heal waits an increasing delay
+   `restart.cooldown_seconds` ago, Docker Autoheal waits.
+2. **Backoff** — if `restart.backoff.enabled`, Docker Autoheal waits an increasing delay
    (`initial_seconds`, then multiplied by `multiplier` on each subsequent restart of that
    container, up to `max_seconds`) before restarting. The delay goes back to
    `initial_seconds` once the container has stayed healthy for longer than the delay it
@@ -102,16 +102,16 @@ and `DELETE /api/healthchecks/{id}`.
    the Docker connection was unavailable: the old wait is dropped and the next failure
    starts a fresh one, with the same delay, instead of restarting at once.
 3. **Threshold and quarantine** — once a container has been restarted `max_restarts`
-   times within `max_restarts_window_seconds`, it's **quarantined**: Auto-Heal stops
+   times within `max_restarts_window_seconds`, it's **quarantined**: Docker Autoheal stops
    trying to restart it until you intervene, or until it becomes healthy on its own (see
    below).
-4. **Auto-unquarantine** — on every monitoring cycle, Auto-Heal re-checks quarantined
+4. **Auto-unquarantine** — on every monitoring cycle, Docker Autoheal re-checks quarantined
    containers. One that has been running and passing its health check(s) for 3
    consecutive checks of the same run, and has been up for at least 3 monitoring
    intervals, is removed from quarantine and its restart count reset. A single healthy
    snapshot isn't enough, since a crash-looping container is running between crashes,
    and Docker health `starting` doesn't count as healthy in the `health` and `both`
-   modes. The check count is kept in memory, so restarting Auto-Heal starts it again
+   modes. The check count is kept in memory, so restarting Docker Autoheal starts it again
    from zero (the container stays quarantined meanwhile). You can also un-quarantine
    manually from the UI or `POST /api/containers/{id}/unquarantine`.
 

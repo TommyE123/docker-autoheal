@@ -517,12 +517,12 @@ class NotificationManager:
             "description": message.replace("**", ""),
             "color": color_map.get(priority, 0x3498DB),
             "timestamp": event.timestamp.isoformat(),
-            "footer": {"text": "Docker Auto-Heal"},
+            "footer": {"text": "Docker Autoheal"},
         }
 
         payload = {
             "embeds": [embed],
-            "username": service.username or "Docker Auto-Heal",
+            "username": service.username or "Docker Autoheal",
         }
 
         session = self._get_session("Discord")
@@ -853,11 +853,11 @@ class NotificationManager:
             event_type="test",
             restart_count=0,
             status="success",
-            message="This is a test notification from Docker Auto-Heal",
+            message="This is a test notification from Docker Autoheal",
         )
 
         title = "🧪 Test Notification"
-        message = "This is a test notification from Docker Auto-Heal. If you received this, your notification service is configured correctly!"
+        message = "This is a test notification from Docker Autoheal. If you received this, your notification service is configured correctly!"
         priority = NotificationPriority.NORMAL
 
         _last_failure.set(None)

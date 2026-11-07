@@ -1,4 +1,4 @@
-# Contributing to Docker Auto-Heal
+# Contributing to Docker Autoheal
 
 Thanks for your interest in contributing. This page gets you from a fresh clone to a
 running dev environment and a passing test suite. Deeper technical detail — architecture,

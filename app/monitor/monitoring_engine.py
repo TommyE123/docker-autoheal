@@ -1,5 +1,5 @@
 """
-Core monitoring engine for Docker Auto-Heal Service
+Core monitoring engine for Docker Autoheal
 Monitors containers and performs auto-healing actions
 """
 

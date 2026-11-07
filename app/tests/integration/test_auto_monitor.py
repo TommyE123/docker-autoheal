@@ -8,7 +8,7 @@ exclusions and unlabelled containers - is already covered against fakes in
 prove the real event stream and the real running service actually wire up
 end-to-end (it previously didn't - see #78/#81).
 
-Requires a real Docker daemon *and* a running Auto-Heal service reachable at
+Requires a real Docker daemon *and* a running Docker Autoheal instance reachable at
 AUTOHEAL_BASE_URL (default http://localhost:3132, the development stack).
 """
 

@@ -65,7 +65,7 @@ Adjust verbosity with `observability.log_level` (`DEBUG`, `INFO`, `WARNING`, `ER
 
 ## Optional: Uptime Kuma integration
 
-If you run [Uptime Kuma](https://github.com/louislam/uptime-kuma), Docker Auto-Heal can
+If you run [Uptime Kuma](https://github.com/louislam/uptime-kuma), Docker Autoheal can
 treat a mapped monitor's DOWN status as an additional restart trigger. This is opt-in and
 disabled by default — see [Configuration](configuration.md#uptime_kuma-optional-integration).
 

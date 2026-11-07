@@ -2,7 +2,7 @@
 
 ## Overview
 
-Docker Auto-Heal is a single Python process (FastAPI + asyncio) that talks to the Docker
+Docker Autoheal is a single Python process (FastAPI + asyncio) that talks to the Docker
 Engine API, plus a React single-page app served by that same process. There's no
 database — all state is JSON files under `/data`.
 
@@ -102,7 +102,7 @@ monitoring engine never keys restart counts, quarantine state, or selection on t
 Docker ID. Instead it resolves a **stable identifier** per container — see
 [Labels: stable container identity](../user/labels.md#stable-container-identity) for the
 resolution order. This is why a container's restart count in the UI can differ from
-Docker's own `State.RestartCount`: the UI shows Auto-Heal's own tracked count
+Docker's own `State.RestartCount`: the UI shows Docker Autoheal's own tracked count
 (`config.containers.restart_counts`, keyed by recovery identifier, below; the quarantine
 threshold uses the timestamps in `config.containers.restart_history` over
 `max_restarts_window_seconds`), not Docker's native counter,

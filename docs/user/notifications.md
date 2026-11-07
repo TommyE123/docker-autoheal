@@ -1,6 +1,6 @@
 # Notifications
 
-Docker Auto-Heal can send a notification whenever it restarts, quarantines, or
+Docker Autoheal can send a notification whenever it restarts, quarantines, or
 auto-unquarantines a container, or a health check fails. Notifications are **disabled by
 default** and delivered asynchronously (via a background queue), so a slow or unreachable
 notification endpoint never blocks monitoring.

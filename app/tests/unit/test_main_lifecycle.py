@@ -77,8 +77,8 @@ class TestAutoHealServiceStop:
 
         assert service.running is False
         assert self._messages(caplog, "INFO") == [
-            "Stopping Docker Auto-Heal Service...",
-            "Docker Auto-Heal Service stopped",
+            "Stopping Docker Autoheal...",
+            "Docker Autoheal stopped",
         ]
 
     @pytest.mark.asyncio
@@ -538,7 +538,7 @@ class TestAutoHealServiceStartFailure:
             with pytest.raises(RuntimeError):
                 await AutoHealService().start()
 
-        assert f"Starting Docker Auto-Heal Service v{main_module.app.version}" in caplog.text
+        assert f"Starting Docker Autoheal v{main_module.app.version}" in caplog.text
 
     @pytest.mark.asyncio
     async def test_uptime_kuma_start_failure_does_not_abort_startup(self):

@@ -1,4 +1,4 @@
-# Docker Auto-Heal Service
+# Docker Autoheal
 
 [![Unit Tests](https://github.com/TommyE123/docker-autoheal/actions/workflows/tests.yml/badge.svg)](https://github.com/TommyE123/docker-autoheal/actions/workflows/tests.yml)
 [![Test Coverage](https://img.shields.io/codecov/c/github/TommyE123/docker-autoheal?branch=main&label=Test%20Coverage)](https://codecov.io/gh/TommyE123/docker-autoheal)
@@ -10,7 +10,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/TommyE123/docker-autoheal?sort=semver&label=GitHub%20Release)](https://github.com/TommyE123/docker-autoheal/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Docker Auto-Heal watches your Docker containers and restarts the ones that fail or go
+Docker Autoheal watches your Docker containers and restarts the ones that fail or go
 unhealthy, so you don't have to. It runs as a single container with a web dashboard, a
 REST API, and Prometheus metrics.
 
@@ -32,7 +32,7 @@ REST API, and Prometheus metrics.
 
 ### Project status
 
-Docker Auto-Heal is under active development. The core monitoring/restart engine, web
+Docker Autoheal is under active development. The core monitoring/restart engine, web
 UI, REST API, and notification system are implemented and covered by an automated test
 suite (see [Unit Tests workflow](.github/workflows/tests.yml)). Configuration is stored
 on disk in `/data` and managed through the web UI or the REST API — there are currently
@@ -80,7 +80,7 @@ services:
 docker compose up -d
 ```
 
-Open **<http://localhost:3131>** — that's the dashboard. Docker Auto-Heal is now running
+Open **<http://localhost:3131>** — that's the dashboard. Docker Autoheal is now running
 and ready to monitor containers.
 
 For a from-scratch walkthrough (requirements, verifying the socket mount, testing with a
@@ -103,10 +103,10 @@ services:
       retries: 3
 ```
 
-Docker Auto-Heal picks up labelled containers automatically — both containers that are
+Docker Autoheal picks up labelled containers automatically — both containers that are
 already running when it starts, and new ones as they start. A container's Docker
-`healthcheck` (if it has one) determines when Auto-Heal considers it unhealthy; without a
-health check, Auto-Heal still restarts the container if it exits with a non-zero code.
+`healthcheck` (if it has one) determines when Docker Autoheal considers it unhealthy; without a
+health check, Docker Autoheal still restarts the container if it exits with a non-zero code.
 You can also select containers to monitor from the web UI without adding a label at all.
 
 See [Labels](docs/user/labels.md) and [Health Checks](docs/user/health-checks.md) for the
