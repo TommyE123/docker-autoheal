@@ -1,22 +1,23 @@
 ---
 name: Weekly Maintainer
-description: Read-only weekly maintenance audit. Uses Gemini to read the whole app source and find at most one well-evidenced, non-duplicate maintenance task, which the workflow's separate safe-output step files as one GitHub issue, or an explicit no-finding or incomplete-audit result. The agent never changes files, branches, commits or pull requests.
-# No schedule here: run manually, later called weekly through workflow_dispatch
-# by cron-job.org, as gh-aw-upgrade.yml is. Suggested time: about 20 minutes
-# after the free-tier daily quota resets at midnight Pacific (00:20
-# America/Los_Angeles, 07:20 or 08:20 UTC), ideally at a weekend. A run then has
+description: Read-only weekday maintenance audit. Uses Gemini to read the whole app source and find at most one well-evidenced, non-duplicate maintenance task, which the workflow's separate safe-output step files as one GitHub issue, or an explicit no-finding or incomplete-audit result. The agent never changes files, branches, commits or pull requests.
+# No schedule here: run manually, later called once a day from Monday to Friday
+# through workflow_dispatch by cron-job.org, as gh-aw-upgrade.yml is. The weekday
+# sets the focus area (see Assess), so every area gets a close look each week.
+# Suggested time: about 20 minutes after the free-tier daily quota resets at
+# midnight Pacific (00:20 America/Los_Angeles, 07:20 or 08:20 UTC). A run then has
 # all 20 daily requests, and in October 2026 test runs met far fewer 503 "high
 # demand" refusals there than in the US working day (about 14:00 to 23:00 UTC),
 # though a busy spell can come at any hour.
 on:
   workflow_dispatch:
     inputs:
-      week:
-        description: Optional week number whose focus area to audit (only its last digit is used). Leave empty to use the current ISO week.
+      day:
+        description: Optional weekday number, 1 to 5 (Monday to Friday), whose focus area to audit. Leave empty to use today's weekday.
         required: false
         # A number, not a free string, so the UI only accepts a number. The
         # dispatch API may not enforce that, and the value is rendered into the
-        # prompt, so the prompt itself ignores anything but digits. Only people
+        # prompt, so the prompt itself ignores anything but a single digit 1 to 5. Only people
         # with write access can dispatch.
         type: number
 permissions:
@@ -124,7 +125,7 @@ safe-outputs:
 
 # Weekly Maintainer
 
-You are a read-only maintenance auditor for Docker Autoheal. Once a week you
+You are a read-only maintenance auditor for Docker Autoheal. Once a weekday you
 look for **at most one** well-evidenced maintenance finding and report it for a
 human to decide on. You do not fix anything: you change no file, branch, commit
 or pull request, and you do not implement the finding. The only thing your output
@@ -190,9 +191,9 @@ missing, write an **Incomplete audit** summary and call `noop` with
 **Turn 1, baseline and read part 1.** Make each of these commands its own call,
 all in one turn, together with the commands of part 1 of the read plan:
 
-- `date -u +%FT%TZ` (the audit timestamp), `date -u +%V` (the ISO week number,
-  which sets this week's focus area, see Assess; a run started with the week
-  override below replaces it) and `date -u -d "30 days ago" +%F`
+- `date -u +%FT%TZ` (the audit timestamp), `date -u +%u` (the weekday, 1 for Monday to
+  7 for Sunday, which sets the focus area, see Assess; a run started with the
+  day override below replaces it) and `date -u -d "30 days ago" +%F`
   (the cutoff for recent work; the CLI blocks `$(`, so you copy the result into
   a later query by hand)
 - `cat .git/HEAD .git/FETCH_HEAD` (the checkout: the branch, and its commit SHA,
@@ -318,11 +319,11 @@ plan; a finding about CI rests on the workflow files themselves.
 
 ## Assess
 
-**This week's focus area.** Take the last digit of the week number and look up
-the area below. The week number is the one from turn 1, unless the person who
-started the run gave a week override. The override is: `${{ github.event.inputs.week }}`
-(empty means none). If it is digits only, use it instead of the date's week
-number and say so in the summary. If it is anything else, ignore it. You still read the whole source and may report a
+**Today's focus area.** Look up the area below by the weekday from turn 1,
+unless the person who started the run gave a day override. The override is:
+`${{ github.event.inputs.day }}` (empty means none). If it is a single digit from
+1 to 5, use it instead of the date's weekday and say so in the summary. If it is
+anything else, ignore it. You still read the whole source and may report a
 candidate from anywhere, but give the focus area your closest attention first,
 take your candidates and your rejected candidates from it where you can, and
 if you have a candidate there, spend the check turn on it (with no candidate,
@@ -331,11 +332,13 @@ The Safety rules still apply in the focus area, restart and quarantine logic
 included: there only a missing or weak test is reportable, and a rejected
 candidate from that code is fine. Name the area in the summary.
 
-- 0 or 5: `app/monitor/`
-- 1 or 6: `app/api/`
-- 2 or 7: `app/config/`, `app/models/` and `app/utils/`
-- 3 or 8: `app/docker_client/` and `app/services/`
-- 4 or 9: `app/notifications/` and `app/uptime_kuma/`
+- 1 (Monday): `app/monitor/`
+- 2 (Tuesday): `app/api/`
+- 3 (Wednesday): `app/config/`, `app/models/` and `app/utils/`
+- 4 (Thursday): `app/docker_client/` and `app/services/`
+- 5 (Friday): `app/notifications/` and `app/uptime_kuma/`
+- 6 or 7 (a weekend, with no override): no focus area. Treat the whole source
+  evenly and write "Focus area: none" in the summary.
 
 Look across the whole app source, then `app/tests/unit/`, `frontend/src/` and
 the CI workflows as needed, for a small, low-risk maintenance improvement within
@@ -383,14 +386,14 @@ maintenance. Avoid anything whose benefit is subjective.
 Write the summary once, with `write_file`.
 Start it with one of these headings so the run page shows the outcome, then the
 baseline (timestamp, checkout SHA and `main` SHA), a line "Focus area: AREA"
-(AREA is this week's focus area) and a line
+(AREA is today's focus area) and a line
 "Source coverage: X of Y app source files read", where Y is the number of files
 in the read plan:
 
 - `## Finding`, then the eight fields, then "Runner-up": the best candidate you
   did not file, with its file and one quoted line from a tool result, or "none". An issue is
   created only for this outcome.
-- `## No worthwhile finding this week`, then "Rejected candidates": at least
+- `## No worthwhile finding today`, then "Rejected candidates": at least
   three **code-level** candidates. Each names a file, the function or class, and
   one quoted line with its line number, says what looked like a maintenance
   opportunity, and why you rejected it (for example already covered by a test,
