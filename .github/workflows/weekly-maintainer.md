@@ -193,7 +193,7 @@ all in one turn, together with the commands of part 1 of the read plan:
     (the head of `main` is the very first line of the output, and only that
     line's SHA is the `main` SHA you report; the lines below it are older commits)
   - `github list_issues --owner OWNER --repo REPO --state OPEN --perPage 100 | jq -r '.[] | "#\(.number) \(.title) | \(.body // "" | .[0:300] | gsub("\\s+"; " "))"'`
-  - `github list_pull_requests --owner OWNER --repo REPO --state open --perPage 50 | jq -r '.[] | "#\(.number) \(.title) [\(.head.ref // "")]"'`
+  - `github list_pull_requests --owner OWNER --repo REPO --state open --perPage 50 | jq -r '.[] | "#\(.number) \(.title) [\(.head.ref // "")] | \(.body // "" | .[0:300] | gsub("\\s+"; " "))"'`
 
 If a `jq` filter fails because the result has another shape, run that command
 once more without the pipe and read what it returns.
@@ -232,9 +232,11 @@ request lists is a failed read, not an empty repository: rerun it without the
 pipe (a long unpiped result that is cut in the middle still counts as read; a
 `[]` is an empty list). If the head of `main`, the open issues or the open pull
 requests still cannot be read, stop and report an **Incomplete audit**; never treat an
-unread list as empty. Carry on without any other non-source read
-(such as the closed-work searches) that fails twice, and name it in the summary.
-A source `cat -n` that fails twice makes the audit incomplete. If you have used 9 turns and have
+unread list as empty. The final duplicate searches before a finding are
+essential too: if one still fails after two attempts, report an **Incomplete
+audit** and do not call `create_issue`. Carry on without any other non-source
+read (such as the closed-work searches) that fails twice, and name it in the
+summary. A source `cat -n` that fails twice makes the audit incomplete. If you have used 9 turns and have
 not reported yet, stop: write the summary as an **Incomplete audit** that says
 how far you got, and call `noop`. If the source cannot be read, stop and report an **Incomplete audit**.
 

@@ -63,12 +63,12 @@ def _log(checkout: Path, *calls: tuple[str, str]) -> None:
     (checkout / "agent.log").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _run(checkout: Path) -> subprocess.CompletedProcess[str]:
+def _run(checkout: Path, path: str = "/usr/bin:/bin") -> subprocess.CompletedProcess[str]:
     return subprocess.run(  # noqa: S603
         ["bash", str(SCRIPT)],  # noqa: S607 - PATH is fixed to /usr/bin:/bin below
         cwd=checkout,
         env={
-            "PATH": "/usr/bin:/bin",
+            "PATH": path,
             "AGENT_LOG": str(checkout / "agent.log"),
             "AGENT_OUTPUT": str(checkout / "output.json"),
             "GITHUB_STEP_SUMMARY": str(checkout / "summary.md"),
@@ -128,6 +128,25 @@ def test_noop_output_is_left_alone_when_coverage_is_incomplete(checkout: Path):
 
     assert result.returncode == 1
     assert _items(checkout) == [noop]
+
+
+def test_failed_rewrite_drops_the_issue_instead_of_leaving_it(checkout: Path, tmp_path: Path):
+    # A jq that fails only when it is asked to rewrite the output (the call with --arg).
+    fake = tmp_path / "fakebin"
+    fake.mkdir()
+    shim = fake / "jq"
+    shim.write_text(
+        '#!/bin/bash\nfor a in "$@"; do [[ $a == --arg ]] && exit 5; done\nexec /usr/bin/jq "$@"\n',
+        encoding="utf-8",
+    )
+    shim.chmod(0o755)
+    _log(checkout, (f"cat -n {SMALL}", "success"))
+
+    result = _run(checkout, path=f"{fake}:/usr/bin:/bin")
+
+    assert result.returncode == 1
+    assert _items(checkout) == []
+    assert "every output item was dropped" in _summary(checkout)
 
 
 def test_three_parts_that_join_up_count(checkout: Path):

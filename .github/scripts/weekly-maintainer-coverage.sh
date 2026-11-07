@@ -112,11 +112,17 @@ fi
 if [[ -f "$output" ]] && jq -e '.items // [] | any(.type == "create_issue")' "$output" >/dev/null; then
   message="INCOMPLETE AUDIT: the agent read $read_count of $total app source files, so its issue was withheld."
   updated=$(mktemp)
-  jq --arg message "$message" \
+  if jq --arg message "$message" \
     '.items |= map(if .type == "create_issue" then {type: "noop", message: $message} else . end)' \
-    "$output" >"$updated"
-  mv "$updated" "$output"
-  echo "Withheld the create_issue output: coverage incomplete." | tee -a "$summary"
+    "$output" >"$updated"; then
+    mv "$updated" "$output"
+    echo "Withheld the create_issue output: coverage incomplete." | tee -a "$summary"
+  else
+    # Fail closed: a failed rewrite must not leave the create_issue item for safe_outputs.
+    rm -f "$updated"
+    echo '{"items":[],"errors":[]}' >"$output"
+    echo "Could not rewrite the output, so every output item was dropped: coverage incomplete." | tee -a "$summary"
+  fi
 fi
 
 echo "::error::Incomplete audit: the agent read $read_count of $total app source files" >&2
