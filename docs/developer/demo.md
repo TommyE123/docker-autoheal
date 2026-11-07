@@ -60,7 +60,7 @@ any of these, update the demo in the same pull request:
 ## Running it locally
 
 In the Dev Container, run **Terminal → Run Task → Autoheal: Run Demo** and open
-`http://localhost:3001/docker-autoheal/` (hot reload; a page reload resets the simulation).
+`http://localhost:3133/docker-autoheal/` (hot reload; a page reload resets the simulation).
 To see the production-style build instead:
 
 ```bash

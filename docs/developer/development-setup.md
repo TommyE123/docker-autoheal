@@ -109,8 +109,9 @@ request (see [UI E2E CI](testing.md#ci)). After pulling this change into an exis
 **Dev Containers: Rebuild Container** once.
 
 **Autoheal: Run Demo** serves the [browser demo](demo.md) with the Vite dev server (hot
-reload, no backend or Docker needed) on its own port, so it can run beside **Run React
-Frontend**. Open `http://localhost:3001/docker-autoheal/`.
+reload, no backend or Docker needed) on port 3133, next to the app's 3131 and the dev
+stack's 3132, so it can run beside **Run React Frontend**. Open
+`http://localhost:3133/docker-autoheal/`.
 
 **Autoheal: Install gh-aw** installs the `github/gh-aw` extension pinned to the
 `compiler_version` recorded in the header of `.github/workflows/issue-triage.lock.yml`, so
