@@ -14,6 +14,7 @@ import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
 
+from app.api.errors import get_docker_client
 from app.api.routes.healthchecks import (
     add_health_check,
     delete_health_check,
@@ -33,13 +34,6 @@ def wired_api(monkeypatch, docker_client, engine):
     return docker_client, engine
 
 
-@pytest.fixture
-def uninitialized_api(monkeypatch):
-    """Simulate the API being called before ``init_api`` has run."""
-    monkeypatch.setattr("app.api.state.docker_client", None)
-    monkeypatch.setattr("app.api.state.monitoring_engine", None)
-
-
 @pytest.mark.asyncio
 class TestHealthCheckManagement:
     async def test_add_health_check_resolves_full_container_id(self, wired_api):
@@ -48,11 +42,12 @@ class TestHealthCheckManagement:
         docker_client.add_container(container, info)
 
         result = await add_health_check(
+            get_docker_client(),
             HealthCheckConfig(
                 container_id="web",
                 check_type="http",
                 http_endpoint="http://localhost/health",
-            )
+            ),
         )
 
         assert result["status"] == "success"
@@ -64,20 +59,11 @@ class TestHealthCheckManagement:
     async def test_add_health_check_unknown_container_returns_404(self, wired_api):
         with pytest.raises(HTTPException) as exc_info:
             await add_health_check(
-                HealthCheckConfig(container_id="does-not-exist", check_type="tcp", tcp_port=8080)
+                get_docker_client(),
+                HealthCheckConfig(container_id="does-not-exist", check_type="tcp", tcp_port=8080),
             )
 
         assert exc_info.value.status_code == 404
-
-    async def test_add_health_check_uninitialized_docker_client_returns_500(
-        self, uninitialized_api
-    ):
-        with pytest.raises(HTTPException) as exc_info:
-            await add_health_check(
-                HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080)
-            )
-
-        assert exc_info.value.status_code == 500
 
     async def test_get_health_check_returns_stored_check(self, wired_api):
         docker_client, _engine = wired_api
@@ -87,7 +73,7 @@ class TestHealthCheckManagement:
             HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080)
         )
 
-        result = await get_health_check("web")
+        result = await get_health_check(get_docker_client(), "web")
 
         assert result.container_id == "web"
         assert result.check_type == "tcp"
@@ -98,7 +84,7 @@ class TestHealthCheckManagement:
         docker_client.add_container(container, info)
 
         with pytest.raises(HTTPException) as exc_info:
-            await get_health_check("web")
+            await get_health_check(get_docker_client(), "web")
 
         assert exc_info.value.status_code == 404
 
@@ -112,7 +98,7 @@ class TestHealthCheckManagement:
             HealthCheckConfig(container_id="a" * 64, check_type="tcp", tcp_port=8080)
         )
 
-        result = await get_health_check("web")
+        result = await get_health_check(get_docker_client(), "web")
 
         assert result.container_id == "a" * 64
         assert result.check_type == "tcp"
@@ -132,24 +118,16 @@ class TestHealthCheckManagement:
             HealthCheckConfig(container_id="a" * 64, check_type="tcp", tcp_port=8080)
         )
 
-        result = await get_health_check("web")
+        result = await get_health_check(get_docker_client(), "web")
 
         assert result.container_id == "web"
         assert result.check_type == "http"
 
     async def test_get_health_check_unknown_container_returns_404(self, wired_api):
         with pytest.raises(HTTPException) as exc_info:
-            await get_health_check("does-not-exist")
+            await get_health_check(get_docker_client(), "does-not-exist")
 
         assert exc_info.value.status_code == 404
-
-    async def test_get_health_check_uninitialized_docker_client_returns_500(
-        self, uninitialized_api
-    ):
-        with pytest.raises(HTTPException) as exc_info:
-            await get_health_check("web")
-
-        assert exc_info.value.status_code == 500
 
     async def test_delete_health_check_removes_stored_check(self, wired_api):
         docker_client, _engine = wired_api
@@ -159,7 +137,7 @@ class TestHealthCheckManagement:
             HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080)
         )
 
-        result = await delete_health_check("web")
+        result = await delete_health_check(get_docker_client(), "web")
 
         assert result["status"] == "success"
         assert config_manager.get_custom_health_check("web") is None
@@ -172,7 +150,7 @@ class TestHealthCheckManagement:
             HealthCheckConfig(container_id="a" * 64, check_type="tcp", tcp_port=8080)
         )
 
-        result = await delete_health_check("web")
+        result = await delete_health_check(get_docker_client(), "web")
 
         assert result["status"] == "success"
         assert config_manager.get_custom_health_check("a" * 64) is None
@@ -194,7 +172,7 @@ class TestHealthCheckManagement:
             HealthCheckConfig(container_id="a" * 64, check_type="tcp", tcp_port=8080)
         )
 
-        result = await delete_health_check("web")
+        result = await delete_health_check(get_docker_client(), "web")
 
         assert result["status"] == "success"
         assert config_manager.get_custom_health_check("web") is None
@@ -202,17 +180,9 @@ class TestHealthCheckManagement:
 
     async def test_delete_health_check_unknown_container_returns_404(self, wired_api):
         with pytest.raises(HTTPException) as exc_info:
-            await delete_health_check("does-not-exist")
+            await delete_health_check(get_docker_client(), "does-not-exist")
 
         assert exc_info.value.status_code == 404
-
-    async def test_delete_health_check_uninitialized_docker_client_returns_500(
-        self, uninitialized_api
-    ):
-        with pytest.raises(HTTPException) as exc_info:
-            await delete_health_check("web")
-
-        assert exc_info.value.status_code == 500
 
     async def test_list_health_checks_returns_all_registered_checks(self):
         config_manager.add_custom_health_check(
@@ -246,7 +216,8 @@ class TestHealthCheckManagement:
 
         with pytest.raises(HTTPException) as exc_info:
             await add_health_check(
-                HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080)
+                get_docker_client(),
+                HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080),
             )
 
         docker_client.get_container_info = original_get_info
@@ -264,7 +235,8 @@ class TestHealthCheckManagement:
 
         with pytest.raises(HTTPException) as exc_info:
             await add_health_check(
-                HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080)
+                get_docker_client(),
+                HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080),
             )
 
         engine.get_stable_identifier = original_get_stable
@@ -281,7 +253,7 @@ class TestHealthCheckManagement:
         docker_client.get_container_info = lambda c: {}
 
         with pytest.raises(HTTPException) as exc_info:
-            await get_health_check("web")
+            await get_health_check(get_docker_client(), "web")
 
         docker_client.get_container_info = original_get_info
         assert exc_info.value.status_code == 500
@@ -297,7 +269,7 @@ class TestHealthCheckManagement:
         engine.get_stable_identifier = lambda info: None
 
         with pytest.raises(HTTPException) as exc_info:
-            await get_health_check("web")
+            await get_health_check(get_docker_client(), "web")
 
         engine.get_stable_identifier = original_get_stable
         assert exc_info.value.status_code == 500
@@ -313,7 +285,7 @@ class TestHealthCheckManagement:
         docker_client.get_container_info = lambda c: {}
 
         with pytest.raises(HTTPException) as exc_info:
-            await delete_health_check("web")
+            await delete_health_check(get_docker_client(), "web")
 
         docker_client.get_container_info = original_get_info
         assert exc_info.value.status_code == 500
@@ -329,7 +301,7 @@ class TestHealthCheckManagement:
         engine.get_stable_identifier = lambda info: None
 
         with pytest.raises(HTTPException) as exc_info:
-            await delete_health_check("web")
+            await delete_health_check(get_docker_client(), "web")
 
         engine.get_stable_identifier = original_get_stable
         assert exc_info.value.status_code == 500
@@ -343,20 +315,16 @@ class TestHealthCheckManagement:
         docker_client.add_container(container, info)
 
         # Mock config_manager.add_custom_health_check to raise an exception
-        original_add = config_manager.add_custom_health_check
-
         def mock_add_raises(health_check):
             raise ValueError("Unexpected config error")
 
-        config_manager.add_custom_health_check = mock_add_raises
+        monkeypatch.setitem(vars(config_manager), "add_custom_health_check", mock_add_raises)
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(ValueError, match="Unexpected config error"):
             await add_health_check(
-                HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080)
+                get_docker_client(),
+                HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080),
             )
-
-        config_manager.add_custom_health_check = original_add
-        assert exc_info.value.status_code == 500
 
     async def test_get_health_check_handles_unexpected_error(self, wired_api, monkeypatch):
         docker_client, _engine = wired_api
@@ -364,18 +332,13 @@ class TestHealthCheckManagement:
         docker_client.add_container(container, info)
 
         # Mock config_manager.get_custom_health_check to raise an exception
-        original_get = config_manager.get_custom_health_check
-
         def mock_get_raises(container_id):
             raise ValueError("Unexpected config error")
 
-        config_manager.get_custom_health_check = mock_get_raises
+        monkeypatch.setitem(vars(config_manager), "get_custom_health_check", mock_get_raises)
 
-        with pytest.raises(HTTPException) as exc_info:
-            await get_health_check("web")
-
-        config_manager.get_custom_health_check = original_get
-        assert exc_info.value.status_code == 500
+        with pytest.raises(ValueError, match="Unexpected config error"):
+            await get_health_check(get_docker_client(), "web")
 
     async def test_delete_health_check_handles_unexpected_error(self, wired_api, monkeypatch):
         docker_client, _engine = wired_api
@@ -383,18 +346,13 @@ class TestHealthCheckManagement:
         docker_client.add_container(container, info)
 
         # Mock config_manager.remove_custom_health_check to raise an exception
-        original_remove = config_manager.remove_custom_health_check
-
         def mock_remove_raises(container_id):
             raise ValueError("Unexpected config error")
 
-        config_manager.remove_custom_health_check = mock_remove_raises
+        monkeypatch.setitem(vars(config_manager), "remove_custom_health_check", mock_remove_raises)
 
-        with pytest.raises(HTTPException) as exc_info:
-            await delete_health_check("web")
-
-        config_manager.remove_custom_health_check = original_remove
-        assert exc_info.value.status_code == 500
+        with pytest.raises(ValueError, match="Unexpected config error"):
+            await delete_health_check(get_docker_client(), "web")
 
     async def test_add_health_check_rejects_when_monitoring_engine_not_initialized(
         self, monkeypatch, docker_client
@@ -409,7 +367,8 @@ class TestHealthCheckManagement:
 
         with pytest.raises(HTTPException) as exc_info:
             await add_health_check(
-                HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080)
+                get_docker_client(),
+                HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080),
             )
 
         assert exc_info.value.status_code == 500
@@ -427,7 +386,7 @@ class TestHealthCheckManagement:
         monkeypatch.setattr("app.api.state.monitoring_engine", None)
 
         with pytest.raises(HTTPException) as exc_info:
-            await get_health_check("web")
+            await get_health_check(get_docker_client(), "web")
 
         assert exc_info.value.status_code == 500
         assert "Unable to resolve container stable identifier" in exc_info.value.detail
@@ -444,7 +403,7 @@ class TestHealthCheckManagement:
         monkeypatch.setattr("app.api.state.monitoring_engine", None)
 
         with pytest.raises(HTTPException) as exc_info:
-            await delete_health_check("web")
+            await delete_health_check(get_docker_client(), "web")
 
         assert exc_info.value.status_code == 500
         assert "Unable to resolve container stable identifier" in exc_info.value.detail
@@ -507,7 +466,7 @@ class TestHealthCheckValidation:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(("fields", "expected"), INVALID_CHECKS)
-    async def test_post_returns_422_and_stores_nothing(self, fields, expected):
+    async def test_post_returns_422_and_stores_nothing(self, wired_api, fields, expected):
         status, body, _ = await _request(
             "POST",
             "/api/healthchecks",

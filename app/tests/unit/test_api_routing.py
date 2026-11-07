@@ -83,14 +83,20 @@ def _registered_routes() -> list[tuple[str, str]]:
     ]
 
 
-async def _request(
+async def _request(  # noqa: PLR0913 - keyword-only flag added alongside the existing request fields
     method: str,
     path: str,
     request_headers: dict[str, str] | None = None,
     query: str = "",
     body: bytes = b"",
+    *,
+    raise_app_exceptions: bool = True,
 ) -> tuple[int, bytes, dict[str, str]]:
-    """Send one request through the ASGI app and return (status, body, headers)."""
+    """Send one request through the ASGI app and return (status, body, headers).
+
+    Starlette re-raises an unhandled exception after the 500 response has been sent.
+    Pass ``raise_app_exceptions=False`` to inspect that response instead of the exception.
+    """
     scope: dict[str, Any] = {
         "type": "http",
         "asgi": {"version": "3.0", "spec_version": "2.1"},
@@ -125,7 +131,11 @@ async def _request(
         elif message["type"] == "http.response.body":
             response_body += message.get("body", b"")
 
-    await app(scope, receive, send)
+    try:
+        await app(scope, receive, send)
+    except Exception:
+        if raise_app_exceptions or status is None:
+            raise
     assert status is not None, "app never started a response"
     return status, response_body, headers
 

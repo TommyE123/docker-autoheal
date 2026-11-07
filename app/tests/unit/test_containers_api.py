@@ -18,6 +18,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi import HTTPException
 
+from app.api.errors import get_docker_client
 from app.api.models import ContainerSelectionRequest
 from app.api.routes.containers import (
     _stable_id_from_info,
@@ -42,13 +43,6 @@ def wired_api(monkeypatch, docker_client, engine):
     monkeypatch.setattr("app.api.state.docker_client", docker_client)
     monkeypatch.setattr("app.api.state.monitoring_engine", engine)
     return docker_client, engine
-
-
-@pytest.fixture
-def uninitialized_api(monkeypatch):
-    """Simulate the API being called before ``init_api`` has run."""
-    monkeypatch.setattr("app.api.state.docker_client", None)
-    monkeypatch.setattr("app.api.state.monitoring_engine", None)
 
 
 @pytest.mark.parametrize(
@@ -86,7 +80,7 @@ class TestListContainers:
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
 
-        result = await list_containers()
+        result = await list_containers(get_docker_client())
 
         assert len(result) == 1
         assert result[0].name == "web"
@@ -109,7 +103,7 @@ class TestListContainers:
         engine.uptime_kuma_monitor.is_container_mapped.return_value = True
         engine.uptime_kuma_monitor.get_container_status.return_value = 1  # up
 
-        result = await list_containers()
+        result = await list_containers(get_docker_client())
 
         assert result[0].uptime_kuma_status == 1
         assert result[0].uptime_kuma_monitor_name == "Web Monitor"
@@ -125,7 +119,7 @@ class TestListContainers:
         # that hasn't finished initializing the integration yet.
         assert engine.uptime_kuma_monitor is None
 
-        result = await list_containers()
+        result = await list_containers(get_docker_client())
 
         assert result[0].uptime_kuma_status == 4
         assert result[0].uptime_kuma_monitor_name is None
@@ -140,7 +134,7 @@ class TestListContainers:
         engine.uptime_kuma_monitor = MagicMock()
         engine.uptime_kuma_monitor.is_container_mapped.return_value = False
 
-        result = await list_containers()
+        result = await list_containers(get_docker_client())
 
         assert result[0].uptime_kuma_status is None
         assert result[0].uptime_kuma_monitor_name is None
@@ -153,7 +147,7 @@ class TestListContainers:
         docker_client.add_container(container, info)
         monkeypatch.setattr("app.api.state.monitoring_engine", None)
 
-        result = await list_containers()
+        result = await list_containers(get_docker_client())
 
         assert result[0].monitored is False
 
@@ -173,7 +167,7 @@ class TestListContainers:
         engine.uptime_kuma_monitor.is_container_mapped.return_value = True
         engine.uptime_kuma_monitor.get_container_status.return_value = 1
 
-        result = await list_containers()
+        result = await list_containers(get_docker_client())
 
         assert result[0].uptime_kuma_status == 1
         assert result[0].uptime_kuma_monitor_name is None
@@ -185,17 +179,11 @@ class TestListContainers:
         container, _info = make_container(name="vanished")
         docker_client._containers.append(container)
 
-        result = await list_containers()
+        result = await list_containers(get_docker_client())
 
         assert result == []
 
-    async def test_uninitialized_docker_client_returns_500(self, uninitialized_api):
-        with pytest.raises(HTTPException) as exc_info:
-            await list_containers()
-
-        assert exc_info.value.status_code == 500
-
-    async def test_docker_listing_error_returns_500(self, wired_api, monkeypatch):
+    async def test_docker_listing_error_propagates(self, wired_api, monkeypatch):
         docker_client, _engine = wired_api
         monkeypatch.setattr(
             docker_client,
@@ -203,10 +191,8 @@ class TestListContainers:
             MagicMock(side_effect=RuntimeError("daemon unavailable")),
         )
 
-        with pytest.raises(HTTPException) as exc_info:
-            await list_containers()
-
-        assert exc_info.value.status_code == 500
+        with pytest.raises(RuntimeError, match="daemon unavailable"):
+            await list_containers(get_docker_client())
 
 
 @pytest.mark.asyncio
@@ -216,7 +202,7 @@ class TestGetContainerDetails:
         container, info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, info)
 
-        details = await get_container_details("a" * 64)
+        details = await get_container_details(get_docker_client(), "a" * 64)
 
         assert details["name"] == "web"
         assert details["monitored"] is True
@@ -231,7 +217,7 @@ class TestGetContainerDetails:
         docker_client.add_container(container, info)
         monkeypatch.setattr("app.api.state.monitoring_engine", None)
 
-        details = await get_container_details("a" * 64)
+        details = await get_container_details(get_docker_client(), "a" * 64)
 
         assert details["monitored"] is False
 
@@ -244,7 +230,7 @@ class TestGetContainerDetails:
             HealthCheckConfig(container_id=key, check_type="tcp", tcp_port=80)
         )
 
-        details = await get_container_details("a" * 64)
+        details = await get_container_details(get_docker_client(), "a" * 64)
 
         assert details["custom_health_check"].container_id == key
 
@@ -258,7 +244,7 @@ class TestGetContainerDetails:
             HealthCheckConfig(container_id="stable", check_type="tcp", tcp_port=80)
         )
 
-        details = await get_container_details("a" * 64)
+        details = await get_container_details(get_docker_client(), "a" * 64)
 
         assert details["custom_health_check"].container_id == "stable"
 
@@ -276,7 +262,7 @@ class TestGetContainerDetails:
             )
 
         for expected in ("stable", "web", "a" * 64):
-            details = await get_container_details("a" * 64)
+            details = await get_container_details(get_docker_client(), "a" * 64)
             assert details["custom_health_check"].container_id == expected
             config_manager.remove_custom_health_check(expected)
 
@@ -286,7 +272,7 @@ class TestGetContainerDetails:
         docker_client.add_container(container, {})
 
         with pytest.raises(HTTPException) as exc_info:
-            await get_container_details("a" * 64)
+            await get_container_details(get_docker_client(), "a" * 64)
 
         assert exc_info.value.status_code == 500
 
@@ -297,23 +283,17 @@ class TestGetContainerDetails:
         docker_client.add_container(container, info)
 
         with pytest.raises(HTTPException) as exc_info:
-            await get_container_details("a" * 64)
+            await get_container_details(get_docker_client(), "a" * 64)
 
         assert exc_info.value.status_code == 500
 
     async def test_unknown_container_returns_404(self, wired_api):
         with pytest.raises(HTTPException) as exc_info:
-            await get_container_details("does-not-exist")
+            await get_container_details(get_docker_client(), "does-not-exist")
 
         assert exc_info.value.status_code == 404
 
-    async def test_uninitialized_docker_client_returns_500(self, uninitialized_api):
-        with pytest.raises(HTTPException) as exc_info:
-            await get_container_details("anything")
-
-        assert exc_info.value.status_code == 500
-
-    async def test_docker_inspection_error_returns_500(self, wired_api, monkeypatch):
+    async def test_docker_inspection_error_propagates(self, wired_api, monkeypatch):
         docker_client, _engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, info)
@@ -323,23 +303,12 @@ class TestGetContainerDetails:
             MagicMock(side_effect=RuntimeError("inspection failed")),
         )
 
-        with pytest.raises(HTTPException) as exc_info:
-            await get_container_details("a" * 64)
-
-        assert exc_info.value.status_code == 500
+        with pytest.raises(RuntimeError, match="inspection failed"):
+            await get_container_details(get_docker_client(), "a" * 64)
 
 
 @pytest.mark.asyncio
 class TestUpdateContainerSelection:
-    async def test_uninitialized_docker_client_returns_clear_500(self, uninitialized_api):
-        with pytest.raises(HTTPException) as exc_info:
-            await update_container_selection(
-                ContainerSelectionRequest(container_ids=["web"], enabled=True)
-            )
-
-        assert exc_info.value.status_code == 500
-        assert exc_info.value.detail == "Docker client not initialized"
-
     async def test_enabling_adds_stable_id_and_clears_exclusion(self, wired_api):
         docker_client, _engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
@@ -349,7 +318,7 @@ class TestUpdateContainerSelection:
         config_manager.update_config(config)
 
         await update_container_selection(
-            ContainerSelectionRequest(container_ids=["a" * 64], enabled=True)
+            get_docker_client(), ContainerSelectionRequest(container_ids=["a" * 64], enabled=True)
         )
 
         updated = config_manager.get_config()
@@ -365,7 +334,7 @@ class TestUpdateContainerSelection:
         config_manager.update_config(config)
 
         await update_container_selection(
-            ContainerSelectionRequest(container_ids=["a" * 64], enabled=True)
+            get_docker_client(), ContainerSelectionRequest(container_ids=["a" * 64], enabled=True)
         )
 
         assert config_manager.get_config().containers.selected == ["web"]
@@ -379,7 +348,7 @@ class TestUpdateContainerSelection:
         config_manager.update_config(config)
 
         await update_container_selection(
-            ContainerSelectionRequest(container_ids=["a" * 64], enabled=False)
+            get_docker_client(), ContainerSelectionRequest(container_ids=["a" * 64], enabled=False)
         )
 
         assert config_manager.get_config().containers.excluded == ["web"]
@@ -390,7 +359,7 @@ class TestUpdateContainerSelection:
         config_manager.update_config(config)
 
         await update_container_selection(
-            ContainerSelectionRequest(container_ids=["ghost"], enabled=True)
+            get_docker_client(), ContainerSelectionRequest(container_ids=["ghost"], enabled=True)
         )
 
         assert config_manager.get_config().containers.selected == ["ghost"]
@@ -401,7 +370,7 @@ class TestUpdateContainerSelection:
         config_manager.update_config(config)
 
         await update_container_selection(
-            ContainerSelectionRequest(container_ids=["ghost"], enabled=False)
+            get_docker_client(), ContainerSelectionRequest(container_ids=["ghost"], enabled=False)
         )
 
         assert config_manager.get_config().containers.excluded == ["ghost"]
@@ -415,7 +384,7 @@ class TestUpdateContainerSelection:
         config_manager.update_config(config)
 
         await update_container_selection(
-            ContainerSelectionRequest(container_ids=["a" * 64], enabled=False)
+            get_docker_client(), ContainerSelectionRequest(container_ids=["a" * 64], enabled=False)
         )
 
         updated = config_manager.get_config()
@@ -430,7 +399,8 @@ class TestUpdateContainerSelection:
         config_manager.update_config(config)
 
         await update_container_selection(
-            ContainerSelectionRequest(container_ids=["ghost-container"], enabled=True)
+            get_docker_client(),
+            ContainerSelectionRequest(container_ids=["ghost-container"], enabled=True),
         )
 
         updated = config_manager.get_config()
@@ -454,7 +424,7 @@ class TestUpdateContainerSelection:
 
         with caplog.at_level(logging.DEBUG, logger="app.api.routes.containers"):
             await update_container_selection(
-                ContainerSelectionRequest(container_ids=[cid], enabled=enabled)
+                get_docker_client(), ContainerSelectionRequest(container_ids=[cid], enabled=enabled)
             )
 
         messages = [r.getMessage() for r in caplog.records if r.levelno == logging.DEBUG]
@@ -470,7 +440,8 @@ class TestUpdateContainerSelection:
     ):
         with caplog.at_level(logging.DEBUG, logger="app.api.routes.containers"):
             await update_container_selection(
-                ContainerSelectionRequest(container_ids=["ghost"], enabled=enabled)
+                get_docker_client(),
+                ContainerSelectionRequest(container_ids=["ghost"], enabled=enabled),
             )
 
         messages = [r.getMessage() for r in caplog.records if r.levelno == logging.DEBUG]
@@ -499,7 +470,8 @@ class TestUpdateContainerSelection:
         docker_client.add_container(container, info)
 
         await update_container_selection(
-            ContainerSelectionRequest(container_ids=["a" * 64], enabled=enabled)
+            get_docker_client(),
+            ContainerSelectionRequest(container_ids=["a" * 64], enabled=enabled),
         )
 
         containers = config_manager.get_config().containers
@@ -517,7 +489,7 @@ class TestUpdateContainerSelection:
         docker_client.add_container(container, {})
 
         await update_container_selection(
-            ContainerSelectionRequest(container_ids=["a" * 64], enabled=True)
+            get_docker_client(), ContainerSelectionRequest(container_ids=["a" * 64], enabled=True)
         )
 
         assert config_manager.get_config().containers.selected == ["a" * 64]
@@ -541,7 +513,7 @@ class TestUpdateContainerSelection:
         docker_client.add_container(container, info)
 
         await update_container_selection(
-            ContainerSelectionRequest(container_ids=["a" * 64], enabled=True)
+            get_docker_client(), ContainerSelectionRequest(container_ids=["a" * 64], enabled=True)
         )
 
         assert expected_id in config_manager.get_config().containers.selected
@@ -552,7 +524,8 @@ class TestUpdateContainerSelection:
         config_manager.update_config(config)
 
         await update_container_selection(
-            ContainerSelectionRequest(container_ids=["ghost-container"], enabled=False)
+            get_docker_client(),
+            ContainerSelectionRequest(container_ids=["ghost-container"], enabled=False),
         )
 
         updated = config_manager.get_config()
@@ -587,26 +560,24 @@ class TestUpdateContainerSelection:
         config_manager.update_config(config)
 
         await update_container_selection(
-            ContainerSelectionRequest(container_ids=["a" * 64], enabled=False)
+            get_docker_client(), ContainerSelectionRequest(container_ids=["a" * 64], enabled=False)
         )
 
         updated = config_manager.get_config()
         assert updated.containers.excluded == [stable_id]
         assert updated.containers.selected == []
 
-    async def test_selection_persistence_error_returns_500(self, monkeypatch):
+    async def test_selection_persistence_error_propagates(self, wired_api, monkeypatch):
         monkeypatch.setattr(
             config_manager,
             "update_config",
             MagicMock(side_effect=RuntimeError("disk error")),
         )
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(RuntimeError, match="disk error"):
             await update_container_selection(
-                ContainerSelectionRequest(container_ids=[], enabled=True)
+                get_docker_client(), ContainerSelectionRequest(container_ids=[], enabled=True)
             )
-
-        assert exc_info.value.status_code == 500
 
 
 @pytest.mark.asyncio
@@ -616,14 +587,14 @@ class TestRestartContainerManual:
         container, info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, info)
 
-        result = await restart_container_manual("a" * 64)
+        result = await restart_container_manual(get_docker_client(), "a" * 64)
 
         assert result["status"] == "success"
         assert docker_client.restart_calls == ["web"]
 
     async def test_unknown_container_returns_404(self, wired_api):
         with pytest.raises(HTTPException) as exc_info:
-            await restart_container_manual("does-not-exist")
+            await restart_container_manual(get_docker_client(), "does-not-exist")
 
         assert exc_info.value.status_code == 404
 
@@ -634,17 +605,11 @@ class TestRestartContainerManual:
         docker_client.restart_results["web"] = False
 
         with pytest.raises(HTTPException) as exc_info:
-            await restart_container_manual("a" * 64)
+            await restart_container_manual(get_docker_client(), "a" * 64)
 
         assert exc_info.value.status_code == 500
 
-    async def test_uninitialized_docker_client_returns_500(self, uninitialized_api):
-        with pytest.raises(HTTPException) as exc_info:
-            await restart_container_manual("anything")
-
-        assert exc_info.value.status_code == 500
-
-    async def test_docker_restart_exception_returns_500(self, wired_api, monkeypatch):
+    async def test_docker_restart_exception_propagates(self, wired_api, monkeypatch):
         docker_client, _engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, info)
@@ -654,10 +619,8 @@ class TestRestartContainerManual:
             MagicMock(side_effect=RuntimeError("restart failed")),
         )
 
-        with pytest.raises(HTTPException) as exc_info:
-            await restart_container_manual("a" * 64)
-
-        assert exc_info.value.status_code == 500
+        with pytest.raises(RuntimeError, match="restart failed"):
+            await restart_container_manual(get_docker_client(), "a" * 64)
 
 
 @pytest.mark.asyncio
@@ -669,7 +632,7 @@ class TestUnquarantineContainer:
         config_manager.quarantine_container("web")
         config_manager.record_restart("web")
 
-        result = await unquarantine_container("a" * 64)
+        result = await unquarantine_container(get_docker_client(), "a" * 64)
 
         assert result["status"] == "success"
         assert config_manager.is_quarantined("web") is False
@@ -688,7 +651,7 @@ class TestUnquarantineContainer:
         docker_client.add_container(container, {})
 
         with pytest.raises(HTTPException) as exc_info:
-            await unquarantine_container("a" * 64)
+            await unquarantine_container(get_docker_client(), "a" * 64)
 
         assert exc_info.value.status_code == 500
 
@@ -702,24 +665,18 @@ class TestUnquarantineContainer:
         config_manager.quarantine_container("web")
 
         with pytest.raises(HTTPException) as exc_info:
-            await unquarantine_container("a" * 64)
+            await unquarantine_container(get_docker_client(), "a" * 64)
 
         assert exc_info.value.status_code == 500
         assert config_manager.is_quarantined("web") is True
 
     async def test_unknown_container_returns_404(self, wired_api):
         with pytest.raises(HTTPException) as exc_info:
-            await unquarantine_container("does-not-exist")
+            await unquarantine_container(get_docker_client(), "does-not-exist")
 
         assert exc_info.value.status_code == 404
 
-    async def test_uninitialized_docker_client_returns_500(self, uninitialized_api):
-        with pytest.raises(HTTPException) as exc_info:
-            await unquarantine_container("anything")
-
-        assert exc_info.value.status_code == 500
-
-    async def test_notification_error_returns_500(self, wired_api, monkeypatch):
+    async def test_notification_error_propagates(self, wired_api, monkeypatch):
         docker_client, _engine = wired_api
         container, info = make_container(name="web", container_id="a" * 64)
         docker_client.add_container(container, info)
@@ -728,7 +685,5 @@ class TestUnquarantineContainer:
             AsyncMock(side_effect=RuntimeError("notification failed")),
         )
 
-        with pytest.raises(HTTPException) as exc_info:
-            await unquarantine_container("a" * 64)
-
-        assert exc_info.value.status_code == 500
+        with pytest.raises(RuntimeError, match="notification failed"):
+            await unquarantine_container(get_docker_client(), "a" * 64)

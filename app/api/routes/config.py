@@ -15,9 +15,12 @@ from typing import Annotated
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
+from app.api.errors import escape_for_log, invalid_input_as_422
 from app.config.config_manager import (
     AutoHealConfig,
+    ConfigImportError,
     MonitorConfig,
+    ObservabilityConfig,
     RestartConfig,
     config_manager,
 )
@@ -36,116 +39,103 @@ async def get_config():
 @router.put("/api/config")
 async def update_config(config: AutoHealConfig):
     """Update configuration"""
-    try:
-        config_manager.update_config(config)
-    except Exception as e:
-        logger.error("Error updating config: %s", e)
-        raise HTTPException(status_code=500, detail=str(e)) from e
-    else:
-        return {"status": "success", "message": "Configuration updated"}
+    config_manager.update_config(config)
+    return {"status": "success", "message": "Configuration updated"}
 
 
 @router.put("/api/config/monitor")
 async def update_monitor_config(monitor_config: MonitorConfig):
     """Update monitor configuration"""
-    try:
-        config = config_manager.get_config()
-        config.monitor = monitor_config
-        config_manager.update_config(config)
-    except Exception as e:
-        logger.error("Error updating monitor config: %s", e)
-        raise HTTPException(status_code=500, detail=str(e)) from e
-    else:
-        return {"status": "success", "message": "Monitor configuration updated"}
+    config = config_manager.get_config()
+    config.monitor = monitor_config
+    config_manager.update_config(config)
+    return {"status": "success", "message": "Monitor configuration updated"}
 
 
 @router.put("/api/config/restart")
 async def update_restart_config(restart_config: RestartConfig):
     """Update restart configuration"""
-    try:
-        config = config_manager.get_config()
-        config.restart = restart_config
-        config_manager.update_config(config)
-    except Exception as e:
-        logger.error("Error updating restart config: %s", e)
-        raise HTTPException(status_code=500, detail=str(e)) from e
-    else:
-        return {"status": "success", "message": "Restart configuration updated"}
+    config = config_manager.get_config()
+    config.restart = restart_config
+    config_manager.update_config(config)
+    return {"status": "success", "message": "Restart configuration updated"}
 
 
 @router.get("/api/config/export")
 async def export_config():
     """Export configuration as JSON"""
-    try:
-        config_json = config_manager.export_config()
+    config_json = config_manager.export_config()
 
-        # Return as downloadable file
-        return JSONResponse(
-            content=json.loads(config_json),
-            headers={
-                "Content-Disposition": f"attachment; filename=autoheal-config-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}.json"
-            },
-        )
-    except Exception as e:
-        logger.error("Error exporting config: %s", e)
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    # Return as downloadable file
+    return JSONResponse(
+        content=json.loads(config_json),
+        headers={
+            "Content-Disposition": f"attachment; filename=autoheal-config-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}.json"
+        },
+    )
 
 
-@router.post("/api/config/import")
+@router.post(
+    "/api/config/import",
+    responses={422: {"description": "File is not UTF-8 JSON or is not a valid configuration"}},
+)
 async def import_config(file: Annotated[UploadFile, File()]):
     """Import configuration from JSON file"""
+    content = await file.read()
     try:
-        content = await file.read()
         config_json = content.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=422, detail="File must be UTF-8 encoded JSON") from None
 
-        config_manager.import_config(config_json)
-    except Exception as e:
-        logger.error("Error importing config: %s", e)
-        raise HTTPException(status_code=500, detail=str(e)) from e
-    else:
-        return {"status": "success", "message": "Configuration imported successfully"}
+    try:
+        with invalid_input_as_422():
+            config_manager.import_config(config_json)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=422, detail="File is not valid JSON") from None
+    except ConfigImportError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from None
+    return {"status": "success", "message": "Configuration imported successfully"}
 
 
 @router.put("/api/config/observability")
 async def update_observability_config(observability_config: dict):
     """Update observability configuration including log level"""
-    try:
-        config = config_manager.get_config()
+    config = config_manager.get_config()
 
-        # Update observability config
-        if "log_level" in observability_config:
-            level_name = observability_config["log_level"]
-            config.observability.log_level = level_name
+    # Validate the merged section as one model, so a bad value is rejected here instead of
+    # being saved and then reset the next time the config loads.
+    updates = {
+        key: observability_config[key]
+        for key in ("log_level", "prometheus_enabled", "log_format")
+        if key in observability_config
+    }
+    with invalid_input_as_422():
+        config.observability = ObservabilityConfig.model_validate(
+            {**config.observability.model_dump(), **updates}
+        )
 
-            # Update log level directly without importing main
-            level_map = {
-                "DEBUG": logging.DEBUG,
-                "INFO": logging.INFO,
-                "WARNING": logging.WARNING,
-                "ERROR": logging.ERROR,
-                "CRITICAL": logging.CRITICAL,
-            }
-            level = level_map.get(level_name.upper(), logging.INFO)
+    if "log_level" in updates:
+        level_name = config.observability.log_level
 
-            # Set root logger level
-            logging.getLogger().setLevel(level)
+        # Update log level directly without importing main
+        level_map = {
+            "DEBUG": logging.DEBUG,
+            "INFO": logging.INFO,
+            "WARNING": logging.WARNING,
+            "ERROR": logging.ERROR,
+            "CRITICAL": logging.CRITICAL,
+        }
+        level = level_map.get(level_name.upper(), logging.INFO)
 
-            # Disable uvicorn access logs completely
-            logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-            logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
-            logging.getLogger("uvicorn").setLevel(logging.WARNING)
+        # Set root logger level
+        logging.getLogger().setLevel(level)
 
-            logger.info("Log level changed to: %s", level_name)
+        # Disable uvicorn access logs completely
+        logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+        logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
+        logging.getLogger("uvicorn").setLevel(logging.WARNING)
 
-        if "prometheus_enabled" in observability_config:
-            config.observability.prometheus_enabled = observability_config["prometheus_enabled"]
+        logger.info("Log level changed to: %s", escape_for_log(level_name))
 
-        if "log_format" in observability_config:
-            config.observability.log_format = observability_config["log_format"]
-
-        config_manager.update_config(config)
-    except Exception as e:
-        logger.exception("Error updating observability config: %s", e)
-        raise HTTPException(status_code=500, detail=str(e)) from e
-    else:
-        return {"status": "success", "message": "Observability configuration updated"}
+    config_manager.update_config(config)
+    return {"status": "success", "message": "Observability configuration updated"}

@@ -23,7 +23,12 @@ from app.api.routes.config import (
 )
 from app.api.routes.config import import_config as api_import_config
 from app.api.routes.config import update_config as api_update_config
-from app.config.config_manager import MonitorConfig, RestartConfig, config_manager
+from app.config.config_manager import (
+    HealthCheckConfig,
+    MonitorConfig,
+    RestartConfig,
+    config_manager,
+)
 
 
 @pytest.mark.asyncio
@@ -92,19 +97,17 @@ class TestConfigurationEndpoints:
             (update_restart_config, RestartConfig(mode="both", max_restarts=7)),
         ],
     )
-    async def test_configuration_update_errors_return_500(self, monkeypatch, endpoint, payload):
+    async def test_configuration_update_errors_propagate(self, monkeypatch, endpoint, payload):
         monkeypatch.setattr(
             config_manager,
             "update_config",
             MagicMock(side_effect=RuntimeError("disk error")),
         )
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(RuntimeError, match="disk error"):
             await endpoint(payload) if payload is not None else await endpoint(
                 config_manager.get_config()
             )
-
-        assert exc_info.value.status_code == 500
 
 
 @pytest.mark.asyncio
@@ -165,17 +168,39 @@ class TestObservabilityConfig:
 
         assert config_manager.get_config().restart.mode == original_restart_mode
 
-    async def test_update_observability_config_unexpected_error_returns_500(self, monkeypatch):
+    @pytest.mark.parametrize(
+        "body",
+        [{"log_level": 5}, {"prometheus_enabled": "abc"}, {"log_format": ["json"]}],
+        ids=["log-level-not-string", "prometheus-not-bool", "log-format-not-string"],
+    )
+    async def test_update_observability_config_with_invalid_body_returns_422(self, body):
+        before = config_manager.get_config().observability.model_dump()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await update_observability_config(body)
+
+        assert exc_info.value.status_code == 422
+        assert config_manager.get_config().observability.model_dump() == before
+
+    async def test_log_level_change_log_line_cannot_be_forged(self, caplog):
+        with caplog.at_level("INFO", logger="app.api.routes.config"):
+            await update_observability_config({"log_level": "INFO\nFORGED log line"})
+
+        message = next(
+            r.getMessage() for r in caplog.records if "Log level changed" in r.getMessage()
+        )
+        assert "\n" not in message
+        assert "INFO\\nFORGED log line" in message
+
+    async def test_update_observability_config_unexpected_error_propagates(self, monkeypatch):
         monkeypatch.setattr(
             config_manager,
             "update_config",
             MagicMock(side_effect=RuntimeError("disk error")),
         )
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(RuntimeError, match="disk error"):
             await update_observability_config({"log_level": "DEBUG"})
-
-        assert exc_info.value.status_code == 500
 
 
 @pytest.mark.asyncio
@@ -192,17 +217,15 @@ class TestConfigExportImport:
         body = json.loads(bytes(response.body))
         assert body["monitor"]["interval_seconds"] == 77
 
-    async def test_export_config_failure_returns_500(self, monkeypatch):
+    async def test_export_config_failure_propagates(self, monkeypatch):
         monkeypatch.setattr(
             config_manager,
             "export_config",
             MagicMock(side_effect=RuntimeError("disk error")),
         )
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(RuntimeError, match="disk error"):
             await export_config()
-
-        assert exc_info.value.status_code == 500
 
     async def test_import_config_applies_uploaded_configuration(self):
         new_config = config_manager.get_config()
@@ -215,10 +238,71 @@ class TestConfigExportImport:
         assert result["status"] == "success"
         assert config_manager.get_config().monitor.interval_seconds == 123
 
-    async def test_import_config_invalid_json_returns_500(self):
-        upload = UploadFile(file=BytesIO(b"not valid json"), filename="config.json")
+    @pytest.mark.parametrize(
+        ("payload", "detail"),
+        [
+            ([], "Configuration must be a JSON object"),
+            ("just a string", "Configuration must be a JSON object"),
+            (
+                {"custom_health_checks": []},
+                "custom_health_checks must be an object whose values are health check objects",
+            ),
+            (
+                {"custom_health_checks": {"web": "not-an-object"}},
+                "custom_health_checks must be an object whose values are health check objects",
+            ),
+        ],
+        ids=["root-array", "root-string", "custom-checks-array", "custom-check-not-object"],
+    )
+    async def test_import_config_with_wrong_structure_returns_422(self, payload, detail):
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080)
+        )
+        before = config_manager.get_config()
+        checks_before = config_manager.get_all_custom_health_checks()
+        upload = UploadFile(file=BytesIO(json.dumps(payload).encode()), filename="config.json")
 
         with pytest.raises(HTTPException) as exc_info:
             await api_import_config(upload)
 
-        assert exc_info.value.status_code == 500
+        assert exc_info.value.status_code == 422
+        assert exc_info.value.detail == detail
+        assert config_manager.get_config() == before
+        assert config_manager.get_all_custom_health_checks() == checks_before
+
+    async def test_import_config_422_does_not_echo_a_submitted_check_type(self):
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=8080)
+        )
+        checks_before = config_manager.get_all_custom_health_checks()
+        payload = {
+            "custom_health_checks": {
+                "web": {"container_id": "web", "check_type": "SECRET-VALUE-123"}
+            }
+        }
+        upload = UploadFile(file=BytesIO(json.dumps(payload).encode()), filename="config.json")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await api_import_config(upload)
+
+        assert exc_info.value.status_code == 422
+        assert "Unknown check_type" in exc_info.value.detail
+        assert "SECRET-VALUE-123" not in exc_info.value.detail
+        assert config_manager.get_all_custom_health_checks() == checks_before
+
+    @pytest.mark.parametrize(
+        ("content", "detail"),
+        [
+            (b"not valid json", "File is not valid JSON"),
+            (b"\xff\xfe not utf-8", "File must be UTF-8 encoded JSON"),
+        ],
+        ids=["not-json", "not-utf8"],
+    )
+    async def test_import_config_unreadable_file_returns_422(self, content, detail):
+        upload = UploadFile(file=BytesIO(content), filename="config.json")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await api_import_config(upload)
+
+        assert exc_info.value.status_code == 422
+        assert exc_info.value.detail == detail

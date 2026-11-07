@@ -15,6 +15,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from app.api.errors import register_exception_handlers
 from app.api.state import init_api  # noqa: F401  (re-exported for app/main.py)
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,8 @@ app = FastAPI(
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
 )
+
+register_exception_handlers(app)
 
 # No CORS middleware: the bundled UI is served by this same app (and the Vite
 # dev server proxies /api and /health), so every legitimate browser request is

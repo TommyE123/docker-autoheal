@@ -14,6 +14,7 @@ import threading
 import pytest
 from fastapi import HTTPException
 
+from app.api.errors import get_docker_client
 from app.api.models import ContainerSelectionRequest
 from app.api.routes.containers import (
     get_container_details,
@@ -107,7 +108,7 @@ class TestDockerCallsDoNotBlockEventLoop:
         client = _wire(monkeypatch, engine, "restart_container")
 
         result = await _assert_loop_stays_responsive(
-            client, lambda: restart_container_manual("web")
+            client, lambda: restart_container_manual(get_docker_client(), "web")
         )
 
         assert result["status"] == "success"
@@ -116,14 +117,18 @@ class TestDockerCallsDoNotBlockEventLoop:
     async def test_list_containers(self, monkeypatch, engine):
         client = _wire(monkeypatch, engine, "list_containers")
 
-        result = await _assert_loop_stays_responsive(client, list_containers)
+        result = await _assert_loop_stays_responsive(
+            client, lambda: list_containers(get_docker_client())
+        )
 
         assert [c.name for c in result] == ["web"]
 
     async def test_list_containers_inspect(self, monkeypatch, engine):
         client = _wire(monkeypatch, engine, "get_container_info")
 
-        result = await _assert_loop_stays_responsive(client, list_containers)
+        result = await _assert_loop_stays_responsive(
+            client, lambda: list_containers(get_docker_client())
+        )
 
         assert [c.name for c in result] == ["web"]
 
@@ -145,7 +150,9 @@ class TestDockerCallsDoNotBlockEventLoop:
     async def test_container_details(self, monkeypatch, engine):
         client = _wire(monkeypatch, engine, "get_container_info")
 
-        result = await _assert_loop_stays_responsive(client, lambda: get_container_details("web"))
+        result = await _assert_loop_stays_responsive(
+            client, lambda: get_container_details(get_docker_client(), "web")
+        )
 
         assert result["name"] == "web"
 
@@ -154,7 +161,7 @@ class TestDockerCallsDoNotBlockEventLoop:
         request = ContainerSelectionRequest(container_ids=["web"], enabled=True)
 
         result = await _assert_loop_stays_responsive(
-            client, lambda: update_container_selection(request)
+            client, lambda: update_container_selection(get_docker_client(), request)
         )
 
         assert result["status"] == "success"
@@ -163,7 +170,9 @@ class TestDockerCallsDoNotBlockEventLoop:
         client = _wire(monkeypatch, engine, "get_container_info")
         monkeypatch.setattr("app.api.state.notification_manager", _NoopNotifier(), raising=False)
 
-        result = await _assert_loop_stays_responsive(client, lambda: unquarantine_container("web"))
+        result = await _assert_loop_stays_responsive(
+            client, lambda: unquarantine_container(get_docker_client(), "web")
+        )
 
         assert result["status"] == "success"
 
@@ -174,7 +183,7 @@ class TestDockerCallsDoNotBlockEventLoop:
         )
 
         result = await _assert_loop_stays_responsive(
-            client, lambda: add_health_check(health_check_config)
+            client, lambda: add_health_check(get_docker_client(), health_check_config)
         )
 
         assert result["status"] == "success"
@@ -183,14 +192,18 @@ class TestDockerCallsDoNotBlockEventLoop:
         client = _wire(monkeypatch, engine, "get_container_info")
 
         with pytest.raises(HTTPException) as exc_info:
-            await _assert_loop_stays_responsive(client, lambda: get_health_check("web"))
+            await _assert_loop_stays_responsive(
+                client, lambda: get_health_check(get_docker_client(), "web")
+            )
 
         assert exc_info.value.status_code == 404
 
     async def test_delete_health_check(self, monkeypatch, engine):
         client = _wire(monkeypatch, engine, "get_container")
 
-        result = await _assert_loop_stays_responsive(client, lambda: delete_health_check("web"))
+        result = await _assert_loop_stays_responsive(
+            client, lambda: delete_health_check(get_docker_client(), "web")
+        )
 
         assert result["status"] == "success"
 
@@ -207,7 +220,7 @@ class TestErrorsFromWorkerThreadsStillHandled:
         client.restart_results["web"] = False
 
         with pytest.raises(HTTPException) as exc_info:
-            await restart_container_manual("web")
+            await restart_container_manual(get_docker_client(), "web")
 
         assert exc_info.value.status_code == 500
         assert exc_info.value.detail == "Failed to restart container"
@@ -216,19 +229,16 @@ class TestErrorsFromWorkerThreadsStillHandled:
         _wire(monkeypatch, engine, "none")
 
         with pytest.raises(HTTPException) as exc_info:
-            await restart_container_manual("missing")
+            await restart_container_manual(get_docker_client(), "missing")
 
         assert exc_info.value.status_code == 404
 
-    async def test_exception_in_worker_thread_returns_500_with_detail(self, monkeypatch, engine):
+    async def test_exception_in_worker_thread_propagates_with_detail(self, monkeypatch, engine):
         client = _wire(monkeypatch, engine, "none")
         client.list_containers_error = RuntimeError("daemon unreachable")
 
-        with pytest.raises(HTTPException) as exc_info:
-            await list_containers()
-
-        assert exc_info.value.status_code == 500
-        assert exc_info.value.detail == "daemon unreachable"
+        with pytest.raises(RuntimeError, match="daemon unreachable"):
+            await list_containers(get_docker_client())
 
 
 @pytest.mark.asyncio
@@ -253,13 +263,13 @@ class TestConcurrentSelectionRequests:
 
         first = asyncio.create_task(
             update_container_selection(
-                ContainerSelectionRequest(container_ids=["web"], enabled=False)
+                get_docker_client(), ContainerSelectionRequest(container_ids=["web"], enabled=False)
             )
         )
         assert await asyncio.to_thread(client.entered.wait, WAIT_SECONDS)
 
         await update_container_selection(
-            ContainerSelectionRequest(container_ids=["db"], enabled=False)
+            get_docker_client(), ContainerSelectionRequest(container_ids=["db"], enabled=False)
         )
         client.release.set()
         await asyncio.wait_for(first, WAIT_SECONDS)
