@@ -32,11 +32,14 @@
 
   "waitFor": "postCreateCommand",
 
-  "forwardPorts": [3000, 3132, 9091, 9323],
+  "forwardPorts": [3000, 3001, 3132, 9091, 9323],
 
   "portsAttributes": {
     "3000": {
       "label": "Frontend"
+    },
+    "3001": {
+      "label": "Browser demo"
     },
     "3132": {
       "label": "Autoheal dev stack (UI and API)"

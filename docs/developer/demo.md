@@ -60,7 +60,7 @@ any of these, update the demo in the same pull request:
 ## Running it locally
 
 In the Dev Container, run **Terminal → Run Task → Autoheal: Run Demo** and open
-`http://localhost:3000/docker-autoheal/` (hot reload; a page reload resets the simulation).
+`http://localhost:3001/docker-autoheal/` (hot reload; a page reload resets the simulation).
 To see the production-style build instead:
 
 ```bash
@@ -82,7 +82,7 @@ npm run build:demo
 npm run test:demo-e2e
 ```
 
-In the Dev Container, **Autoheal: Run Demo Smoke Test** does both. It runs in CI on every pull request (`frontend-tests` in `tests.yml`) and before each
+It runs in CI on every pull request (`frontend-tests` in `tests.yml`) and before each
 deployment. See [Testing](testing.md#browser-demo-smoke-test-playwright).
 
 ## Deployment
