@@ -305,7 +305,7 @@ def test_serve_react_app_fallback_page_is_exact(tmp_path, monkeypatch):
     response = api_module.serve_react_app()
 
     assert bytes(response.body).decode() == (
-        "<h1>Docker Auto-Heal Service</h1>"
+        "<h1>Docker Autoheal</h1>"
         "<p>React UI not found. Please build the frontend first:</p>"
         "<pre>cd frontend && npm install && npm run build</pre>"
         "<p>API documentation is available at <a href='/api/swagger'>/api/swagger</a></p>"

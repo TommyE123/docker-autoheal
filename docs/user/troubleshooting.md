@@ -22,7 +22,7 @@ docker logs docker-autoheal
   something else on the host
 - Confirm the health endpoint responds from inside the same network the container is on:
   `curl http://localhost:3131/health`
-- If you get `<h1>Docker Auto-Heal Service</h1> ... React UI not found`, the image's
+- If you get `<h1>Docker Autoheal</h1> ... React UI not found`, the image's
   frontend build is missing — this shouldn't happen with the published image, but if
   you're building locally, make sure the multi-stage Docker build completed successfully
   (see [Development Setup](../developer/development-setup.md)).

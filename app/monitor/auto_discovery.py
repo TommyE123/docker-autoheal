@@ -1,5 +1,5 @@
 """
-Container auto-discovery for Docker Auto-Heal Service
+Container auto-discovery for Docker Autoheal
 Adds containers that carry the configured monitoring label to the monitored list, from a
 scan of the running containers and from Docker container start events
 """

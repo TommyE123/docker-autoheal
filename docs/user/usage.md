@@ -18,7 +18,7 @@ The web UI is a Progressive Web App, so supported browsers can install it as a s
 app window:
 
 - **Chrome / Edge (desktop):** click the install icon in the address bar, or use the
-  browser menu → *Install Docker Auto-Heal Service*.
+  browser menu → *Install Docker Autoheal*.
 - **Android (Chrome):** menu → *Install app* / *Add to Home screen*.
 - **iOS / iPadOS (Safari):** Share → *Add to Home Screen*.
 

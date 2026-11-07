@@ -1,5 +1,5 @@
 {
-  "name": "Docker Auto-Heal Service",
+  "name": "Docker Autoheal",
   "short_name": "AutoHeal",
   "description": "Monitor and automatically heal Docker containers",
   "id": "/",

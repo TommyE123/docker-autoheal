@@ -1,4 +1,4 @@
-# Docker Auto-Heal Service
+# Docker Autoheal
 
 [![Docker Pulls](https://img.shields.io/docker/pulls/tommye123/docker-autoheal)](https://hub.docker.com/r/tommye123/docker-autoheal)
 [![Docker Image Size](https://img.shields.io/docker/image-size/tommye123/docker-autoheal/latest)](https://hub.docker.com/r/tommye123/docker-autoheal)
