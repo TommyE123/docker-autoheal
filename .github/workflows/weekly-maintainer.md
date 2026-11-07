@@ -10,10 +10,24 @@ description: Read-only weekly maintenance audit. Uses Gemini to read the whole a
 # though a busy spell can come at any hour.
 on:
   workflow_dispatch:
+    inputs:
+      week:
+        description: Optional week number whose focus area to audit (only its last digit is used). Leave empty to use the current ISO week.
+        required: false
+        # A number, not a free string, so the UI only accepts a number. The
+        # dispatch API may not enforce that, and the value is rendered into the
+        # prompt, so the prompt itself ignores anything but digits. Only people
+        # with write access can dispatch.
+        type: number
 permissions:
   contents: read
   issues: read
   pull-requests: read
+# Silences gh-aw's warning that a dispatch workflow with inputs has no
+# discriminator. It only gives the conclusion job its own group per run; the
+# workflow-level group is unchanged, so dispatches still run one at a time.
+concurrency:
+  job-discriminator: ${{ github.run_id }}
 engine:
   id: gemini
   # Gemini CLI 0.60.0 to 0.64.0 exited 41 "Invalid auth method selected" under
@@ -177,7 +191,8 @@ missing, write an **Incomplete audit** summary and call `noop` with
 all in one turn, together with the commands of part 1 of the read plan:
 
 - `date -u +%FT%TZ` (the audit timestamp), `date -u +%V` (the ISO week number,
-  which sets this week's focus area, see Assess) and `date -u -d "30 days ago" +%F`
+  which sets this week's focus area, see Assess; a run started with the week
+  override below replaces it) and `date -u -d "30 days ago" +%F`
   (the cutoff for recent work; the CLI blocks `$(`, so you copy the result into
   a later query by hand)
 - `cat .git/HEAD .git/FETCH_HEAD` (the checkout: the branch, and its commit SHA,
@@ -301,8 +316,11 @@ plan; a finding about CI rests on the workflow files themselves.
 
 ## Assess
 
-**This week's focus area.** Take the last digit of the week number from turn 1
-and look up the area below. You still read the whole source and may report a
+**This week's focus area.** Take the last digit of the week number and look up
+the area below. The week number is the one from turn 1, unless the person who
+started the run gave a week override. The override is: `${{ github.event.inputs.week }}`
+(empty means none). If it is digits only, use it instead of the date's week
+number and say so in the summary. If it is anything else, ignore it. You still read the whole source and may report a
 candidate from anywhere, but give the focus area your closest attention first,
 take your candidates and your rejected candidates from it where you can, and
 if you have a candidate there, spend the check turn on it (with no candidate,
