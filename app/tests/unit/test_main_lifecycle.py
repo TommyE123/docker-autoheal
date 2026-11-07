@@ -1,5 +1,5 @@
 """
-Unit tests for AutohealApp application lifecycle: startup failure
+Unit tests for AutoHealService application lifecycle: startup failure
 handling, shutdown ordering, signal handling and the process entry point.
 
 Reuses the mocking approach from test_prometheus_start.py (patching
@@ -16,7 +16,7 @@ import pytest
 
 import app.main as main_module
 from app.main import (
-    AutohealApp,
+    AutoHealService,
     CancelledErrorFilter,
     get_public_port,
     get_ui_url,
@@ -50,11 +50,11 @@ class TestCancelledErrorFilter:
         assert CancelledErrorFilter().filter(record) is True
 
 
-class TestAutohealAppStop:
-    """AutohealApp.stop() shutdown ordering and per-component error handling."""
+class TestAutoHealServiceStop:
+    """AutoHealService.stop() shutdown ordering and per-component error handling."""
 
     def test_new_service_is_not_running(self):
-        service = AutohealApp()
+        service = AutoHealService()
 
         assert service.running is False
         assert service.docker_client is None
@@ -69,7 +69,7 @@ class TestAutohealAppStop:
 
     @pytest.mark.asyncio
     async def test_stop_with_no_components_initialized(self, caplog):
-        service = AutohealApp()
+        service = AutoHealService()
         service.running = True
 
         with caplog.at_level("INFO", logger="app.main"):
@@ -83,7 +83,7 @@ class TestAutohealAppStop:
 
     @pytest.mark.asyncio
     async def test_stop_order_kuma_then_engine_then_notifications_then_docker(self):
-        service = AutohealApp()
+        service = AutoHealService()
         order = []
 
         service.uptime_kuma_monitor = MagicMock()
@@ -103,7 +103,7 @@ class TestAutohealAppStop:
 
     @pytest.mark.asyncio
     async def test_stop_stops_notification_manager(self):
-        service = AutohealApp()
+        service = AutoHealService()
         service.notification_manager = MagicMock()
         service.notification_manager.stop = AsyncMock()
 
@@ -113,7 +113,7 @@ class TestAutohealAppStop:
 
     @pytest.mark.asyncio
     async def test_stop_continues_after_notification_manager_stop_raises(self, caplog):
-        service = AutohealApp()
+        service = AutoHealService()
         service.notification_manager = MagicMock()
         service.notification_manager.stop = AsyncMock(side_effect=RuntimeError("notif boom"))
         service.docker_client = MagicMock()
@@ -133,7 +133,7 @@ class TestAutohealAppStop:
     async def test_stop_closes_docker_when_cancelled_mid_shutdown(self, cancelled_step):
         # CancelledError is not an Exception, so the per-step handlers do not catch
         # it; the Docker client must still be closed before it propagates.
-        service = AutohealApp()
+        service = AutoHealService()
         service.uptime_kuma_monitor = MagicMock()
         service.uptime_kuma_monitor.stop = AsyncMock()
         service.monitoring_engine = MagicMock()
@@ -156,7 +156,7 @@ class TestAutohealAppStop:
 
     @pytest.mark.asyncio
     async def test_stop_continues_after_kuma_stop_raises(self, caplog):
-        service = AutohealApp()
+        service = AutoHealService()
         service.uptime_kuma_monitor = MagicMock()
         service.uptime_kuma_monitor.stop = AsyncMock(side_effect=RuntimeError("kuma boom"))
         service.monitoring_engine = MagicMock()
@@ -180,7 +180,7 @@ class TestAutohealAppStop:
 
     @pytest.mark.asyncio
     async def test_stop_continues_after_engine_stop_raises(self, caplog):
-        service = AutohealApp()
+        service = AutoHealService()
         service.monitoring_engine = MagicMock()
         service.monitoring_engine.stop = AsyncMock(side_effect=RuntimeError("engine boom"))
         service.notification_manager = MagicMock()
@@ -201,7 +201,7 @@ class TestAutohealAppStop:
 
     @pytest.mark.asyncio
     async def test_stop_swallows_docker_close_error(self, caplog):
-        service = AutohealApp()
+        service = AutoHealService()
         service.docker_client = MagicMock()
         service.docker_client.close.side_effect = RuntimeError("close boom")
 
@@ -215,8 +215,8 @@ class TestAutohealAppStop:
         assert isinstance(record.exc_info[1], RuntimeError)
 
 
-class TestAutohealAppStartFailure:
-    """Failure handling for AutohealApp.start(): partial-init cleanup + re-raise."""
+class TestAutoHealServiceStartFailure:
+    """Failure handling for AutoHealService.start(): partial-init cleanup + re-raise."""
 
     def _make_config(self, uptime_kuma_enabled=False):
         config = MagicMock()
@@ -244,7 +244,7 @@ class TestAutohealAppStartFailure:
             mock_cm.get_config.return_value = self._make_config()
             mock_notif.stop = AsyncMock()
 
-            service = AutohealApp()
+            service = AutoHealService()
 
             with pytest.raises(RuntimeError, match="docker unavailable"):
                 await service.start()
@@ -267,7 +267,7 @@ class TestAutohealAppStartFailure:
             mock_cm.get_config.return_value = self._make_config()
             mock_notif.stop = AsyncMock()
 
-            service = AutohealApp()
+            service = AutoHealService()
 
             with pytest.raises(RuntimeError, match="engine broke"):
                 await service.start()
@@ -320,7 +320,7 @@ class TestAutohealAppStartFailure:
                 "monitoring_engine_start": mock_engine_cls.return_value.start,
             }[failing_step].side_effect = error
 
-            service = AutohealApp()
+            service = AutoHealService()
 
             with pytest.raises(RuntimeError) as exc_info:
                 await service.start()
@@ -350,7 +350,7 @@ class TestAutohealAppStartFailure:
             mock_notif.start = AsyncMock(side_effect=RuntimeError("notify broke"))
             mock_notif.stop = AsyncMock()
 
-            service = AutohealApp()
+            service = AutoHealService()
 
             with pytest.raises(RuntimeError, match="notify broke"):
                 await service.start()
@@ -379,7 +379,7 @@ class TestAutohealAppStartFailure:
             mock_notif.start = AsyncMock(side_effect=asyncio.CancelledError())
             mock_notif.stop = AsyncMock()
 
-            service = AutohealApp()
+            service = AutoHealService()
 
             with pytest.raises(asyncio.CancelledError):
                 await service.start()
@@ -392,7 +392,7 @@ class TestAutohealAppStartFailure:
 
     @pytest.mark.asyncio
     async def test_metrics_shutdown_error_still_closes_the_socket(self):
-        service = AutohealApp()
+        service = AutoHealService()
         server = MagicMock()
         server.shutdown.side_effect = RuntimeError("shutdown boom")
         service.metrics_server = server
@@ -428,7 +428,7 @@ class TestAutohealAppStartFailure:
             mock_notif.start = AsyncMock()
             mock_notif.stop = AsyncMock()
 
-            service = AutohealApp()
+            service = AutoHealService()
 
             with pytest.raises(RuntimeError, match="late failure"):
                 await service.start()
@@ -453,7 +453,7 @@ class TestAutohealAppStartFailure:
             mock_docker_cls.return_value.close.side_effect = RuntimeError("close boom")
             mock_notif.stop = AsyncMock()
 
-            service = AutohealApp()
+            service = AutoHealService()
 
             with pytest.raises(RuntimeError, match="engine broke"):
                 await service.start()
@@ -473,7 +473,7 @@ class TestAutohealAppStartFailure:
             mock_cm.get_config.return_value = self._make_config()
             mock_notif.stop = AsyncMock(side_effect=RuntimeError("notify boom"))
 
-            service = AutohealApp()
+            service = AutoHealService()
 
             with pytest.raises(RuntimeError) as excinfo:
                 await service.start()
@@ -494,7 +494,7 @@ class TestAutohealAppStartFailure:
         ):
             mock_cm.get_config.return_value = self._make_config()
 
-            service = AutohealApp()
+            service = AutoHealService()
             # The service never holds None here; the double must satisfy stop().
             service.notification_manager = MagicMock(spec_set=NotificationManager, stop=AsyncMock())
 
@@ -514,7 +514,7 @@ class TestAutohealAppStartFailure:
             mock_cm.get_config.side_effect = RuntimeError("config broke")
             mock_notif.stop = AsyncMock()
 
-            service = AutohealApp()
+            service = AutoHealService()
 
             with pytest.raises(RuntimeError, match="config broke"):
                 await service.start()
@@ -536,7 +536,7 @@ class TestAutohealAppStartFailure:
             mock_notif.stop = AsyncMock()
 
             with pytest.raises(RuntimeError):
-                await AutohealApp().start()
+                await AutoHealService().start()
 
         assert f"Starting Docker Autoheal v{main_module.app.version}" in caplog.text
 
@@ -556,7 +556,7 @@ class TestAutohealAppStartFailure:
             mock_kuma_cls.return_value.start = AsyncMock(side_effect=RuntimeError("kuma down"))
             mock_notif.start = AsyncMock()
 
-            service = AutohealApp()
+            service = AutoHealService()
             await service.start()  # must not raise
 
             assert service.running is True
@@ -593,7 +593,7 @@ class TestUiUrl:
             mock_engine_cls.return_value.start = AsyncMock()
             mock_notif.start = AsyncMock()
 
-            await AutohealApp().start()
+            await AutoHealService().start()
 
         return caplog.text
 
@@ -779,10 +779,10 @@ async def real_delay(seconds: float) -> None:
     await done
 
 
-class TestAutohealAppRun:
+class TestAutoHealServiceRun:
     @pytest.mark.asyncio
     async def test_run_starts_loops_then_stops(self):
-        service = AutohealApp()
+        service = AutoHealService()
         service.start = AsyncMock(side_effect=lambda: setattr(service, "running", True))
         service.stop = AsyncMock()
 
@@ -797,7 +797,7 @@ class TestAutohealAppRun:
 
     @pytest.mark.asyncio
     async def test_run_blocks_until_stop_event_is_set(self):
-        service = AutohealApp()
+        service = AutoHealService()
         service.start = AsyncMock()
         service.stop = AsyncMock()
 
@@ -813,7 +813,7 @@ class TestAutohealAppRun:
 
     @pytest.mark.asyncio
     async def test_stop_requested_before_run_skips_startup(self):
-        service = AutohealApp()
+        service = AutoHealService()
         service.start = AsyncMock()
         service.docker_client = MagicMock()
 
@@ -825,7 +825,7 @@ class TestAutohealAppRun:
 
     @pytest.mark.asyncio
     async def test_stop_during_startup_waits_then_stops_what_startup_created(self):
-        service = AutohealApp()
+        service = AutoHealService()
         service.notification_manager = MagicMock()
         service.notification_manager.stop = AsyncMock()
         engine = MagicMock()
@@ -856,7 +856,7 @@ class TestAutohealAppRun:
     @pytest.mark.asyncio
     async def test_stop_cancels_startup_that_outlasts_the_grace_period(self, monkeypatch):
         monkeypatch.setattr(main_module, "STARTUP_STOP_GRACE_SECONDS", 0.05)
-        service = AutohealApp()
+        service = AutoHealService()
         service.notification_manager = MagicMock()
         service.notification_manager.stop = AsyncMock()
         engine = MagicMock()
@@ -883,7 +883,7 @@ class TestAutohealAppRun:
     @pytest.mark.asyncio
     async def test_second_stop_does_not_interrupt_startup_cleanup(self, monkeypatch):
         monkeypatch.setattr(main_module, "STARTUP_STOP_GRACE_SECONDS", 0.05)
-        service = AutohealApp()
+        service = AutoHealService()
         service.notification_manager = MagicMock()
         service.notification_manager.stop = AsyncMock()
         cleanup_started = asyncio.Event()
@@ -927,7 +927,7 @@ class TestAutohealAppRun:
         self, monkeypatch
     ):
         monkeypatch.setattr(main_module, "STARTUP_STOP_GRACE_SECONDS", 0.05)
-        service = AutohealApp()
+        service = AutoHealService()
         service.notification_manager = MagicMock()
         service.notification_manager.stop = AsyncMock()
         cleanup_started = asyncio.Event()
@@ -956,7 +956,7 @@ class TestAutohealAppRun:
 
     @pytest.mark.asyncio
     async def test_startup_finishing_within_grace_period_is_not_cancelled(self):
-        service = AutohealApp()
+        service = AutoHealService()
         service.notification_manager = MagicMock()
         service.notification_manager.stop = AsyncMock()
         outcome = []
@@ -977,7 +977,7 @@ class TestAutohealAppRun:
 
     @pytest.mark.asyncio
     async def test_cancelling_run_during_startup_still_propagates(self):
-        service = AutohealApp()
+        service = AutoHealService()
         service.notification_manager = MagicMock()
         service.notification_manager.stop = AsyncMock()
 
@@ -1003,7 +1003,7 @@ class TestAutohealAppRun:
 
     @pytest.mark.asyncio
     async def test_failed_startup_after_shutdown_does_not_shut_down_twice(self):
-        service = AutohealApp()
+        service = AutoHealService()
         service._shutdown = AsyncMock()
         service._stopped = True
 
@@ -1014,7 +1014,7 @@ class TestAutohealAppRun:
 
     @pytest.mark.asyncio
     async def test_stop_sets_stop_event(self):
-        service = AutohealApp()
+        service = AutoHealService()
 
         await service.stop()
 
@@ -1022,7 +1022,7 @@ class TestAutohealAppRun:
 
     @pytest.mark.asyncio
     async def test_run_stops_on_cancelled_error_while_waiting(self):
-        service = AutohealApp()
+        service = AutoHealService()
         started = asyncio.Event()
         service.start = AsyncMock(side_effect=started.set)
         service.stop = AsyncMock()
@@ -1038,7 +1038,7 @@ class TestAutohealAppRun:
 
     @pytest.mark.asyncio
     async def test_concurrent_stops_share_one_shutdown(self):
-        service = AutohealApp()
+        service = AutoHealService()
         engine_release = asyncio.Event()
         order = []
 
@@ -1081,7 +1081,7 @@ class TestMain:
 
         with (
             patch("app.main.signal.signal") as mock_signal,
-            patch("app.main.AutohealApp", return_value=fake_service),
+            patch("app.main.AutoHealService", return_value=fake_service),
             patch("app.main.run_api_server", new=AsyncMock()),
         ):
             await main_module.main()
@@ -1101,7 +1101,7 @@ class TestMain:
 
         with (
             patch("app.main.signal.signal"),
-            patch("app.main.AutohealApp", return_value=fake_service),
+            patch("app.main.AutoHealService", return_value=fake_service),
             patch("app.main.run_api_server", new=AsyncMock()),
         ):
             await main_module.main()
@@ -1116,7 +1116,7 @@ class TestMain:
 
         with (
             patch("app.main.signal.signal"),
-            patch("app.main.AutohealApp", return_value=fake_service),
+            patch("app.main.AutoHealService", return_value=fake_service),
             patch("app.main.run_api_server", new=MagicMock(return_value=None)),
             patch("app.main.asyncio.gather", side_effect=asyncio.CancelledError),
         ):
@@ -1131,7 +1131,7 @@ class TestMain:
 
         with (
             patch("app.main.signal.signal"),
-            patch("app.main.AutohealApp", return_value=fake_service),
+            patch("app.main.AutoHealService", return_value=fake_service),
             patch("app.main.run_api_server", new=MagicMock(return_value=None)),
             patch("app.main.asyncio.gather", side_effect=KeyboardInterrupt),
             caplog.at_level("INFO", logger="app.main"),
@@ -1150,7 +1150,7 @@ class TestMain:
 
         with (
             patch("app.main.signal.signal"),
-            patch("app.main.AutohealApp", return_value=fake_service),
+            patch("app.main.AutoHealService", return_value=fake_service),
             patch("app.main.run_api_server", new=MagicMock(return_value=None)),
             patch("app.main.asyncio.gather", side_effect=RuntimeError("gather boom")),
         ):

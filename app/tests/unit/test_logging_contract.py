@@ -25,7 +25,7 @@ from app.config.init_defaults import (
     reset_to_defaults,
 )
 from app.docker_client.docker_client_wrapper import DockerClientWrapper
-from app.main import AutohealApp
+from app.main import AutoHealService
 from app.main import main as app_main
 from app.notifications.notification_manager import NotificationManager
 from app.tests.unit.conftest import BlockingStream, cancel_and_wait, make_container, wait_until
@@ -126,7 +126,7 @@ class TestErrorsLoggedWithTraceback:
         ):
             mock_cm.get_config.return_value = config
             mock_notif.stop = AsyncMock()
-            service = AutohealApp()
+            service = AutoHealService()
 
             with pytest.raises(RuntimeError, match="docker unavailable"):
                 await service.start()
@@ -143,7 +143,7 @@ class TestErrorsLoggedWithTraceback:
 
         with (
             patch("app.main.signal.signal"),
-            patch("app.main.AutohealApp", return_value=failing_service),
+            patch("app.main.AutoHealService", return_value=failing_service),
             patch("app.main.run_api_server", new=AsyncMock()),
         ):
             await app_main()

@@ -1,5 +1,5 @@
 """
-Unit tests for how AutohealApp.start() wires its components together.
+Unit tests for how AutoHealService.start() wires its components together.
 
 Uses the patching approach from test_main_lifecycle.py and test_prometheus_start.py
 (patching the component classes on ``app.main``) so no Docker daemon is needed.
@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.main import AutohealApp
+from app.main import AutoHealService
 
 
 def _make_config() -> MagicMock:
@@ -53,7 +53,7 @@ class TestUptimeKumaWiring:
             mock_engine_cls.side_effect = build_engine
             mock_notif.start = AsyncMock()
 
-            service = AutohealApp()
+            service = AutoHealService()
             await service.start()
 
         assert built == ["kuma", "engine"]

@@ -99,7 +99,7 @@ health_checks_failed = Counter(
 )
 
 
-class AutohealApp:
+class AutoHealService:
     """Main service orchestrator"""
 
     def __init__(self) -> None:
@@ -333,7 +333,7 @@ class AutohealApp:
 
 
 # Global service instance
-service: AutohealApp | None = None
+service: AutoHealService | None = None
 
 # Strong references to in-flight shutdown tasks, so the event loop can't garbage collect them
 _shutdown_tasks: set[asyncio.Task] = set()
@@ -397,7 +397,7 @@ async def main() -> None:
     signal.signal(signal.SIGTERM, signal_handler)
 
     # Create service instance
-    service = AutohealApp()
+    service = AutoHealService()
 
     # Start service and API server concurrently
     try:
