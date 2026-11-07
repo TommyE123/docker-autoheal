@@ -108,6 +108,12 @@ terminal) in your browser. Chromium and its system libraries are installed by
 request (see [UI E2E CI](testing.md#ci)). After pulling this change into an existing Dev Container, run
 **Dev Containers: Rebuild Container** once.
 
+**Autoheal: Run Demo** serves the [browser demo](demo.md) with the Vite dev server (hot
+reload, no backend or Docker needed). Open `http://localhost:3000/docker-autoheal/`. It uses
+the same port as **Run React Frontend**, so stop one before starting the other.
+**Autoheal: Run Demo Smoke Test** builds the demo and runs its Playwright smoke test
+headlessly, as CI does (see [Browser demo smoke test](testing.md#browser-demo-smoke-test-playwright)).
+
 **Autoheal: Install gh-aw** installs the `github/gh-aw` extension pinned to the
 `compiler_version` recorded in the header of `.github/workflows/issue-triage.lock.yml`, so
 recompiling the workflows doesn't churn the lock file. It needs `gh auth login` (or a
