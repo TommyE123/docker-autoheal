@@ -16,10 +16,10 @@ services:
 docker run -d --name my-app --label autoheal=true nginx:alpine
 ```
 
-Auto-Heal picks this up two ways: it scans all existing containers for the label when it
+Docker Autoheal picks this up two ways: it scans all existing containers for the label when it
 starts, and it listens for Docker `start` events afterwards — so both containers already
 running and containers started later are picked up automatically, without restarting the
-Auto-Heal service.
+Docker Autoheal instance.
 
 The label key and value are configurable (`monitor.label_key` / `monitor.label_value` in
 [Configuration](configuration.md)), but default to `autoheal` / `true`.
@@ -45,7 +45,7 @@ are even considered, and always wins either way.
 ## There is no per-container timeout label
 
 Older documentation for this project referenced an `autoheal.stop.timeout` label for
-customizing how long Auto-Heal waits before force-stopping a container. **This label does
+customizing how long Docker Autoheal waits before force-stopping a container. **This label does
 not exist in the current implementation.** Restart timeout is a fixed 10-second default
 applied by the Docker client wrapper and is not currently configurable per container.
 
@@ -53,7 +53,7 @@ applied by the Docker client wrapper and is not currently configurable per conta
 
 Container IDs and even auto-generated names change when a container is recreated (for
 example, after `docker compose up` rebuilds an image). To keep restart counts,
-quarantine state, and monitoring selection stable across recreation, Auto-Heal resolves
+quarantine state, and monitoring selection stable across recreation, Docker Autoheal resolves
 each container to a **stable identifier**, in this priority order:
 
 1. A `monitoring.id` label, if you set one explicitly:

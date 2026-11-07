@@ -39,14 +39,14 @@ docker logs docker-autoheal
 2. Is it in the excluded list? Check **Configuration → Container Selection** in the UI, or
    `GET /api/config` and inspect `containers.excluded`.
 3. Does it fail a whitelist/blacklist filter? See [Configuration](configuration.md#filters).
-4. Check the **Events** tab — an `auto_monitor` event confirms Auto-Heal picked it up.
+4. Check the **Events** tab — an `auto_monitor` event confirms Docker Autoheal picked it up.
 5. Turn on `DEBUG` logging (`observability.log_level`) and check
    `docker logs docker-autoheal` for the monitoring decision.
 
 ## A container keeps getting quarantined
 
 This means it hit `restart.max_restarts` restarts within
-`restart.max_restarts_window_seconds` — Auto-Heal has stopped trying to restart it
+`restart.max_restarts_window_seconds` — Docker Autoheal has stopped trying to restart it
 automatically. That almost always means the container has a real, recurring problem.
 
 1. Check the container's own logs to find the underlying failure.
@@ -61,9 +61,9 @@ If containers are being quarantined too aggressively, increase `cooldown_seconds
 
 ## Restart count looks wrong / doesn't match Docker
 
-Auto-Heal tracks its own restart count per container (stored in `config.json`, keyed by
+Docker Autoheal tracks its own restart count per container (stored in `config.json`, keyed by
 the container's [stable identifier](labels.md#stable-container-identity)) — this is
-**not** the same as Docker's native `RestartCount` on the container object. Auto-Heal's
+**not** the same as Docker's native `RestartCount` on the container object. Docker Autoheal's
 count only increases when *it* restarts a container, and it persists across container
 recreation; Docker's own count resets when the container is recreated and also includes
 restarts from Docker's own `restart:` policy. If you need to reset the tracked count, use

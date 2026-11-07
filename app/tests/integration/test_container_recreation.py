@@ -6,7 +6,7 @@ Fake-based unit coverage of the same logic lives in
 `test_monitoring_identity.py` / `test_restart_handling.py`; this validates it
 against a real Docker recreation rather than a simulated ID change.
 
-Requires a real Docker daemon; does not require a running Auto-Heal service.
+Requires a real Docker daemon; does not require a running Docker Autoheal instance.
 """
 
 import uuid

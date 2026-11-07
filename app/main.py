@@ -99,7 +99,7 @@ health_checks_failed = Counter(
 )
 
 
-class AutoHealService:
+class AutohealApp:
     """Main service orchestrator"""
 
     def __init__(self) -> None:
@@ -116,7 +116,7 @@ class AutoHealService:
         self._startup_cancelled = False
 
     async def start(self) -> None:
-        """Start the auto-heal service"""
+        """Start Docker Autoheal"""
         try:
             logger.info("Starting Docker Autoheal v%s", app.version)
 
@@ -228,7 +228,7 @@ class AutoHealService:
 
     async def stop(self) -> None:
         """
-        Stop the auto-heal service
+        Stop Docker Autoheal
 
         Safe to call concurrently (the signal handler and ``run()`` both do): later callers
         wait for the first shutdown to finish, then return without repeating it.
@@ -333,7 +333,7 @@ class AutoHealService:
 
 
 # Global service instance
-service: AutoHealService | None = None
+service: AutohealApp | None = None
 
 # Strong references to in-flight shutdown tasks, so the event loop can't garbage collect them
 _shutdown_tasks: set[asyncio.Task] = set()
@@ -397,7 +397,7 @@ async def main() -> None:
     signal.signal(signal.SIGTERM, signal_handler)
 
     # Create service instance
-    service = AutoHealService()
+    service = AutohealApp()
 
     # Start service and API server concurrently
     try:

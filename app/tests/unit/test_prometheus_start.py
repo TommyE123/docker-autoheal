@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.main import AutoHealService
+from app.main import AutohealApp
 
 
 class TestPrometheusStart:
@@ -74,7 +74,7 @@ class TestPrometheusStart:
         with patch("app.main.config_manager") as mock_cm:
             mock_cm.get_config.return_value = config
 
-            service = AutoHealService()
+            service = AutohealApp()
             await service.start()
 
             self.mock_http_server.assert_called_once_with(9090)
@@ -86,7 +86,7 @@ class TestPrometheusStart:
         with patch("app.main.config_manager") as mock_cm:
             mock_cm.get_config.return_value = config
 
-            service = AutoHealService()
+            service = AutohealApp()
             await service.start()
 
             self.mock_http_server.assert_called_once_with(9090)
@@ -98,7 +98,7 @@ class TestPrometheusStart:
         with patch("app.main.config_manager") as mock_cm:
             mock_cm.get_config.return_value = config
 
-            service = AutoHealService()
+            service = AutohealApp()
             await service.start()
 
             self.mock_http_server.assert_not_called()
@@ -110,7 +110,7 @@ class TestPrometheusStart:
         with patch("app.main.config_manager") as mock_cm:
             mock_cm.get_config.return_value = config
 
-            service = AutoHealService()
+            service = AutohealApp()
             await service.start()
 
             self.mock_http_server.assert_called_once_with(8080)

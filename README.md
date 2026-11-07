@@ -105,8 +105,8 @@ services:
 
 Docker Autoheal picks up labelled containers automatically — both containers that are
 already running when it starts, and new ones as they start. A container's Docker
-`healthcheck` (if it has one) determines when Auto-Heal considers it unhealthy; without a
-health check, Auto-Heal still restarts the container if it exits with a non-zero code.
+`healthcheck` (if it has one) determines when Docker Autoheal considers it unhealthy; without a
+health check, Docker Autoheal still restarts the container if it exits with a non-zero code.
 You can also select containers to monitor from the web UI without adding a label at all.
 
 See [Labels](docs/user/labels.md) and [Health Checks](docs/user/health-checks.md) for the

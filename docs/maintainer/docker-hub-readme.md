@@ -97,7 +97,7 @@ docker compose up -d
 ```
 
 Any container labelled `autoheal=true` is picked up automatically — both containers
-already running when Auto-Heal starts, and new ones as they start.
+already running when Docker Autoheal starts, and new ones as they start.
 
 ## Configuration
 
@@ -157,7 +157,7 @@ Recommended for production:
 
 - Mount the socket read-only (`:ro`, as shown above)
 - Put the web UI behind a reverse proxy with authentication and TLS if exposing it beyond
-  a trusted network — Auto-Heal does not implement its own authentication
+  a trusted network — Docker Autoheal does not implement its own authentication
 - Restrict access to the Prometheus metrics port similarly
 - Keep regular configuration backups (export from the UI)
 

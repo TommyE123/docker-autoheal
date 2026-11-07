@@ -1,7 +1,7 @@
 # Maintenance Mode
 
 Maintenance mode lets you pause all auto-healing while keeping the dashboard and API
-available — useful while you're doing manual container work and don't want Auto-Heal
+available — useful while you're doing manual container work and don't want Docker Autoheal
 "fixing" what you're deliberately stopping or restarting.
 
 ## What it does
@@ -12,7 +12,7 @@ available — useful while you're doing manual container work and don't want Aut
   fresh wait once maintenance ends, rather than restarting immediately. Switching
   maintenance on and off between two checks changes nothing.
 - Manual actions (restart, unquarantine) via the UI or API still work normally.
-- State persists across restarts of the Auto-Heal container and across page refreshes —
+- State persists across restarts of the Docker Autoheal container and across page refreshes —
   it's stored in `/data/maintenance.json`, not just in the browser.
 
 ## Using it

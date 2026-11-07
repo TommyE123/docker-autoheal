@@ -88,7 +88,7 @@ docker run -d \
   -p 8081:80 \
   nginx:alpine
 
-# Kill it and watch Auto-Heal restart it
+# Kill it and watch Docker Autoheal restart it
 docker kill test-nginx
 ```
 
