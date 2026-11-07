@@ -73,6 +73,15 @@ jobs:
           # refreshes on client-side routes still load the app.
           cp dist/index.html dist/404.html
 
+      # Test the exact files about to be deployed; a failure deploys nothing.
+      - name: Install Chromium and its system dependencies
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke-test the demo
+        working-directory: frontend
+        run: npm run test:demo-e2e
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:

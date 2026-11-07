@@ -396,6 +396,23 @@ or stall; the app itself is never faked. The settings forms and the modals do no
 labels to inputs or give dialogs accessible names, so those are found by role within their
 form and by title (`dialogTitled`).
 
+## Browser demo smoke test (Playwright)
+
+`frontend/e2e-demo/demo.spec.js` checks the built [browser demo](demo.md): every page
+works against the in-browser mock API with no console errors or off-site requests, a
+deep link loads under the `/docker-autoheal/` sub-path, there is no service worker or
+manifest, and a crashed container gets restarted. It needs no Docker and takes about
+15 seconds. It serves an existing build, so build first:
+
+```bash
+cd frontend
+npm run build:demo
+npm run test:demo-e2e
+```
+
+CI runs it in the `frontend-tests` job of `tests.yml`, and `demo-pages.yml` runs it on
+the files it is about to deploy.
+
 ## CI
 
 `.github/workflows/tests.yml` runs the unit suite with coverage on every push

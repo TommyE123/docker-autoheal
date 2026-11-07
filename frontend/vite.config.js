@@ -64,8 +64,8 @@ export default defineConfig(({ mode }) => ({
         new URL("./src/test/pwa-register-stub.js", import.meta.url),
       ),
     },
-    // Playwright UI E2E specs run via `npm run test:ui-e2e`, not Vitest.
-    exclude: [...configDefaults.exclude, "e2e-ui/**"],
+    // Playwright specs run via `npm run test:ui-e2e` and `npm run test:demo-e2e`, not Vitest.
+    exclude: [...configDefaults.exclude, "e2e-ui/**", "e2e-demo/**"],
     setupFiles: ["./src/test/setup.js"],
     globalSetup: ["./src/test/globalSetup.js"],
     coverage: {
@@ -86,6 +86,8 @@ export default defineConfig(({ mode }) => ({
         "src/test/globalSetup.js",
         "playwright.ui.config.js",
         "e2e-ui/**",
+        "playwright.demo.config.js",
+        "e2e-demo/**",
       ],
     },
   },

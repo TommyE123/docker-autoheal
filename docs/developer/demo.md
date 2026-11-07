@@ -54,7 +54,8 @@ any of these, update the demo in the same pull request:
   python -c 'import json; from app.config.config_manager import AutoHealConfig; print(json.dumps(AutoHealConfig().model_dump(mode="json"), indent=2))' > frontend/src/demo/default-config.json
   ```
 
-- **A new API call in the UI**: add a handler, or the demo answers it with a 404.
+- **A new API call in the UI**: add a handler, or the demo answers it with a 404 and
+  the smoke test fails.
 
 ## Running it locally
 
@@ -64,6 +65,21 @@ npm run build:demo
 npx vite preview --mode demo
 # open http://localhost:4173/docker-autoheal/
 ```
+
+## Testing
+
+Unit tests sit next to each module in `src/demo/`. `e2e-demo/demo.spec.js` is a
+Playwright smoke test of the built demo, which fails on any console error, so a UI call
+the mock doesn't answer is caught:
+
+```bash
+cd frontend
+npm run build:demo
+npm run test:demo-e2e
+```
+
+It runs in CI on every pull request (`frontend-tests` in `tests.yml`) and before each
+deployment. See [Testing](testing.md#browser-demo-smoke-test-playwright).
 
 ## Deployment
 
@@ -76,8 +92,8 @@ environment.
   tag picked in "Use workflow from": `main` to show merged work before the next release,
   or a release tag to go back to a release.
 
-There is one demo, so each deployment replaces the last one. If a build fails, nothing
-is deployed and the live demo stays as it was. The banner shows the release tag, or the
+There is one demo, so each deployment replaces the last one. If the build or its smoke
+test fails, nothing is deployed and the live demo stays as it was. The banner shows the release tag, or the
 branch and short commit for anything else.
 
 One-off repository setup:
