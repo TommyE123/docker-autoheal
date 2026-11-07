@@ -16,7 +16,7 @@ project layout, frontend tooling, testing internals — lives under
 You'll need:
 
 - Python 3, matching the version pinned in the `Dockerfile`'s `FROM python:X.Y-slim` line
-- Node.js 24 and npm (only if you're working on the web UI)
+- Node.js 26 and npm (only if you're working on the web UI)
 - Docker (to run the service the way users do, and for integration testing)
 
 Alternatively, the repository ships a Dev Container that provides all of the above plus
