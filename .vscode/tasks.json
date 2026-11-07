@@ -56,6 +56,15 @@
       "problemMatcher": []
     },
     {
+      "label": "Autoheal: Run Demo",
+      "type": "shell",
+      "command": "npm run dev -- --mode demo --host 0.0.0.0 --port 3133 --strictPort",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "Autoheal: Build Frontend",
       "type": "shell",
       "command": "npm run build",

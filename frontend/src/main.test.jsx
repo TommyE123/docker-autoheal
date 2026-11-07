@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const renderMock = vi.fn();
 const createRootMock = vi.fn(() => ({ render: renderMock }));
@@ -37,5 +37,27 @@ describe("main entry point", () => {
 
     expect(registerSW).toHaveBeenCalledTimes(1);
     expect(registerSW).toHaveBeenCalledWith({ immediate: true });
+  });
+});
+
+describe("main entry point in the demo build", () => {
+  const renderDemo = vi.fn();
+  vi.doMock("./demo/index.jsx", () => ({ renderDemo }));
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("hands the root to the demo and registers no service worker", async () => {
+    vi.stubEnv("MODE", "demo");
+    await import("./main.jsx");
+    const { registerSW } = await import("virtual:pwa-register");
+
+    await vi.waitFor(() => expect(renderDemo).toHaveBeenCalledTimes(1));
+    expect(renderDemo.mock.calls[0][0]).toBe(
+      createRootMock.mock.results[0].value,
+    );
+    expect(renderMock).not.toHaveBeenCalled();
+    expect(registerSW).not.toHaveBeenCalled();
   });
 });
