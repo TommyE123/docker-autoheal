@@ -14,6 +14,9 @@ Docker Auto-Heal watches your Docker containers and restarts the ones that fail 
 unhealthy, so you don't have to. It runs as a single container with a web dashboard, a
 REST API, and Prometheus metrics.
 
+**[Try the interactive demo](https://tommye123.github.io/docker-autoheal/)**: the real web
+UI against a simulated Docker host, in your browser. No install, nothing to sign up for.
+
 ## Why use it
 
 - **Automatic recovery** — containers that exit with an error or fail their health check
@@ -151,7 +154,7 @@ For more, see the full [Troubleshooting guide](docs/user/troubleshooting.md).
 | [Usage](docs/user/usage.md)                                 | [Project structure](docs/developer/project-structure.md) | [Release process](docs/maintainer/release-process.md)             |
 | [Labels](docs/user/labels.md)                               | [Frontend development](docs/developer/frontend.md)       |                                                                   |
 | [Health checks](docs/user/health-checks.md)                 | [Testing](docs/developer/testing.md)                     |                                                                   |
-| [Monitoring & metrics](docs/user/monitoring-and-metrics.md) |                                                          |                                                                   |
+| [Monitoring & metrics](docs/user/monitoring-and-metrics.md) | [Browser demo](docs/developer/demo.md)                   |                                                                   |
 | [Notifications](docs/user/notifications.md)                 |                                                          |                                                                   |
 | [Maintenance mode](docs/user/maintenance-mode.md)           |                                                          |                                                                   |
 | [Troubleshooting](docs/user/troubleshooting.md)             |                                                          |                                                                   |

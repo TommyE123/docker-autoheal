@@ -8,11 +8,18 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import { workbox } from "./workbox.config.js";
 
+// `--mode demo` builds the public browser demo (src/demo/, deployed to GitHub
+// Pages by .github/workflows/demo-pages.yml): served from a sub-path, written
+// to dist/ instead of the backend's static/, and without a service worker.
+const DEMO_BASE = "/docker-autoheal/";
+
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  base: mode === "demo" ? DEMO_BASE : "/",
   plugins: [
     react(),
     VitePWA({
+      disable: mode === "demo",
       // The client registers the service worker itself (src/main.jsx), so the
       // plugin must not inject its own registerSW.js script into index.html.
       injectRegister: false,
@@ -37,7 +44,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: "../static",
+    outDir: mode === "demo" ? "dist" : "../static",
     emptyOutDir: true,
   },
   test: {
@@ -73,4 +80,4 @@ export default defineConfig({
       ],
     },
   },
-});
+}));

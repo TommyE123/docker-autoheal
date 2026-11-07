@@ -55,6 +55,7 @@ tag shape is ignored automatically.
 | Git tag + GitHub Release creation                                 | Yes, on Release PR merge (`release-please.yml`)                           |
 | Docker image build + push (Docker Hub + GHCR) + `latest`          | Yes, gated on an actual release (`release-please.yml`)                    |
 | Docker Hub description update                                     | Yes, only when a release was published (part of `release-please.yml`)     |
+| Browser demo deployed to GitHub Pages                             | Yes, when a release is published (`demo-pages.yml`)                       |
 | Dependency updates                                                | Yes, via Renovate (see [Dependency Management](dependency-management.md)) |
 | Release notes                                                     | Yes — published to GitHub Releases, no committed changelog file           |
 | Version file                                                      | Yes — `version.txt`, maintained by Release Please                         |
