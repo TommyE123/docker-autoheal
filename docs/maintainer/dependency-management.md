@@ -363,9 +363,6 @@ automatically merging them can still introduce compatibility or behavioural chan
   excluded from Renovate dependency management because it is produced by this repository rather
   than being a third-party dependency.
 
-* **Node 18** — the frontend build currently uses the Node 18 Alpine image. This is retained
-  until there is a deliberate decision to change the frontend build/runtime baseline.
-
 * **Pre-1.0 and build tooling dependencies** — `0.x` patch updates are automerged like other
   eligible patch updates. Build tooling is automerged
   only when its update is a patch. A patch or minor version does not automatically mean a
