@@ -148,8 +148,9 @@ jobs:
       - name: Build the browser demo
         run: npm run build:demo
 
+      # The lockfile-pinned Playwright from node_modules, not an npx download.
       - name: Install Chromium and its system dependencies
-        run: npx playwright install --with-deps chromium
+        run: npm run test:demo-e2e:install
 
       - name: Smoke-test the browser demo
         run: npm run test:demo-e2e
