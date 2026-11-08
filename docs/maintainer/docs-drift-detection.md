@@ -55,6 +55,21 @@ does documentation drift only: other maintenance is the Weekly Maintainer's job.
   drift found" (with at least five claims checked, each with the quoted document and code
   lines) or "Incomplete audit".
 
+## Evidence from grep
+
+The agent reads only its focus area's files, so it cannot see from them alone that a documented
+setting is read nowhere. After the reads, in the check turn, it may search `app` and
+`frontend/src` (tests excluded) with `grep -rn -- KEY ... | head -n 20` for up to ten setting
+keys: bare key names that the documents present as working options and that it saw defined but
+not used. A grep can only show where a name appears, never how code behaves. A key counts as
+having no reader only if the grep printed fewer than 20 lines (a full 20 may be cut), every
+match is a definition, a default or a test, and the code it read has no generic handling
+(`getattr`, `model_dump`, a loop over fields, a form built from the model). Then it corrects the
+document only to say the option has no effect, and notes under "Needs human review" that the
+code may be incomplete. Otherwise it makes no edit and lists the key for review. Environment
+variables, routes, labels and metric names are not searched this way, because they are often
+built from parts.
+
 ## Permissions
 
 The agent job has read-only `contents`, `issues` and `pull-requests` permissions. The only
