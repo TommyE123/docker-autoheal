@@ -1,5 +1,5 @@
 """
-Shared fixtures for the Docker Auto-Heal unit-test suite.
+Shared fixtures for the Docker Autoheal unit-test suite.
 
 These tests never touch a real Docker daemon and never touch the real /data
 directory:

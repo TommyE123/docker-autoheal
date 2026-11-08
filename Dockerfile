@@ -1,9 +1,9 @@
-# Multi-stage Dockerfile for Docker Auto-Heal Service with React UI
+# Multi-stage Dockerfile for Docker Autoheal with React UI
 
 # ============================================
 # Stage 1: Build React Frontend
 # ============================================
-FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS frontend-builder
+FROM node:26-alpine@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216 AS frontend-builder
 
 WORKDIR /frontend
 
@@ -24,7 +24,7 @@ RUN npm run build
 # ============================================
 FROM python:3.14-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170
 
-LABEL maintainer="Docker Auto-Heal Service"
+LABEL maintainer="Docker Autoheal"
 LABEL description="Automated container monitoring and healing service with React UI"
 
 # Set working directory

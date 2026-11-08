@@ -1,7 +1,6 @@
 # Usage
 
-The web UI lives at `http://<host>:3131` and is the primary way to operate Docker
-Auto-Heal day to day.
+The web UI lives at `http://<host>:3131` and is the primary way to operate Docker Autoheal day to day.
 
 ## Dashboard
 
@@ -18,12 +17,12 @@ The web UI is a Progressive Web App, so supported browsers can install it as a s
 app window:
 
 - **Chrome / Edge (desktop):** click the install icon in the address bar, or use the
-  browser menu → *Install Docker Auto-Heal Service*.
+  browser menu → *Install Docker Autoheal*.
 - **Android (Chrome):** menu → *Install app* / *Add to Home screen*.
 - **iOS / iPadOS (Safari):** Share → *Add to Home Screen*.
 
 Browsers only offer installation on a secure origin: `https://`, or `http://localhost`.
-A plain `http://<host>:3131` address is usually not installable, so put Auto-Heal behind
+A plain `http://<host>:3131` address is usually not installable, so put Docker Autoheal behind
 an HTTPS reverse proxy for remote installs.
 
 Limitations: the app does not work offline. Only the static UI files are cached, so the
@@ -43,7 +42,7 @@ installed, so unsaved form input can be lost.
 
 ## Events tab
 
-A running log of every decision Auto-Heal made: restarts (success or failure),
+A running log of every decision Docker Autoheal made: restarts (success or failure),
 quarantines, auto-unquarantines, and containers auto-added to monitoring because they
 started with the `autoheal=true` label. The UI shows the most recent entries (up to
 `ui.max_log_entries`, 50 by default). Use the **Event Type**, **Container** and

@@ -1,8 +1,8 @@
 """
-Shared fixtures for the Docker Auto-Heal integration suite.
+Shared fixtures for the Docker Autoheal integration suite.
 
 Unlike ``app/tests/unit``, these tests exercise the real Docker SDK and/or a
-running Auto-Heal service (the development stack on ``http://localhost:3132`` by default). They are never
+running Docker Autoheal instance (the development stack on ``http://localhost:3132`` by default). They are never
 collected by a plain ``pytest`` run (see ``pytest.ini``'s ``testpaths`` and
 ``docs/developer/testing.md``) and every test here is skipped, rather than failed, when
 the resource it needs isn't available.
@@ -53,12 +53,12 @@ def real_docker_client():
 
 @pytest.fixture
 def running_service():
-    """Skip the test unless a live Auto-Heal service answers at AUTOHEAL_BASE_URL."""
+    """Skip the test unless a live Docker Autoheal instance answers at AUTOHEAL_BASE_URL."""
     try:
         response = requests.get(f"{AUTOHEAL_BASE_URL}/health", timeout=3)
         response.raise_for_status()
     except Exception as exc:
-        pytest.skip(f"No running Auto-Heal service at {AUTOHEAL_BASE_URL}: {exc}")
+        pytest.skip(f"No running Docker Autoheal instance at {AUTOHEAL_BASE_URL}: {exc}")
     return AUTOHEAL_BASE_URL
 
 

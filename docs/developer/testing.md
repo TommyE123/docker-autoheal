@@ -3,11 +3,11 @@
 ## Overview
 
 Unit tests live in `app/tests/unit/`. They run entirely against fakes and mocks:
-**no Docker daemon and no running Auto-Heal service are required**, and no
+**no Docker daemon and no running Docker Autoheal instance are required**, and no
 external network calls are made. This is what CI runs.
 
 An integration suite lives in `app/tests/integration/`. Those tests exercise a
-real Docker daemon and/or a running Auto-Heal service (the dev stack on `http://localhost:3132`)
+real Docker daemon and/or a running Docker Autoheal instance (the dev stack on `http://localhost:3132`)
 and are **not** collected by a plain `pytest` run - `pytest.ini`'s `testpaths`
 only points at `app/tests/unit`. Run them explicitly (see below) when you have
 the resources they need available.
@@ -41,7 +41,7 @@ check.
 
 The integration suite requires a real Docker daemon reachable at the default
 socket (`unix://var/run/docker.sock`), and some of its tests additionally
-require a running Auto-Heal service on `http://localhost:3132` (the dev stack,
+require a running Docker Autoheal instance on `http://localhost:3132` (the dev stack,
 started with the **Autoheal: Run Docker Stack** task). Set `AUTOHEAL_BASE_URL` (and
 `AUTOHEAL_METRICS_URL`, default `http://localhost:9091`) to test another instance. To test the
 backend run directly with **Autoheal: Run Backend** (it listens on `3131`, metrics on `9090`,
@@ -74,7 +74,7 @@ includes both suites.
 | Auto-discovery of containers with the service's monitor label  | `test_auto_monitor.py`         |
 | `/health`, `/api/status`, the React UI, and Prometheus metrics | `test_service_smoke.py`        |
 
-### Isolation against a real Auto-Heal instance
+### Isolation against a real Docker Autoheal instance
 
 `AUTOHEAL_BASE_URL` may point at someone's real, already-running instance, not a
 throwaway test fixture - these tests only do things a real user's actions
@@ -100,7 +100,7 @@ would also do, and undo the ones with lasting effect:
 ### CI status
 
 This suite is **not** run in CI. It needs a live Docker daemon and, for most
-of its tests, a running Auto-Heal service - standing up Docker-in-Docker (or
+of its tests, a running Docker Autoheal instance - standing up Docker-in-Docker (or
 an equivalent) for that was judged not worth the added CI complexity for now.
 `.github/workflows/tests.yml` continues to run only the unit-test suite (see
 above), unaffected by this suite's existence. Run the integration suite

@@ -1,6 +1,6 @@
 {
-  "name": "Docker Auto-Heal Service",
-  "short_name": "AutoHeal",
+  "name": "Docker Autoheal",
+  "short_name": "Autoheal",
   "description": "Monitor and automatically heal Docker containers",
   "id": "/",
   "start_url": "/",

@@ -138,7 +138,7 @@ class TestErrorsLoggedWithTraceback:
     @pytest.mark.asyncio
     async def test_main_entry_point_failure(self, caplog):
         failing_service = MagicMock()
-        failing_service.run.side_effect = RuntimeError("cannot run")
+        failing_service.run = AsyncMock(side_effect=RuntimeError("cannot run"))
         failing_service.running = False
 
         with (
@@ -146,8 +146,9 @@ class TestErrorsLoggedWithTraceback:
             patch("app.main.AutoHealService", return_value=failing_service),
             patch("app.main.run_api_server", new=AsyncMock()),
         ):
-            await app_main()
+            exit_code = await app_main()
 
+        assert exit_code == 1
         assert_error_with_traceback(caplog, "Service error: cannot run", RuntimeError)
 
     @pytest.mark.asyncio
