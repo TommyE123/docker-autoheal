@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       area:
-        description: Optional focus area number, 0 to 4, to audit instead of this week's area (a larger number wraps round: 7 is area 2; see docs/maintainer/docs-drift-detection.md). Leave empty to use this week's area.
+        description: Optional focus area number, 0 to 4, to audit instead of this week's area (a larger number wraps round, so 7 is area 2, see docs/maintainer/docs-drift-detection.md). Leave empty to use this week's area.
         required: false
         # A number, not a free string. The value only reaches the read plan step through
         # its environment, never the prompt, and that step refuses anything that is not
