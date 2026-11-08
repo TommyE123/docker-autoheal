@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import axios from "axios";
 import { DemoEngine } from "./engine.js";
 import {
@@ -310,9 +310,9 @@ describe("configuration", () => {
   it("refuses an invalid import without changing anything", async () => {
     const bad = new FormData();
     bad.append("file", new File(["{not json"], "c.json"));
-    expect((await error(api.post("/config/import", bad))).response.status).toBe(
-      500,
-    );
+    const notJson = await error(api.post("/config/import", bad));
+    expect(notJson.response.status).toBe(422);
+    expect(notJson.response.data).toEqual({ detail: "File is not valid JSON" });
     const invalid = new FormData();
     invalid.append(
       "file",
@@ -322,8 +322,41 @@ describe("configuration", () => {
       ),
     );
     const e = await error(api.post("/config/import", invalid));
-    expect(e.response.status).toBe(500);
-    expect(e.response.data.detail).toContain("interval_seconds");
+    expect(e.response.status).toBe(422);
+    expect(e.response.data.detail).toBe(
+      "monitor.interval_seconds: Input should be greater than or equal to 1",
+    );
+    const badChecks = new FormData();
+    badChecks.append(
+      "file",
+      new File([JSON.stringify({ custom_health_checks: { a: 1 } })], "c.json"),
+    );
+    expect(
+      (await error(api.post("/config/import", badChecks))).response.data,
+    ).toEqual({
+      detail:
+        "custom_health_checks must be an object whose values are health check objects",
+    });
+    const badCheck = new FormData();
+    badCheck.append(
+      "file",
+      new File(
+        [
+          JSON.stringify({
+            custom_health_checks: {
+              a: { container_id: "a", check_type: "ping" },
+            },
+          }),
+        ],
+        "c.json",
+      ),
+    );
+    expect(
+      (await error(api.post("/config/import", badCheck))).response.data,
+    ).toEqual({
+      detail:
+        "Value error, Unknown check_type; expected one of: http, tcp, exec, docker",
+    });
     expect(engine.config.monitor.interval_seconds).toBe(5);
     expect((await error(api.post("/config/import", {}))).response.status).toBe(
       422,
@@ -448,6 +481,7 @@ describe("notifications", () => {
     name: "chat",
     type: "discord",
     url: "https://example.invalid",
+    headers: { "X-Demo": "1" },
   };
 
   it("adds, updates, tests and deletes services", async () => {
@@ -497,19 +531,28 @@ describe("notifications", () => {
   });
 
   it("validates services", async () => {
-    expect(
-      (await error(api.post("/notifications/services", { name: "x" }))).response
-        .status,
-    ).toBe(500);
+    const missing = await error(
+      api.post("/notifications/services", { name: "x" }),
+    );
+    expect(missing.response.status).toBe(422);
+    expect(missing.response.data).toEqual({ detail: "type: Field required" });
     await api.post("/notifications/services", service);
-    expect(
-      (await error(api.put("/notifications/services/chat", { type: 3 })))
-        .response.status,
-    ).toBe(500);
+    const wrong = await error(
+      api.put("/notifications/services/chat", {
+        type: 3,
+        enabled: "yes",
+        headers: "x",
+        url: 1,
+      }),
+    );
+    expect(wrong.response.status).toBe(422);
+    expect(wrong.response.data.detail).toBe(
+      "type: Input should be a valid string; enabled: Input should be a valid boolean; url: Input should be a valid string; headers: Input should be a valid dictionary",
+    );
     const e = await error(api.post("/notifications/test", { type: "slack" }));
     expect(e.response.status).toBe(422);
     expect(e.response.data.detail).toEqual([
-      { type: "missing", loc: ["name"], msg: "Field required" },
+      { loc: ["name"], msg: "Field required" },
     ]);
     expect(
       (await error(api.post("/notifications/test", "x"))).response.status,
@@ -539,13 +582,28 @@ describe("notifications", () => {
     ).data;
     expect(res.config).toMatchObject({ enabled: true, event_filters: [] });
     expect(res.config.services[0].name).toBe("chat");
+    const bad = await error(
+      api.put("/notifications/config", {
+        enabled: "yes",
+        event_filters: [1],
+        services: [{}],
+      }),
+    );
+    expect(bad.response.status).toBe(422);
+    expect(bad.response.data.detail).toBe(
+      "enabled: Input should be a valid boolean; event_filters.0: Input should be a valid string; services.0.name: Field required; services.0.type: Field required",
+    );
     expect(
-      (await error(api.put("/notifications/config", { services: [{}] })))
-        .response.status,
-    ).toBe(500);
+      (await error(api.put("/notifications/config", { event_filters: "x" })))
+        .response.data.detail,
+    ).toBe("event_filters: Input should be a valid list");
+    expect(
+      (await error(api.put("/notifications/config", { services: ["x"] })))
+        .response.data.detail,
+    ).toBe("services.0: Input should be a valid dictionary");
     expect(
       (await error(api.put("/notifications/config", "x"))).response.status,
-    ).toBe(500);
+    ).toBe(422);
   });
 });
 
@@ -565,6 +623,21 @@ describe("Uptime Kuma", () => {
       }),
     );
     expect(e.response.status).toBe(500);
+    expect(e.response.data).toEqual({
+      detail: "Internal server error, see logs",
+    });
+    const invalid = await error(
+      api.post("/uptime-kuma/enable", {
+        server_url: "http://k",
+        api_token: "t",
+        username: 1,
+        auto_restart_on_down: "no",
+      }),
+    );
+    expect(invalid.response.status).toBe(422);
+    expect(invalid.response.data.detail).toBe(
+      "username: Input should be a valid string; auto_restart_on_down: Input should be a valid boolean",
+    );
     expect(
       (await error(api.get("/uptime-kuma/monitors"))).response.data.detail,
     ).toBe("Uptime-Kuma integration not enabled");
@@ -593,10 +666,21 @@ describe("Uptime Kuma", () => {
     );
     await api.delete("/uptime-kuma/mappings/shop_web");
     expect((await api.get("/uptime-kuma/mappings")).data.mappings).toEqual([]);
-    expect(
-      (await error(api.post("/uptime-kuma/mappings", { container_id: "nope" })))
-        .response.status,
-    ).toBe(500);
+    const unknown = await error(
+      api.post("/uptime-kuma/mappings", {
+        container_id: "nope",
+        monitor_friendly_name: "Web",
+      }),
+    );
+    expect(unknown.response.status).toBe(404);
+    expect(unknown.response.data).toEqual({ detail: "Container not found" });
+    const blank = await error(
+      api.post("/uptime-kuma/mappings", { container_id: "shop-web-1" }),
+    );
+    expect(blank.response.status).toBe(400);
+    expect(blank.response.data.detail).toBe(
+      "container_id and monitor_friendly_name are required",
+    );
   });
 });
 
@@ -626,11 +710,20 @@ describe("routing", () => {
     expect(accepted.status).toBe(404);
   });
 
-  it("turns unexpected handler errors into a 500", async () => {
+  it("turns unexpected handler errors into the generic 500", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     engine.config.notifications = null;
     const e = await error(api.get("/notifications/config"));
     expect(e.response.status).toBe(500);
+    // No internal exception text reaches the client (app/api/errors.py).
+    expect(e.response.data).toEqual({
+      detail: "Internal server error, see logs",
+    });
     expect(e.code).toBe("ERR_BAD_RESPONSE");
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 
   it("notifies engine listeners after each request", async () => {
@@ -651,32 +744,45 @@ describe("edge cases", () => {
   });
 
   it("rejects non-object bodies", async () => {
-    expect(
-      (await error(api.post("/notifications/services", [1]))).response.status,
-    ).toBe(500);
+    // FastAPI rejects a non-object body for a `dict` parameter with its 422.
+    const dictError = {
+      detail: [
+        {
+          type: "dict_type",
+          loc: ["body"],
+          msg: "Input should be a valid dictionary",
+        },
+      ],
+    };
+    for (const [method, url] of [
+      ["post", "/notifications/services"],
+      ["put", "/notifications/services/c"],
+      ["put", "/notifications/config"],
+      ["put", "/config/observability"],
+      ["post", "/uptime-kuma/enable"],
+      ["post", "/uptime-kuma/mappings"],
+    ]) {
+      const e = await error(api[method](url, [1]));
+      expect(e.response.status).toBe(422);
+      expect(e.response.data).toEqual(dictError);
+    }
     expect((await error(api.post("/healthchecks", [1]))).response.status).toBe(
       422,
     );
     expect(
-      (await error(api.post("/uptime-kuma/mappings", [1]))).response.status,
-    ).toBe(500);
-    expect(
       (await error(api.put("/notifications/config", { services: "x" })))
-        .response.status,
-    ).toBe(500);
-    await api.post("/notifications/services", { name: "c", type: "slack" });
-    // No body fields: the service loses its required type, as in the backend.
-    expect(
-      (await error(api.put("/notifications/services/c", [1]))).response.status,
-    ).toBe(500);
+        .response.data.detail,
+    ).toBe("services: Input should be a valid list");
   });
 
   it("refuses an import that isn't a JSON object", async () => {
     const form = new FormData();
     form.append("file", new File(["[1]"], "c.json"));
-    expect(
-      (await error(api.post("/config/import", form))).response.status,
-    ).toBe(500);
+    const e = await error(api.post("/config/import", form));
+    expect(e.response.status).toBe(422);
+    expect(e.response.data).toEqual({
+      detail: "Configuration must be a JSON object",
+    });
   });
 
   it("deletes a check stored under the full Docker ID", async () => {
@@ -774,9 +880,11 @@ describe("edge cases", () => {
         "c.json",
       ),
     );
-    expect(
-      (await error(api.post("/config/import", form))).response.status,
-    ).toBe(500);
+    const imported = await error(api.post("/config/import", form));
+    expect(imported.response.status).toBe(422);
+    expect(imported.response.data).toEqual({
+      detail: "filters.blacklist_names: Input should be a valid list",
+    });
     // The simulation keeps working after the rejected payloads.
     expect(() => engine.runCycle()).not.toThrow();
   });
@@ -788,5 +896,19 @@ describe("edge cases", () => {
     await api.put("/config", config);
     expect(engine.config.filters.unknown).toBeUndefined();
     expect(engine.config.alerts.webhook).toBe("https://example.invalid/hook");
+  });
+
+  it("validates observability settings like ObservabilityConfig", async () => {
+    const e = await error(
+      api.put("/config/observability", {
+        log_level: 3,
+        prometheus_enabled: "yes",
+      }),
+    );
+    expect(e.response.status).toBe(422);
+    expect(e.response.data.detail).toBe(
+      "log_level: Input should be a valid string; prometheus_enabled: Input should be a valid boolean",
+    );
+    expect(engine.config.observability.log_level).toBe("INFO");
   });
 });

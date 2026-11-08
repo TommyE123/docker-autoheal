@@ -129,6 +129,51 @@ function validateRestart(body, loc, errors) {
   return restart;
 }
 
+// app/api/errors.py: the generic body of every unexpected 500.
+export const INTERNAL_ERROR_DETAIL = "Internal server error, see logs";
+
+/** FastAPI's 422 for a `dict` body parameter that isn't a JSON object. */
+function requireObjectBody(body) {
+  if (!isObject(body)) {
+    throw new ApiError(422, [
+      {
+        type: "dict_type",
+        loc: ["body"],
+        msg: "Input should be a valid dictionary",
+      },
+    ]);
+  }
+}
+
+/**
+ * invalid_input_as_422 (app/api/errors.py): a model validation failure on
+ * user data inside a handler is a 422 whose detail is one string of
+ * "location: message" parts, without the submitted values.
+ */
+function raiseInvalidInput(errors) {
+  if (!errors.length) return;
+  const detail = errors
+    .map(({ loc, msg }) => {
+      const location = loc.filter((part) => part !== "body").join(".");
+      return location ? `${location}: ${msg}` : msg;
+    })
+    .join("; ");
+  throw new ApiError(422, detail);
+}
+
+/** Push a type error unless `value` is of `kind` (string, boolean or list). */
+function checkKind(value, kind, loc, errors) {
+  const ok = kind === "list" ? Array.isArray(value) : typeof value === kind;
+  if (!ok) {
+    const name = { string: "string", boolean: "boolean", list: "list" }[kind];
+    errors.push({
+      type: `${kind === "boolean" ? "bool" : kind}_type`,
+      loc,
+      msg: `Input should be a valid ${name}`,
+    });
+  }
+}
+
 function raiseIfInvalid(errors) {
   if (errors.length) throw new ApiError(422, errors);
 }
@@ -202,50 +247,73 @@ function validateFullConfig(data, loc = ["body"]) {
   return config;
 }
 
-function validateNotificationService(service) {
+const OPTIONAL_SERVICE_FIELDS = [
+  "url",
+  "headers",
+  "username",
+  "password",
+  "bot_token",
+  "chat_id",
+  "topic",
+  "server_url",
+  "access_token",
+  "app_token",
+  "user_key",
+  "api_token",
+];
+
+/**
+ * NotificationService(**service): the normalised service, or null after
+ * pushing its errors (located under `loc`) onto `errors`.
+ */
+function validateNotificationService(service, loc, errors) {
   if (!isObject(service)) {
-    throw new ApiError(422, [
-      {
-        type: "model_type",
-        loc: ["body"],
-        msg: "Input should be a valid dictionary",
-      },
-    ]);
+    errors.push({
+      type: "model_type",
+      loc,
+      msg: "Input should be a valid dictionary",
+    });
+    return null;
   }
-  const errors = [];
+  const before = errors.length;
   for (const field of ["name", "type"]) {
-    if (typeof service[field] !== "string") {
+    if (field in service) {
+      checkKind(service[field], "string", [...loc, field], errors);
+    } else {
       errors.push({
-        type: field in service ? "string_type" : "missing",
-        loc: [field],
-        msg:
-          field in service
-            ? "Input should be a valid string"
-            : "Field required",
+        type: "missing",
+        loc: [...loc, field],
+        msg: "Field required",
       });
     }
   }
-  raiseIfInvalid(errors);
-  const optional = [
-    "url",
-    "headers",
-    "username",
-    "password",
-    "bot_token",
-    "chat_id",
-    "topic",
-    "server_url",
-    "access_token",
-    "app_token",
-    "user_key",
-    "api_token",
-  ];
+  if ("enabled" in service) {
+    checkKind(service.enabled, "boolean", [...loc, "enabled"], errors);
+  }
+  for (const field of OPTIONAL_SERVICE_FIELDS) {
+    const value = service[field];
+    if (value == null) continue;
+    if (field === "headers") {
+      if (!isObject(value)) {
+        errors.push({
+          type: "dict_type",
+          loc: [...loc, field],
+          msg: "Input should be a valid dictionary",
+        });
+      }
+    } else {
+      checkKind(value, "string", [...loc, field], errors);
+    }
+  }
+  if (errors.length > before) return null;
   const result = {
     name: service.name,
     type: service.type,
     enabled: service.enabled ?? true,
   };
-  for (const field of optional) result[field] = service[field] ?? null;
+  for (const field of OPTIONAL_SERVICE_FIELDS) {
+    result[field] = service[field] ?? null;
+  }
   return result;
 }
 
@@ -275,9 +343,7 @@ function validateHealthCheck(body) {
   if (typeof hc.container_id !== "string") fail("container_id is required");
   const required = CHECK_TYPE_FIELDS[hc.check_type];
   if (!required) {
-    fail(
-      `Unknown check_type '${hc.check_type}'; expected one of: http, tcp, exec, docker`,
-    );
+    fail("Unknown check_type; expected one of: http, tcp, exec, docker");
   }
   const missing = required.filter((field) => hc[field] == null);
   if (missing.length)
@@ -574,9 +640,20 @@ const routes = [
     "put",
     /^\/api\/config\/observability$/,
     (engine, { body }) => {
+      requireObjectBody(body);
+      const kinds = {
+        log_level: "string",
+        prometheus_enabled: "boolean",
+        log_format: "string",
+      };
+      const errors = [];
+      for (const [key, kind] of Object.entries(kinds)) {
+        if (key in body) checkKind(body[key], kind, [key], errors);
+      }
+      raiseInvalidInput(errors);
       const observability = engine.config.observability;
-      for (const key of ["log_level", "prometheus_enabled", "log_format"]) {
-        if (isObject(body) && key in body) observability[key] = body[key];
+      for (const key of Object.keys(kinds)) {
+        if (key in body) observability[key] = body[key];
       }
       return {
         status: "success",
@@ -603,27 +680,41 @@ const routes = [
           { type: "missing", loc: ["body", "file"], msg: "Field required" },
         ]);
       }
+      // As import_config in app/api/routes/config.py: every bad file is a 422
+      // with a fixed message, and nothing changes unless all of it is valid.
+      let data;
       try {
-        const data = JSON.parse(await file.text());
-        const customChecks = isObject(data)
-          ? (data.custom_health_checks ?? {})
-          : {};
-        if (isObject(data)) delete data.custom_health_checks;
-        const config = validateFullConfig(data, []);
-        const checks = {};
+        data = JSON.parse(await file.text());
+      } catch {
+        throw new ApiError(422, "File is not valid JSON");
+      }
+      if (!isObject(data)) {
+        throw new ApiError(422, "Configuration must be a JSON object");
+      }
+      const customChecks = data.custom_health_checks ?? {};
+      if (
+        !isObject(customChecks) ||
+        !Object.values(customChecks).every(isObject)
+      ) {
+        throw new ApiError(
+          422,
+          "custom_health_checks must be an object whose values are health check objects",
+        );
+      }
+      delete data.custom_health_checks;
+      const checks = {};
+      let config;
+      try {
+        config = validateFullConfig(data, []);
         for (const [cid, hc] of Object.entries(customChecks)) {
           checks[cid] = validateHealthCheck(hc);
         }
-        engine.config = config;
-        engine.customHealthChecks = checks;
       } catch (error) {
-        throw new ApiError(
-          500,
-          error instanceof ApiError
-            ? JSON.stringify(error.detail)
-            : error.message,
-        );
+        // Both validators throw a 422 ApiError whose detail is a list.
+        raiseInvalidInput(error.detail);
       }
+      engine.config = config;
+      engine.customHealthChecks = checks;
       return {
         status: "success",
         message: "Configuration imported successfully",
@@ -727,24 +818,34 @@ const routes = [
     "put",
     /^\/api\/notifications\/config$/,
     (engine, { body }) => {
+      requireObjectBody(body);
       const notifications = engine.config.notifications;
-      if (!isObject(body))
-        throw new ApiError(500, "Invalid notification configuration");
-      let services = notifications.services;
-      try {
-        if ("services" in body)
-          services = body.services.map(validateNotificationService);
-      } catch (error) {
-        throw new ApiError(
-          500,
-          error instanceof ApiError
-            ? JSON.stringify(error.detail)
-            : error.message,
-        );
+      // NotificationsConfig.model_validate of the merged section
+      const errors = [];
+      if ("enabled" in body) {
+        checkKind(body.enabled, "boolean", ["enabled"], errors);
       }
+      if ("event_filters" in body) {
+        checkKind(body.event_filters, "list", ["event_filters"], errors);
+        if (Array.isArray(body.event_filters)) {
+          body.event_filters.forEach((filter, i) =>
+            checkKind(filter, "string", ["event_filters", i], errors),
+          );
+        }
+      }
+      let services = notifications.services;
+      if ("services" in body) {
+        checkKind(body.services, "list", ["services"], errors);
+        if (Array.isArray(body.services)) {
+          services = body.services.map((service, i) =>
+            validateNotificationService(service, ["services", i], errors),
+          );
+        }
+      }
+      raiseInvalidInput(errors);
       if ("enabled" in body) notifications.enabled = body.enabled;
       if ("event_filters" in body)
-        notifications.event_filters = body.event_filters;
+        notifications.event_filters = [...body.event_filters];
       notifications.services = services;
       return {
         status: "success",
@@ -757,12 +858,10 @@ const routes = [
     "post",
     /^\/api\/notifications\/services$/,
     (engine, { body }) => {
-      let service;
-      try {
-        service = validateNotificationService(body);
-      } catch (error) {
-        throw new ApiError(500, JSON.stringify(error.detail));
-      }
+      requireObjectBody(body);
+      const errors = [];
+      const service = validateNotificationService(body, [], errors);
+      raiseInvalidInput(errors);
       if (
         engine.config.notifications.services.some(
           (s) => s.name === service.name,
@@ -785,18 +884,18 @@ const routes = [
     "put",
     /^\/api\/notifications\/services\/([^/]+)$/,
     (engine, { match, body }) => {
+      requireObjectBody(body);
       const name = decodeURIComponent(match[1]);
       const index = findService(engine, match[1]);
       if (index === -1) throw new ApiError(404, `Service '${name}' not found`);
-      let service;
-      try {
-        service = validateNotificationService({
-          name,
-          ...(isObject(body) ? body : {}),
-        });
-      } catch (error) {
-        throw new ApiError(500, JSON.stringify(error.detail));
-      }
+      // The name is kept when the body doesn't set one.
+      const errors = [];
+      const service = validateNotificationService(
+        { name, ...body },
+        [],
+        errors,
+      );
+      raiseInvalidInput(errors);
       engine.config.notifications.services[index] = service;
       return {
         status: "success",
@@ -825,7 +924,15 @@ const routes = [
     (engine, { body }) => {
       if (!isObject(body))
         throw new ApiError(422, "Request body must be a JSON object");
-      validateNotificationService(body);
+      // This route reports field locations and messages only, as a list.
+      const errors = [];
+      validateNotificationService(body, [], errors);
+      if (errors.length) {
+        throw new ApiError(
+          422,
+          errors.map(({ loc, msg }) => ({ loc, msg })),
+        );
+      }
       return { status: "success", message: DEMO_TEST_MESSAGE };
     },
   ],
@@ -856,11 +963,27 @@ const routes = [
     "post",
     /^\/api\/uptime-kuma\/enable$/,
     (engine, { body }) => {
+      requireObjectBody(body);
       const ok = (v) => typeof v === "string" && v.trim();
-      if (!isObject(body) || !ok(body.server_url) || !ok(body.api_token)) {
+      if (!ok(body.server_url) || !ok(body.api_token)) {
         throw new ApiError(400, "server_url and api_token are required");
       }
-      throw new ApiError(500, "Uptime Kuma isn't available in the demo");
+      const errors = [];
+      if ("username" in body) {
+        checkKind(body.username, "string", ["username"], errors);
+      }
+      if ("auto_restart_on_down" in body) {
+        checkKind(
+          body.auto_restart_on_down,
+          "boolean",
+          ["auto_restart_on_down"],
+          errors,
+        );
+      }
+      raiseInvalidInput(errors);
+      // The real route now contacts the server; with none to reach, the
+      // client error ends in the generic 500.
+      throw new ApiError(500, INTERNAL_ERROR_DETAIL);
     },
   ],
   [
@@ -884,10 +1007,16 @@ const routes = [
     "post",
     /^\/api\/uptime-kuma\/mappings$/,
     (engine, { body }) => {
-      const container = isObject(body)
-        ? engine.findContainer(String(body.container_id))
-        : null;
-      if (!container) throw new ApiError(500, "404: Container not found");
+      requireObjectBody(body);
+      const filled = (v) => typeof v === "string" && v.trim();
+      if (!filled(body.container_id) || !filled(body.monitor_friendly_name)) {
+        throw new ApiError(
+          400,
+          "container_id and monitor_friendly_name are required",
+        );
+      }
+      const container = engine.findContainer(body.container_id);
+      if (!container) throw new ApiError(404, "Container not found");
       const mapping = {
         container_id: engine.info(container).stable_id,
         monitor_friendly_name: body.monitor_friendly_name,
@@ -969,7 +1098,9 @@ export async function handleRequest(engine, config) {
     if (error instanceof ApiError) {
       return { status: error.status, data: { detail: error.detail } };
     }
-    return { status: 500, data: { detail: error.message } };
+    // An unexpected error: the generic 500 (unhandled_exception_handler).
+    console.error("Demo mock API error:", error);
+    return { status: 500, data: { detail: INTERNAL_ERROR_DETAIL } };
   }
 }
 
