@@ -270,7 +270,8 @@ const COLLECTION_CHECKS = {
 function mergeSection(target, values, loc, errors) {
   const kind = (value) => (Array.isArray(value) ? "list" : typeof value);
   for (const [key, value] of Object.entries(values)) {
-    if (!(key in target)) continue;
+    // Own keys only: inherited names (toString, __proto__, ...) are unknown.
+    if (!Object.hasOwn(target, key)) continue;
     const expected = target[key];
     if (expected === null) {
       if (value === null || isString(value)) target[key] = value;
@@ -468,7 +469,9 @@ function validateHealthCheck(body) {
     ]);
   };
   if (typeof hc.container_id !== "string") fail("container_id is required");
-  const required = CHECK_TYPE_FIELDS[hc.check_type];
+  const required = Object.hasOwn(CHECK_TYPE_FIELDS, hc.check_type)
+    ? CHECK_TYPE_FIELDS[hc.check_type]
+    : null;
   if (!required) {
     fail("Unknown check_type; expected one of: http, tcp, exec, docker");
   }

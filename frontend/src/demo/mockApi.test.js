@@ -999,4 +999,52 @@ describe("edge cases", () => {
     // update_config keeps the live restart counts.
     expect(engine.config.containers.restart_counts).toEqual({});
   });
+
+  it("treats inherited property names as unknown keys and check types", async () => {
+    // JSON.parse gives these as own keys, as a request body would.
+    const config = JSON.parse(JSON.stringify((await api.get("/config")).data));
+    const filters = JSON.parse(
+      '{"toString": 1, "constructor": "x", "__proto__": {"polluted": true}}',
+    );
+    config.filters = { ...config.filters, ...filters };
+    await api.put("/config", JSON.stringify(config), {
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(Object.getPrototypeOf(engine.config.filters)).toBe(Object.prototype);
+    expect(engine.config.filters.polluted).toBeUndefined();
+    expect(Object.hasOwn(engine.config.filters, "toString")).toBe(false);
+
+    for (const checkType of ["constructor", "toString", "__proto__"]) {
+      const e = await error(
+        api.post("/healthchecks", {
+          container_id: "shop-web-1",
+          check_type: checkType,
+        }),
+      );
+      expect(e.response.status).toBe(422);
+      expect(e.response.data.detail[0].msg).toBe(
+        "Value error, Unknown check_type; expected one of: http, tcp, exec, docker",
+      );
+    }
+    const form = new FormData();
+    form.append(
+      "file",
+      new File(
+        [
+          JSON.stringify({
+            custom_health_checks: {
+              a: { container_id: "a", check_type: "constructor" },
+            },
+          }),
+        ],
+        "c.json",
+      ),
+    );
+    expect(
+      (await error(api.post("/config/import", form))).response.data,
+    ).toEqual({
+      detail:
+        "Value error, Unknown check_type; expected one of: http, tcp, exec, docker",
+    });
+  });
 });
