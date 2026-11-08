@@ -170,8 +170,8 @@ lists its documentation and source files as the exact `cat -n` commands that rea
 up to three parts (a short area has fewer parts; skip a part that is absent). Run each
 command as its own call, exactly as written: a later workflow step checks your tool calls
 against the same files, and any file not read that way makes the audit incomplete, and no pull
-request is opened. `cat -n` numbers the lines; those numbers are the only line numbers you
-may cite. Never redirect or discard the output. If the read plan is missing, write an
+request is opened. `cat -n` numbers the lines; those numbers, and the numbers `grep -n` prints, are the only
+line numbers you may cite. Never redirect or discard the output. If the read plan is missing, write an
 **Incomplete audit** summary and call `noop` with `INCOMPLETE AUDIT: no read plan`.
 
 **Turn 1, baseline and read part 1.** Make each of these commands its own call, all in one
@@ -206,8 +206,14 @@ cause of drift):
 
 - `github search_issues --query "repo:OWNER/REPO is:pr is:merged merged:>YYYY-MM-DD" --perPage 100 | jq -r '.[] | "#\(.number) \(.closed_at // "" | .[0:10]) \(.title)"'`
 
-**Turn 4, only with a drift candidate: check it.** Assess the files (see Assess). If you
-have no candidate worth checking, skip to the report. For your candidates, make every
+**Turn 4, only with a drift candidate or a setting to check: check it.** Assess the files
+(see Assess). A *setting to check* is a setting key that this area's documents present as a
+working option, that you saw defined in the files you read, and whose use you saw in none of
+the files you read. Use the bare key (for example allow_export_json), never a dotted path, an
+environment variable, a route, a label or a metric name, and at most 10 keys. Check each with
+one call `grep -rn --exclude-dir=tests --exclude="*.test.*" -- KEY app frontend/src | head -n 20`
+(see Grep evidence in the Rules). If you have no candidate and no setting to check, skip to
+the report. For your candidates, make every
 remaining check in this one turn: open any further file that settles the question (for
 example the unit test of the code in question, in `app/tests/unit/`, with `cat -n`), and
 run any `grep` you need, together with one `sleep 60` call (it costs no request: it holds
@@ -230,7 +236,8 @@ error, run it once more, fixed if the error says what is wrong. If it fails twic
 claim a pull request: in one more turn write the summary again with `write_file` as an
 **Incomplete audit** that names the error and keeps the findings, and call `noop`.
 
-If a call fails, run it once more, fixed if the error says what is wrong. A `jq` pipe that
+If a call fails, run it once more, fixed if the error says what is wrong. An empty `grep`
+result means no match, not a failed call: never rerun it. A `jq` pipe that
 prints an empty list or `null` for the commit, issue or pull request lists is a failed
 read, not an empty repository: rerun it without the pipe (a long unpiped result that is cut
 in the middle still counts as read; a `[]` is an empty list). If the head of `main`, the
@@ -261,7 +268,19 @@ and call `noop`.
   anything subjective are not drift.
 - **Only the area you read.** Judge a claim only against implementation you read in this run
   (the focus area's files, or a file you opened in the check turn). A claim about code you did
-  not read is not drift: at most list it under "Not verified" in the summary.
+  not read is not drift: at most list it under "Not verified" in the summary. The one
+  exception is where a setting key appears, which `grep` can show (see Grep evidence).
+- **Grep evidence.** A grep result shows only where a name appears, never how code behaves.
+  It can support one kind of drift: a setting that the documents present as a working option
+  and that nothing reads. That needs all of these: the key is defined in the files you read;
+  the grep printed **fewer than 20 lines** (20 lines may be cut, and then it shows nothing);
+  every match is a definition, a default or a test, none in code that acts on the value; and
+  the code you read has no generic handling that could use it without naming it (`getattr`,
+  `model_dump`, a loop over model fields, a form built from the model). Quote the command,
+  the matches and the line that defines the key. If any of these fails, do not edit: list the
+  key under "Needs human review". When all hold, correct the document only to say the option
+  has no effect (never remove it) and say under "Needs human review" that the code may be
+  incomplete. Tests are not evidence that the application uses a key.
 - **Disagreement is not yours to settle.** If the implementation and a test disagree, or the
   code is ambiguous, do not choose an interpretation and do not edit: list it under "Needs
   human review".
@@ -326,7 +345,8 @@ You report through these only:
     human review" and "Not verified" ("none" when empty).
   - `## No documentation drift found`: then "Claims checked", **at least five** concrete
     statements from this area's documents, each with the document and line number, the
-    quoted statement, the code file and line number, the quoted code line, and the result.
+    quoted statement, the code file and line number, the quoted code line (for a setting with no reader: the grep command, the number of
+    matching lines and the defining line), and the result.
     Without the coverage line, full coverage and these claims, the outcome is **Incomplete
     audit**. Then "Needs human review" and "Not verified".
   - `## Incomplete audit`: exactly what could not be retrieved or read. This is never a clean
