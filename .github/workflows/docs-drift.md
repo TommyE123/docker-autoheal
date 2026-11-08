@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       area:
-        description: Optional focus area number, 0 to 4, to audit instead of this week's area (see docs/maintainer/docs-drift-detection.md). Leave empty to use this week's area.
+        description: Optional focus area number, 0 to 4, to audit instead of this week's area (a larger number wraps round: 7 is area 2; see docs/maintainer/docs-drift-detection.md). Leave empty to use this week's area.
         required: false
         # A number, not a free string. The value only reaches the read plan step through
         # its environment, never the prompt, and that step refuses anything that is not
@@ -164,7 +164,7 @@ turn**: several tool calls in one turn cost one model request. Follow this plan 
 spend turns on anything else.
 
 The end of this prompt holds a read plan, between the lines READS START and READS END,
-generated from the checkout before you started. It names this week's **focus area** and
+generated from the checkout before you started. It names this run's **focus area** and
 lists its documentation and source files as the exact `cat -n` commands that read them, in
 up to three parts (a short area has fewer parts; skip a part that is absent). Run each
 command as its own call, exactly as written: a later workflow step checks your tool calls
@@ -294,7 +294,7 @@ restart, configuration persistence, ports, Docker labels (including `autoheal=tr
 health-check intervals and retries, the default restart mode, automatic unquarantine, event
 names (such as `health_check_failed`), Prometheus metrics, container ID and name fallback,
 Docker image names and tags, Compose examples and supported Python versions, where they fall
-in this week's area.
+in this run's area.
 
 Before editing, check that no open pull request or issue (from the lists you have) already
 covers the same documentation correction. If one does, do not open a competing pull request:
