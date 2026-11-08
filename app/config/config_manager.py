@@ -272,9 +272,8 @@ class HealthCheckConfig(BaseModel):
             "docker": (),
         }
         if self.check_type not in required:
-            raise ValueError(
-                f"Unknown check_type {self.check_type!r}; expected one of: {', '.join(required)}"
-            )
+            # The submitted value is deliberately left out of the message: it reaches API clients.
+            raise ValueError(f"Unknown check_type; expected one of: {', '.join(required)}")
         missing = [name for name in required[self.check_type] if getattr(self, name) is None]
         if missing:
             raise ValueError(f"check_type {self.check_type!r} requires: {', '.join(missing)}")
@@ -478,6 +477,13 @@ def _remove_orphaned_temp_files(data_dir: Path) -> None:
             logger.warning("Could not remove orphaned temp file %s: %s", candidate, error)
         else:
             logger.warning("Removed orphaned temp file left by an interrupted save: %s", candidate)
+
+
+class ConfigImportError(ValueError):
+    """An imported configuration is not shaped like an AutoHeal configuration.
+
+    The message is fixed text, safe to return to the client.
+    """
 
 
 class ConfigManager:
@@ -849,9 +855,17 @@ class ConfigManager:
         """Import configuration from JSON string"""
         with self._lock:
             config_dict = json.loads(json_str)
+            if not isinstance(config_dict, dict):
+                raise ConfigImportError("Configuration must be a JSON object")
 
             # Extract and store custom health checks separately
             custom_hc = config_dict.pop("custom_health_checks", {})
+            if not isinstance(custom_hc, dict) or not all(
+                isinstance(hc, dict) for hc in custom_hc.values()
+            ):
+                raise ConfigImportError(
+                    "custom_health_checks must be an object whose values are health check objects"
+                )
 
             # Validate the full payload before assigning anything, so a
             # failure anywhere leaves the live config and custom health

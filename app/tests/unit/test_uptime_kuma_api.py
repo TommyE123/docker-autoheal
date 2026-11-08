@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi import HTTPException
 
+from app.api.errors import get_docker_client
 from app.api.routes.uptime_kuma import (
     create_uptime_kuma_mapping,
     delete_uptime_kuma_mapping,
@@ -119,7 +120,7 @@ class TestUptimeKumaIntegration:
         )
 
         result = await enable_uptime_kuma_integration(
-            {"server_url": "http://kuma.example", "api_token": "token"}
+            get_docker_client(), {"server_url": "http://kuma.example", "api_token": "token"}
         )
 
         assert result["success"] is True
@@ -149,13 +150,37 @@ class TestUptimeKumaIntegration:
         ],
     )
     async def test_enable_without_valid_connection_fields_returns_400_and_stays_disabled(
-        self, integration_config
+        self, wired_api, integration_config
     ):
         with pytest.raises(HTTPException) as exc_info:
-            await enable_uptime_kuma_integration(integration_config)
+            await enable_uptime_kuma_integration(get_docker_client(), integration_config)
 
         assert exc_info.value.status_code == 400
         assert config_manager.get_config().uptime_kuma.enabled is False
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [("auto_restart_on_down", "abc"), ("username", None), ("username", 5)],
+        ids=["auto-restart-not-bool", "username-null", "username-not-string"],
+    )
+    async def test_enable_with_invalid_field_returns_422_before_contacting_kuma(
+        self, wired_api, monkeypatch, field, value
+    ):
+        def build_client(*_args):
+            raise AssertionError("Uptime-Kuma must not be contacted for an invalid body")
+
+        monkeypatch.setattr("app.uptime_kuma.uptime_kuma_client.UptimeKumaClient", build_client)
+        before = config_manager.get_config().uptime_kuma.model_dump()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await enable_uptime_kuma_integration(
+                get_docker_client(),
+                {"server_url": "http://kuma.example", "api_token": "token", field: value},
+            )
+
+        assert exc_info.value.status_code == 422
+        assert field in exc_info.value.detail
+        assert config_manager.get_config().uptime_kuma.model_dump() == before
 
     async def test_enable_strips_surrounding_whitespace_before_saving(self, wired_api, monkeypatch):
         captured = []
@@ -167,7 +192,8 @@ class TestUptimeKumaIntegration:
         monkeypatch.setattr("app.uptime_kuma.uptime_kuma_client.UptimeKumaClient", build_client)
 
         await enable_uptime_kuma_integration(
-            {"server_url": " http://kuma.example ", "api_token": "token\n", "username": " user "}
+            get_docker_client(),
+            {"server_url": " http://kuma.example ", "api_token": "token\n", "username": " user "},
         )
 
         saved = config_manager.get_config().uptime_kuma
@@ -198,7 +224,7 @@ class TestUptimeKumaIntegration:
         )
 
         result = await enable_uptime_kuma_integration(
-            {"server_url": "http://kuma.example", "api_token": "token"}
+            get_docker_client(), {"server_url": "http://kuma.example", "api_token": "token"}
         )
 
         assert result["success"] is True
@@ -227,7 +253,7 @@ class TestUptimeKumaIntegration:
         )
 
         result = await enable_uptime_kuma_integration(
-            {"server_url": "http://kuma.example", "api_token": "token"}
+            get_docker_client(), {"server_url": "http://kuma.example", "api_token": "token"}
         )
 
         assert result["success"] is True
@@ -270,7 +296,7 @@ class TestUptimeKumaIntegration:
         )
 
         result = await enable_uptime_kuma_integration(
-            {"server_url": "http://kuma.example", "api_token": "token"}
+            get_docker_client(), {"server_url": "http://kuma.example", "api_token": "token"}
         )
 
         persisted = {
@@ -320,7 +346,7 @@ class TestUptimeKumaIntegration:
         )
 
         result = await enable_uptime_kuma_integration(
-            {"server_url": "http://kuma.example", "api_token": "token"}
+            get_docker_client(), {"server_url": "http://kuma.example", "api_token": "token"}
         )
 
         config = config_manager.get_config()
@@ -346,7 +372,7 @@ class TestUptimeKumaIntegration:
         )
 
         result = await enable_uptime_kuma_integration(
-            {"server_url": "http://kuma.example", "api_token": "token"}
+            get_docker_client(), {"server_url": "http://kuma.example", "api_token": "token"}
         )
 
         assert result["success"] is True
@@ -359,7 +385,7 @@ class TestUptimeKumaIntegration:
 
         assert exc_info.value.status_code == 400
 
-    async def test_get_monitors_client_error_returns_500(self, monkeypatch):
+    async def test_get_monitors_client_error_propagates(self, monkeypatch):
         config = config_manager.get_config()
         config.uptime_kuma.enabled = True
         config_manager.update_config(config)
@@ -370,10 +396,8 @@ class TestUptimeKumaIntegration:
             lambda *a, **k: fake_client,
         )
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(RuntimeError, match="server unavailable"):
             await get_uptime_kuma_monitors()
-
-        assert exc_info.value.status_code == 500
 
     async def test_get_monitors_returns_empty_list_when_fetch_fails(self, monkeypatch):
         config = config_manager.get_config()
@@ -404,7 +428,7 @@ class TestUptimeKumaIntegration:
 
         assert result == {"monitors": monitors}
 
-    async def test_enable_client_error_returns_500(self, wired_api, monkeypatch):
+    async def test_enable_client_error_propagates(self, wired_api, monkeypatch):
         fake_client = MagicMock()
         fake_client.get_all_monitors = AsyncMock(side_effect=RuntimeError("server unavailable"))
         monkeypatch.setattr(
@@ -412,28 +436,10 @@ class TestUptimeKumaIntegration:
             lambda *a, **k: fake_client,
         )
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(RuntimeError, match="server unavailable"):
             await enable_uptime_kuma_integration(
-                {"server_url": "http://kuma.example", "api_token": "token"}
+                get_docker_client(), {"server_url": "http://kuma.example", "api_token": "token"}
             )
-
-        assert exc_info.value.status_code == 500
-
-    async def test_enable_without_docker_client_returns_500(self, monkeypatch):
-        monkeypatch.setattr("app.api.state.docker_client", None)
-        fake_client = FakeUptimeKumaClient(monitors=[])
-        monkeypatch.setattr(
-            "app.uptime_kuma.uptime_kuma_client.UptimeKumaClient",
-            lambda *a, **k: fake_client,
-        )
-
-        with pytest.raises(HTTPException) as exc_info:
-            await enable_uptime_kuma_integration(
-                {"server_url": "http://kuma.example", "api_token": "token"}
-            )
-
-        assert exc_info.value.status_code == 500
-        assert exc_info.value.detail == "Docker client not initialized"
 
     async def test_enable_restarts_initialized_monitor(self, wired_api, monkeypatch):
         _docker_client, engine = wired_api
@@ -447,7 +453,7 @@ class TestUptimeKumaIntegration:
         )
 
         result = await enable_uptime_kuma_integration(
-            {"server_url": "http://kuma.example", "api_token": "token"}
+            get_docker_client(), {"server_url": "http://kuma.example", "api_token": "token"}
         )
 
         assert result["success"] is True
@@ -460,7 +466,7 @@ class TestUptimeKumaIntegration:
         docker_client.add_container(container, info)
 
         created = await create_uptime_kuma_mapping(
-            {"container_id": "a" * 64, "monitor_friendly_name": "web"}
+            get_docker_client(), {"container_id": "a" * 64, "monitor_friendly_name": "web"}
         )
         assert created["success"] is True
 
@@ -471,16 +477,77 @@ class TestUptimeKumaIntegration:
         assert deleted["success"] is True
         assert (await get_uptime_kuma_mappings())["mappings"] == []
 
-    async def test_create_mapping_for_unknown_container_returns_500(self, wired_api):
+    async def test_delete_mapping_log_line_cannot_be_forged(self, caplog):
+        with caplog.at_level("INFO", logger="app.api.routes.uptime_kuma"):
+            await delete_uptime_kuma_mapping("web\nFORGED log line")
+
+        message = next(
+            r.getMessage()
+            for r in caplog.records
+            if "Deleted Uptime-Kuma mapping" in r.getMessage()
+        )
+        assert "\n" not in message
+        assert "web\\nFORGED log line" in message
+
+    async def test_create_mapping_log_line_cannot_be_forged(self, wired_api, caplog):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+
+        with caplog.at_level("INFO", logger="app.api.routes.uptime_kuma"):
+            await create_uptime_kuma_mapping(
+                get_docker_client(),
+                {"container_id": "a" * 64, "monitor_friendly_name": "web\nFORGED log line"},
+            )
+
+        message = next(
+            r.getMessage()
+            for r in caplog.records
+            if "Created Uptime-Kuma mapping" in r.getMessage()
+        )
+        assert "\n" not in message
+        assert "web\\nFORGED log line" in message
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            {},
+            {"container_id": "web"},
+            {"monitor_friendly_name": "Monitor"},
+            {"container_id": "", "monitor_friendly_name": "Monitor"},
+            {"container_id": "web", "monitor_friendly_name": "   "},
+            {"container_id": 7, "monitor_friendly_name": "Monitor"},
+            {"container_id": "web", "monitor_friendly_name": None},
+        ],
+        ids=[
+            "empty",
+            "missing-monitor",
+            "missing-container",
+            "blank-container",
+            "blank-monitor",
+            "non-string-container",
+            "null-monitor",
+        ],
+    )
+    async def test_create_mapping_without_valid_fields_returns_400(self, wired_api, body):
+        with pytest.raises(HTTPException) as exc_info:
+            await create_uptime_kuma_mapping(get_docker_client(), body)
+
+        assert exc_info.value.status_code == 400
+        assert (await get_uptime_kuma_mappings())["mappings"] == []
+
+    async def test_create_mapping_for_unknown_container_returns_404(self, wired_api):
         with pytest.raises(HTTPException) as exc_info:
             await create_uptime_kuma_mapping(
+                get_docker_client(),
                 {
                     "container_id": "missing",
                     "monitor_friendly_name": "Monitor",
-                }
+                },
             )
 
-        assert exc_info.value.status_code == 500
+        assert exc_info.value.status_code == 404
+        assert exc_info.value.detail == "Container not found"
 
     async def test_create_mapping_without_stable_id_returns_500(self, wired_api):
         docker_client, _engine = wired_api
@@ -490,34 +557,21 @@ class TestUptimeKumaIntegration:
 
         with pytest.raises(HTTPException) as exc_info:
             await create_uptime_kuma_mapping(
-                {"container_id": "a" * 64, "monitor_friendly_name": "Monitor"}
+                get_docker_client(), {"container_id": "a" * 64, "monitor_friendly_name": "Monitor"}
             )
 
         assert exc_info.value.status_code == 500
         assert config_manager.get_config().uptime_kuma_mappings == []
 
-    async def test_create_mapping_without_docker_client_returns_500(self, monkeypatch):
-        monkeypatch.setattr("app.api.state.docker_client", None)
-
-        with pytest.raises(HTTPException) as exc_info:
-            await create_uptime_kuma_mapping(
-                {"container_id": "web", "monitor_friendly_name": "Monitor"}
-            )
-
-        assert exc_info.value.status_code == 500
-        assert exc_info.value.detail == "Docker client not initialized"
-
-    async def test_delete_mapping_persistence_error_returns_500(self, monkeypatch):
+    async def test_delete_mapping_persistence_error_propagates(self, monkeypatch):
         monkeypatch.setattr(
             config_manager,
             "update_config",
             MagicMock(side_effect=RuntimeError("disk error")),
         )
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(RuntimeError, match="disk error"):
             await delete_uptime_kuma_mapping("web")
-
-        assert exc_info.value.status_code == 500
 
     async def test_disable_turns_off_integration_flag(self):
         config = config_manager.get_config()
@@ -541,14 +595,12 @@ class TestUptimeKumaIntegration:
 
         engine.uptime_kuma_monitor.stop.assert_awaited_once_with()
 
-    async def test_disable_persistence_error_returns_500(self, monkeypatch):
+    async def test_disable_persistence_error_propagates(self, monkeypatch):
         monkeypatch.setattr(
             config_manager,
             "update_config",
             MagicMock(side_effect=RuntimeError("disk error")),
         )
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(RuntimeError, match="disk error"):
             await disable_uptime_kuma_integration()
-
-        assert exc_info.value.status_code == 500
