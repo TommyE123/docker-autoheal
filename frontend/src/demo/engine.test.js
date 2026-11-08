@@ -497,4 +497,34 @@ describe("monitoring loop", () => {
     vi.advanceTimersByTime(20000);
     expect(runCycle).toHaveBeenCalledTimes(2);
   });
+
+  it("keeps running when a cycle throws, like the real engine", () => {
+    const real = new DemoEngine();
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const runCycle = vi.spyOn(real, "runCycle").mockImplementationOnce(() => {
+      throw new Error("boom");
+    });
+    real.start();
+    vi.advanceTimersByTime(0);
+    expect(error).toHaveBeenCalledWith(
+      "Demo monitoring cycle failed:",
+      expect.any(Error),
+    );
+    expect(real.running).toBe(true);
+    vi.advanceTimersByTime(5000);
+    expect(runCycle).toHaveBeenCalledTimes(2);
+    real.stop();
+    error.mockRestore();
+  });
+
+  it("doesn't reschedule when stopped during a cycle", () => {
+    const real = new DemoEngine();
+    const runCycle = vi
+      .spyOn(real, "runCycle")
+      .mockImplementation(() => real.stop());
+    real.start();
+    vi.advanceTimersByTime(20000);
+    expect(runCycle).toHaveBeenCalledTimes(1);
+    expect(real.running).toBe(false);
+  });
 });

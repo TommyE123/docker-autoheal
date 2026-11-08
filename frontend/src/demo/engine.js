@@ -274,11 +274,20 @@ export class DemoEngine {
   start() {
     if (this._timer !== null) return;
     const loop = () => {
-      this.runCycle();
-      this._timer = setTimeout(
-        loop,
-        this.config.monitor.interval_seconds * 1000,
-      );
+      // A failing cycle must not stop the loop: the real engine logs the
+      // error and carries on (monitoring_engine.py _monitor_loop).
+      try {
+        this.runCycle();
+      } catch (error) {
+        console.error("Demo monitoring cycle failed:", error);
+      } finally {
+        if (this._timer !== null) {
+          this._timer = setTimeout(
+            loop,
+            this.config.monitor.interval_seconds * 1000,
+          );
+        }
+      }
     };
     this._timer = setTimeout(loop, 0);
   }

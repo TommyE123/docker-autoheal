@@ -745,4 +745,48 @@ describe("edge cases", () => {
     expect(trimTrailingSlashes("/a")).toBe("/a");
     expect(trimTrailingSlashes("///")).toBe("");
   });
+
+  it("rejects wrongly typed fields in the other sections, like AutoHealConfig", async () => {
+    const config = (await api.get("/config")).data;
+    config.filters.blacklist_names = "abc";
+    config.ui.max_log_entries = "lots";
+    const e = await error(api.put("/config", config));
+    expect(e.response.status).toBe(422);
+    expect(e.response.data.detail).toEqual([
+      {
+        type: "list_type",
+        loc: ["body", "filters", "blacklist_names"],
+        msg: "Input should be a valid list",
+      },
+      {
+        type: "number_type",
+        loc: ["body", "ui", "max_log_entries"],
+        msg: "Input should be a valid number",
+      },
+    ]);
+    expect(engine.config.filters.blacklist_names).toEqual([]);
+
+    const form = new FormData();
+    form.append(
+      "file",
+      new File(
+        [JSON.stringify({ filters: { blacklist_names: "abc" } })],
+        "c.json",
+      ),
+    );
+    expect(
+      (await error(api.post("/config/import", form))).response.status,
+    ).toBe(500);
+    // The simulation keeps working after the rejected payloads.
+    expect(() => engine.runCycle()).not.toThrow();
+  });
+
+  it("drops unknown fields and lets optional (null) fields take a value", async () => {
+    const config = (await api.get("/config")).data;
+    config.filters.unknown = 1;
+    config.alerts.webhook = "https://example.invalid/hook";
+    await api.put("/config", config);
+    expect(engine.config.filters.unknown).toBeUndefined();
+    expect(engine.config.alerts.webhook).toBe("https://example.invalid/hook");
+  });
 });

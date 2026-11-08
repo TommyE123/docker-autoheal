@@ -133,6 +133,29 @@ function raiseIfInvalid(errors) {
   if (errors.length) throw new ApiError(422, errors);
 }
 
+/**
+ * Copy one section's known fields onto its defaults, like the Pydantic model:
+ * unknown keys are dropped, and a value of the wrong kind (list, object,
+ * string, number or boolean, judged by the default) is a 422. A null default
+ * (an optional field) accepts anything.
+ */
+function mergeSection(target, values, loc, errors) {
+  const kind = (value) => (Array.isArray(value) ? "list" : typeof value);
+  for (const [key, value] of Object.entries(values)) {
+    if (!(key in target)) continue;
+    const expected = target[key];
+    if (expected === null || kind(expected) === kind(value)) {
+      target[key] = clone(value);
+    } else {
+      errors.push({
+        type: `${kind(expected)}_type`,
+        loc: [...loc, key],
+        msg: `Input should be a valid ${kind(expected)}`,
+      });
+    }
+  }
+}
+
 /** AutoHealConfig(**data): unknown keys dropped, missing sections defaulted. */
 function validateFullConfig(data, loc = ["body"]) {
   if (!isObject(data)) {
@@ -166,7 +189,7 @@ function validateFullConfig(data, loc = ["body"]) {
         });
       }
     } else if (isObject(data[section])) {
-      Object.assign(config[section], clone(data[section]));
+      mergeSection(config[section], data[section], [...loc, section], errors);
     } else {
       errors.push({
         type: "model_type",
