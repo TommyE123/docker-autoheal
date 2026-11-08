@@ -134,7 +134,7 @@ jobs:
             fi
             sleep 2
           done
-          echo "::error::Auto-Heal service did not become ready within the timeout"
+          echo "::error::Docker Autoheal instance did not become ready within the timeout"
           exit 1
 
       - name: Verify the application can communicate with Docker

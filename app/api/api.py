@@ -1,5 +1,5 @@
 """
-FastAPI application - REST API endpoints for Docker Auto-Heal Service
+FastAPI application - REST API endpoints for Docker Autoheal
 
 Route handlers live in ``app/api/routes/`` (split from this module in issue
 #321), grouped by domain: health/status, containers, maintenance, config,
@@ -15,19 +15,22 @@ import logging
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from app.api.errors import register_exception_handlers
 from app.api.state import init_api  # noqa: F401  (re-exported for app/main.py)
 
 logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app. The API documentation lives under /api/, with the rest of the API.
 app = FastAPI(
-    title="Docker Auto-Heal Service",
+    title="Docker Autoheal",
     description="Automated container monitoring and healing service",
     version="2.6.0",  # x-release-please-version
     docs_url="/api/swagger",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
 )
+
+register_exception_handlers(app)
 
 # No CORS middleware: the bundled UI is served by this same app (and the Vite
 # dev server proxies /api and /health), so every legitimate browser request is

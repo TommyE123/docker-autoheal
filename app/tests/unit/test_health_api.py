@@ -11,7 +11,6 @@ ever touched.
 """
 
 import pytest
-from fastapi import HTTPException
 
 from app.api import state
 from app.api.routes.health import get_manifest, get_system_status, health_check
@@ -87,14 +86,12 @@ class TestSystemStatus:
         assert status.quarantined_containers == 1
         assert status.docker_connected is True
 
-    async def test_docker_failure_returns_500(self, wired_api):
+    async def test_docker_failure_propagates(self, wired_api):
         docker_client, _engine = wired_api
         docker_client.list_containers_error = RuntimeError("daemon unreachable")
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(RuntimeError, match="daemon unreachable"):
             await get_system_status()
-
-        assert exc_info.value.status_code == 500
 
     async def test_uninspectable_container_is_not_counted_as_monitored(self, wired_api):
         docker_client, _engine = wired_api

@@ -32,7 +32,7 @@ test(
   async ({ page }) => {
     await loadControlledPage(page);
     await page.goto("/containers");
-    await expect(page.getByText("Docker Auto-Heal Service")).toBeVisible();
+    await expect(page.getByText("Docker Autoheal")).toBeVisible();
     // Real API traffic has happened by now; none of it may be in Cache Storage.
     const paths = await cachedPaths(page);
 

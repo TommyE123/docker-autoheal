@@ -304,7 +304,7 @@ pytest --cov=app --cov-report=term-missing
 
 That runs the unit suite only (per `pytest.ini`'s `testpaths`) — no Docker daemon needed.
 There's also an integration suite that exercises a real Docker daemon and, for some
-tests, a running Auto-Heal instance; it's not run by a plain `pytest` and not run in CI.
+tests, a running Docker Autoheal instance; it's not run by a plain `pytest` and not run in CI.
 See [Testing](testing.md) for what's covered, how to run the integration suite, and how
 test isolation works.
 

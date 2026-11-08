@@ -54,7 +54,7 @@ describe("App", () => {
     );
 
     expect(await screen.findByText("Dashboard")).toBeInTheDocument();
-    expect(screen.getByText("Docker Auto-Heal Service")).toBeInTheDocument();
+    expect(screen.getByText("Docker Autoheal")).toBeInTheDocument();
   });
 
   it("shows the maintenance modal when the backend reports maintenance mode active", async () => {

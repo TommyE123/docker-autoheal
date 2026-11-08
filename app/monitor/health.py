@@ -1,5 +1,5 @@
 """
-Container health evaluation for Docker Auto-Heal Service
+Container health evaluation for Docker Autoheal
 Decides from a container's state and health checks whether it needs a restart
 """
 

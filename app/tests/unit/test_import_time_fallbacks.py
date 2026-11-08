@@ -58,11 +58,15 @@ def test_main_entry_point_runs_the_service(sandboxed_import, monkeypatch):
     def fake_run(coroutine):
         started.append(coroutine.cr_code.co_name)
         coroutine.close()
+        return 3
 
     monkeypatch.setattr(asyncio, "run", fake_run)
 
-    runpy.run_module("app.main", run_name="__main__")
+    # The exit code from main() becomes the process exit code, so a failure reaches Docker.
+    with pytest.raises(SystemExit) as exc_info:
+        runpy.run_module("app.main", run_name="__main__")
 
+    assert exc_info.value.code == 3
     # mutmut wraps functions in a trampoline, so the name differs in mutation runs.
     assert started in (["main"], ["_trampoline_wrapper"])
 

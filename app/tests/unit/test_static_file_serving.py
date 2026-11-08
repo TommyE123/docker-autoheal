@@ -9,13 +9,16 @@ as ``httpx``/``TestClient`` as a test dependency.
 """
 
 import asyncio
+import json
 from typing import TYPE_CHECKING, Any
 
 import pytest
 from fastapi import HTTPException
 
+from app.api.errors import INTERNAL_ERROR_DETAIL
 from app.api.routes import ui as api_module
 from app.api.routes.ui import get_static_file_path, serve_static_file
+from app.tests.unit.test_api_routing import _request
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -80,7 +83,7 @@ async def test_serve_static_file_serves_sw_js(static_dir):
 
 @pytest.mark.asyncio
 async def test_serve_static_file_serves_manifest_json(static_dir):
-    content = b'{"name": "Docker Auto-Heal"}'
+    content = b'{"name": "Docker Autoheal"}'
     (static_dir / "manifest.json").write_bytes(content)
 
     response = await serve_static_file("manifest.json", "application/manifest+json")
@@ -133,17 +136,35 @@ def test_get_static_file_path_resolution_error_raises_400(static_dir, monkeypatc
 
 
 @pytest.mark.asyncio
-async def test_serve_static_file_unexpected_error_becomes_500(static_dir, monkeypatch):
+async def test_static_file_error_returns_generic_500_and_logs_traceback(
+    static_dir, monkeypatch, caplog
+):
     def explode(_filename):
         raise OSError("filesystem went away")
 
     monkeypatch.setattr(api_module, "get_static_file_path", explode)
 
-    with pytest.raises(HTTPException) as exc_info:
-        await serve_static_file("sw.js")
+    with caplog.at_level("ERROR", logger="app.api.errors"):
+        status, body, _headers = await _request("GET", "/sw.js", raise_app_exceptions=False)
 
-    assert exc_info.value.status_code == 500
-    assert "filesystem went away" in str(exc_info.value.detail)
+    assert status == 500
+    assert json.loads(body) == {"detail": INTERNAL_ERROR_DETAIL}
+    assert b"filesystem went away" not in body
+    record = next(r for r in caplog.records if r.name == "app.api.errors")
+    assert record.getMessage() == "Unhandled error on GET /sw.js"
+    assert record.exc_info is not None
+    assert record.exc_info[0] is OSError
+
+
+@pytest.mark.asyncio
+async def test_serve_static_file_unexpected_error_propagates(static_dir, monkeypatch):
+    def explode(_filename):
+        raise OSError("filesystem went away")
+
+    monkeypatch.setattr(api_module, "get_static_file_path", explode)
+
+    with pytest.raises(OSError, match="filesystem went away"):
+        await serve_static_file("sw.js")
 
 
 # ---------------------------------------------------------------------------
@@ -305,7 +326,7 @@ def test_serve_react_app_fallback_page_is_exact(tmp_path, monkeypatch):
     response = api_module.serve_react_app()
 
     assert bytes(response.body).decode() == (
-        "<h1>Docker Auto-Heal Service</h1>"
+        "<h1>Docker Autoheal</h1>"
         "<p>React UI not found. Please build the frontend first:</p>"
         "<pre>cd frontend && npm install && npm run build</pre>"
         "<p>API documentation is available at <a href='/api/swagger'>/api/swagger</a></p>"
@@ -401,19 +422,3 @@ async def test_serve_static_file_logs_success(static_dir, caplog):
         await serve_static_file("sw.js", "application/javascript")
 
     assert "Serving static file: sw.js (application/javascript)" in caplog.text
-
-
-@pytest.mark.asyncio
-async def test_serve_static_file_logs_unexpected_error(static_dir, monkeypatch, caplog):
-    def explode(_filename):
-        raise OSError("filesystem went away")
-
-    monkeypatch.setattr(api_module, "get_static_file_path", explode)
-
-    with (
-        caplog.at_level("ERROR", logger=api_module.logger.name),
-        pytest.raises(HTTPException),
-    ):
-        await serve_static_file("sw.js")
-
-    assert "Error serving static file sw.js: filesystem went away" in caplog.text

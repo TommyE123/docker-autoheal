@@ -13,11 +13,7 @@ import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import HTTPException
 
-from app.api.models import ContainerSelectionRequest
-from app.api.routes.config import update_observability_config
-from app.api.routes.containers import update_container_selection
 from app.config.config_manager import ConfigManager, NotificationService, config_manager
 from app.config.init_defaults import (
     init_data_file,
@@ -80,38 +76,6 @@ def assert_error_without_traceback(caplog, message: str) -> None:
 
 class TestErrorsLoggedWithTraceback:
     @pytest.mark.asyncio
-    async def test_observability_update_failure(self, caplog, monkeypatch):
-        monkeypatch.setattr(
-            config_manager, "update_config", MagicMock(side_effect=RuntimeError("boom"))
-        )
-
-        with pytest.raises(HTTPException) as exc_info:
-            await update_observability_config({"log_format": "text"})
-
-        assert exc_info.value.status_code == 500
-        assert_error_with_traceback(
-            caplog, "Error updating observability config: boom", RuntimeError
-        )
-
-    @pytest.mark.asyncio
-    async def test_container_selection_failure(self, caplog, monkeypatch, docker_client, engine):
-        monkeypatch.setattr("app.api.state.docker_client", docker_client)
-        monkeypatch.setattr("app.api.state.monitoring_engine", engine)
-        monkeypatch.setattr(
-            config_manager, "update_config", MagicMock(side_effect=RuntimeError("boom"))
-        )
-
-        with pytest.raises(HTTPException) as exc_info:
-            await update_container_selection(
-                ContainerSelectionRequest(container_ids=["ghost"], enabled=True)
-            )
-
-        assert exc_info.value.status_code == 500
-        assert_error_with_traceback(
-            caplog, "Error updating container selection: boom", RuntimeError
-        )
-
-    @pytest.mark.asyncio
     async def test_service_start_failure(self, caplog):
         config = MagicMock()
         config.observability.log_level = "INFO"
@@ -138,7 +102,7 @@ class TestErrorsLoggedWithTraceback:
     @pytest.mark.asyncio
     async def test_main_entry_point_failure(self, caplog):
         failing_service = MagicMock()
-        failing_service.run.side_effect = RuntimeError("cannot run")
+        failing_service.run = AsyncMock(side_effect=RuntimeError("cannot run"))
         failing_service.running = False
 
         with (
@@ -146,8 +110,9 @@ class TestErrorsLoggedWithTraceback:
             patch("app.main.AutoHealService", return_value=failing_service),
             patch("app.main.run_api_server", new=AsyncMock()),
         ):
-            await app_main()
+            exit_code = await app_main()
 
+        assert exit_code == 1
         assert_error_with_traceback(caplog, "Service error: cannot run", RuntimeError)
 
     @pytest.mark.asyncio

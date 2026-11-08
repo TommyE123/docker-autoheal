@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from fastapi import APIRouter, HTTPException
 
 from app.api import state
+from app.api.errors import DockerClientDep  # noqa: TC001  (FastAPI resolves it at runtime)
 from app.api.models import ContainerInfo, ContainerSelectionRequest
 from app.config.config_manager import AutoHealEvent, ContainersConfig, config_manager
 
@@ -31,160 +32,141 @@ def _inspect_containers(docker_client: DockerClientWrapper, include_stopped: boo
 
 
 @router.get("/api/containers", response_model=list[ContainerInfo])
-async def list_containers(include_stopped: bool = False):
+async def list_containers(docker_client: DockerClientDep, include_stopped: bool = False):
     """List all containers with their monitoring status"""
-    docker_client = state.docker_client
     monitoring_engine = state.monitoring_engine
-    try:
-        if not docker_client:
-            raise HTTPException(status_code=500, detail="Docker client not initialized")
+    inspected = await asyncio.to_thread(_inspect_containers, docker_client, include_stopped)
+    result = []
 
-        inspected = await asyncio.to_thread(_inspect_containers, docker_client, include_stopped)
-        result = []
+    # Get Uptime Kuma configuration
+    config = config_manager.get_config()
+    uptime_kuma_enabled = config.uptime_kuma.enabled
 
-        # Get Uptime Kuma configuration
-        config = config_manager.get_config()
-        uptime_kuma_enabled = config.uptime_kuma.enabled
+    # Use the uptime_kuma_monitor from monitoring_engine if available
+    uptime_kuma_monitor = None
+    if uptime_kuma_enabled and monitoring_engine:
+        uptime_kuma_monitor = monitoring_engine.uptime_kuma_monitor
 
-        # Use the uptime_kuma_monitor from monitoring_engine if available
-        uptime_kuma_monitor = None
-        if uptime_kuma_enabled and monitoring_engine:
-            uptime_kuma_monitor = monitoring_engine.uptime_kuma_monitor
+    for container, info in inspected:
+        if not info:
+            continue
 
-        for container, info in inspected:
-            if not info:
-                continue
+        stable_id = info.get("stable_id")  # Get stable identifier
 
-            stable_id = info.get("stable_id")  # Get stable identifier
+        # Check if monitored
+        monitored = False
+        if monitoring_engine:
+            monitored = monitoring_engine.should_monitor_container(container, info)
 
-            # Check if monitored
-            monitored = False
-            if monitoring_engine:
-                monitored = monitoring_engine.should_monitor_container(container, info)
+        # Restart counts and quarantine are stored per replica (recovery_id)
+        recovery_id = info.get("recovery_id")
 
-            # Restart counts and quarantine are stored per replica (recovery_id)
-            recovery_id = info.get("recovery_id")
+        # Check if quarantined (use recovery_id, matching how quarantine is stored)
+        quarantined = config_manager.is_quarantined(recovery_id)
 
-            # Check if quarantined (use recovery_id, matching how quarantine is stored)
-            quarantined = config_manager.is_quarantined(recovery_id)
+        # Get locally tracked restart count (persists across container recreations)
+        locally_tracked_restarts = config_manager.get_total_restart_count(recovery_id)
 
-            # Get locally tracked restart count (persists across container recreations)
-            locally_tracked_restarts = config_manager.get_total_restart_count(recovery_id)
+        # Check for Uptime Kuma mapping and status using uptime_kuma_monitor
+        uptime_kuma_status = None
+        uptime_kuma_monitor_name = None
 
-            # Check for Uptime Kuma mapping and status using uptime_kuma_monitor
-            uptime_kuma_status = None
-            uptime_kuma_monitor_name = None
+        if uptime_kuma_enabled and uptime_kuma_monitor:
+            # Check if container is mapped
+            if uptime_kuma_monitor.is_container_mapped(stable_id):
+                # Get the monitor name from mappings
+                for mapping in config.uptime_kuma_mappings:
+                    if mapping.container_id == stable_id:
+                        uptime_kuma_monitor_name = mapping.monitor_friendly_name
+                        break
 
-            if uptime_kuma_enabled and uptime_kuma_monitor:
-                # Check if container is mapped
-                if uptime_kuma_monitor.is_container_mapped(stable_id):
-                    # Get the monitor name from mappings
-                    for mapping in config.uptime_kuma_mappings:
-                        if mapping.container_id == stable_id:
-                            uptime_kuma_monitor_name = mapping.monitor_friendly_name
-                            break
+                # Get cached status from uptime_kuma_monitor
+                uptime_kuma_status = uptime_kuma_monitor.get_container_status(stable_id)
+        elif uptime_kuma_enabled and not uptime_kuma_monitor:
+            # Uptime-Kuma integration enabled but monitor not initialized
+            uptime_kuma_status = 4  # Indicate unknown status
+        else:
+            uptime_kuma_status = 5  # Integration disabled
 
-                    # Get cached status from uptime_kuma_monitor
-                    uptime_kuma_status = uptime_kuma_monitor.get_container_status(stable_id)
-            elif uptime_kuma_enabled and not uptime_kuma_monitor:
-                # Uptime-Kuma integration enabled but monitor not initialized
-                uptime_kuma_status = 4  # Indicate unknown status
-            else:
-                uptime_kuma_status = 5  # Integration disabled
+        container_info = ContainerInfo(
+            id=info.get("id"),
+            name=info.get("name"),
+            image=info.get("image"),
+            status=info.get("status"),
+            state=info.get("state", {}),
+            labels=info.get("labels", {}),
+            health=info.get("health"),
+            restart_count=locally_tracked_restarts,  # Use locally tracked count instead of Docker's
+            monitored=monitored,
+            quarantined=quarantined,
+            uptime_kuma_status=uptime_kuma_status,
+            uptime_kuma_monitor_name=uptime_kuma_monitor_name,
+        )
+        result.append(container_info)
 
-            container_info = ContainerInfo(
-                id=info.get("id"),
-                name=info.get("name"),
-                image=info.get("image"),
-                status=info.get("status"),
-                state=info.get("state", {}),
-                labels=info.get("labels", {}),
-                health=info.get("health"),
-                restart_count=locally_tracked_restarts,  # Use locally tracked count instead of Docker's
-                monitored=monitored,
-                quarantined=quarantined,
-                uptime_kuma_status=uptime_kuma_status,
-                uptime_kuma_monitor_name=uptime_kuma_monitor_name,
-            )
-            result.append(container_info)
-
-        return result
-    except Exception as e:
-        logger.error("Error listing containers: %s", e)
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    return result
 
 
 @router.get(
     "/api/containers/{container_id}",
     responses={500: {"description": "Container could not be inspected or identified"}},
 )
-async def get_container_details(container_id: str):
+async def get_container_details(docker_client: DockerClientDep, container_id: str):
     """Get detailed information about a specific container"""
-    docker_client = state.docker_client
     monitoring_engine = state.monitoring_engine
-    try:
-        if not docker_client:
-            raise HTTPException(status_code=500, detail="Docker client not initialized")
+    container = await asyncio.to_thread(docker_client.get_container, container_id)
+    if not container:
+        raise HTTPException(status_code=404, detail="Container not found")
 
-        container = await asyncio.to_thread(docker_client.get_container, container_id)
-        if not container:
-            raise HTTPException(status_code=404, detail="Container not found")
+    info = await asyncio.to_thread(docker_client.get_container_info, container)
+    if not info:
+        raise HTTPException(status_code=500, detail="Unable to inspect container")
 
-        info = await asyncio.to_thread(docker_client.get_container_info, container)
-        if not info:
-            raise HTTPException(status_code=500, detail="Unable to inspect container")
+    # Use stable_id for tracking (persists across recreations)
+    full_container_id = info.get("full_id")
+    container_name = info.get("name")
+    stable_id = info.get("stable_id")
+    # Restart counts and quarantine are stored per replica (recovery_id)
+    recovery_id = info.get("recovery_id")
+    if (
+        full_container_id is None
+        or container_name is None
+        or stable_id is None
+        or recovery_id is None
+    ):
+        raise HTTPException(status_code=500, detail="Unable to resolve container identifiers")
 
-        # Use stable_id for tracking (persists across recreations)
-        full_container_id = info.get("full_id")
-        container_name = info.get("name")
-        stable_id = info.get("stable_id")
-        # Restart counts and quarantine are stored per replica (recovery_id)
-        recovery_id = info.get("recovery_id")
-        if (
-            full_container_id is None
-            or container_name is None
-            or stable_id is None
-            or recovery_id is None
-        ):
-            raise HTTPException(status_code=500, detail="Unable to resolve container identifiers")
+    # Get locally tracked restart counts (using recovery_id)
+    recent_restart_count = config_manager.get_restart_count(
+        recovery_id, config_manager.get_config().restart.max_restarts_window_seconds
+    )
+    total_restart_count = config_manager.get_total_restart_count(recovery_id)
 
-        # Get locally tracked restart counts (using recovery_id)
-        recent_restart_count = config_manager.get_restart_count(
-            recovery_id, config_manager.get_config().restart.max_restarts_window_seconds
-        )
-        total_restart_count = config_manager.get_total_restart_count(recovery_id)
+    # Check monitoring status
+    monitored = False
+    if monitoring_engine:
+        monitored = monitoring_engine.should_monitor_container(container, info)
 
-        # Check monitoring status
-        monitored = False
-        if monitoring_engine:
-            monitored = monitoring_engine.should_monitor_container(container, info)
+    # Check if quarantined (use recovery_id, matching how quarantine is stored)
+    quarantined = config_manager.is_quarantined(recovery_id)
 
-        # Check if quarantined (use recovery_id, matching how quarantine is stored)
-        quarantined = config_manager.is_quarantined(recovery_id)
+    # Get custom health check (by stable_id first for correctness, then fallback to name/ID for legacy compat)
+    custom_hc = config_manager.get_custom_health_check(stable_id)
+    if not custom_hc:
+        custom_hc = config_manager.get_custom_health_check(container_name)
+    if not custom_hc:
+        custom_hc = config_manager.get_custom_health_check(full_container_id)
 
-        # Get custom health check (by stable_id first for correctness, then fallback to name/ID for legacy compat)
-        custom_hc = config_manager.get_custom_health_check(stable_id)
-        if not custom_hc:
-            custom_hc = config_manager.get_custom_health_check(container_name)
-        if not custom_hc:
-            custom_hc = config_manager.get_custom_health_check(full_container_id)
-
-        # Override restart_count in info with locally tracked count
-        info["restart_count"] = total_restart_count
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Error getting container details: %s", e)
-        raise HTTPException(status_code=500, detail=str(e)) from e
-    else:
-        return {
-            **info,
-            "monitored": monitored,
-            "quarantined": quarantined,
-            "recent_restart_count": recent_restart_count,
-            "total_restart_count": total_restart_count,
-            "custom_health_check": custom_hc,
-        }
+    # Override restart_count in info with locally tracked count
+    info["restart_count"] = total_restart_count
+    return {
+        **info,
+        "monitored": monitored,
+        "quarantined": quarantined,
+        "recent_restart_count": recent_restart_count,
+        "total_restart_count": total_restart_count,
+        "custom_health_check": custom_hc,
+    }
 
 
 def _stable_id_from_info(info: dict | None) -> str | None:
@@ -257,133 +239,104 @@ def _apply_selection(
 
 
 @router.post("/api/containers/select")
-async def update_container_selection(request: ContainerSelectionRequest):
+async def update_container_selection(
+    docker_client: DockerClientDep, request: ContainerSelectionRequest
+):
     """Enable or disable auto-heal for specific containers"""
-    try:
-        logger.debug(
-            "Container selection request: containers=%s, enabled=%s",
-            request.container_ids,
-            request.enabled,
+    logger.debug(
+        "Container selection request: containers=%s, enabled=%s",
+        request.container_ids,
+        request.enabled,
+    )
+
+    # Resolve every container first. The config snapshot is taken only after
+    # the last await, so concurrent selection requests cannot overwrite each
+    # other's updates with a stale copy.
+    resolved: dict[str, dict | None] = {}
+    for cid in request.container_ids:
+        container = await asyncio.to_thread(docker_client.get_container, cid)
+        resolved[cid] = (
+            await asyncio.to_thread(docker_client.get_container_info, container)
+            if container
+            else None
         )
 
-        docker_client = state.docker_client
-        if not docker_client:
-            raise HTTPException(status_code=500, detail="Docker client not initialized")
+    config = config_manager.get_config()
 
-        # Resolve every container first. The config snapshot is taken only after
-        # the last await, so concurrent selection requests cannot overwrite each
-        # other's updates with a stale copy.
-        resolved: dict[str, dict | None] = {}
-        for cid in request.container_ids:
-            container = await asyncio.to_thread(docker_client.get_container, cid)
-            resolved[cid] = (
-                await asyncio.to_thread(docker_client.get_container_info, container)
-                if container
-                else None
-            )
+    for cid in request.container_ids:
+        _apply_selection(config.containers, cid, resolved[cid], request.enabled)
 
-        config = config_manager.get_config()
+    config_manager.update_config(config)
 
-        for cid in request.container_ids:
-            _apply_selection(config.containers, cid, resolved[cid], request.enabled)
+    logger.info(
+        "Container selection updated: %s container(s) %s",
+        len(request.container_ids),
+        "enabled" if request.enabled else "disabled",
+    )
 
-        config_manager.update_config(config)
-
-        logger.info(
-            "Container selection updated: %s container(s) %s",
-            len(request.container_ids),
-            "enabled" if request.enabled else "disabled",
-        )
-
-        return {
-            "status": "success",
-            "message": f"Updated {len(request.container_ids)} containers",
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception("Error updating container selection: %s", e)
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    return {
+        "status": "success",
+        "message": f"Updated {len(request.container_ids)} containers",
+    }
 
 
 @router.post("/api/containers/{container_id}/restart")
-async def restart_container_manual(container_id: str):
+async def restart_container_manual(docker_client: DockerClientDep, container_id: str):
     """Manually restart a container"""
-    docker_client = state.docker_client
-    try:
-        if not docker_client:
-            raise HTTPException(status_code=500, detail="Docker client not initialized")
+    container = await asyncio.to_thread(docker_client.get_container, container_id)
+    if not container:
+        raise HTTPException(status_code=404, detail="Container not found")
 
-        container = await asyncio.to_thread(docker_client.get_container, container_id)
-        if not container:
-            raise HTTPException(status_code=404, detail="Container not found")
+    success = await asyncio.to_thread(docker_client.restart_container, container)
 
-        success = await asyncio.to_thread(docker_client.restart_container, container)
-
-        if success:
-            return {
-                "status": "success",
-                "message": f"Container {container_id} restarted",
-            }
-        raise HTTPException(status_code=500, detail="Failed to restart container")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Error restarting container: %s", e)
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    if success:
+        return {
+            "status": "success",
+            "message": f"Container {container_id} restarted",
+        }
+    raise HTTPException(status_code=500, detail="Failed to restart container")
 
 
 @router.post(
     "/api/containers/{container_id}/unquarantine",
     responses={500: {"description": "Container could not be inspected or identified"}},
 )
-async def unquarantine_container(container_id: str):
+async def unquarantine_container(docker_client: DockerClientDep, container_id: str):
     """Remove container from quarantine"""
-    docker_client = state.docker_client
-    try:
-        if not docker_client:
-            raise HTTPException(status_code=500, detail="Docker client not initialized")
+    # Get the container to resolve stable_id
+    container = await asyncio.to_thread(docker_client.get_container, container_id)
+    if not container:
+        raise HTTPException(status_code=404, detail="Container not found")
 
-        # Get the container to resolve stable_id
-        container = await asyncio.to_thread(docker_client.get_container, container_id)
-        if not container:
-            raise HTTPException(status_code=404, detail="Container not found")
+    info = await asyncio.to_thread(docker_client.get_container_info, container)
+    if not info:
+        raise HTTPException(status_code=500, detail="Unable to inspect container")
+    container_name = info.get("name")
+    recovery_id = info.get("recovery_id")
+    full_container_id = info.get("full_id")
+    if container_name is None or recovery_id is None or full_container_id is None:
+        raise HTTPException(status_code=500, detail="Unable to resolve container identifiers")
 
-        info = await asyncio.to_thread(docker_client.get_container_info, container)
-        if not info:
-            raise HTTPException(status_code=500, detail="Unable to inspect container")
-        container_name = info.get("name")
-        recovery_id = info.get("recovery_id")
-        full_container_id = info.get("full_id")
-        if container_name is None or recovery_id is None or full_container_id is None:
-            raise HTTPException(status_code=500, detail="Unable to resolve container identifiers")
+    # Remove from quarantine using recovery_id (matches how quarantine is stored)
+    config_manager.unquarantine_container(recovery_id)
 
-        # Remove from quarantine using recovery_id (matches how quarantine is stored)
-        config_manager.unquarantine_container(recovery_id)
+    # Clear restart history using recovery_id
+    config_manager.clear_restart_history(recovery_id)
 
-        # Clear restart history using recovery_id
-        config_manager.clear_restart_history(recovery_id)
+    event = AutoHealEvent(
+        timestamp=datetime.now(UTC),
+        container_name=f"{container_name} ({recovery_id})",
+        container_id=full_container_id,  # Store current ID for reference
+        event_type="unquarantine",
+        restart_count=0,
+        status="success",
+        message="Container un-quarantined by user request",
+    )
+    config_manager.add_event(event)
 
-        event = AutoHealEvent(
-            timestamp=datetime.now(UTC),
-            container_name=f"{container_name} ({recovery_id})",
-            container_id=full_container_id,  # Store current ID for reference
-            event_type="unquarantine",
-            restart_count=0,
-            status="success",
-            message="Container un-quarantined by user request",
-        )
-        config_manager.add_event(event)
-
-        # Send notification for quarantine event
-        await state.notification_manager.send_event_notification(event)
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Error unquarantining container: %s", e)
-        raise HTTPException(status_code=500, detail=str(e)) from e
-    else:
-        return {
-            "status": "success",
-            "message": f"Container {container_name} removed from quarantine",
-        }
+    # Send notification for quarantine event
+    await state.notification_manager.send_event_notification(event)
+    return {
+        "status": "success",
+        "message": f"Container {container_name} removed from quarantine",
+    }

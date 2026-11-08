@@ -1,5 +1,5 @@
 """
-Main entry point for Docker Auto-Heal Service
+Main entry point for Docker Autoheal
 """
 
 import asyncio
@@ -116,9 +116,9 @@ class AutoHealService:
         self._startup_cancelled = False
 
     async def start(self) -> None:
-        """Start the auto-heal service"""
+        """Start Docker Autoheal"""
         try:
-            logger.info("Starting Docker Auto-Heal Service v%s", app.version)
+            logger.info("Starting Docker Autoheal v%s", app.version)
 
             # Load configuration
             config = config_manager.get_config()
@@ -182,7 +182,7 @@ class AutoHealService:
                     logger.warning("Uptime-Kuma failed to start: %s", e)
 
             self.running = True
-            logger.info("Docker Auto-Heal Service started successfully")
+            logger.info("Docker Autoheal started successfully")
             ui_url = get_ui_url(config)
             public_port = get_public_port()
             if ui_url:
@@ -228,7 +228,7 @@ class AutoHealService:
 
     async def stop(self) -> None:
         """
-        Stop the auto-heal service
+        Stop Docker Autoheal
 
         Safe to call concurrently (the signal handler and ``run()`` both do): later callers
         wait for the first shutdown to finish, then return without repeating it.
@@ -271,7 +271,7 @@ class AutoHealService:
 
     async def _shutdown(self) -> None:
         """Stop the components and release the Docker client and metrics server"""
-        logger.info("Stopping Docker Auto-Heal Service...")
+        logger.info("Stopping Docker Autoheal...")
 
         # Stop components gracefully with error handling. The Docker client is
         # closed in `finally` so a cancellation (not an Exception) during an
@@ -302,7 +302,7 @@ class AutoHealService:
                 except Exception as e:
                     logger.warning("Error closing Docker client: %s", e, exc_info=True)
 
-        logger.info("Docker Auto-Heal Service stopped")
+        logger.info("Docker Autoheal stopped")
 
     async def run(self) -> None:
         """Run the service (blocking)"""
@@ -384,11 +384,24 @@ async def run_api_server() -> None:
     )
 
     server = uvicorn.Server(uvicorn_config)
-    await server.serve()
+    try:
+        await server.serve()
+    except SystemExit as e:
+        # uvicorn calls sys.exit() on bind or startup failure. Surface it as an ordinary
+        # error so the supervising TaskGroup cancels the service and logs it once.
+        msg = f"API server exited during startup (code {e.code})"
+        raise RuntimeError(msg) from e
 
 
-async def main() -> None:
-    """Main entry point"""
+async def main() -> int:
+    """
+    Main entry point; returns the process exit code.
+
+    The service and the API server are supervised together: if either fails, the other is
+    cancelled and the failure is reported as a non-zero exit code, so a crashed monitoring
+    service can't leave the API running while nothing is being healed, and Docker's restart
+    policy gets a chance to act.
+    """
     # Deliberate: the module-level signal handler reads ``service`` to stop it.
     global service  # noqa: PLW0603
 
@@ -398,25 +411,28 @@ async def main() -> None:
 
     # Create service instance
     service = AutoHealService()
+    exit_code = 0
 
     # Start service and API server concurrently
     try:
-        await asyncio.gather(
-            service.run(),
-            run_api_server(),
-            return_exceptions=True,  # Don't propagate CancelledError
-        )
+        async with asyncio.TaskGroup() as group:
+            group.create_task(service.run())
+            group.create_task(run_api_server())
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt")
     except asyncio.CancelledError:
         logger.info("Application cancelled, shutting down gracefully")
-    except Exception as e:
-        logger.exception("Service error: %s", e)
+    except ExceptionGroup as group_error:
+        # TaskGroup wraps task failures; log each one so the real cause is in the message
+        for error in group_error.exceptions:
+            logger.error("Service error: %s", error, exc_info=error)
+        exit_code = 1
     finally:
         if service and service.running:
             await service.stop()
+    return exit_code
 
 
 if __name__ == "__main__":
     # Run the service
-    asyncio.run(main())
+    sys.exit(asyncio.run(main()))

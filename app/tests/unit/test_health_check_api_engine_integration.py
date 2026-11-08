@@ -16,6 +16,7 @@ Docker itself faked via ``FakeDockerClient``/``make_container``.
 
 import pytest
 
+from app.api.errors import get_docker_client
 from app.api.routes.healthchecks import add_health_check, delete_health_check
 from app.config.config_manager import HealthCheckConfig, config_manager
 from app.tests.unit.conftest import make_container
@@ -56,7 +57,8 @@ class TestCustomHealthCheckDiscoveryAcrossRecreation:
         docker_client.health_results[container.name] = False
 
         result = await add_health_check(
-            HealthCheckConfig(container_id="stack-web-1", check_type="tcp", tcp_port=8080)
+            get_docker_client(),
+            HealthCheckConfig(container_id="stack-web-1", check_type="tcp", tcp_port=8080),
         )
         assert result["status"] == "success"
 
@@ -78,7 +80,8 @@ class TestCustomHealthCheckDiscoveryAcrossRecreation:
         docker_client.add_container(original_container, original_info)
 
         await add_health_check(
-            HealthCheckConfig(container_id="stack-web-1", check_type="tcp", tcp_port=8080)
+            get_docker_client(),
+            HealthCheckConfig(container_id="stack-web-1", check_type="tcp", tcp_port=8080),
         )
 
         stable_id = engine.get_stable_identifier(original_info)
@@ -113,12 +116,13 @@ class TestCustomHealthCheckDiscoveryAcrossRecreation:
         docker_client.health_results[container.name] = False
 
         await add_health_check(
-            HealthCheckConfig(container_id="stack-web-1", check_type="tcp", tcp_port=8080)
+            get_docker_client(),
+            HealthCheckConfig(container_id="stack-web-1", check_type="tcp", tcp_port=8080),
         )
         needs_restart, _ = await engine._evaluate_container_health(container, info)
         assert needs_restart is True
 
-        result = await delete_health_check("stack-web-1")
+        result = await delete_health_check(get_docker_client(), "stack-web-1")
         assert result["status"] == "success"
         assert config_manager.get_all_custom_health_checks() == {}
 
