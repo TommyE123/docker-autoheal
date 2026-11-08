@@ -15,7 +15,8 @@
 # mapped file that no longer exists (rename it in the area table). Any problem fails the step
 # loudly rather than leaving the agent without a plan.
 # Optional environment: PROMPT_FILE (the prompt to append to), WEEK (an ISO week number,
-# instead of today's), FIRST_PART (calls in part 1), GITHUB_ENV (set by GitHub Actions).
+# instead of today's; the workflow passes its optional "area" dispatch input here, 0 to 4, and
+# an empty value means today's week), FIRST_PART (calls in part 1), GITHUB_ENV (set by GitHub Actions).
 set -euo pipefail
 
 prompt_file=${PROMPT_FILE:-/tmp/gh-aw/aw-prompts/prompt.txt}

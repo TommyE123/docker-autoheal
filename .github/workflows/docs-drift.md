@@ -11,10 +11,23 @@ description: Weekly audit of one focus area of the documentation against the imp
 # met far fewer 503 "high demand" refusals then than in the US working day.
 on:
   workflow_dispatch:
+    inputs:
+      area:
+        description: Optional focus area number, 0 to 4, to audit instead of this week's area (see docs/maintainer/docs-drift-detection.md). Leave empty to use this week's area.
+        required: false
+        # A number, not a free string. The value only reaches the read plan step through
+        # its environment, never the prompt, and that step refuses anything that is not
+        # digits. Only people with write access can dispatch.
+        type: number
 permissions:
   contents: read
   issues: read
   pull-requests: read
+# Silences gh-aw's warning that a dispatch workflow with inputs has no discriminator. It only gives
+# the conclusion job its own group per run; the workflow-level group is unchanged, so dispatches
+# still run one at a time.
+concurrency:
+  job-discriminator: ${{ github.run_id }}
 engine:
   id: gemini
   # Gemini CLI 0.66.0: versions 0.60 to 0.64 exited 41 "Invalid auth method selected" under
@@ -41,6 +54,9 @@ features:
 # as the post-step.
 pre-agent-steps:
   - name: Append the focus area read plan to the prompt
+    env:
+      # An empty value (no override) makes the script use today's ISO week number.
+      WEEK: ${{ github.event.inputs.area }}
     run: bash .github/scripts/docs-drift-reads.sh
 # Counts the planned files the agent actually read, from its own tool-call log, because the
 # agent's coverage claim cannot be trusted. Runs after gh-aw writes the agent output and before
@@ -170,10 +186,11 @@ turn, together with the commands of part 1 of the read plan:
   the project-structure document describes)
 - the GitHub state, each piped through `jq` so the result stays short (the raw results run
   to over 100,000 characters and would be cut):
-  - `github list_commits --owner OWNER --repo REPO --sha main --perPage 30 | jq -r '.[] | "\(.sha[0:12]) \(.commit.message | split("\n")[0])"'`
-    (the head of `main` is the very first line of the output, and only that line's SHA is
-    the `main` SHA you report; the lines below it are older commits, which show what changed
-    recently)
+  - `github list_commits --owner OWNER --repo REPO --sha main --perPage 30 | jq -r '.[] | "COMMIT \(.sha[0:12]) \(.commit.message | split("\n")[0])"'`
+    (about ten `[info]` log lines come first; ignore them. The head of `main` is the first
+    line that starts with COMMIT, and only that line's SHA is the `main` SHA you report. It
+    is not the checkout SHA from `.git/FETCH_HEAD`. The COMMIT lines below it are older
+    commits, which show what changed recently)
   - `github list_issues --owner OWNER --repo REPO --state OPEN --perPage 100 | jq -r '.[] | "#\(.number) \(.title) | \(.body // "" | .[0:300] | gsub("\\s+"; " "))"'`
   - `github list_pull_requests --owner OWNER --repo REPO --state open --perPage 50 | jq -r '.[] | "#\(.number) \(.title) [\(.head.ref // "")]"'`
 

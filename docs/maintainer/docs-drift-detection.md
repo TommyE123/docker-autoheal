@@ -78,8 +78,15 @@ Actions → **Documentation Drift Detection** → **Run workflow** on `main`, or
 gh workflow run docs-drift.lock.yml --ref main
 ```
 
-The area follows the week the run starts in. To see which files a week would read, run the
-read plan script locally; the temporary file it appends to lists the files:
+The area follows the week the run starts in. To audit a particular area instead, pass its
+number (0 to 4, in the order of the table above) as the `area` input:
+
+```bash
+gh workflow run docs-drift.lock.yml --ref main -f area=3
+```
+
+To see which files a week would read, run the read plan script locally; the temporary file it
+appends to lists the files:
 
 ```bash
 plan=$(mktemp); PROMPT_FILE=$plan WEEK=<number> bash .github/scripts/docs-drift-reads.sh; cat "$plan"
