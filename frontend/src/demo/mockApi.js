@@ -178,19 +178,106 @@ function raiseIfInvalid(errors) {
   if (errors.length) throw new ApiError(422, errors);
 }
 
+// Element types of the typed collections in AutoHealConfig, keyed by
+// "section.field" (config_manager.py). Each checker pushes a 422 entry for
+// every bad element, as Pydantic does, and returns the value to store.
+const isString = (value) => typeof value === "string";
+
+function checkEach(items, loc, check) {
+  items.forEach((item, index) => check(item, [...loc, index]));
+  return clone(items);
+}
+
+function stringList(items, loc, errors) {
+  return checkEach(items, loc, (item, itemLoc) =>
+    checkKind(item, "string", itemLoc, errors),
+  );
+}
+
+// list[dict[str, str]]
+function labelFilterList(items, loc, errors) {
+  return checkEach(items, loc, (item, itemLoc) => {
+    if (!isObject(item)) {
+      errors.push({
+        type: "dict_type",
+        loc: itemLoc,
+        msg: "Input should be a valid dictionary",
+      });
+      return;
+    }
+    for (const [key, value] of Object.entries(item)) {
+      checkKind(value, "string", [...itemLoc, key], errors);
+    }
+  });
+}
+
+// dict[str, int] and dict[str, list[float]]
+function mapValues(map, loc, errors, check) {
+  for (const [key, value] of Object.entries(map)) check(value, [...loc, key]);
+  return clone(map);
+}
+
+const COLLECTION_CHECKS = {
+  "filters.whitelist_names": stringList,
+  "filters.blacklist_names": stringList,
+  "filters.whitelist_labels": labelFilterList,
+  "filters.blacklist_labels": labelFilterList,
+  "containers.selected": stringList,
+  "containers.excluded": stringList,
+  "containers.restart_counts": (map, loc, errors) =>
+    mapValues(map, loc, errors, (value, valueLoc) => {
+      if (!Number.isInteger(value)) {
+        errors.push({
+          type: "int_type",
+          loc: valueLoc,
+          msg: "Input should be a valid integer",
+        });
+      }
+    }),
+  "containers.restart_history": (map, loc, errors) =>
+    mapValues(map, loc, errors, (value, valueLoc) => {
+      if (!Array.isArray(value)) {
+        errors.push({
+          type: "list_type",
+          loc: valueLoc,
+          msg: "Input should be a valid list",
+        });
+        return;
+      }
+      value.forEach((time, index) => {
+        if (typeof time !== "number") {
+          errors.push({
+            type: "float_type",
+            loc: [...valueLoc, index],
+            msg: "Input should be a valid number",
+          });
+        }
+      });
+    }),
+  "notifications.event_filters": stringList,
+  "notifications.services": (items, loc, errors) =>
+    items.map((service, index) =>
+      validateNotificationService(service, [...loc, index], errors),
+    ),
+};
+
 /**
  * Copy one section's known fields onto its defaults, like the Pydantic model:
  * unknown keys are dropped, and a value of the wrong kind (list, object,
- * string, number or boolean, judged by the default) is a 422. A null default
- * (an optional field) accepts anything.
+ * string, number or boolean, judged by the default) is a 422, as is a bad
+ * element of a typed collection. A null default is an optional string.
  */
 function mergeSection(target, values, loc, errors) {
   const kind = (value) => (Array.isArray(value) ? "list" : typeof value);
   for (const [key, value] of Object.entries(values)) {
     if (!(key in target)) continue;
     const expected = target[key];
-    if (expected === null || kind(expected) === kind(value)) {
-      target[key] = clone(value);
+    if (expected === null) {
+      if (value === null || isString(value)) target[key] = value;
+      else checkKind(value, "string", [...loc, key], errors);
+    } else if (kind(expected) === kind(value)) {
+      const check = COLLECTION_CHECKS[`${loc.at(-1)}.${key}`];
+      target[key] = check ? check(value, [...loc, key], errors) : clone(value);
     } else {
       errors.push({
         type: `${kind(expected)}_type`,
@@ -199,6 +286,45 @@ function mergeSection(target, values, loc, errors) {
       });
     }
   }
+}
+
+// list[UptimeKumaMapping]
+function mappingList(items, loc, errors) {
+  return items.map((item, index) => {
+    const itemLoc = [...loc, index];
+    if (!isObject(item)) {
+      errors.push({
+        type: "model_type",
+        loc: itemLoc,
+        msg: "Input should be a valid dictionary",
+      });
+      return null;
+    }
+    for (const field of ["container_id", "monitor_friendly_name"]) {
+      if (field in item) {
+        checkKind(item[field], "string", [...itemLoc, field], errors);
+      } else {
+        errors.push({
+          type: "missing",
+          loc: [...itemLoc, field],
+          msg: "Field required",
+        });
+      }
+    }
+    if ("auto_mapped" in item) {
+      checkKind(
+        item.auto_mapped,
+        "boolean",
+        [...itemLoc, "auto_mapped"],
+        errors,
+      );
+    }
+    return {
+      container_id: item.container_id,
+      monitor_friendly_name: item.monitor_friendly_name,
+      auto_mapped: item.auto_mapped ?? false,
+    };
+  });
 }
 
 /** AutoHealConfig(**data): unknown keys dropped, missing sections defaulted. */
@@ -225,8 +351,9 @@ function validateFullConfig(data, loc = ["body"]) {
         errors,
       );
     } else if (section === "uptime_kuma_mappings") {
-      if (Array.isArray(data[section])) config[section] = clone(data[section]);
-      else {
+      if (Array.isArray(data[section])) {
+        config[section] = mappingList(data[section], [...loc, section], errors);
+      } else {
         errors.push({
           type: "list_type",
           loc: [...loc, section],

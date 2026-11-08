@@ -911,4 +911,92 @@ describe("edge cases", () => {
     );
     expect(engine.config.observability.log_level).toBe("INFO");
   });
+
+  it("checks the elements of typed collections, like AutoHealConfig", async () => {
+    const importing = (data) => {
+      const form = new FormData();
+      form.append("file", new File([JSON.stringify(data)], "c.json"));
+      return error(api.post("/config/import", form));
+    };
+    // CodeRabbit's examples: these used to be accepted and then crash.
+    expect(
+      (await importing({ filters: { whitelist_labels: [null] } })).response
+        .data,
+    ).toEqual({
+      detail: "filters.whitelist_labels.0: Input should be a valid dictionary",
+    });
+    expect(
+      (
+        await importing({
+          containers: { restart_history: { "compose:shop:web#1": 1 } },
+        })
+      ).response.data,
+    ).toEqual({
+      detail:
+        "containers.restart_history.compose:shop:web#1: Input should be a valid list",
+    });
+
+    const e = await importing({
+      filters: {
+        whitelist_names: [1],
+        blacklist_labels: [{ tier: 2 }],
+      },
+      containers: {
+        excluded: [null],
+        restart_counts: { a: "x" },
+        restart_history: { a: [1.5, "x"] },
+      },
+      alerts: { webhook: 5 },
+      notifications: { event_filters: [true], services: [null] },
+      uptime_kuma_mappings: [null, { container_id: 1, auto_mapped: "x" }],
+    });
+    expect(e.response.status).toBe(422);
+    expect(e.response.data.detail.split("; ")).toEqual([
+      "containers.excluded.0: Input should be a valid string",
+      "containers.restart_counts.a: Input should be a valid integer",
+      "containers.restart_history.a.1: Input should be a valid number",
+      "filters.whitelist_names.0: Input should be a valid string",
+      "filters.blacklist_labels.0.tier: Input should be a valid string",
+      "alerts.webhook: Input should be a valid string",
+      "uptime_kuma_mappings.0: Input should be a valid dictionary",
+      "uptime_kuma_mappings.1.container_id: Input should be a valid string",
+      "uptime_kuma_mappings.1.monitor_friendly_name: Field required",
+      "uptime_kuma_mappings.1.auto_mapped: Input should be a valid boolean",
+      "notifications.event_filters.0: Input should be a valid string",
+      "notifications.services.0: Input should be a valid dictionary",
+    ]);
+
+    // Nothing was applied, and the demo keeps working.
+    expect(engine.config.filters.whitelist_labels).toEqual([]);
+    expect(() => engine.describe()).not.toThrow();
+    expect(() => engine.runCycle()).not.toThrow();
+    expect((await api.get("/status")).status).toBe(200);
+  });
+
+  it("accepts well-formed collections and normalises them", async () => {
+    const config = (await api.get("/config")).data;
+    config.filters.whitelist_labels = [{ tier: "web" }];
+    config.containers.restart_counts = { x: 2 };
+    config.notifications.services = [{ name: "c", type: "slack" }];
+    config.uptime_kuma_mappings = [
+      { container_id: "shop_web", monitor_friendly_name: "Web" },
+    ];
+    config.alerts.webhook = null;
+    await api.put("/config", config);
+    expect(engine.config.filters.whitelist_labels).toEqual([{ tier: "web" }]);
+    expect(engine.config.notifications.services[0]).toMatchObject({
+      name: "c",
+      enabled: true,
+      url: null,
+    });
+    expect(engine.config.uptime_kuma_mappings).toEqual([
+      {
+        container_id: "shop_web",
+        monitor_friendly_name: "Web",
+        auto_mapped: false,
+      },
+    ]);
+    // update_config keeps the live restart counts.
+    expect(engine.config.containers.restart_counts).toEqual({});
+  });
 });
