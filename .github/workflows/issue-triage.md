@@ -148,6 +148,15 @@ you run from the shell:
   only the first item). Continue with `--page 2`, `--page 3` and so on only
   when the current page contains exactly 100 comments. Stop when a page contains fewer than 100. If a flag is rejected,
   run `github issue_read --help` and use the flags it lists.
+- **Related work (stage 2, see below).** Two more reads, each piped through
+  `jq` so the result stays short. Open issues (the one being triaged is
+  skipped; replace N with its number):
+  `github list_issues --owner OWNER --repo REPO --state OPEN --perPage 100 | jq -r '.[] | select(.number != N) | "#\(.number) \(.title) | \(.body // "" | .[0:200] | gsub("\\s+"; " "))"'`.
+  Open pull requests:
+  `github search_issues --query "repo:OWNER/REPO is:pr is:open" --perPage 30 | jq -r '(if type == "array" then . else .items end)[] | "#\(.number) \(.title)"'`.
+  If either call fails, run it once more; if it still fails, carry on without
+  that list and treat related work as unknown (that means no related-work
+  statement, never a guess).
 - **Writes: `safeoutputs`**. Pass one JSON object as a single quoted argument.
   Do not pass an issue number: the workflow fixes the target of every write to
   the issue being triaged, and a write cannot go anywhere else:
@@ -191,7 +200,8 @@ combinations are the `github issue_read ... | jq ...` fetch pipe and the
    labels as they are), then call `report_incomplete` with the reason and
    stop. Never call `noop` for this.
 2. Your next call (after any comment pages from step 1) reads
-   `.github/labels.yml` for the exact allowed `kind:*`, `area:*`, and
+   `.github/labels.yml`. Make the two related-work reads from Tools in the same
+   turn, side by side, because stage 2 may need them for the exact allowed `kind:*`, `area:*`, and
    `status:*` label names. The file is short, so read the whole file. If the
    read fails or returns nothing, retry once without a line range or run
    `cat .github/labels.yml`. If it still fails, do not guess label names: call
@@ -207,10 +217,12 @@ combinations are the `github issue_read ... | jq ...` fetch pipe and the
    restart after Uptime Kuma reports DOWN" is classifiable even with an
    empty body) — do not require a minimum body length.
    - Add the new `kind:*` and `area:*` labels.
-   - Then remove every `kind:*`, `area:*`, `status:needs-triage`, and
-     `status:needs-information` label currently on the issue **other than**
-     the two you just added, so the issue ends up with exactly one `kind:*`
-     and exactly one `area:*`, and neither status label.
+   - Then remove every `kind:*`, `area:*` and `status:needs-triage` label
+     currently on the issue **other than** the two you just added, so the issue
+     ends up with exactly one `kind:*` and exactly one `area:*`.
+   - Also remove `status:needs-information`, unless a stage 2 clarification is
+     still waiting (see Stage 2), in which case leave the label as it is.
+   - Then do stage 2.
 
    **B. Genuinely insufficient content** — the title, body, and any comments
    together give you nothing to classify (for example a title of "help" with an empty
@@ -243,10 +255,64 @@ combinations are the `github issue_read ... | jq ...` fetch pipe and the
    - Remove `status:needs-information` if present.
    - Do not add or remove any `kind:*` or `area:*` label.
 
+## Stage 2: conservative review (only after outcome A)
+
+Classification is done. Stage 2 can add at most **one comment** and may change
+only `status:needs-information`. It never changes `kind:*` or `area:*`. **Most
+issues need nothing here: if you are not confident that a comment is genuinely
+useful, do nothing.** Never invent facts, and never infer environment details
+that the reporter did not give.
+
+Stage 2 comments carry a marker, written the way the needs-information marker
+is: `<!`, then `-- gh-aw:issue-triage:review --`, then `>`, joined with
+nothing between them and kept inside backticks. To check for it, search each
+comment body (from step 1) for the token `gh-aw:issue-triage:review`.
+
+First decide which of these applies.
+
+1. **A clarification is already waiting.** A comment with the review token
+   exists, and the issue has `status:needs-information`.
+   - If the reporter (the issue's author) has commented after it and the reply
+     gives the information that was asked for, call `remove_labels` with
+     `status:needs-information` and post no comment.
+   - Otherwise do nothing: never ask again, never post a second review comment.
+2. **A review comment was posted before and nothing was waiting.** Do nothing.
+3. **First review of this issue.** Consider at most one of the following, in
+   this order, and stop at the first that applies.
+   - **Missing information (kind:bug only).** Ask only if all of these hold:
+     the issue is potentially actionable; one specific item is missing; you
+     need it to decide the next step; it cannot be found in the repository; the
+     reporter is the right person; and it directly concerns the reported
+     problem. Combine items into the smallest useful request, naming them
+     (never "please provide more information"). Add `status:needs-information`
+     and post the comment with the marker. Optional or merely interesting
+     details are not a reason.
+   - **Related work.** From the two lists, name an open issue or pull request
+     only if it is substantially the same task (the same problem in the same
+     part of the code). Post one comment with the marker that says
+     "This appears related to #N" and why in one sentence. If the overlap is
+     uncertain, say nothing. Never close, link or label anything.
+   - **Story gap (kind:enhancement, kind:chore or kind:documentation, only when
+     the issue states requirements or acceptance criteria).** Name a gap only if
+     it prevents the work being implemented or verified: an ambiguous or
+     unverifiable acceptance criterion, a missing test or CI expectation the
+     story itself calls for, conflicting requirements, or a dependency on other
+     work that it does not mention. Preferences (another framework, more
+     detail, a nicer layout, more documentation) are not gaps. Post one concise
+     comment with the marker, beginning "Potential story gap", that states the
+     gap and a question for the maintainer. Do not rewrite or restate the
+     story, and do not add a label.
+   - Otherwise do nothing.
+
+Post the comment with `write_file` and the `jq` pipe from Tools. The text
+inside it follows the Rules: no instructions to anyone, no argument with the
+reporter, no more than a few sentences.
+
 ## Stay on task
 
 You need only two things: the issue (step 1) and the label list (step 2), which
-describes every label. Decide as soon as you have both. Do not run `git`, do
+describes every label. Decide as soon as you have both (and, for stage 2, the
+two related-work lists). Do not run `git`, do
 not list directories or search the repository, and do not read any file other
 than `.github/labels.yml` and the comment file you write in outcome B. Do not
 call a tool that is not named in this prompt. Those calls are denied or only
@@ -267,6 +333,8 @@ use up your request limit.
 - Never modify the issue title or body.
 - Never add a comment except the single needs-information comment described
   in outcome B, and never when that exact marker is already present on the
-  issue.
+  issue, or the single stage 2 comment, and never when the review token is
+  already present. Never more than one comment per run.
 - Take no action other than the labels (and, at most, the one comment)
-  described above, and the failure handling in steps 1 and 2.
+  described above, and the failure handling in steps 1 and 2. Never close,
+  assign, edit or link an issue or pull request.
