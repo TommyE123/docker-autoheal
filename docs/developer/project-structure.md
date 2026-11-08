@@ -74,7 +74,8 @@ suites (see [Testing](testing.md#legacy-script-triage) for what happened to each
 
 - **`app/main.py`** — process entry point: logging setup, Docker client and monitoring
   engine construction, Prometheus metrics server startup, signal handling, and running
-  the FastAPI server and monitoring engine concurrently via `asyncio.gather`.
+  the FastAPI server and monitoring engine concurrently under an `asyncio.TaskGroup`, so a
+  failure in either cancels the other and the process exits non-zero.
 - **`app/api/api.py`** — FastAPI app construction (static asset mount) and wiring
   each router from `app/api/routes/` into the app; holds no endpoints itself.
 - **`app/api/state.py`** — the shared `docker_client`/`monitoring_engine` instances every
