@@ -62,7 +62,7 @@ class TestMaintenanceMode:
 
 @pytest.mark.asyncio
 class TestMaintenanceModePersistenceFailures:
-    """A failing ``config_manager`` must surface as a 500, not escape raw."""
+    """A failing ``config_manager`` propagates out of the route; the app-level handler returns the 500."""
 
     @pytest.mark.parametrize(
         ("endpoint", "broken_method"),
