@@ -260,4 +260,4 @@ class TestModelValidationErrors:
         status, text = await _call("POST", "/api/notifications/services", {"name": "No Type"})
 
         assert status == 422
-        assert "type" in json.loads(text)["detail"]
+        assert json.loads(text)["detail"] == "type: Field required"

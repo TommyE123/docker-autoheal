@@ -286,7 +286,9 @@ class TestConfigExportImport:
             await api_import_config(upload)
 
         assert exc_info.value.status_code == 422
-        assert "Unknown check_type" in exc_info.value.detail
+        assert exc_info.value.detail == (
+            "Value error, Unknown check_type; expected one of: http, tcp, exec, docker"
+        )
         assert "SECRET-VALUE-123" not in exc_info.value.detail
         assert config_manager.get_all_custom_health_checks() == checks_before
 

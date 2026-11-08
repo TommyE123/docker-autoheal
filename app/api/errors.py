@@ -23,6 +23,8 @@ from app.docker_client.docker_client_wrapper import DockerClientWrapper
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from pydantic_core import ErrorDetails
+
 logger = logging.getLogger(__name__)
 
 INTERNAL_ERROR_DETAIL = "Internal server error, see logs"
@@ -56,6 +58,15 @@ def get_docker_client() -> DockerClientWrapper:
 DockerClientDep = Annotated[DockerClientWrapper, Depends(get_docker_client)]
 
 
+def _describe(error: ErrorDetails) -> str:
+    """Format one validation error as ``location: message``, or just the message.
+
+    Errors raised by a model-level validator have no field location.
+    """
+    location = ".".join(str(part) for part in error["loc"])
+    return f"{location}: {error['msg']}" if location else error["msg"]
+
+
 @contextmanager
 def invalid_input_as_422() -> Iterator[None]:
     """Report a model validation failure on user-supplied data as 422.
@@ -69,10 +80,7 @@ def invalid_input_as_422() -> Iterator[None]:
     try:
         yield
     except ValidationError as exc:
-        detail = "; ".join(
-            f"{'.'.join(str(part) for part in err['loc'])}: {err['msg']}"
-            for err in exc.errors(include_input=False)
-        )
+        detail = "; ".join(_describe(err) for err in exc.errors(include_input=False))
         raise HTTPException(status_code=422, detail=detail or "Validation error") from None
 
 
