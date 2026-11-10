@@ -393,7 +393,7 @@ describe("custom health checks", () => {
 
   it("validates checks like HealthCheckConfig", async () => {
     const cases = [
-      [{ check_type: "http" }, "container_id is required"],
+      [{ check_type: "http" }, "Field required"],
       [{ container_id: "x", check_type: "ping" }, "Unknown check_type"],
       [{ container_id: "x", check_type: "tcp" }, "requires: tcp_port"],
       [
@@ -1046,5 +1046,176 @@ describe("edge cases", () => {
       detail:
         "Value error, Unknown check_type; expected one of: http, tcp, exec, docker",
     });
+  });
+
+  // Expected values recorded from the real model:
+  // HealthCheckConfig(**data) in app/config/config_manager.py.
+  it("validates health check fields and limits like HealthCheckConfig", async () => {
+    const post = (body) => error(api.post("/healthchecks", body));
+    const detail = async (body) => (await post(body)).response.data.detail;
+
+    // The reviewer's example: zero interval, timeout and retries.
+    const zero = await post({
+      container_id: "shop-web-1",
+      check_type: "docker",
+      interval_seconds: 0,
+      timeout_seconds: 0,
+      retries: 0,
+    });
+    expect(zero.response.status).toBe(422);
+    expect(zero.response.data.detail).toEqual(
+      ["interval_seconds", "timeout_seconds", "retries"].map((field) => ({
+        type: "greater_than_equal",
+        loc: ["body", field],
+        msg: "Input should be greater than or equal to 1",
+      })),
+    );
+
+    expect(
+      await detail({
+        container_id: "x",
+        check_type: "http",
+        http_endpoint: 5,
+        http_expected_status: "ok",
+        tcp_port: "x",
+        exec_command: "ls",
+      }),
+    ).toEqual([
+      {
+        type: "string_type",
+        loc: ["body", "http_endpoint"],
+        msg: "Input should be a valid string",
+      },
+      {
+        type: "int_parsing",
+        loc: ["body", "http_expected_status"],
+        msg: "Input should be a valid integer, unable to parse string as an integer",
+      },
+      {
+        type: "int_parsing",
+        loc: ["body", "tcp_port"],
+        msg: "Input should be a valid integer, unable to parse string as an integer",
+      },
+      {
+        type: "list_type",
+        loc: ["body", "exec_command"],
+        msg: "Input should be a valid list",
+      },
+    ]);
+    expect(
+      await detail({
+        container_id: "x",
+        check_type: "exec",
+        exec_command: ["ls", 1],
+      }),
+    ).toEqual([
+      {
+        type: "string_type",
+        loc: ["body", "exec_command", 1],
+        msg: "Input should be a valid string",
+      },
+    ]);
+    expect(
+      await detail({
+        container_id: "x",
+        check_type: "docker",
+        interval_seconds: 1.5,
+      }),
+    ).toEqual([
+      {
+        type: "int_from_float",
+        loc: ["body", "interval_seconds"],
+        msg: "Input should be a valid integer, got a number with a fractional part",
+      },
+    ]);
+    expect(
+      await detail({
+        container_id: "x",
+        check_type: "docker",
+        interval_seconds: null,
+      }),
+    ).toEqual([
+      {
+        type: "int_type",
+        loc: ["body", "interval_seconds"],
+        msg: "Input should be a valid integer",
+      },
+    ]);
+    expect(
+      await detail({ container_id: "x", check_type: "docker", retries: false }),
+    ).toEqual([
+      {
+        type: "greater_than_equal",
+        loc: ["body", "retries"],
+        msg: "Input should be greater than or equal to 1",
+      },
+    ]);
+    expect(await detail({ container_id: "x", check_type: 5 })).toEqual([
+      {
+        type: "string_type",
+        loc: ["body", "check_type"],
+        msg: "Input should be a valid string",
+      },
+    ]);
+    expect(
+      await detail({
+        container_id: "x",
+        check_type: "http",
+        http_endpoint: "/h",
+        http_expected_status: null,
+      }),
+    ).toEqual([
+      {
+        type: "value_error",
+        loc: ["body"],
+        msg: "Value error, check_type 'http' requires: http_expected_status",
+      },
+    ]);
+  });
+
+  it("converts lax values and drops unknown fields like HealthCheckConfig", async () => {
+    await api.post("/healthchecks", {
+      container_id: "shop-web-1",
+      check_type: "tcp",
+      tcp_port: "80",
+      interval_seconds: "5",
+      timeout_seconds: 2.0,
+      retries: true,
+      extra: "dropped",
+    });
+    expect(engine.customHealthChecks.shop_web).toEqual({
+      container_id: "shop_web",
+      check_type: "tcp",
+      interval_seconds: 5,
+      timeout_seconds: 2,
+      retries: 1,
+      http_endpoint: null,
+      http_expected_status: 200,
+      tcp_port: 80,
+      exec_command: null,
+    });
+  });
+
+  it("rejects invalid health checks in a config import", async () => {
+    const form = new FormData();
+    form.append(
+      "file",
+      new File(
+        [
+          JSON.stringify({
+            custom_health_checks: {
+              a: { container_id: "a", check_type: "docker", retries: 0 },
+            },
+          }),
+        ],
+        "c.json",
+      ),
+    );
+    const e = await error(api.post("/config/import", form));
+    expect(e.response.status).toBe(422);
+    expect(e.response.data).toEqual({
+      detail: "retries: Input should be greater than or equal to 1",
+    });
+    expect(engine.customHealthChecks).toEqual({});
   });
 });

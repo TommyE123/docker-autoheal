@@ -452,23 +452,99 @@ const CHECK_TYPE_FIELDS = {
   docker: [],
 };
 
+/** Pydantic's lax int: true/false, whole floats and integer strings convert. */
+function laxInt(value) {
+  if (typeof value === "boolean") return { value: value ? 1 : 0 };
+  if (typeof value === "number" && Number.isFinite(value)) {
+    if (Number.isInteger(value)) return { value };
+    return {
+      type: "int_from_float",
+      msg: "Input should be a valid integer, got a number with a fractional part",
+    };
+  }
+  if (typeof value === "string") {
+    if (/^\s*[+-]?\d+\s*$/.test(value)) {
+      return { value: Number.parseInt(value, 10) };
+    }
+    return {
+      type: "int_parsing",
+      msg: "Input should be a valid integer, unable to parse string as an integer",
+    };
+  }
+  return { type: "int_type", msg: "Input should be a valid integer" };
+}
+
+// HealthCheckConfig's fields (config_manager.py): [default, kind, minimum].
+// A default of undefined means required; "optional" kinds also accept null.
+const HEALTH_CHECK_FIELDS = {
+  container_id: [undefined, "str"],
+  check_type: [undefined, "str"],
+  interval_seconds: [30, "int", 1],
+  timeout_seconds: [10, "int", 1],
+  retries: [3, "int", 1],
+  http_endpoint: [null, "optional str"],
+  http_expected_status: [200, "optional int"],
+  tcp_port: [null, "optional int"],
+  exec_command: [null, "optional list[str]"],
+};
+
+/**
+ * HealthCheckConfig(**body): field types and limits first, as Pydantic does,
+ * then (only if those pass) the model validator's per-check-type rules.
+ * Unknown keys are dropped. Errors are FastAPI's 422 list, under "body".
+ */
 function validateHealthCheck(body) {
-  const hc = {
-    interval_seconds: 30,
-    timeout_seconds: 10,
-    retries: 3,
-    http_endpoint: null,
-    http_expected_status: 200,
-    tcp_port: null,
-    exec_command: null,
-    ...(isObject(body) ? body : {}),
-  };
+  const data = isObject(body) ? body : {};
+  const hc = {};
+  const errors = [];
+  const push = (field, type, msg) =>
+    errors.push({ type, loc: ["body", field], msg });
+  for (const [field, [fallback, kind, minimum]] of Object.entries(
+    HEALTH_CHECK_FIELDS,
+  )) {
+    if (!Object.hasOwn(data, field)) {
+      if (fallback === undefined) push(field, "missing", "Field required");
+      else hc[field] = fallback;
+      continue;
+    }
+    const value = data[field];
+    if (value === null && kind.startsWith("optional")) {
+      hc[field] = null;
+    } else if (kind.endsWith("str") && !kind.endsWith("list[str]")) {
+      if (typeof value === "string") hc[field] = value;
+      else push(field, "string_type", "Input should be a valid string");
+    } else if (kind.endsWith("int")) {
+      const result = laxInt(value);
+      if (result.msg) push(field, result.type, result.msg);
+      else if (minimum !== undefined && result.value < minimum) {
+        push(
+          field,
+          "greater_than_equal",
+          `Input should be greater than or equal to ${minimum}`,
+        );
+      } else hc[field] = result.value;
+    } else if (!Array.isArray(value)) {
+      push(field, "list_type", "Input should be a valid list");
+    } else {
+      value.forEach((item, index) => {
+        if (typeof item !== "string") {
+          errors.push({
+            type: "string_type",
+            loc: ["body", field, index],
+            msg: "Input should be a valid string",
+          });
+        }
+      });
+      hc[field] = [...value];
+    }
+  }
+  raiseIfInvalid(errors);
+
   const fail = (msg) => {
     throw new ApiError(422, [
       { type: "value_error", loc: ["body"], msg: `Value error, ${msg}` },
     ]);
   };
-  if (typeof hc.container_id !== "string") fail("container_id is required");
   const required = Object.hasOwn(CHECK_TYPE_FIELDS, hc.check_type)
     ? CHECK_TYPE_FIELDS[hc.check_type]
     : null;
@@ -478,16 +554,13 @@ function validateHealthCheck(body) {
   const missing = required.filter((field) => hc[field] == null);
   if (missing.length)
     fail(`check_type '${hc.check_type}' requires: ${missing.join(", ")}`);
-  if (hc.check_type === "http" && !String(hc.http_endpoint).trim()) {
+  if (hc.check_type === "http" && !hc.http_endpoint.trim()) {
     fail("http_endpoint must not be empty");
   }
   if (hc.check_type === "tcp" && !(hc.tcp_port >= 1 && hc.tcp_port <= 65535)) {
     fail("tcp_port must be between 1 and 65535");
   }
-  if (
-    hc.check_type === "exec" &&
-    !(Array.isArray(hc.exec_command) && String(hc.exec_command[0] ?? "").trim())
-  ) {
+  if (hc.check_type === "exec" && !hc.exec_command[0]?.trim()) {
     fail(
       "exec_command must be a non-empty list starting with a non-blank command",
     );
