@@ -60,7 +60,10 @@ describe("demo mock API", () => {
     expect(state.containers[4].status).toBe("running");
     await api.post("/containers/worker/unquarantine");
     expect(state.containers[2].quarantined).toBe(false);
-    expect(state.events.at(-1).event_type).toBe("unquarantine");
+    expect(state.events.at(-1)).toMatchObject({
+      event_type: "unquarantine",
+      container_id: state.containers[2].full_id,
+    });
   });
 
   it("toggles maintenance mode", async () => {
@@ -93,7 +96,9 @@ describe("demo mock API", () => {
   });
 
   it("filters and clears the events", async () => {
-    expect((await api.get("/events")).data).toHaveLength(5);
+    const events = (await api.get("/events")).data;
+    expect(events).toHaveLength(5);
+    expect(events[0].container_id).toBe(state.containers[1].full_id);
     const params = { event_type: "restart", container: "work", limit: 2 };
     expect((await api.get("/events", { params })).data).toHaveLength(2);
     await api.delete("/events");

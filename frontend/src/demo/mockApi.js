@@ -13,6 +13,9 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
 const minutesAgo = (minutes) =>
   new Date(Date.now() - minutes * 60000).toISOString();
 
+// A sample container's 64-character ID, from its position in the list.
+const fullId = (index) => String(index).repeat(64);
+
 const DEMO_MESSAGE =
   "Demo: nothing was sent. A real install would contact the service.";
 
@@ -25,10 +28,9 @@ function sampleContainer(index, name, image, options = {}) {
     restarts = 0,
     exitCode = 0,
   } = options;
-  const fullId = String(index).repeat(64);
   return {
-    id: fullId.slice(0, 12),
-    full_id: fullId,
+    id: fullId(index).slice(0, 12),
+    full_id: fullId(index),
     name,
     image,
     status,
@@ -45,10 +47,18 @@ function sampleContainer(index, name, image, options = {}) {
   };
 }
 
-function sampleEvent(minutes, name, type, status, restarts, message) {
+function sampleEvent(
+  minutes,
+  containerId,
+  name,
+  type,
+  status,
+  restarts,
+  message,
+) {
   return {
     timestamp: minutesAgo(minutes),
-    container_id: "3".repeat(64),
+    container_id: containerId,
     container_name: name,
     event_type: type,
     restart_count: restarts,
@@ -94,6 +104,7 @@ export function createDemoState() {
     events: [
       sampleEvent(
         42,
+        fullId(2),
         "api",
         "restart",
         "success",
@@ -102,6 +113,7 @@ export function createDemoState() {
       ),
       sampleEvent(
         30,
+        fullId(3),
         "worker",
         "restart",
         "success",
@@ -110,6 +122,7 @@ export function createDemoState() {
       ),
       sampleEvent(
         25,
+        fullId(3),
         "worker",
         "restart",
         "success",
@@ -118,6 +131,7 @@ export function createDemoState() {
       ),
       sampleEvent(
         15,
+        fullId(3),
         "worker",
         "restart",
         "success",
@@ -126,6 +140,7 @@ export function createDemoState() {
       ),
       sampleEvent(
         10,
+        fullId(3),
         "worker",
         "quarantine",
         "quarantined",
@@ -243,6 +258,7 @@ const routes = [
       state.events.push(
         sampleEvent(
           0,
+          container.full_id,
           container.name,
           "unquarantine",
           "success",

@@ -1,7 +1,7 @@
 name: Demo (GitHub Pages)
 
-# Builds the public browser demo (frontend `--mode demo`: the real UI against a
-# simulated backend, see frontend/src/demo/) and deploys it to GitHub Pages.
+# Builds the public browser demo (frontend `--mode demo`: the real UI with sample
+# data and a mock API, see frontend/src/demo/) and deploys it to GitHub Pages.
 #   - release published: deploys that release's tag.
 #   - manual run: deploys the branch or tag picked in "Use workflow from" (main by
 #     default, to show merged work before the next release; or a release tag).
