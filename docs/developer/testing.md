@@ -413,6 +413,12 @@ npm run test:demo-e2e
 CI runs it in the `frontend-tests` job of `tests.yml`, and `demo-pages.yml` runs it on
 the files it is about to deploy.
 
+The demo's behaviour is also checked against the real backend:
+`app/tests/unit/test_demo_contract.py` (in the unit suite) and
+`frontend/src/demo/contract.test.js` (in `npm test`) compare its routes, validation and
+restart decisions with the backend's answers. See
+[Keeping it accurate](demo.md#keeping-it-accurate).
+
 ## CI
 
 `.github/workflows/tests.yml` runs the unit suite with coverage on every push

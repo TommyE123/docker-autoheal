@@ -7,7 +7,7 @@
 // changes, change it here in the same release.
 
 import { AxiosError } from "axios";
-import defaultConfig from "./default-config.json";
+import { validateModel } from "./schema.js";
 
 export class ApiError extends Error {
   constructor(status, detail) {
@@ -21,113 +21,11 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
 const isObject = (value) =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-// --- request body validation (the Pydantic models' constraints) -----------
-
-const MONITOR_FIELDS = {
-  interval_seconds: { type: "int", ge: 1 },
-  label_key: { type: "str" },
-  label_value: { type: "str" },
-  include_all: { type: "bool" },
-};
-const RESTART_FIELDS = {
-  mode: { type: "str" },
-  cooldown_seconds: { type: "int", ge: 0 },
-  max_restarts: { type: "int", ge: 1 },
-  max_restarts_window_seconds: { type: "int", ge: 1 },
-  respect_manual_stop: { type: "bool" },
-};
-const BACKOFF_FIELDS = {
-  enabled: { type: "bool" },
-  initial_seconds: { type: "int", ge: 1 },
-  multiplier: { type: "float", ge: 1 },
-  max_seconds: { type: "int", ge: 1 },
-};
-
-function coerce(value, type) {
-  // Pydantic's lax mode: numeric strings become numbers, "true"/"false" bools.
-  if (type === "int" || type === "float") {
-    const n =
-      typeof value === "string" && value.trim() !== "" ? Number(value) : value;
-    if (
-      typeof n !== "number" ||
-      Number.isNaN(n) ||
-      typeof value === "boolean"
-    ) {
-      return {
-        error: `Input should be a valid ${type === "int" ? "integer" : "number"}`,
-      };
-    }
-    if (type === "int" && !Number.isInteger(n)) {
-      return { error: "Input should be a valid integer" };
-    }
-    return { value: n };
-  }
-  if (type === "bool") {
-    if (typeof value === "boolean") return { value };
-    if (value === "true" || value === 1) return { value: true };
-    if (value === "false" || value === 0) return { value: false };
-    return { error: "Input should be a valid boolean" };
-  }
-  if (typeof value !== "string")
-    return { error: "Input should be a valid string" };
-  return { value };
-}
-
-/** Validate one model section against its fields, filling defaults. */
-function validateSection(body, fields, defaults, loc, errors) {
-  const result = { ...defaults };
-  if (!isObject(body)) {
-    errors.push({
-      type: "model_type",
-      loc,
-      msg: "Input should be a valid dictionary",
-    });
-    return result;
-  }
-  for (const [name, rule] of Object.entries(fields)) {
-    if (!(name in body)) continue;
-    const { value, error } = coerce(body[name], rule.type);
-    if (error) {
-      errors.push({
-        type: `${rule.type}_parsing`,
-        loc: [...loc, name],
-        msg: error,
-      });
-    } else if (rule.ge !== undefined && value < rule.ge) {
-      errors.push({
-        type: "greater_than_equal",
-        loc: [...loc, name],
-        msg: `Input should be greater than or equal to ${rule.ge}`,
-      });
-    } else {
-      result[name] = value;
-    }
-  }
-  return result;
-}
-
-function validateMonitor(body, loc, errors) {
-  return validateSection(
-    body,
-    MONITOR_FIELDS,
-    defaultConfig.monitor,
-    loc,
-    errors,
-  );
-}
-
-function validateRestart(body, loc, errors) {
-  const { backoff: defaultBackoff, ...defaults } = defaultConfig.restart;
-  const restart = validateSection(body, RESTART_FIELDS, defaults, loc, errors);
-  restart.backoff = validateSection(
-    isObject(body) && "backoff" in body ? body.backoff : {},
-    BACKOFF_FIELDS,
-    defaultBackoff,
-    [...loc, "backoff"],
-    errors,
-  );
-  return restart;
-}
+// --- request body validation ----------------------------------------------
+//
+// Field types, defaults and limits come from the backend's JSON Schemas via
+// ./schema.js; only HealthCheckConfig's own model validator is written out
+// here. contract.test.js checks the results against the real models.
 
 // app/api/errors.py: the generic body of every unexpected 500.
 export const INTERNAL_ERROR_DETAIL = "Internal server error, see logs";
@@ -140,6 +38,24 @@ function requireObjectBody(body) {
         type: "dict_type",
         loc: ["body"],
         msg: "Input should be a valid dictionary",
+      },
+    ]);
+  }
+}
+
+/** FastAPI's 422s for a missing or non-object body declared as a model. */
+function requireModelBody(body) {
+  if (body === undefined) {
+    throw new ApiError(422, [
+      { type: "missing", loc: ["body"], msg: "Field required" },
+    ]);
+  }
+  if (!isObject(body)) {
+    throw new ApiError(422, [
+      {
+        type: "model_attributes_type",
+        loc: ["body"],
+        msg: "Input should be a valid dictionary or object to extract fields from",
       },
     ]);
   }
@@ -161,288 +77,33 @@ function raiseInvalidInput(errors) {
   throw new ApiError(422, detail);
 }
 
-/** Push a type error unless `value` is of `kind` (string, boolean or list). */
-function checkKind(value, kind, loc, errors) {
-  const ok = kind === "list" ? Array.isArray(value) : typeof value === kind;
-  if (!ok) {
-    const name = { string: "string", boolean: "boolean", list: "list" }[kind];
-    errors.push({
-      type: `${kind === "boolean" ? "bool" : kind}_type`,
-      loc,
-      msg: `Input should be a valid ${name}`,
-    });
-  }
-}
-
 function raiseIfInvalid(errors) {
   if (errors.length) throw new ApiError(422, errors);
 }
 
-// Element types of the typed collections in AutoHealConfig, keyed by
-// "section.field" (config_manager.py). Each checker pushes a 422 entry for
-// every bad element, as Pydantic does, and returns the value to store.
-const isString = (value) => typeof value === "string";
-
-function checkEach(items, loc, check) {
-  items.forEach((item, index) => check(item, [...loc, index]));
-  return clone(items);
-}
-
-function stringList(items, loc, errors) {
-  return checkEach(items, loc, (item, itemLoc) =>
-    checkKind(item, "string", itemLoc, errors),
-  );
-}
-
-// list[dict[str, str]]
-function labelFilterList(items, loc, errors) {
-  return checkEach(items, loc, (item, itemLoc) => {
-    if (!isObject(item)) {
-      errors.push({
-        type: "dict_type",
-        loc: itemLoc,
-        msg: "Input should be a valid dictionary",
-      });
-      return;
-    }
-    for (const [key, value] of Object.entries(item)) {
-      checkKind(value, "string", [...itemLoc, key], errors);
-    }
-  });
-}
-
-// dict[str, int] and dict[str, list[float]]
-function mapValues(map, loc, errors, check) {
-  for (const [key, value] of Object.entries(map)) check(value, [...loc, key]);
-  return clone(map);
-}
-
-const COLLECTION_CHECKS = {
-  "filters.whitelist_names": stringList,
-  "filters.blacklist_names": stringList,
-  "filters.whitelist_labels": labelFilterList,
-  "filters.blacklist_labels": labelFilterList,
-  "containers.selected": stringList,
-  "containers.excluded": stringList,
-  "containers.restart_counts": (map, loc, errors) =>
-    mapValues(map, loc, errors, (value, valueLoc) => {
-      if (!Number.isInteger(value)) {
-        errors.push({
-          type: "int_type",
-          loc: valueLoc,
-          msg: "Input should be a valid integer",
-        });
-      }
-    }),
-  "containers.restart_history": (map, loc, errors) =>
-    mapValues(map, loc, errors, (value, valueLoc) => {
-      if (!Array.isArray(value)) {
-        errors.push({
-          type: "list_type",
-          loc: valueLoc,
-          msg: "Input should be a valid list",
-        });
-        return;
-      }
-      value.forEach((time, index) => {
-        if (typeof time !== "number") {
-          errors.push({
-            type: "float_type",
-            loc: [...valueLoc, index],
-            msg: "Input should be a valid number",
-          });
-        }
-      });
-    }),
-  "notifications.event_filters": stringList,
-  "notifications.services": (items, loc, errors) =>
-    items.map((service, index) =>
-      validateNotificationService(service, [...loc, index], errors),
-    ),
-};
-
-/**
- * Copy one section's known fields onto its defaults, like the Pydantic model:
- * unknown keys are dropped, and a value of the wrong kind (list, object,
- * string, number or boolean, judged by the default) is a 422, as is a bad
- * element of a typed collection. A null default is an optional string.
- */
-function mergeSection(target, values, loc, errors) {
-  const kind = (value) => (Array.isArray(value) ? "list" : typeof value);
-  for (const [key, value] of Object.entries(values)) {
-    // Own keys only: inherited names (toString, __proto__, ...) are unknown.
-    if (!Object.hasOwn(target, key)) continue;
-    const expected = target[key];
-    if (expected === null) {
-      if (value === null || isString(value)) target[key] = value;
-      else checkKind(value, "string", [...loc, key], errors);
-    } else if (kind(expected) === kind(value)) {
-      const check = COLLECTION_CHECKS[`${loc.at(-1)}.${key}`];
-      target[key] = check ? check(value, [...loc, key], errors) : clone(value);
-    } else {
-      errors.push({
-        type: `${kind(expected)}_type`,
-        loc: [...loc, key],
-        msg: `Input should be a valid ${kind(expected)}`,
-      });
-    }
-  }
-}
-
-// list[UptimeKumaMapping]
-function mappingList(items, loc, errors) {
-  return items.map((item, index) => {
-    const itemLoc = [...loc, index];
-    if (!isObject(item)) {
-      errors.push({
-        type: "model_type",
-        loc: itemLoc,
-        msg: "Input should be a valid dictionary",
-      });
-      return null;
-    }
-    for (const field of ["container_id", "monitor_friendly_name"]) {
-      if (field in item) {
-        checkKind(item[field], "string", [...itemLoc, field], errors);
-      } else {
-        errors.push({
-          type: "missing",
-          loc: [...itemLoc, field],
-          msg: "Field required",
-        });
-      }
-    }
-    if ("auto_mapped" in item) {
-      checkKind(
-        item.auto_mapped,
-        "boolean",
-        [...itemLoc, "auto_mapped"],
-        errors,
-      );
-    }
-    return {
-      container_id: item.container_id,
-      monitor_friendly_name: item.monitor_friendly_name,
-      auto_mapped: item.auto_mapped ?? false,
-    };
-  });
-}
-
-/** AutoHealConfig(**data): unknown keys dropped, missing sections defaulted. */
-function validateFullConfig(data, loc = ["body"]) {
-  if (!isObject(data)) {
-    throw new ApiError(422, [
-      { type: "model_type", loc, msg: "Input should be a valid dictionary" },
-    ]);
-  }
+/** A request body validated as model `name`: FastAPI's 422 list on failure. */
+function validateBody(name, body) {
+  requireModelBody(body);
   const errors = [];
-  const config = clone(defaultConfig);
-  for (const section of Object.keys(config)) {
-    if (!(section in data)) continue;
-    if (section === "monitor") {
-      config.monitor = validateMonitor(
-        data.monitor,
-        [...loc, "monitor"],
-        errors,
-      );
-    } else if (section === "restart") {
-      config.restart = validateRestart(
-        data.restart,
-        [...loc, "restart"],
-        errors,
-      );
-    } else if (section === "uptime_kuma_mappings") {
-      if (Array.isArray(data[section])) {
-        config[section] = mappingList(data[section], [...loc, section], errors);
-      } else {
-        errors.push({
-          type: "list_type",
-          loc: [...loc, section],
-          msg: "Input should be a valid list",
-        });
-      }
-    } else if (isObject(data[section])) {
-      mergeSection(config[section], data[section], [...loc, section], errors);
-    } else {
-      errors.push({
-        type: "model_type",
-        loc: [...loc, section],
-        msg: "Input should be a valid dictionary",
-      });
-    }
-  }
+  const value = validateModel(name, body, ["body"], errors);
+  raiseIfInvalid(errors);
+  return value;
+}
+
+/** AutoHealConfig(**data); errors are located under `loc`. */
+export function validateFullConfig(data, loc = ["body"]) {
+  const errors = [];
+  const config = validateModel("AutoHealConfig", data, loc, errors);
   raiseIfInvalid(errors);
   return config;
 }
 
-const OPTIONAL_SERVICE_FIELDS = [
-  "url",
-  "headers",
-  "username",
-  "password",
-  "bot_token",
-  "chat_id",
-  "topic",
-  "server_url",
-  "access_token",
-  "app_token",
-  "user_key",
-  "api_token",
-];
-
 /**
- * NotificationService(**service): the normalised service, or null after
- * pushing its errors (located under `loc`) onto `errors`.
+ * NotificationService(**service): the normalised service, after pushing any
+ * errors (located under `loc`) onto `errors`.
  */
-function validateNotificationService(service, loc, errors) {
-  if (!isObject(service)) {
-    errors.push({
-      type: "model_type",
-      loc,
-      msg: "Input should be a valid dictionary",
-    });
-    return null;
-  }
-  const before = errors.length;
-  for (const field of ["name", "type"]) {
-    if (field in service) {
-      checkKind(service[field], "string", [...loc, field], errors);
-    } else {
-      errors.push({
-        type: "missing",
-        loc: [...loc, field],
-        msg: "Field required",
-      });
-    }
-  }
-  if ("enabled" in service) {
-    checkKind(service.enabled, "boolean", [...loc, "enabled"], errors);
-  }
-  for (const field of OPTIONAL_SERVICE_FIELDS) {
-    const value = service[field];
-    if (value == null) continue;
-    if (field === "headers") {
-      if (!isObject(value)) {
-        errors.push({
-          type: "dict_type",
-          loc: [...loc, field],
-          msg: "Input should be a valid dictionary",
-        });
-      }
-    } else {
-      checkKind(value, "string", [...loc, field], errors);
-    }
-  }
-  if (errors.length > before) return null;
-  const result = {
-    name: service.name,
-    type: service.type,
-    enabled: service.enabled ?? true,
-  };
-  for (const field of OPTIONAL_SERVICE_FIELDS) {
-    result[field] = service[field] ?? null;
-  }
-  return result;
+export function validateNotificationService(service, loc, errors) {
+  return validateModel("NotificationService", service, loc, errors);
 }
 
 const CHECK_TYPE_FIELDS = {
@@ -452,101 +113,15 @@ const CHECK_TYPE_FIELDS = {
   docker: [],
 };
 
-/** Pydantic's lax int: true/false, whole floats and integer strings convert. */
-function laxInt(value) {
-  if (typeof value === "boolean") return { value: value ? 1 : 0 };
-  if (typeof value === "number" && Number.isFinite(value)) {
-    // Beyond int64 (a JS number can't tell a big integer from a float here).
-    if (Math.abs(value) >= 2 ** 63) {
-      return {
-        type: "int_parsing_size",
-        msg: "Unable to parse input string as an integer, exceeded maximum size",
-      };
-    }
-    if (Number.isInteger(value)) return { value };
-    return {
-      type: "int_from_float",
-      msg: "Input should be a valid integer, got a number with a fractional part",
-    };
-  }
-  if (typeof value === "string") {
-    // Digits with single underscores between them, optionally ".0..."
-    if (/^\s*[+-]?\d+(?:_\d+)*(?:\.0+)?\s*$/.test(value)) {
-      return { value: Number.parseInt(value.replaceAll("_", ""), 10) };
-    }
-    return {
-      type: "int_parsing",
-      msg: "Input should be a valid integer, unable to parse string as an integer",
-    };
-  }
-  return { type: "int_type", msg: "Input should be a valid integer" };
-}
-
-// HealthCheckConfig's fields (config_manager.py): [default, kind, minimum].
-// A default of undefined means required; "optional" kinds also accept null.
-const HEALTH_CHECK_FIELDS = {
-  container_id: [undefined, "str"],
-  check_type: [undefined, "str"],
-  interval_seconds: [30, "int", 1],
-  timeout_seconds: [10, "int", 1],
-  retries: [3, "int", 1],
-  http_endpoint: [null, "optional str"],
-  http_expected_status: [200, "optional int"],
-  tcp_port: [null, "optional int"],
-  exec_command: [null, "optional list[str]"],
-};
-
 /**
- * HealthCheckConfig(**body): field types and limits first, as Pydantic does,
- * then (only if those pass) the model validator's per-check-type rules.
- * Unknown keys are dropped. Errors are FastAPI's 422 list, under "body".
+ * HealthCheckConfig(**body): field types and limits first (from its schema),
+ * then, only if those pass, the model validator's per-check-type rules
+ * (_require_fields_for_check_type in config_manager.py). Errors are FastAPI's
+ * 422 list, under "body".
  */
-function validateHealthCheck(body) {
-  // Callers have already checked that `body` is an object.
-  const data = body;
-  const hc = {};
+export function validateHealthCheck(body) {
   const errors = [];
-  const push = (field, type, msg) =>
-    errors.push({ type, loc: ["body", field], msg });
-  for (const [field, [fallback, kind, minimum]] of Object.entries(
-    HEALTH_CHECK_FIELDS,
-  )) {
-    if (!Object.hasOwn(data, field)) {
-      if (fallback === undefined) push(field, "missing", "Field required");
-      else hc[field] = fallback;
-      continue;
-    }
-    const value = data[field];
-    if (value === null && kind.startsWith("optional")) {
-      hc[field] = null;
-    } else if (kind.endsWith("str") && !kind.endsWith("list[str]")) {
-      if (typeof value === "string") hc[field] = value;
-      else push(field, "string_type", "Input should be a valid string");
-    } else if (kind.endsWith("int")) {
-      const result = laxInt(value);
-      if (result.msg) push(field, result.type, result.msg);
-      else if (minimum !== undefined && result.value < minimum) {
-        push(
-          field,
-          "greater_than_equal",
-          `Input should be greater than or equal to ${minimum}`,
-        );
-      } else hc[field] = result.value;
-    } else if (!Array.isArray(value)) {
-      push(field, "list_type", "Input should be a valid list");
-    } else {
-      value.forEach((item, index) => {
-        if (typeof item !== "string") {
-          errors.push({
-            type: "string_type",
-            loc: ["body", field, index],
-            msg: "Input should be a valid string",
-          });
-        }
-      });
-      hc[field] = [...value];
-    }
-  }
+  const hc = validateModel("HealthCheckConfig", body, ["body"], errors);
   raiseIfInvalid(errors);
 
   const fail = (msg) => {
@@ -816,7 +391,7 @@ const routes = [
     "put",
     /^\/api\/config$/,
     (engine, { body }) => {
-      const config = validateFullConfig(body);
+      const config = validateBody("AutoHealConfig", body);
       // update_config keeps the live restart counts and history
       config.containers.restart_counts =
         engine.config.containers.restart_counts;
@@ -830,10 +405,7 @@ const routes = [
     "put",
     /^\/api\/config\/monitor$/,
     (engine, { body }) => {
-      const errors = [];
-      const monitor = validateMonitor(body, ["body"], errors);
-      raiseIfInvalid(errors);
-      engine.config.monitor = monitor;
+      engine.config.monitor = validateBody("MonitorConfig", body);
       return { status: "success", message: "Monitor configuration updated" };
     },
   ],
@@ -841,10 +413,7 @@ const routes = [
     "put",
     /^\/api\/config\/restart$/,
     (engine, { body }) => {
-      const errors = [];
-      const restart = validateRestart(body, ["body"], errors);
-      raiseIfInvalid(errors);
-      engine.config.restart = restart;
+      engine.config.restart = validateBody("RestartConfig", body);
       return { status: "success", message: "Restart configuration updated" };
     },
   ],
@@ -853,20 +422,20 @@ const routes = [
     /^\/api\/config\/observability$/,
     (engine, { body }) => {
       requireObjectBody(body);
-      const kinds = {
-        log_level: "string",
-        prometheus_enabled: "boolean",
-        log_format: "string",
-      };
+      // ObservabilityConfig.model_validate of the merged section
+      const updates = {};
+      for (const key of ["log_level", "prometheus_enabled", "log_format"]) {
+        if (Object.hasOwn(body, key)) updates[key] = body[key];
+      }
       const errors = [];
-      for (const [key, kind] of Object.entries(kinds)) {
-        if (key in body) checkKind(body[key], kind, [key], errors);
-      }
+      const observability = validateModel(
+        "ObservabilityConfig",
+        { ...engine.config.observability, ...updates },
+        [],
+        errors,
+      );
       raiseInvalidInput(errors);
-      const observability = engine.config.observability;
-      for (const key of Object.keys(kinds)) {
-        if (key in body) observability[key] = body[key];
-      }
+      engine.config.observability = observability;
       return {
         status: "success",
         message: "Observability configuration updated",
@@ -946,21 +515,7 @@ const routes = [
     "post",
     /^\/api\/healthchecks$/,
     (engine, { body }) => {
-      // FastAPI's errors for a missing or non-object HealthCheckConfig body
-      if (body === undefined) {
-        throw new ApiError(422, [
-          { type: "missing", loc: ["body"], msg: "Field required" },
-        ]);
-      }
-      if (!isObject(body)) {
-        throw new ApiError(422, [
-          {
-            type: "model_attributes_type",
-            loc: ["body"],
-            msg: "Input should be a valid dictionary or object to extract fields from",
-          },
-        ]);
-      }
+      requireModelBody(body);
       const hc = validateHealthCheck(body);
       const info = engine.info(requireContainer(engine, hc.container_id));
       hc.container_id = info.stable_id;
@@ -1049,34 +604,20 @@ const routes = [
     /^\/api\/notifications\/config$/,
     (engine, { body }) => {
       requireObjectBody(body);
-      const notifications = engine.config.notifications;
       // NotificationsConfig.model_validate of the merged section
+      const updates = {};
+      for (const key of ["enabled", "event_filters", "services"]) {
+        if (Object.hasOwn(body, key)) updates[key] = body[key];
+      }
       const errors = [];
-      if ("enabled" in body) {
-        checkKind(body.enabled, "boolean", ["enabled"], errors);
-      }
-      if ("event_filters" in body) {
-        checkKind(body.event_filters, "list", ["event_filters"], errors);
-        if (Array.isArray(body.event_filters)) {
-          body.event_filters.forEach((filter, i) =>
-            checkKind(filter, "string", ["event_filters", i], errors),
-          );
-        }
-      }
-      let services = notifications.services;
-      if ("services" in body) {
-        checkKind(body.services, "list", ["services"], errors);
-        if (Array.isArray(body.services)) {
-          services = body.services.map((service, i) =>
-            validateNotificationService(service, ["services", i], errors),
-          );
-        }
-      }
+      const notifications = validateModel(
+        "NotificationsConfig",
+        { ...engine.config.notifications, ...updates },
+        [],
+        errors,
+      );
       raiseInvalidInput(errors);
-      if ("enabled" in body) notifications.enabled = body.enabled;
-      if ("event_filters" in body)
-        notifications.event_filters = [...body.event_filters];
-      notifications.services = services;
+      engine.config.notifications = notifications;
       return {
         status: "success",
         message: "Notification configuration updated",
@@ -1198,18 +739,24 @@ const routes = [
       if (!ok(body.server_url) || !ok(body.api_token)) {
         throw new ApiError(400, "server_url and api_token are required");
       }
+      // UptimeKumaConfig(...) of the supplied fields, before any connection
+      const stripped = (v) => (typeof v === "string" ? v.trim() : v);
       const errors = [];
-      if ("username" in body) {
-        checkKind(body.username, "string", ["username"], errors);
-      }
-      if ("auto_restart_on_down" in body) {
-        checkKind(
-          body.auto_restart_on_down,
-          "boolean",
-          ["auto_restart_on_down"],
-          errors,
-        );
-      }
+      validateModel(
+        "UptimeKumaConfig",
+        {
+          server_url: body.server_url.trim(),
+          api_token: body.api_token.trim(),
+          username: stripped(
+            Object.hasOwn(body, "username") ? body.username : "",
+          ),
+          auto_restart_on_down: Object.hasOwn(body, "auto_restart_on_down")
+            ? body.auto_restart_on_down
+            : true,
+        },
+        [],
+        errors,
+      );
       raiseInvalidInput(errors);
       // The real route now contacts the server; with none to reach, the
       // client error ends in the generic 500.

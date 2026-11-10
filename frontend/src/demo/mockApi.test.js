@@ -261,10 +261,19 @@ describe("configuration", () => {
     expect(engine.config.monitor.include_all).toBe(true);
     await api.put("/config/monitor", { include_all: 0 });
     expect(engine.config.monitor.include_all).toBe(false);
+    // Pydantic's lax int takes a boolean too (true -> 1).
+    await api.put("/config/monitor", { interval_seconds: true });
+    expect(engine.config.monitor.interval_seconds).toBe(1);
     expect(
-      (await error(api.put("/config/monitor", { interval_seconds: true })))
-        .response.status,
-    ).toBe(422);
+      (await error(api.put("/config/monitor", { include_all: "maybe" })))
+        .response.data.detail,
+    ).toEqual([
+      {
+        type: "bool_parsing",
+        loc: ["body", "include_all"],
+        msg: "Input should be a valid boolean, unable to interpret input",
+      },
+    ]);
   });
 
   it("replaces the whole config but keeps live restart counts", async () => {
@@ -547,7 +556,8 @@ describe("notifications", () => {
     );
     expect(wrong.response.status).toBe(422);
     expect(wrong.response.data.detail).toBe(
-      "type: Input should be a valid string; enabled: Input should be a valid boolean; url: Input should be a valid string; headers: Input should be a valid dictionary",
+      // "yes" is a valid boolean to Pydantic.
+      "type: Input should be a valid string; url: Input should be a valid string; headers: Input should be a valid dictionary",
     );
     const e = await error(api.post("/notifications/test", { type: "slack" }));
     expect(e.response.status).toBe(422);
@@ -591,7 +601,8 @@ describe("notifications", () => {
     );
     expect(bad.response.status).toBe(422);
     expect(bad.response.data.detail).toBe(
-      "enabled: Input should be a valid boolean; event_filters.0: Input should be a valid string; services.0.name: Field required; services.0.type: Field required",
+      // In the model's field order; "yes" is a valid boolean.
+      "services.0.name: Field required; services.0.type: Field required; event_filters.0: Input should be a valid string",
     );
     expect(
       (await error(api.put("/notifications/config", { event_filters: "x" })))
@@ -600,7 +611,9 @@ describe("notifications", () => {
     expect(
       (await error(api.put("/notifications/config", { services: ["x"] })))
         .response.data.detail,
-    ).toBe("services.0: Input should be a valid dictionary");
+    ).toBe(
+      "services.0: Input should be a valid dictionary or instance of NotificationService",
+    );
     expect(
       (await error(api.put("/notifications/config", "x"))).response.status,
     ).toBe(422);
@@ -636,7 +649,8 @@ describe("Uptime Kuma", () => {
     );
     expect(invalid.response.status).toBe(422);
     expect(invalid.response.data.detail).toBe(
-      "username: Input should be a valid string; auto_restart_on_down: Input should be a valid boolean",
+      // "no" is a valid boolean to Pydantic.
+      "username: Input should be a valid string",
     );
     expect(
       (await error(api.get("/uptime-kuma/monitors"))).response.data.detail,
@@ -865,9 +879,9 @@ describe("edge cases", () => {
         msg: "Input should be a valid list",
       },
       {
-        type: "number_type",
+        type: "int_parsing",
         loc: ["body", "ui", "max_log_entries"],
-        msg: "Input should be a valid number",
+        msg: "Input should be a valid integer, unable to parse string as an integer",
       },
     ]);
     expect(engine.config.filters.blacklist_names).toEqual([]);
@@ -907,7 +921,8 @@ describe("edge cases", () => {
     );
     expect(e.response.status).toBe(422);
     expect(e.response.data.detail).toBe(
-      "log_level: Input should be a valid string; prometheus_enabled: Input should be a valid boolean",
+      // "yes" is a valid boolean to Pydantic.
+      "log_level: Input should be a valid string",
     );
     expect(engine.config.observability.log_level).toBe("INFO");
   });
@@ -952,18 +967,19 @@ describe("edge cases", () => {
     });
     expect(e.response.status).toBe(422);
     expect(e.response.data.detail.split("; ")).toEqual([
+      // The real AutoHealConfig's errors for this payload, in its field order
       "containers.excluded.0: Input should be a valid string",
-      "containers.restart_counts.a: Input should be a valid integer",
-      "containers.restart_history.a.1: Input should be a valid number",
+      "containers.restart_counts.a: Input should be a valid integer, unable to parse string as an integer",
+      "containers.restart_history.a.1: Input should be a valid number, unable to parse string as a number",
       "filters.whitelist_names.0: Input should be a valid string",
       "filters.blacklist_labels.0.tier: Input should be a valid string",
       "alerts.webhook: Input should be a valid string",
-      "uptime_kuma_mappings.0: Input should be a valid dictionary",
+      "uptime_kuma_mappings.0: Input should be a valid dictionary or instance of UptimeKumaMapping",
       "uptime_kuma_mappings.1.container_id: Input should be a valid string",
       "uptime_kuma_mappings.1.monitor_friendly_name: Field required",
-      "uptime_kuma_mappings.1.auto_mapped: Input should be a valid boolean",
+      "uptime_kuma_mappings.1.auto_mapped: Input should be a valid boolean, unable to interpret input",
+      "notifications.services.0: Input should be a valid dictionary or instance of NotificationService",
       "notifications.event_filters.0: Input should be a valid string",
-      "notifications.services.0: Input should be a valid dictionary",
     ]);
 
     // Nothing was applied, and the demo keeps working.

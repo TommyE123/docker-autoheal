@@ -27,6 +27,8 @@ differences, all switched on by the `demo` mode:
 | `src/demo/engine.js`           | A small fake Docker host (containers that run, crash, crash-loop and fail health checks) and a port of the monitoring cycle that watches it: `monitoring_engine.py`, `selection.py` and `health.py`. |
 | `src/demo/recovery.js`         | A port of `RecoveryPolicy` (`app/monitor/recovery.py`): cooldown, backoff, restart waits and quarantine release.                                                                                     |
 | `src/demo/mockApi.js`          | The axios adapter: one handler per route in `app/api/routes/`, with the same response shapes, status codes and `{"detail": ...}` error bodies.                                                       |
+| `src/demo/schema.js`           | Validates request data against the backend's JSON Schemas (`contract/schemas.json`) with Pydantic's lax conversion rules and error messages.                                                         |
+| `src/demo/contract/`           | The backend's answers the demo is checked against in CI (see [Keeping it accurate](#keeping-it-accurate)).                                                                                           |
 | `src/demo/default-config.json` | The backend's default configuration, `AutoHealConfig().model_dump(mode="json")`.                                                                                                                     |
 | `src/demo/DemoBanner.jsx`      | The banner and the per-container controls.                                                                                                                                                           |
 
@@ -40,22 +42,41 @@ nothing was sent, and Uptime Kuma reports it isn't available.
 
 ## Keeping it accurate
 
-The demo must not show behaviour the real service doesn't have. When a change touches
-any of these, update the demo in the same pull request:
+The demo must not show behaviour the real service doesn't have, so CI checks it against
+the backend. `app/tests/unit/test_demo_contract.py` computes the real backend's answers
+and compares them with a stored copy in `frontend/src/demo/contract/`; `contract.test.js`
+checks the demo against the same stored answers:
 
-- **Restart, quarantine or selection logic** (`app/monitor/`): update `engine.js` or
-  `recovery.js`, and the matching tests in `engine.test.js` and `recovery.test.js`.
-- **An API route or response model** (`app/api/`): update the handler in `mockApi.js`
-  and `mockApi.test.js`, which checks the `ContainerInfo` and `SystemStatus` fields.
-- **The configuration model** (`app/config/config_manager.py`): regenerate
-  `default-config.json`. `app/tests/unit/test_demo_default_config.py` fails until you do:
+| File              | Holds                                                                                                                    | The demo must                                                    |
+|-------------------|--------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------|
+| `api.json`        | Every `/health` and `/api/*` route and method, and the `ContainerInfo` and `SystemStatus` fields                         | answer every route and return every field                        |
+| `schemas.json`    | The configuration models' JSON Schemas                                                                                   | (used directly: `schema.js` validates request data against them) |
+| `validation.json` | Inputs for `AutoHealConfig`, `HealthCheckConfig` and `NotificationService`, with the real models' values or errors       | give the same value, or the same errors in the same order        |
+| `scenarios.json`  | Timelines of container states, with the real monitoring engine's restarts, events and quarantine decisions at each check | make the same decisions                                          |
 
-  ```bash
-  python -c 'import json; from app.config.config_manager import AutoHealConfig; print(json.dumps(AutoHealConfig().model_dump(mode="json"), indent=2))' > frontend/src/demo/default-config.json
-  ```
+So a backend change that the demo doesn't copy fails CI. To bring the demo up to date:
 
-- **A new API call in the UI**: add a handler, or the demo answers it with a 404 and
-  the smoke test fails.
+1. Refresh the stored answers, then format them:
+
+   ```bash
+   UPDATE_DEMO_CONTRACT=1 pytest app/tests/unit/test_demo_contract.py
+   cd frontend && npx prettier --write src/demo/contract
+   ```
+
+2. Review the diff, then change `engine.js`, `recovery.js` or `mockApi.js` until
+   `npm test` passes. Validation usually needs no change, because it follows `schemas.json`.
+
+To cover a new case, add its input to `validation.json` or a timeline to `scenarios.json`
+and run step 1. The default configuration has its own check:
+`app/tests/unit/test_demo_default_config.py` fails until `default-config.json` is
+regenerated:
+
+```bash
+python -c 'import json; from app.config.config_manager import AutoHealConfig; print(json.dumps(AutoHealConfig().model_dump(mode="json"), indent=2))' > frontend/src/demo/default-config.json
+```
+
+A new API call in the UI also needs a handler, or the demo answers it with a 404 and the
+smoke test fails.
 
 ## Running it locally
 

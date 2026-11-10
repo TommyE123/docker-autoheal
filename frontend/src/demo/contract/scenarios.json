@@ -1,0 +1,1332 @@
+{
+  "scenarios": [
+    {
+      "name": "crash loop: backoff, cooldown, quarantine, then release once stable",
+      "config": {
+        "monitor": {
+          "interval_seconds": 5
+        },
+        "restart": {
+          "mode": "both",
+          "cooldown_seconds": 10,
+          "max_restarts": 3,
+          "max_restarts_window_seconds": 300,
+          "backoff": {
+            "initial_seconds": 5,
+            "max_seconds": 60
+          }
+        }
+      },
+      "labels": {
+        "autoheal": "true"
+      },
+      "steps": [
+        {
+          "at": 0,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 5,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 10,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 15,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 20,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 25,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 30,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 35,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 40,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 45,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 50,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 55,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 60,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 65,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 70,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 100,
+          "status": "running",
+          "exit_code": 0,
+          "health": null,
+          "started_at": 100
+        },
+        {
+          "at": 105,
+          "status": "running",
+          "exit_code": 0,
+          "health": null,
+          "started_at": 100
+        },
+        {
+          "at": 110,
+          "status": "running",
+          "exit_code": 0,
+          "health": null,
+          "started_at": 100
+        },
+        {
+          "at": 115,
+          "status": "running",
+          "exit_code": 0,
+          "health": null,
+          "started_at": 100
+        },
+        {
+          "at": 120,
+          "status": "running",
+          "exit_code": 0,
+          "health": null,
+          "started_at": 100
+        }
+      ],
+      "expected": [
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": true,
+          "events": [
+            {
+              "event_type": "restart",
+              "restart_count": 1,
+              "status": "success",
+              "message": "Restart successful: Container exited with code 1"
+            }
+          ],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": true,
+          "events": [
+            {
+              "event_type": "restart",
+              "restart_count": 2,
+              "status": "success",
+              "message": "Restart successful: Container exited with code 1"
+            }
+          ],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": true,
+          "events": [
+            {
+              "event_type": "restart",
+              "restart_count": 3,
+              "status": "success",
+              "message": "Restart successful: Container exited with code 1"
+            }
+          ],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [
+            {
+              "event_type": "quarantine",
+              "restart_count": 3,
+              "status": "quarantined",
+              "message": "Container quarantined: exceeded 3 restarts in 300s window"
+            }
+          ],
+          "quarantined": true
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": true
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": true
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": true
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": true
+        },
+        {
+          "restarted": false,
+          "events": [
+            {
+              "event_type": "auto_unquarantine",
+              "restart_count": 0,
+              "status": "success",
+              "message": "Container automatically removed from quarantine - auto-healed and now healthy"
+            }
+          ],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        }
+      ]
+    },
+    {
+      "name": "quarantine release needs consecutive healthy checks of one run",
+      "config": {
+        "monitor": {
+          "interval_seconds": 5
+        },
+        "restart": {
+          "mode": "both",
+          "cooldown_seconds": 10,
+          "max_restarts": 3,
+          "max_restarts_window_seconds": 300,
+          "backoff": {
+            "initial_seconds": 5,
+            "max_seconds": 60
+          }
+        }
+      },
+      "labels": {
+        "autoheal": "true"
+      },
+      "steps": [
+        {
+          "at": 0,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 5,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 10,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 15,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 20,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 25,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 30,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 35,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 40,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 45,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 50,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 55,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 60,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 65,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 70,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 100,
+          "status": "running",
+          "exit_code": 0,
+          "health": null,
+          "started_at": 90
+        },
+        {
+          "at": 105,
+          "status": "running",
+          "exit_code": 0,
+          "health": null,
+          "started_at": 90
+        },
+        {
+          "at": 110,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": 90
+        },
+        {
+          "at": 115,
+          "status": "running",
+          "exit_code": 0,
+          "health": null,
+          "started_at": 112
+        },
+        {
+          "at": 120,
+          "status": "running",
+          "exit_code": 0,
+          "health": null,
+          "started_at": 112
+        },
+        {
+          "at": 125,
+          "status": "running",
+          "exit_code": 0,
+          "health": null,
+          "started_at": 112
+        },
+        {
+          "at": 130,
+          "status": "running",
+          "exit_code": 0,
+          "health": null,
+          "started_at": 112
+        }
+      ],
+      "expected": [
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": true,
+          "events": [
+            {
+              "event_type": "restart",
+              "restart_count": 1,
+              "status": "success",
+              "message": "Restart successful: Container exited with code 1"
+            }
+          ],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": true,
+          "events": [
+            {
+              "event_type": "restart",
+              "restart_count": 2,
+              "status": "success",
+              "message": "Restart successful: Container exited with code 1"
+            }
+          ],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": true,
+          "events": [
+            {
+              "event_type": "restart",
+              "restart_count": 3,
+              "status": "success",
+              "message": "Restart successful: Container exited with code 1"
+            }
+          ],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [
+            {
+              "event_type": "quarantine",
+              "restart_count": 3,
+              "status": "quarantined",
+              "message": "Container quarantined: exceeded 3 restarts in 300s window"
+            }
+          ],
+          "quarantined": true
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": true
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": true
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": true
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": true
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": true
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": true
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": true
+        },
+        {
+          "restarted": false,
+          "events": [
+            {
+              "event_type": "auto_unquarantine",
+              "restart_count": 0,
+              "status": "success",
+              "message": "Container automatically removed from quarantine - auto-healed and now healthy"
+            }
+          ],
+          "quarantined": false
+        }
+      ]
+    },
+    {
+      "name": "unhealthy container restarted in mode both, and backoff resets after a stable run",
+      "config": {
+        "monitor": {
+          "interval_seconds": 5
+        },
+        "restart": {
+          "mode": "both",
+          "cooldown_seconds": 10,
+          "max_restarts": 3,
+          "max_restarts_window_seconds": 300,
+          "backoff": {
+            "initial_seconds": 5,
+            "max_seconds": 60
+          }
+        }
+      },
+      "labels": {
+        "autoheal": "true"
+      },
+      "steps": [
+        {
+          "at": 0,
+          "status": "running",
+          "exit_code": 0,
+          "health": "unhealthy",
+          "started_at": -3600
+        },
+        {
+          "at": 5,
+          "status": "running",
+          "exit_code": 0,
+          "health": "unhealthy",
+          "started_at": -3600
+        },
+        {
+          "at": 10,
+          "status": "running",
+          "exit_code": 0,
+          "health": "starting",
+          "started_at": 5
+        },
+        {
+          "at": 15,
+          "status": "running",
+          "exit_code": 0,
+          "health": "healthy",
+          "started_at": 5
+        },
+        {
+          "at": 20,
+          "status": "running",
+          "exit_code": 0,
+          "health": "healthy",
+          "started_at": 5
+        },
+        {
+          "at": 25,
+          "status": "running",
+          "exit_code": 0,
+          "health": "healthy",
+          "started_at": 5
+        },
+        {
+          "at": 30,
+          "status": "running",
+          "exit_code": 0,
+          "health": "unhealthy",
+          "started_at": 5
+        },
+        {
+          "at": 35,
+          "status": "running",
+          "exit_code": 0,
+          "health": "unhealthy",
+          "started_at": 5
+        },
+        {
+          "at": 40,
+          "status": "running",
+          "exit_code": 0,
+          "health": "unhealthy",
+          "started_at": 5
+        }
+      ],
+      "expected": [
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": true,
+          "events": [
+            {
+              "event_type": "restart",
+              "restart_count": 1,
+              "status": "success",
+              "message": "Restart successful: Docker health check reports unhealthy"
+            }
+          ],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": true,
+          "events": [
+            {
+              "event_type": "restart",
+              "restart_count": 2,
+              "status": "success",
+              "message": "Restart successful: Docker health check reports unhealthy"
+            }
+          ],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        }
+      ]
+    },
+    {
+      "name": "health failures ignored in on-failure mode",
+      "config": {
+        "monitor": {
+          "interval_seconds": 5
+        },
+        "restart": {
+          "mode": "on-failure",
+          "cooldown_seconds": 10,
+          "max_restarts": 3,
+          "max_restarts_window_seconds": 300,
+          "backoff": {
+            "initial_seconds": 5,
+            "max_seconds": 60
+          }
+        }
+      },
+      "labels": {
+        "autoheal": "true"
+      },
+      "steps": [
+        {
+          "at": 0,
+          "status": "running",
+          "exit_code": 0,
+          "health": "unhealthy",
+          "started_at": -3600
+        },
+        {
+          "at": 5,
+          "status": "running",
+          "exit_code": 0,
+          "health": "unhealthy",
+          "started_at": -3600
+        },
+        {
+          "at": 10,
+          "status": "running",
+          "exit_code": 0,
+          "health": "unhealthy",
+          "started_at": -3600
+        },
+        {
+          "at": 15,
+          "status": "running",
+          "exit_code": 0,
+          "health": "unhealthy",
+          "started_at": -3600
+        },
+        {
+          "at": 20,
+          "status": "exited",
+          "exit_code": 2,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 25,
+          "status": "exited",
+          "exit_code": 2,
+          "health": null,
+          "started_at": -3600
+        }
+      ],
+      "expected": [
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": true,
+          "events": [
+            {
+              "event_type": "restart",
+              "restart_count": 1,
+              "status": "success",
+              "message": "Restart successful: Container exited with code 2"
+            }
+          ],
+          "quarantined": false
+        }
+      ]
+    },
+    {
+      "name": "exits ignored in health mode",
+      "config": {
+        "monitor": {
+          "interval_seconds": 5
+        },
+        "restart": {
+          "mode": "health",
+          "cooldown_seconds": 10,
+          "max_restarts": 3,
+          "max_restarts_window_seconds": 300,
+          "backoff": {
+            "initial_seconds": 5,
+            "max_seconds": 60
+          }
+        }
+      },
+      "labels": {
+        "autoheal": "true"
+      },
+      "steps": [
+        {
+          "at": 0,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 5,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 10,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 15,
+          "status": "running",
+          "exit_code": 0,
+          "health": "unhealthy",
+          "started_at": -3600
+        },
+        {
+          "at": 20,
+          "status": "running",
+          "exit_code": 0,
+          "health": "unhealthy",
+          "started_at": -3600
+        }
+      ],
+      "expected": [
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": true,
+          "events": [
+            {
+              "event_type": "restart",
+              "restart_count": 1,
+              "status": "success",
+              "message": "Restart successful: Docker health check reports unhealthy"
+            }
+          ],
+          "quarantined": false
+        }
+      ]
+    },
+    {
+      "name": "clean stop is respected",
+      "config": {
+        "monitor": {
+          "interval_seconds": 5
+        },
+        "restart": {
+          "mode": "both",
+          "cooldown_seconds": 10,
+          "max_restarts": 3,
+          "max_restarts_window_seconds": 300,
+          "backoff": {
+            "initial_seconds": 5,
+            "max_seconds": 60
+          }
+        }
+      },
+      "labels": {
+        "autoheal": "true"
+      },
+      "steps": [
+        {
+          "at": 0,
+          "status": "exited",
+          "exit_code": 0,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 5,
+          "status": "exited",
+          "exit_code": 0,
+          "health": null,
+          "started_at": -3600
+        }
+      ],
+      "expected": [
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        }
+      ]
+    },
+    {
+      "name": "clean stop restarted when respect_manual_stop is off",
+      "config": {
+        "monitor": {
+          "interval_seconds": 5
+        },
+        "restart": {
+          "mode": "both",
+          "cooldown_seconds": 10,
+          "max_restarts": 3,
+          "max_restarts_window_seconds": 300,
+          "backoff": {
+            "initial_seconds": 5,
+            "max_seconds": 60
+          },
+          "respect_manual_stop": false
+        }
+      },
+      "labels": {
+        "autoheal": "true"
+      },
+      "steps": [
+        {
+          "at": 0,
+          "status": "exited",
+          "exit_code": 0,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 5,
+          "status": "exited",
+          "exit_code": 0,
+          "health": null,
+          "started_at": -3600
+        }
+      ],
+      "expected": [
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": true,
+          "events": [
+            {
+              "event_type": "restart",
+              "restart_count": 1,
+              "status": "success",
+              "message": "Restart successful: Container stopped (exit 0)"
+            }
+          ],
+          "quarantined": false
+        }
+      ]
+    },
+    {
+      "name": "backoff disabled restarts at once, cooldown still applies",
+      "config": {
+        "monitor": {
+          "interval_seconds": 5
+        },
+        "restart": {
+          "mode": "both",
+          "cooldown_seconds": 10,
+          "max_restarts": 3,
+          "max_restarts_window_seconds": 300,
+          "backoff": {
+            "enabled": false
+          }
+        }
+      },
+      "labels": {
+        "autoheal": "true"
+      },
+      "steps": [
+        {
+          "at": 0,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 5,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 10,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 15,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 20,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 25,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        }
+      ],
+      "expected": [
+        {
+          "restarted": true,
+          "events": [
+            {
+              "event_type": "restart",
+              "restart_count": 1,
+              "status": "success",
+              "message": "Restart successful: Container exited with code 1"
+            }
+          ],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": true,
+          "events": [
+            {
+              "event_type": "restart",
+              "restart_count": 2,
+              "status": "success",
+              "message": "Restart successful: Container exited with code 1"
+            }
+          ],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": true,
+          "events": [
+            {
+              "event_type": "restart",
+              "restart_count": 3,
+              "status": "success",
+              "message": "Restart successful: Container exited with code 1"
+            }
+          ],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        }
+      ]
+    },
+    {
+      "name": "unmonitored container is left alone",
+      "config": {
+        "monitor": {
+          "interval_seconds": 5
+        },
+        "restart": {
+          "mode": "both",
+          "cooldown_seconds": 10,
+          "max_restarts": 3,
+          "max_restarts_window_seconds": 300,
+          "backoff": {
+            "initial_seconds": 5,
+            "max_seconds": 60
+          }
+        }
+      },
+      "labels": {},
+      "steps": [
+        {
+          "at": 0,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 5,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 10,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 15,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        }
+      ],
+      "expected": [
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        }
+      ]
+    },
+    {
+      "name": "include_all monitors an unlabelled container",
+      "config": {
+        "monitor": {
+          "interval_seconds": 5,
+          "include_all": true
+        },
+        "restart": {
+          "mode": "both",
+          "cooldown_seconds": 10,
+          "max_restarts": 3,
+          "max_restarts_window_seconds": 300,
+          "backoff": {
+            "initial_seconds": 5,
+            "max_seconds": 60
+          }
+        }
+      },
+      "labels": {},
+      "steps": [
+        {
+          "at": 0,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 5,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 10,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        }
+      ],
+      "expected": [
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        },
+        {
+          "restarted": true,
+          "events": [
+            {
+              "event_type": "restart",
+              "restart_count": 1,
+              "status": "success",
+              "message": "Restart successful: Container exited with code 1"
+            }
+          ],
+          "quarantined": false
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false
+        }
+      ]
+    }
+  ]
+}
