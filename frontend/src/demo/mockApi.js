@@ -1,288 +1,217 @@
-// Demo-only stand-in for the FastAPI backend, as an axios adapter.
+// Demo-only stand-in for the backend, as an axios adapter.
 //
-// Each handler mirrors the route of the same path in app/api/routes/, with
-// the same response shape, status codes and error body ({"detail": ...}, or a
-// list of {loc, msg, type} for request validation, as FastAPI returns). The
-// state lives in a DemoEngine (./engine.js). When a route or its response
-// changes, change it here in the same release.
+// The demo exists so visitors can see the real UI and click around it. This
+// answers the API calls the UI makes with fixed sample data and simple
+// changes to it (enable a container, clear the events, save a setting, ...).
+// It deliberately doesn't validate input or simulate the monitoring engine.
+// Everything lives in memory, so a page reload starts again.
 
 import { AxiosError } from "axios";
-import { validateModel } from "./schema.js";
+import defaultConfig from "./default-config.json";
 
-export class ApiError extends Error {
+const clone = (value) => JSON.parse(JSON.stringify(value));
+const minutesAgo = (minutes) =>
+  new Date(Date.now() - minutes * 60000).toISOString();
+
+const DEMO_MESSAGE =
+  "Demo: nothing was sent. A real install would contact the service.";
+
+function sampleContainer(index, name, image, options = {}) {
+  const {
+    status = "running",
+    health = "healthy",
+    monitored = true,
+    quarantined = false,
+    restarts = 0,
+    exitCode = 0,
+  } = options;
+  const fullId = String(index).repeat(64);
+  return {
+    id: fullId.slice(0, 12),
+    full_id: fullId,
+    name,
+    image,
+    status,
+    state: { Status: status, ExitCode: exitCode },
+    labels: monitored ? { autoheal: "true" } : {},
+    health: health ? { status: health, failing_streak: 0 } : null,
+    restart_count: restarts,
+    recent_restart_count: restarts,
+    exit_code: exitCode,
+    monitored,
+    quarantined,
+    uptime_kuma_status: 5,
+    uptime_kuma_monitor_name: null,
+  };
+}
+
+function sampleEvent(minutes, name, type, status, restarts, message) {
+  return {
+    timestamp: minutesAgo(minutes),
+    container_id: "3".repeat(64),
+    container_name: name,
+    event_type: type,
+    restart_count: restarts,
+    status,
+    message,
+  };
+}
+
+/** The sample data the demo starts with. */
+export function createDemoState() {
+  const config = clone(defaultConfig);
+  config.notifications.enabled = true;
+  config.notifications.services = [
+    {
+      name: "Team chat",
+      type: "discord",
+      enabled: true,
+      url: "https://discord.example/webhook",
+    },
+  ];
+  return {
+    config,
+    maintenance: { mode: false, start: null },
+    containers: [
+      sampleContainer(1, "web", "nginx:1.27-alpine"),
+      sampleContainer(2, "api", "example/shop-api:2.3", { restarts: 1 }),
+      sampleContainer(3, "worker", "example/shop-worker:2.3", {
+        status: "exited",
+        health: null,
+        quarantined: true,
+        restarts: 3,
+        exitCode: 1,
+      }),
+      sampleContainer(4, "db", "postgres:16-alpine"),
+      sampleContainer(5, "backup", "alpine:3.20", {
+        status: "exited",
+        health: null,
+      }),
+      sampleContainer(6, "grafana", "grafana/grafana:11.3", {
+        monitored: false,
+      }),
+    ],
+    events: [
+      sampleEvent(
+        42,
+        "api",
+        "restart",
+        "success",
+        1,
+        "Restart successful: Docker health check reports unhealthy",
+      ),
+      sampleEvent(
+        30,
+        "worker",
+        "restart",
+        "success",
+        1,
+        "Restart successful: Container exited with code 1",
+      ),
+      sampleEvent(
+        25,
+        "worker",
+        "restart",
+        "success",
+        2,
+        "Restart successful: Container exited with code 1",
+      ),
+      sampleEvent(
+        15,
+        "worker",
+        "restart",
+        "success",
+        3,
+        "Restart successful: Container exited with code 1",
+      ),
+      sampleEvent(
+        10,
+        "worker",
+        "quarantine",
+        "quarantined",
+        3,
+        "Container quarantined: exceeded 3 restarts in 600s window",
+      ),
+    ],
+  };
+}
+
+class ApiError extends Error {
   constructor(status, detail) {
-    super(typeof detail === "string" ? detail : "Validation error");
+    super(detail);
     this.status = status;
     this.detail = detail;
   }
 }
 
-const clone = (value) => JSON.parse(JSON.stringify(value));
-const isObject = (value) =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
-// --- request body validation ----------------------------------------------
-//
-// Field types, defaults and limits come from the backend's JSON Schemas via
-// ./schema.js; only HealthCheckConfig's own model validator is written out
-// here. contract.test.js checks the results against the real models.
-
-// app/api/errors.py: the generic body of every unexpected 500.
-export const INTERNAL_ERROR_DETAIL = "Internal server error, see logs";
-
-/** FastAPI's 422 for a `dict` body parameter that isn't a JSON object. */
-function requireObjectBody(body) {
-  if (!isObject(body)) {
-    throw new ApiError(422, [
-      {
-        type: "dict_type",
-        loc: ["body"],
-        msg: "Input should be a valid dictionary",
-      },
-    ]);
-  }
-}
-
-/** FastAPI's 422s for a missing or non-object body declared as a model. */
-function requireModelBody(body) {
-  if (body === undefined) {
-    throw new ApiError(422, [
-      { type: "missing", loc: ["body"], msg: "Field required" },
-    ]);
-  }
-  if (!isObject(body)) {
-    throw new ApiError(422, [
-      {
-        type: "model_attributes_type",
-        loc: ["body"],
-        msg: "Input should be a valid dictionary or object to extract fields from",
-      },
-    ]);
-  }
-}
-
-/**
- * invalid_input_as_422 (app/api/errors.py): a model validation failure on
- * user data inside a handler is a 422 whose detail is one string of
- * "location: message" parts, without the submitted values.
- */
-function raiseInvalidInput(errors) {
-  if (!errors.length) return;
-  const detail = errors
-    .map(({ loc, msg }) => {
-      const location = loc.filter((part) => part !== "body").join(".");
-      return location ? `${location}: ${msg}` : msg;
-    })
-    .join("; ");
-  throw new ApiError(422, detail);
-}
-
-function raiseIfInvalid(errors) {
-  if (errors.length) throw new ApiError(422, errors);
-}
-
-/** A request body validated as model `name`: FastAPI's 422 list on failure. */
-function validateBody(name, body) {
-  requireModelBody(body);
-  const errors = [];
-  const value = validateModel(name, body, ["body"], errors, {
-    fastapiBody: true,
-  });
-  raiseIfInvalid(errors);
-  return value;
-}
-
-/** AutoHealConfig(**data); errors are located under `loc`. */
-export function validateFullConfig(data, loc = ["body"]) {
-  const errors = [];
-  const config = validateModel("AutoHealConfig", data, loc, errors);
-  raiseIfInvalid(errors);
-  return config;
-}
-
-/**
- * NotificationService(**service): the normalised service, after pushing any
- * errors (located under `loc`) onto `errors`.
- */
-export function validateNotificationService(service, loc, errors) {
-  return validateModel("NotificationService", service, loc, errors);
-}
-
-const CHECK_TYPE_FIELDS = {
-  http: ["http_endpoint", "http_expected_status"],
-  tcp: ["tcp_port"],
-  exec: ["exec_command"],
-  docker: [],
-};
-
-/**
- * HealthCheckConfig(**body): field types and limits first (from its schema),
- * then, only if those pass, the model validator's per-check-type rules
- * (_require_fields_for_check_type in config_manager.py). Errors are FastAPI's
- * 422 list, under "body".
- */
-export function validateHealthCheck(body) {
-  const errors = [];
-  const hc = validateModel("HealthCheckConfig", body, ["body"], errors);
-  raiseIfInvalid(errors);
-
-  const fail = (msg) => {
-    throw new ApiError(422, [
-      { type: "value_error", loc: ["body"], msg: `Value error, ${msg}` },
-    ]);
-  };
-  const required = Object.hasOwn(CHECK_TYPE_FIELDS, hc.check_type)
-    ? CHECK_TYPE_FIELDS[hc.check_type]
-    : null;
-  if (!required) {
-    fail("Unknown check_type; expected one of: http, tcp, exec, docker");
-  }
-  const missing = required.filter((field) => hc[field] == null);
-  if (missing.length)
-    fail(`check_type '${hc.check_type}' requires: ${missing.join(", ")}`);
-  if (hc.check_type === "http" && !hc.http_endpoint.trim()) {
-    fail("http_endpoint must not be empty");
-  }
-  if (hc.check_type === "tcp" && !(hc.tcp_port >= 1 && hc.tcp_port <= 65535)) {
-    fail("tcp_port must be between 1 and 65535");
-  }
-  if (hc.check_type === "exec" && !hc.exec_command[0]?.trim()) {
-    fail(
-      "exec_command must be a non-empty list starting with a non-blank command",
-    );
-  }
-  return hc;
-}
-
-// --- route handlers --------------------------------------------------------
-
-function requireContainer(engine, id) {
-  const container = engine.findContainer(decodeURIComponent(id));
+function findContainer(state, id) {
+  const container = state.containers.find(
+    (c) => c.id === id || c.full_id === id || c.name === id,
+  );
   if (!container) throw new ApiError(404, "Container not found");
   return container;
 }
 
-function containerInfoForList(engine, info) {
-  const uptimeKumaEnabled = engine.config.uptime_kuma.enabled;
-  return {
-    id: info.id,
-    name: info.name,
-    image: info.image,
-    status: info.status,
-    state: info.state,
-    labels: info.labels,
-    health: info.health,
-    restart_count: engine.totalRestartCount(info.recovery_id),
-    monitored: engine.shouldMonitorInfo(info),
-    quarantined: engine.quarantined.has(info.recovery_id),
-    // 4 = enabled but no monitor (it can't connect in the demo), 5 = disabled
-    uptime_kuma_status: uptimeKumaEnabled ? 4 : 5,
-    uptime_kuma_monitor_name: null,
-  };
-}
-
-function applySelection(containersConfig, cid, info, enabled) {
-  const addTo = enabled ? containersConfig.selected : containersConfig.excluded;
-  const removeFrom = enabled
-    ? containersConfig.excluded
-    : containersConfig.selected;
-  const remove = (identifier) => {
-    const index = removeFrom.indexOf(identifier);
-    if (index !== -1) removeFrom.splice(index, 1);
-  };
-  if (!info) {
-    if (!addTo.includes(cid)) addTo.push(cid);
-    remove(cid);
-    return;
-  }
-  if (!addTo.includes(info.stable_id)) addTo.push(info.stable_id);
-  for (const identifier of [info.stable_id, info.name, cid]) remove(identifier);
-}
-
-function notificationsView(config) {
-  return {
-    enabled: config.notifications.enabled,
-    services: clone(config.notifications.services),
-    event_filters: [...config.notifications.event_filters],
-  };
-}
-
-function findService(engine, name) {
-  return engine.config.notifications.services.findIndex(
-    (s) => s.name === decodeURIComponent(name),
-  );
-}
-
-const DEMO_TEST_MESSAGE =
-  "Demo: nothing was sent. In a real install this sends a test notification to the service.";
+// The fields GET /api/containers returns (ContainerInfo); details add more.
+const LIST_FIELDS = [
+  "id",
+  "name",
+  "image",
+  "status",
+  "state",
+  "labels",
+  "health",
+  "restart_count",
+  "monitored",
+  "quarantined",
+  "uptime_kuma_status",
+  "uptime_kuma_monitor_name",
+];
+const listView = (container) =>
+  Object.fromEntries(LIST_FIELDS.map((field) => [field, container[field]]));
 
 const routes = [
   [
     "get",
-    /^\/health$/,
-    (engine) => ({
+    "/health",
+    () => ({
       status: "healthy",
-      timestamp: new Date(engine.clock()).toISOString(),
       docker_connected: true,
-      monitoring_active: engine.running,
+      monitoring_active: true,
     }),
   ],
-
   [
     "get",
-    /^\/api\/status$/,
-    (engine) => {
-      const infos = engine.containers.map((c) => engine.info(c));
-      return {
-        monitoring_active: engine.running,
-        docker_connected: true,
-        total_containers: infos.length,
-        monitored_containers: infos.filter((i) => engine.shouldMonitorInfo(i))
-          .length,
-        quarantined_containers: engine.quarantined.size,
-        maintenance_mode: engine.maintenanceMode,
-        maintenance_start_time: engine.maintenanceStart,
-        config: clone(engine.config),
-      };
-    },
+    "/api/status",
+    (state) => ({
+      monitoring_active: true,
+      docker_connected: true,
+      total_containers: state.containers.length,
+      monitored_containers: state.containers.filter((c) => c.monitored).length,
+      quarantined_containers: state.containers.filter((c) => c.quarantined)
+        .length,
+      maintenance_mode: state.maintenance.mode,
+      maintenance_start_time: state.maintenance.start,
+      config: clone(state.config),
+    }),
   ],
-
   [
     "get",
-    /^\/api\/containers$/,
-    (engine, { params }) => {
-      const includeStopped = String(params.include_stopped) === "true";
-      return engine.containers
-        .filter((c) => includeStopped || c.running)
-        .map((c) => containerInfoForList(engine, engine.info(c)));
-    },
+    "/api/containers",
+    (state, { params }) =>
+      state.containers
+        .filter(
+          (c) =>
+            String(params.include_stopped) === "true" || c.status === "running",
+        )
+        .map(listView),
   ],
-
   [
     "post",
-    /^\/api\/containers\/select$/,
-    (engine, { body }) => {
-      if (
-        !isObject(body) ||
-        !Array.isArray(body.container_ids) ||
-        typeof body.enabled !== "boolean"
-      ) {
-        throw new ApiError(422, [
-          {
-            type: "missing",
-            loc: ["body"],
-            msg: "container_ids (list) and enabled (bool) are required",
-          },
-        ]);
-      }
-      for (const cid of body.container_ids) {
-        const container = engine.findContainer(cid);
-        applySelection(
-          engine.config.containers,
-          cid,
-          container ? engine.info(container) : null,
-          body.enabled,
-        );
+    "/api/containers/select",
+    (state, { body }) => {
+      for (const id of body.container_ids) {
+        findContainer(state, id).monitored = body.enabled;
       }
       return {
         status: "success",
@@ -290,627 +219,232 @@ const routes = [
       };
     },
   ],
-
   [
     "get",
-    /^\/api\/containers\/([^/]+)$/,
-    (engine, { match }) => {
-      const info = engine.info(requireContainer(engine, match[1]));
-      const recoveryId = info.recovery_id;
-      const total = engine.totalRestartCount(recoveryId);
-      return {
-        ...info,
-        restart_count: total,
-        monitored: engine.shouldMonitorInfo(info),
-        quarantined: engine.quarantined.has(recoveryId),
-        recent_restart_count: engine.restartCount(
-          recoveryId,
-          engine.config.restart.max_restarts_window_seconds,
+    "/api/containers/:id",
+    (state, { id }) => clone(findContainer(state, id)),
+  ],
+  [
+    "post",
+    "/api/containers/:id/restart",
+    (state, { id }) => {
+      const container = findContainer(state, id);
+      container.status = "running";
+      container.state = { Status: "running", ExitCode: 0 };
+      return { status: "success", message: `Container ${id} restarted` };
+    },
+  ],
+  [
+    "post",
+    "/api/containers/:id/unquarantine",
+    (state, { id }) => {
+      const container = findContainer(state, id);
+      container.quarantined = false;
+      state.events.push(
+        sampleEvent(
+          0,
+          container.name,
+          "unquarantine",
+          "success",
+          0,
+          "Container un-quarantined by user request",
         ),
-        total_restart_count: total,
-        custom_health_check:
-          engine.customHealthChecks[info.stable_id] ??
-          engine.customHealthChecks[info.name] ??
-          engine.customHealthChecks[info.full_id] ??
-          null,
+      );
+      return {
+        status: "success",
+        message: `Container ${container.name} removed from quarantine`,
       };
     },
   ],
-
   [
     "post",
-    /^\/api\/containers\/([^/]+)\/restart$/,
-    (engine, { match }) => {
-      // Like the real route: a plain Docker restart, not counted as an Autoheal restart.
-      engine._dockerRestart(requireContainer(engine, match[1]));
+    "/api/maintenance/enable",
+    (state) => {
+      state.maintenance = { mode: true, start: new Date().toISOString() };
       return {
         status: "success",
-        message: `Container ${decodeURIComponent(match[1])} restarted`,
-      };
-    },
-  ],
-
-  [
-    "post",
-    /^\/api\/containers\/([^/]+)\/unquarantine$/,
-    (engine, { match }) => {
-      const info = engine.info(requireContainer(engine, match[1]));
-      engine.quarantined.delete(info.recovery_id);
-      engine.clearRestartHistory(info.recovery_id);
-      engine.addEvent({
-        container_name: `${info.name} (${info.recovery_id})`,
-        container_id: info.full_id,
-        event_type: "unquarantine",
-        restart_count: 0,
-        status: "success",
-        message: "Container un-quarantined by user request",
-      });
-      return {
-        status: "success",
-        message: `Container ${info.name} removed from quarantine`,
-      };
-    },
-  ],
-
-  [
-    "post",
-    /^\/api\/maintenance\/enable$/,
-    (engine) => {
-      engine.maintenanceMode = true;
-      engine.maintenanceStart = new Date(engine.clock()).toISOString();
-      return {
-        status: "success",
-        message: "Maintenance mode enabled",
         maintenance_mode: true,
-        maintenance_start_time: engine.maintenanceStart,
+        maintenance_start_time: state.maintenance.start,
       };
     },
   ],
   [
     "post",
-    /^\/api\/maintenance\/disable$/,
-    (engine) => {
-      engine.maintenanceMode = false;
-      engine.maintenanceStart = null;
-      return {
-        status: "success",
-        message: "Maintenance mode disabled",
-        maintenance_mode: false,
-      };
+    "/api/maintenance/disable",
+    (state) => {
+      state.maintenance = { mode: false, start: null };
+      return { status: "success", maintenance_mode: false };
     },
   ],
-  [
-    "get",
-    /^\/api\/maintenance\/status$/,
-    (engine) => ({
-      maintenance_mode: engine.maintenanceMode,
-      maintenance_start_time: engine.maintenanceStart,
-    }),
-  ],
-
-  ["get", /^\/api\/config$/, (engine) => clone(engine.config)],
+  ["get", "/api/config", (state) => clone(state.config)],
+  ["get", "/api/config/export", (state) => clone(state.config)],
   [
     "put",
-    /^\/api\/config$/,
-    (engine, { body }) => {
-      const config = validateBody("AutoHealConfig", body);
-      // update_config keeps the live restart counts and history
-      config.containers.restart_counts =
-        engine.config.containers.restart_counts;
-      config.containers.restart_history =
-        engine.config.containers.restart_history;
-      engine.config = config;
+    "/api/config/:section",
+    (state, { id, body }) => {
+      Object.assign(state.config[id], body);
       return { status: "success", message: "Configuration updated" };
     },
   ],
   [
-    "put",
-    /^\/api\/config\/monitor$/,
-    (engine, { body }) => {
-      engine.config.monitor = validateBody("MonitorConfig", body);
-      return { status: "success", message: "Monitor configuration updated" };
-    },
-  ],
-  [
-    "put",
-    /^\/api\/config\/restart$/,
-    (engine, { body }) => {
-      engine.config.restart = validateBody("RestartConfig", body);
-      return { status: "success", message: "Restart configuration updated" };
-    },
-  ],
-  [
-    "put",
-    /^\/api\/config\/observability$/,
-    (engine, { body }) => {
-      requireObjectBody(body);
-      // ObservabilityConfig.model_validate of the merged section
-      const updates = {};
-      for (const key of ["log_level", "prometheus_enabled", "log_format"]) {
-        if (Object.hasOwn(body, key)) updates[key] = body[key];
-      }
-      const errors = [];
-      const observability = validateModel(
-        "ObservabilityConfig",
-        { ...engine.config.observability, ...updates },
-        [],
-        errors,
-      );
-      raiseInvalidInput(errors);
-      engine.config.observability = observability;
-      return {
-        status: "success",
-        message: "Observability configuration updated",
-      };
-    },
-  ],
-  [
-    "get",
-    /^\/api\/config\/export$/,
-    (engine) => ({
-      ...clone(engine.config),
-      custom_health_checks: clone(engine.customHealthChecks),
-    }),
-  ],
-  [
     "post",
-    /^\/api\/config\/import$/,
-    async (engine, { rawData }) => {
-      const file =
-        typeof rawData?.get === "function" ? rawData.get("file") : null;
-      if (!file || typeof file.text !== "function") {
-        throw new ApiError(422, [
-          { type: "missing", loc: ["body", "file"], msg: "Field required" },
-        ]);
-      }
-      // As import_config in app/api/routes/config.py: every bad file is a 422
-      // with a fixed message, and nothing changes unless all of it is valid.
-      let data;
+    "/api/config/import",
+    async (state, { body }) => {
       try {
-        data = JSON.parse(await file.text());
+        Object.assign(state.config, JSON.parse(await body.get("file").text()));
       } catch {
         throw new ApiError(422, "File is not valid JSON");
       }
-      if (!isObject(data)) {
-        throw new ApiError(422, "Configuration must be a JSON object");
-      }
-      // A present but null value is rejected too, as config_dict.pop() returns None.
-      const customChecks = Object.hasOwn(data, "custom_health_checks")
-        ? data.custom_health_checks
-        : {};
-      if (
-        !isObject(customChecks) ||
-        !Object.values(customChecks).every(isObject)
-      ) {
-        throw new ApiError(
-          422,
-          "custom_health_checks must be an object whose values are health check objects",
-        );
-      }
-      delete data.custom_health_checks;
-      const checks = {};
-      let config;
-      try {
-        config = validateFullConfig(data, []);
-        for (const [cid, hc] of Object.entries(customChecks)) {
-          checks[cid] = validateHealthCheck(hc);
-        }
-      } catch (error) {
-        // Both validators throw a 422 ApiError whose detail is a list.
-        raiseInvalidInput(error.detail);
-      }
-      engine.config = config;
-      engine.customHealthChecks = checks;
       return {
         status: "success",
         message: "Configuration imported successfully",
       };
     },
   ],
-
   [
     "get",
-    /^\/api\/healthchecks$/,
-    (engine) => clone(engine.customHealthChecks),
-  ],
-  [
-    "post",
-    /^\/api\/healthchecks$/,
-    (engine, { body }) => {
-      requireModelBody(body);
-      const hc = validateHealthCheck(body);
-      const info = engine.info(requireContainer(engine, hc.container_id));
-      hc.container_id = info.stable_id;
-      engine.customHealthChecks[info.stable_id] = hc;
-      return {
-        status: "success",
-        message: `Health check added for container ${info.stable_id}`,
-      };
-    },
-  ],
-  [
-    "get",
-    /^\/api\/healthchecks\/([^/]+)$/,
-    (engine, { match }) => {
-      const info = engine.info(requireContainer(engine, match[1]));
-      const hc =
-        engine.customHealthChecks[info.stable_id] ??
-        engine.customHealthChecks[info.full_id];
-      if (!hc)
-        throw new ApiError(
-          404,
-          "No custom health check found for this container",
-        );
-      return clone(hc);
-    },
+    "/api/events",
+    (state, { params }) =>
+      state.events
+        .filter((e) => !params.event_type || e.event_type === params.event_type)
+        .filter(
+          (e) =>
+            !params.container || e.container_name.includes(params.container),
+        )
+        .slice(-(params.limit ?? 100)),
   ],
   [
     "delete",
-    /^\/api\/healthchecks\/([^/]+)$/,
-    (engine, { match }) => {
-      const info = engine.info(requireContainer(engine, match[1]));
-      const key = engine.customHealthChecks[info.stable_id]
-        ? info.stable_id
-        : info.full_id;
-      delete engine.customHealthChecks[key];
-      return {
-        status: "success",
-        message: `Health check removed for container ${decodeURIComponent(match[1])}`,
-      };
-    },
-  ],
-
-  [
-    "get",
-    /^\/api\/events$/,
-    (engine, { params }) => {
-      const limit = params.limit === undefined ? 100 : Number(params.limit);
-      if (!Number.isInteger(limit) || limit < 1) {
-        throw new ApiError(422, [
-          {
-            type: "greater_than_equal",
-            loc: ["query", "limit"],
-            msg: "Input should be greater than or equal to 1",
-          },
-        ]);
-      }
-      let events = engine.events;
-      if (params.event_type != null) {
-        events = events.filter((e) => e.event_type === params.event_type);
-      }
-      if (params.container != null) {
-        const needle = String(params.container).toLowerCase();
-        events = events.filter((e) =>
-          e.container_name.toLowerCase().includes(needle),
-        );
-      }
-      return clone(events.slice(-limit));
-    },
-  ],
-  [
-    "delete",
-    /^\/api\/events$/,
-    (engine) => {
-      engine.events = [];
+    "/api/events",
+    (state) => {
+      state.events = [];
       return { status: "success", message: "All events cleared" };
     },
   ],
-
   [
     "get",
-    /^\/api\/notifications\/config$/,
-    (engine) => notificationsView(engine.config),
+    "/api/notifications/config",
+    (state) => clone(state.config.notifications),
   ],
   [
     "put",
-    /^\/api\/notifications\/config$/,
-    (engine, { body }) => {
-      requireObjectBody(body);
-      // NotificationsConfig.model_validate of the merged section
-      const updates = {};
-      for (const key of ["enabled", "event_filters", "services"]) {
-        if (Object.hasOwn(body, key)) updates[key] = body[key];
-      }
-      const errors = [];
-      const notifications = validateModel(
-        "NotificationsConfig",
-        { ...engine.config.notifications, ...updates },
-        [],
-        errors,
-      );
-      raiseInvalidInput(errors);
-      engine.config.notifications = notifications;
-      return {
-        status: "success",
-        message: "Notification configuration updated",
-        config: notificationsView(engine.config),
-      };
+    "/api/notifications/config",
+    (state, { body }) => {
+      Object.assign(state.config.notifications, body);
+      return { status: "success", config: clone(state.config.notifications) };
     },
   ],
   [
     "post",
-    /^\/api\/notifications\/services$/,
-    (engine, { body }) => {
-      requireObjectBody(body);
-      const errors = [];
-      const service = validateNotificationService(body, [], errors);
-      raiseInvalidInput(errors);
-      if (
-        engine.config.notifications.services.some(
-          (s) => s.name === service.name,
-        )
-      ) {
-        throw new ApiError(
-          400,
-          `Service with name '${service.name}' already exists`,
-        );
-      }
-      engine.config.notifications.services.push(service);
-      return {
-        status: "success",
-        message: `Notification service '${service.name}' added`,
-        service,
-      };
+    "/api/notifications/services",
+    (state, { body }) => {
+      state.config.notifications.services.push(body);
+      return { status: "success", service: body };
     },
   ],
   [
     "put",
-    /^\/api\/notifications\/services\/([^/]+)$/,
-    (engine, { match, body }) => {
-      requireObjectBody(body);
-      const name = decodeURIComponent(match[1]);
-      const index = findService(engine, match[1]);
-      if (index === -1) throw new ApiError(404, `Service '${name}' not found`);
-      // The name is kept when the body doesn't set one.
-      const errors = [];
-      const service = validateNotificationService(
-        { name, ...body },
-        [],
-        errors,
-      );
-      raiseInvalidInput(errors);
-      engine.config.notifications.services[index] = service;
-      return {
-        status: "success",
-        message: `Notification service '${name}' updated`,
-        service,
-      };
+    "/api/notifications/services/:id",
+    (state, { id, body }) => {
+      const services = state.config.notifications.services;
+      const index = services.findIndex((s) => s.name === id);
+      services[index] = { ...services[index], ...body };
+      return { status: "success", service: services[index] };
     },
   ],
   [
     "delete",
-    /^\/api\/notifications\/services\/([^/]+)$/,
-    (engine, { match }) => {
-      const name = decodeURIComponent(match[1]);
-      const index = findService(engine, match[1]);
-      if (index === -1) throw new ApiError(404, `Service '${name}' not found`);
-      engine.config.notifications.services.splice(index, 1);
-      return {
-        status: "success",
-        message: `Notification service '${name}' deleted`,
-      };
+    "/api/notifications/services/:id",
+    (state, { id }) => {
+      const notifications = state.config.notifications;
+      notifications.services = notifications.services.filter(
+        (s) => s.name !== id,
+      );
+      return { status: "success" };
     },
   ],
   [
     "post",
-    /^\/api\/notifications\/test$/,
-    (engine, { body }) => {
-      if (!isObject(body))
-        throw new ApiError(422, "Request body must be a JSON object");
-      // This route reports field locations and messages only, as a list.
-      const errors = [];
-      validateNotificationService(body, [], errors);
-      if (errors.length) {
-        throw new ApiError(
-          422,
-          errors.map(({ loc, msg }) => ({ loc, msg })),
-        );
-      }
-      return { status: "success", message: DEMO_TEST_MESSAGE };
-    },
+    "/api/notifications/test",
+    () => ({ status: "success", message: DEMO_MESSAGE }),
   ],
   [
     "post",
-    /^\/api\/notifications\/test\/([^/]+)$/,
-    (engine, { match }) => {
-      const name = decodeURIComponent(match[1]);
-      const index = findService(engine, match[1]);
-      if (index === -1) throw new ApiError(400, `Service '${name}' not found`);
-      if (!engine.config.notifications.services[index].enabled) {
-        throw new ApiError(400, `Service '${name}' is disabled`);
-      }
-      return { status: "success", message: DEMO_TEST_MESSAGE };
-    },
+    "/api/notifications/test/:id",
+    () => ({ status: "success", message: DEMO_MESSAGE }),
   ],
-
-  // Uptime Kuma needs a real server, so the demo can only show the settings.
   [
     "post",
-    /^\/api\/uptime-kuma\/test-connection$/,
+    "/api/uptime-kuma/test-connection",
     () => ({
       success: false,
-      message: "Connection error: Uptime Kuma isn't available in the demo",
+      message: "Uptime Kuma isn't available in the demo",
     }),
   ],
   [
     "post",
-    /^\/api\/uptime-kuma\/enable$/,
-    (engine, { body }) => {
-      requireObjectBody(body);
-      const ok = (v) => typeof v === "string" && v.trim();
-      if (!ok(body.server_url) || !ok(body.api_token)) {
-        throw new ApiError(400, "server_url and api_token are required");
-      }
-      // UptimeKumaConfig(...) of the supplied fields, before any connection
-      const stripped = (v) => (typeof v === "string" ? v.trim() : v);
-      const errors = [];
-      validateModel(
-        "UptimeKumaConfig",
-        {
-          server_url: body.server_url.trim(),
-          api_token: body.api_token.trim(),
-          username: stripped(
-            Object.hasOwn(body, "username") ? body.username : "",
-          ),
-          auto_restart_on_down: Object.hasOwn(body, "auto_restart_on_down")
-            ? body.auto_restart_on_down
-            : true,
-        },
-        [],
-        errors,
-      );
-      raiseInvalidInput(errors);
-      // The real route now contacts the server; with none to reach, the
-      // client error ends in the generic 500.
-      throw new ApiError(500, INTERNAL_ERROR_DETAIL);
+    "/api/uptime-kuma/enable",
+    () => {
+      throw new ApiError(400, "Uptime Kuma isn't available in the demo");
     },
   ],
-  [
-    "get",
-    /^\/api\/uptime-kuma\/monitors$/,
-    (engine) => {
-      if (!engine.config.uptime_kuma.enabled) {
-        throw new ApiError(400, "Uptime-Kuma integration not enabled");
-      }
-      return { monitors: [] };
-    },
-  ],
-  [
-    "get",
-    /^\/api\/uptime-kuma\/mappings$/,
-    (engine) => ({
-      mappings: clone(engine.config.uptime_kuma_mappings),
-    }),
-  ],
-  [
-    "post",
-    /^\/api\/uptime-kuma\/mappings$/,
-    (engine, { body }) => {
-      requireObjectBody(body);
-      const filled = (v) => typeof v === "string" && v.trim();
-      if (!filled(body.container_id) || !filled(body.monitor_friendly_name)) {
-        throw new ApiError(
-          400,
-          "container_id and monitor_friendly_name are required",
-        );
-      }
-      const container = engine.findContainer(body.container_id);
-      if (!container) throw new ApiError(404, "Container not found");
-      const mapping = {
-        container_id: engine.info(container).stable_id,
-        monitor_friendly_name: body.monitor_friendly_name,
-        auto_mapped: false,
-      };
-      engine.config.uptime_kuma_mappings.push(mapping);
-      return { success: true, mapping };
-    },
-  ],
-  [
-    "delete",
-    /^\/api\/uptime-kuma\/mappings\/([^/]+)$/,
-    (engine, { match }) => {
-      const id = decodeURIComponent(match[1]);
-      engine.config.uptime_kuma_mappings =
-        engine.config.uptime_kuma_mappings.filter((m) => m.container_id !== id);
-      return { success: true };
-    },
-  ],
-  [
-    "post",
-    /^\/api\/uptime-kuma\/disable$/,
-    (engine) => {
-      engine.config.uptime_kuma.enabled = false;
-      return { success: true };
-    },
-  ],
-];
+  ["get", "/api/uptime-kuma/monitors", () => ({ monitors: [] })],
+  ["get", "/api/uptime-kuma/mappings", () => ({ mappings: [] })],
+  ["post", "/api/uptime-kuma/disable", () => ({ success: true })],
+].map(([method, path, handler]) => [
+  method,
+  new RegExp(
+    `^${path
+      .replace(":id", "([^/]+)")
+      .replace(":section", "(monitor|restart|observability)")}$`,
+  ),
+  handler,
+]);
 
-/** "a/b//" -> "a/b": a loop rather than /\/+$/, which backtracks. */
-export function trimTrailingSlashes(text) {
-  let end = text.length;
-  while (end > 0 && text[end - 1] === "/") end--;
-  return text.slice(0, end);
-}
-
-function requestPath(config) {
-  let url = config.url ?? "";
-  if (!/^[a-z]+:\/\//i.test(url) && config.baseURL) {
-    url = `${trimTrailingSlashes(config.baseURL)}/${url.replace(/^\/+/, "")}`;
-  }
-  // Absolute URLs (or a VITE_API_URL with a host) keep only their path.
-  url = url.replace(/^[a-z]+:\/\/[^/]+/i, "");
-  const [path, query = ""] = url.split("?");
-  return { path: trimTrailingSlashes(path) || "/", query };
-}
-
-function parseBody(data) {
-  if (typeof data !== "string") return data;
-  try {
-    return JSON.parse(data);
-  } catch {
-    return data;
-  }
-}
-
-/** Run one request against the engine: resolves to {status, data}. */
-export async function handleRequest(engine, config) {
+/** Answer one request from the demo state: resolves to {status, data}. */
+export async function handleRequest(state, config) {
+  const base = (config.baseURL ?? "").replace(/\/$/, "");
+  const [path, query = ""] = `${base}/${config.url.replace(/^\//, "")}`.split(
+    "?",
+  );
   const method = (config.method ?? "get").toLowerCase();
-  const { path, query } = requestPath(config);
+  const route = routes.find(
+    ([m, pattern]) => m === method && pattern.test(path),
+  );
+  if (!route) return { status: 404, data: { detail: "Not Found" } };
   const params = {
     ...Object.fromEntries(new URLSearchParams(query)),
-    ...(config.params ?? {}),
+    ...config.params,
   };
-  const candidates = routes.filter(([, pattern]) => pattern.test(path));
-  if (candidates.length === 0)
-    return { status: 404, data: { detail: "Not Found" } };
-  const route = candidates.find(([m]) => m === method);
-  if (!route) return { status: 405, data: { detail: "Method Not Allowed" } };
+  const body =
+    typeof config.data === "string" ? JSON.parse(config.data) : config.data;
+  const id = decodeURIComponent(path.match(route[1])[1] ?? "");
   try {
-    const data = await route[2](engine, {
-      match: path.match(route[1]),
-      params,
-      body: parseBody(config.data),
-      rawData: config.data,
-    });
-    return { status: 200, data };
+    return { status: 200, data: await route[2](state, { id, params, body }) };
   } catch (error) {
     if (error instanceof ApiError) {
       return { status: error.status, data: { detail: error.detail } };
     }
-    // An unexpected error: the generic 500 (unhandled_exception_handler).
-    console.error("Demo mock API error:", error);
-    return { status: 500, data: { detail: INTERNAL_ERROR_DETAIL } };
+    throw error;
   }
 }
 
-const STATUS_TEXT = {
-  200: "OK",
-  400: "Bad Request",
-  404: "Not Found",
-  405: "Method Not Allowed",
-  422: "Unprocessable Entity",
-  500: "Internal Server Error",
-};
-
-/** An axios adapter that answers every request from the demo engine. */
-export function createMockAdapter(engine) {
+/** An axios adapter that answers every request from the demo state. */
+export function createMockAdapter(state) {
   return async function demoAdapter(config) {
-    const { status, data } = await handleRequest(engine, config);
-    engine._emit();
+    const { status, data } = await handleRequest(state, config);
     const response = {
       data,
       status,
-      statusText: STATUS_TEXT[status],
-      headers: { "content-type": "application/json" },
+      statusText: "",
+      headers: {},
       config,
       request: {},
     };
-    const validateStatus =
-      config.validateStatus ?? ((s) => s >= 200 && s < 300);
-    if (validateStatus(status)) return response;
+    if (status < 400) return response;
     throw new AxiosError(
       `Request failed with status code ${status}`,
-      status >= 500 ? AxiosError.ERR_BAD_RESPONSE : AxiosError.ERR_BAD_REQUEST,
+      AxiosError.ERR_BAD_REQUEST,
       config,
       response.request,
       response,

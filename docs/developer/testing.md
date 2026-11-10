@@ -400,9 +400,8 @@ form and by title (`dialogTitled`).
 
 `frontend/e2e-demo/demo.spec.js` checks the built [browser demo](demo.md): every page
 works against the in-browser mock API with no console errors or off-site requests, a
-deep link loads under the `/docker-autoheal/` sub-path, there is no service worker or
-manifest, and a crashed container gets restarted. It needs no Docker and takes about
-15 seconds. It serves an existing build, so build first:
+deep link loads under the `/docker-autoheal/` sub-path, and there is no service worker
+or manifest. It needs no Docker and takes a few seconds. It serves an existing build, so build first:
 
 ```bash
 cd frontend
@@ -412,12 +411,6 @@ npm run test:demo-e2e
 
 CI runs it in the `frontend-tests` job of `tests.yml`, and `demo-pages.yml` runs it on
 the files it is about to deploy.
-
-The demo's behaviour is also checked against the real backend:
-`app/tests/unit/test_demo_contract.py` (in the unit suite) and
-`frontend/src/demo/contract.test.js` (in `npm test`) compare its routes, validation and
-restart decisions with the backend's answers. See
-[Keeping it accurate](demo.md#keeping-it-accurate).
 
 ## CI
 

@@ -15,7 +15,7 @@ unhealthy, so you don't have to. It runs as a single container with a web dashbo
 REST API, and Prometheus metrics.
 
 **[Try the interactive demo](https://tommye123.github.io/docker-autoheal/)**: the real web
-UI against a simulated Docker host, in your browser. No install, nothing to sign up for.
+UI with sample data, in your browser. No install, nothing to sign up for.
 
 ## Why use it
 

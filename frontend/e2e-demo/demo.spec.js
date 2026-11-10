@@ -1,9 +1,7 @@
 import { test, expect } from "@playwright/test";
 
-// The built demo: the real UI against the in-browser mock API. Unit tests cover
-// the simulation and the mock; this checks they work together in a real build
-// under the Pages sub-path. A UI call the mock doesn't answer shows up here as
-// a console error.
+// The built demo: the real UI against the in-browser mock API, under the Pages
+// sub-path. A UI call the mock doesn't answer shows up here as a console error.
 
 // The optional Cloudflare Web Analytics beacon: its script host and the host
 // it reports to. Stubbed below so the test never depends on Cloudflare.
@@ -45,11 +43,9 @@ test("every page works against the mock, with the banner and no service worker",
   await page.goto("./");
   await expect(page).toHaveURL(/\/docker-autoheal\/containers$/);
   await expect(
-    page.getByText("Simulated demo: no real containers."),
+    page.getByText("Demo with sample data: no real containers."),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Restart shop-web-1" }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Restart web" })).toBeVisible();
 
   // Headings, like nav links, can start with an icon glyph.
   for (const [link, path, heading] of [
@@ -79,23 +75,6 @@ test("a deep link loads the app", async ({ page }) => {
   await page.goto("./events");
   await expect(page.getByRole("heading", { name: /Event Log$/ })).toBeVisible();
   await expect(
-    page.getByText("Simulated demo: no real containers."),
-  ).toBeVisible();
-});
-
-test("Autoheal restarts a crashed container", async ({ page }) => {
-  await page.goto("./containers");
-  const controls = page.locator("#demo-controls tr", { hasText: "shop-db-1" });
-  await controls.getByRole("button", { name: "Crash", exact: true }).click();
-  await expect(controls.getByText("stopped")).toBeVisible();
-
-  // Next 5s check schedules a 5s backoff wait, then the restart.
-  await expect(controls.getByText("running")).toBeVisible({ timeout: 20000 });
-  await navLink(page, "Events").click();
-  await expect(
-    page.getByText("Restart successful: Container exited with code 1").first(),
-  ).toBeVisible();
-  await expect(
-    page.getByText("shop-db-1 (compose:shop:db#1)").first(),
+    page.getByText("Demo with sample data: no real containers."),
   ).toBeVisible();
 });
