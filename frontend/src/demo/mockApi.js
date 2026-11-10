@@ -456,6 +456,13 @@ const CHECK_TYPE_FIELDS = {
 function laxInt(value) {
   if (typeof value === "boolean") return { value: value ? 1 : 0 };
   if (typeof value === "number" && Number.isFinite(value)) {
+    // Beyond int64 (a JS number can't tell a big integer from a float here).
+    if (Math.abs(value) >= 2 ** 63) {
+      return {
+        type: "int_parsing_size",
+        msg: "Unable to parse input string as an integer, exceeded maximum size",
+      };
+    }
     if (Number.isInteger(value)) return { value };
     return {
       type: "int_from_float",
@@ -463,8 +470,9 @@ function laxInt(value) {
     };
   }
   if (typeof value === "string") {
-    if (/^\s*[+-]?\d+\s*$/.test(value)) {
-      return { value: Number.parseInt(value, 10) };
+    // Digits with single underscores between them, optionally ".0..."
+    if (/^\s*[+-]?\d+(?:_\d+)*(?:\.0+)?\s*$/.test(value)) {
+      return { value: Number.parseInt(value.replaceAll("_", ""), 10) };
     }
     return {
       type: "int_parsing",
@@ -494,7 +502,8 @@ const HEALTH_CHECK_FIELDS = {
  * Unknown keys are dropped. Errors are FastAPI's 422 list, under "body".
  */
 function validateHealthCheck(body) {
-  const data = isObject(body) ? body : {};
+  // Callers have already checked that `body` is an object.
+  const data = body;
   const hc = {};
   const errors = [];
   const push = (field, type, msg) =>
@@ -894,7 +903,10 @@ const routes = [
       if (!isObject(data)) {
         throw new ApiError(422, "Configuration must be a JSON object");
       }
-      const customChecks = data.custom_health_checks ?? {};
+      // A present but null value is rejected too, as config_dict.pop() returns None.
+      const customChecks = Object.hasOwn(data, "custom_health_checks")
+        ? data.custom_health_checks
+        : {};
       if (
         !isObject(customChecks) ||
         !Object.values(customChecks).every(isObject)
@@ -934,6 +946,21 @@ const routes = [
     "post",
     /^\/api\/healthchecks$/,
     (engine, { body }) => {
+      // FastAPI's errors for a missing or non-object HealthCheckConfig body
+      if (body === undefined) {
+        throw new ApiError(422, [
+          { type: "missing", loc: ["body"], msg: "Field required" },
+        ]);
+      }
+      if (!isObject(body)) {
+        throw new ApiError(422, [
+          {
+            type: "model_attributes_type",
+            loc: ["body"],
+            msg: "Input should be a valid dictionary or object to extract fields from",
+          },
+        ]);
+      }
       const hc = validateHealthCheck(body);
       const info = engine.info(requireContainer(engine, hc.container_id));
       hc.container_id = info.stable_id;

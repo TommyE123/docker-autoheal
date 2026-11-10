@@ -1211,11 +1211,94 @@ describe("edge cases", () => {
         "c.json",
       ),
     );
+    // Existing state that a failed import must leave untouched
+    engine.customHealthChecks.keep = { check_type: "docker" };
+    engine.config.monitor.label_key = "before";
     const e = await error(api.post("/config/import", form));
     expect(e.response.status).toBe(422);
     expect(e.response.data).toEqual({
       detail: "retries: Input should be greater than or equal to 1",
     });
-    expect(engine.customHealthChecks).toEqual({});
+    expect(engine.customHealthChecks).toEqual({
+      keep: { check_type: "docker" },
+    });
+    expect(engine.config.monitor.label_key).toBe("before");
+  });
+
+  // Expected values recorded from the real model and FastAPI.
+  it("matches Pydantic's int edge cases and FastAPI's body errors", async () => {
+    const stored = async (value) => {
+      await api.post("/healthchecks", {
+        container_id: "shop-web-1",
+        check_type: "docker",
+        retries: value,
+      });
+      return engine.customHealthChecks.shop_web.retries;
+    };
+    expect(await stored("5.0")).toBe(5);
+    expect(await stored(" +7.00 ")).toBe(7);
+    expect(await stored("1_0")).toBe(10);
+
+    const detail = async (body) =>
+      (await error(api.post("/healthchecks", body))).response.data.detail;
+    expect(
+      await detail({
+        container_id: "x",
+        check_type: "docker",
+        retries: "-5.0",
+      }),
+    ).toEqual([
+      {
+        type: "greater_than_equal",
+        loc: ["body", "retries"],
+        msg: "Input should be greater than or equal to 1",
+      },
+    ]);
+    for (const bad of ["5.", "1__0", "_1", "5.5"]) {
+      expect(
+        (
+          await detail({
+            container_id: "x",
+            check_type: "docker",
+            retries: bad,
+          })
+        )[0].type,
+      ).toBe("int_parsing");
+    }
+    const tooBig = {
+      type: "int_parsing_size",
+      msg: "Unable to parse input string as an integer, exceeded maximum size",
+    };
+    expect(
+      await detail({ container_id: "x", check_type: "docker", retries: 1e20 }),
+    ).toEqual([{ ...tooBig, loc: ["body", "retries"] }]);
+    expect(
+      await detail({ container_id: "x", check_type: "tcp", tcp_port: -9.3e18 }),
+    ).toEqual([{ ...tooBig, loc: ["body", "tcp_port"] }]);
+
+    expect(await detail([1])).toEqual([
+      {
+        type: "model_attributes_type",
+        loc: ["body"],
+        msg: "Input should be a valid dictionary or object to extract fields from",
+      },
+    ]);
+    expect(await detail(undefined)).toEqual([
+      { type: "missing", loc: ["body"], msg: "Field required" },
+    ]);
+  });
+
+  it("rejects a null custom_health_checks in an import", async () => {
+    const form = new FormData();
+    form.append(
+      "file",
+      new File([JSON.stringify({ custom_health_checks: null })], "c.json"),
+    );
+    expect(
+      (await error(api.post("/config/import", form))).response.data,
+    ).toEqual({
+      detail:
+        "custom_health_checks must be an object whose values are health check objects",
+    });
   });
 });
