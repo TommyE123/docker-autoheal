@@ -47,14 +47,20 @@ the backend. `app/tests/unit/test_demo_contract.py` computes the real backend's 
 and compares them with a stored copy in `frontend/src/demo/contract/`; `contract.test.js`
 checks the demo against the same stored answers:
 
-| File              | Holds                                                                                                                    | The demo must                                                    |
-|-------------------|--------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------|
-| `api.json`        | Every `/health` and `/api/*` route and method, and the `ContainerInfo` and `SystemStatus` fields                         | answer every route and return every field                        |
-| `schemas.json`    | The configuration models' JSON Schemas                                                                                   | (used directly: `schema.js` validates request data against them) |
-| `validation.json` | Inputs for `AutoHealConfig`, `HealthCheckConfig` and `NotificationService`, with the real models' values or errors       | give the same value, or the same errors in the same order        |
-| `scenarios.json`  | Timelines of container states, with the real monitoring engine's restarts, events and quarantine decisions at each check | make the same decisions                                          |
+| File                | Holds                                                                                                                    | The demo must                                                    |
+|---------------------|--------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------|
+| `api-contract.json` | Every `/health` and `/api/*` route and method, and the `ContainerInfo` and `SystemStatus` fields                         | answer every route and return every field                        |
+| `schemas.json`      | The configuration models' JSON Schemas                                                                                   | (used directly: `schema.js` validates request data against them) |
+| `validation.json`   | Inputs for `AutoHealConfig`, `HealthCheckConfig` and `NotificationService`, with the real models' values or errors       | give the same value, or the same errors in the same order        |
+| `scenarios.json`    | Timelines of container states, with the real monitoring engine's restarts, events and quarantine decisions at each check | make the same decisions                                          |
 
-So a backend change that the demo doesn't copy fails CI. To bring the demo up to date:
+So a backend change that the stored cases cover fails CI until the demo copies it. The
+cases cover every route and response field, the configuration models' schemas (an
+unfamiliar schema keyword such as an `enum` fails `schema.test.js` until `schema.js`
+supports it), the validation inputs in `validation.json`, and the restart timelines in
+`scenarios.json`, including how containers are identified. Behaviour no case exercises,
+such as custom health checks, maintenance mode or filters in the engine, isn't compared:
+add a case when you change it. To bring the demo up to date:
 
 1. Refresh the stored answers, then format them:
 

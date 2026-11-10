@@ -81,7 +81,7 @@ def test_api_contract():
         name: list(schema["components"]["schemas"][name]["properties"])
         for name in ("ContainerInfo", "SystemStatus")
     }
-    _check("api.json", {"routes": routes, "models": models})
+    _check("api-contract.json", {"routes": routes, "models": models})
 
 
 def test_schema_contract():
@@ -146,9 +146,11 @@ def _iso(seconds: float) -> str:
     return datetime.fromtimestamp(T0 + seconds, UTC).isoformat().replace("+00:00", "Z")
 
 
-def _info(labels: dict, step: dict) -> dict:
+def _info(engine: MonitoringEngine, labels: dict, step: dict) -> dict:
     """The container info dict for one observed state (see the demo's info())."""
-    stable_id = "worker"
+    # The real identity functions, so a change in how these keys are derived
+    # changes the stored quarantine_key too.
+    stable_id = engine.get_stable_identifier({"labels": labels, "name": "worker"})
     health = {"status": step["health"]} if step["health"] else None
     return {
         "id": CONTAINER_ID[:12],
@@ -185,7 +187,7 @@ async def _run_scenario(scenario: dict, monkeypatch) -> list[dict]:
     results = []
     for step in scenario["steps"]:
         now[0] = T0 + step["at"]
-        info = _info(scenario["labels"], step)
+        info = _info(engine, scenario["labels"], step)
         container.status = step["status"]
         docker._info[CONTAINER_ID] = info
         docker.restart_calls.clear()
@@ -204,13 +206,14 @@ async def _run_scenario(scenario: dict, monkeypatch) -> list[dict]:
                     for event in config_manager.get_events()[seen:]
                 ],
                 "quarantined": config_manager.is_quarantined(info["recovery_id"]),
+                "quarantine_key": info["recovery_id"],
             }
         )
     return results
 
 
 @pytest.mark.asyncio
-async def test_scenario_contract(monkeypatch):
+async def test_scenario_contract(monkeypatch, caplog):
     """Decisions of the real engine for the stored timelines (the demo engine must agree)."""
     scenarios = _load("scenarios.json")["scenarios"]
     actual = []
@@ -220,7 +223,12 @@ async def test_scenario_contract(monkeypatch):
         config_manager._config = AutoHealConfig()
         config_manager._event_log = []
         config_manager._quarantined_containers = set()
+        caplog.clear()
         expected = await _run_scenario(scenario, monkeypatch)
+        # The engine logs and swallows errors per container. One here means the
+        # harness no longer fits the engine, not that the engine did nothing.
+        errors = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
+        assert not errors, f"{scenario['name']}: {errors}"
         actual.append(
             {**{k: v for k, v in scenario.items() if k != "expected"}, "expected": expected}
         )

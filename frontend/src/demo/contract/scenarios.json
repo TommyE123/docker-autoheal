@@ -166,7 +166,8 @@
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": true,
@@ -178,22 +179,26 @@
               "message": "Restart successful: Container exited with code 1"
             }
           ],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": true,
@@ -205,32 +210,38 @@
               "message": "Restart successful: Container exited with code 1"
             }
           ],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": true,
@@ -242,12 +253,14 @@
               "message": "Restart successful: Container exited with code 1"
             }
           ],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
@@ -259,27 +272,32 @@
               "message": "Container quarantined: exceeded 3 restarts in 300s window"
             }
           ],
-          "quarantined": true
+          "quarantined": true,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": true
+          "quarantined": true,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": true
+          "quarantined": true,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": true
+          "quarantined": true,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": true
+          "quarantined": true,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
@@ -291,12 +309,14 @@
               "message": "Container automatically removed from quarantine - auto-healed and now healthy"
             }
           ],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         }
       ]
     },
@@ -480,7 +500,8 @@
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": true,
@@ -492,22 +513,26 @@
               "message": "Restart successful: Container exited with code 1"
             }
           ],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": true,
@@ -519,32 +544,38 @@
               "message": "Restart successful: Container exited with code 1"
             }
           ],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": true,
@@ -556,12 +587,14 @@
               "message": "Restart successful: Container exited with code 1"
             }
           ],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
@@ -573,42 +606,50 @@
               "message": "Container quarantined: exceeded 3 restarts in 300s window"
             }
           ],
-          "quarantined": true
+          "quarantined": true,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": true
+          "quarantined": true,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": true
+          "quarantined": true,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": true
+          "quarantined": true,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": true
+          "quarantined": true,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": true
+          "quarantined": true,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": true
+          "quarantined": true,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": true
+          "quarantined": true,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
@@ -620,7 +661,8 @@
               "message": "Container automatically removed from quarantine - auto-healed and now healthy"
             }
           ],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         }
       ]
     },
@@ -713,7 +755,8 @@
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": true,
@@ -725,32 +768,38 @@
               "message": "Restart successful: Docker health check reports unhealthy"
             }
           ],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": true,
@@ -762,12 +811,14 @@
               "message": "Restart successful: Docker health check reports unhealthy"
             }
           ],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         }
       ]
     },
@@ -839,27 +890,32 @@
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": true,
@@ -871,7 +927,8 @@
               "message": "Restart successful: Container exited with code 2"
             }
           ],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         }
       ]
     },
@@ -936,22 +993,26 @@
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": true,
@@ -963,7 +1024,8 @@
               "message": "Restart successful: Docker health check reports unhealthy"
             }
           ],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         }
       ]
     },
@@ -1007,12 +1069,14 @@
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         }
       ]
     },
@@ -1057,7 +1121,8 @@
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": true,
@@ -1069,7 +1134,8 @@
               "message": "Restart successful: Container stopped (exit 0)"
             }
           ],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         }
       ]
     },
@@ -1147,12 +1213,14 @@
               "message": "Restart successful: Container exited with code 1"
             }
           ],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": true,
@@ -1164,12 +1232,14 @@
               "message": "Restart successful: Container exited with code 1"
             }
           ],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": true,
@@ -1181,12 +1251,14 @@
               "message": "Restart successful: Container exited with code 1"
             }
           ],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         }
       ]
     },
@@ -1242,22 +1314,26 @@
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         }
       ]
     },
@@ -1307,7 +1383,8 @@
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": true,
@@ -1319,12 +1396,337 @@
               "message": "Restart successful: Container exited with code 1"
             }
           ],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
         },
         {
           "restarted": false,
           "events": [],
-          "quarantined": false
+          "quarantined": false,
+          "quarantine_key": "worker"
+        }
+      ]
+    },
+    {
+      "name": "compose replica: restarts and quarantine keyed per replica",
+      "config": {
+        "monitor": {
+          "interval_seconds": 5
+        },
+        "restart": {
+          "mode": "both",
+          "cooldown_seconds": 10,
+          "max_restarts": 3,
+          "max_restarts_window_seconds": 300,
+          "backoff": {
+            "initial_seconds": 5,
+            "max_seconds": 60
+          }
+        }
+      },
+      "labels": {
+        "autoheal": "true",
+        "com.docker.compose.project": "shop",
+        "com.docker.compose.service": "worker",
+        "com.docker.compose.container-number": "2"
+      },
+      "steps": [
+        {
+          "at": 0,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 5,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 10,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 15,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 20,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 25,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 30,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 35,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 40,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 45,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 50,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 55,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 60,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 65,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 70,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        }
+      ],
+      "expected": [
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false,
+          "quarantine_key": "compose:shop:worker#2"
+        },
+        {
+          "restarted": true,
+          "events": [
+            {
+              "event_type": "restart",
+              "restart_count": 1,
+              "status": "success",
+              "message": "Restart successful: Container exited with code 1"
+            }
+          ],
+          "quarantined": false,
+          "quarantine_key": "compose:shop:worker#2"
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false,
+          "quarantine_key": "compose:shop:worker#2"
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false,
+          "quarantine_key": "compose:shop:worker#2"
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false,
+          "quarantine_key": "compose:shop:worker#2"
+        },
+        {
+          "restarted": true,
+          "events": [
+            {
+              "event_type": "restart",
+              "restart_count": 2,
+              "status": "success",
+              "message": "Restart successful: Container exited with code 1"
+            }
+          ],
+          "quarantined": false,
+          "quarantine_key": "compose:shop:worker#2"
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false,
+          "quarantine_key": "compose:shop:worker#2"
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false,
+          "quarantine_key": "compose:shop:worker#2"
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false,
+          "quarantine_key": "compose:shop:worker#2"
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false,
+          "quarantine_key": "compose:shop:worker#2"
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false,
+          "quarantine_key": "compose:shop:worker#2"
+        },
+        {
+          "restarted": true,
+          "events": [
+            {
+              "event_type": "restart",
+              "restart_count": 3,
+              "status": "success",
+              "message": "Restart successful: Container exited with code 1"
+            }
+          ],
+          "quarantined": false,
+          "quarantine_key": "compose:shop:worker#2"
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false,
+          "quarantine_key": "compose:shop:worker#2"
+        },
+        {
+          "restarted": false,
+          "events": [
+            {
+              "event_type": "quarantine",
+              "restart_count": 3,
+              "status": "quarantined",
+              "message": "Container quarantined: exceeded 3 restarts in 300s window"
+            }
+          ],
+          "quarantined": true,
+          "quarantine_key": "compose:shop:worker#2"
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": true,
+          "quarantine_key": "compose:shop:worker#2"
+        }
+      ]
+    },
+    {
+      "name": "monitoring.id label keys recovery under the explicit id",
+      "config": {
+        "monitor": {
+          "interval_seconds": 5
+        },
+        "restart": {
+          "mode": "both",
+          "cooldown_seconds": 10,
+          "max_restarts": 3,
+          "max_restarts_window_seconds": 300,
+          "backoff": {
+            "initial_seconds": 5,
+            "max_seconds": 60
+          }
+        }
+      },
+      "labels": {
+        "autoheal": "true",
+        "monitoring.id": "jobs"
+      },
+      "steps": [
+        {
+          "at": 0,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 5,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        },
+        {
+          "at": 10,
+          "status": "exited",
+          "exit_code": 1,
+          "health": null,
+          "started_at": -3600
+        }
+      ],
+      "expected": [
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false,
+          "quarantine_key": "monitoring.id:jobs"
+        },
+        {
+          "restarted": true,
+          "events": [
+            {
+              "event_type": "restart",
+              "restart_count": 1,
+              "status": "success",
+              "message": "Restart successful: Container exited with code 1"
+            }
+          ],
+          "quarantined": false,
+          "quarantine_key": "monitoring.id:jobs"
+        },
+        {
+          "restarted": false,
+          "events": [],
+          "quarantined": false,
+          "quarantine_key": "monitoring.id:jobs"
         }
       ]
     }

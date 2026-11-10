@@ -85,7 +85,9 @@ function raiseIfInvalid(errors) {
 function validateBody(name, body) {
   requireModelBody(body);
   const errors = [];
-  const value = validateModel(name, body, ["body"], errors);
+  const value = validateModel(name, body, ["body"], errors, {
+    fastapiBody: true,
+  });
   raiseIfInvalid(errors);
   return value;
 }

@@ -2,11 +2,11 @@
 // app/tests/unit/test_demo_contract.py (which fails when the backend changes
 // until they are refreshed). See docs/developer/demo.md.
 import { describe, it, expect } from "vitest";
-import apiContract from "./contract/api.json";
+import apiContract from "./contract/api-contract.json";
 import validationContract from "./contract/validation.json";
 import scenarioContract from "./contract/scenarios.json";
 import defaultConfig from "./default-config.json";
-import { DemoEngine } from "./engine.js";
+import { DemoEngine, recoveryIdentifier, stableIdentifier } from "./engine.js";
 import {
   ApiError,
   handleRequest,
@@ -112,6 +112,10 @@ function runScenario(scenario) {
   engine.config = deepMerge(clone(defaultConfig), scenario.config);
   const container = engine.containers[0];
   engine.containers = [container];
+  // The demo's own identity functions, as info() uses them, so a change in
+  // how the backend derives these keys is compared too.
+  const stableId = stableIdentifier(scenario.labels, "worker");
+  const recoveryId = recoveryIdentifier(stableId, scenario.labels);
   let step;
   let restarted;
   // Feed the observed state in directly instead of the simulated Docker host.
@@ -124,8 +128,8 @@ function runScenario(scenario) {
     id: CONTAINER_ID.slice(0, 12),
     full_id: CONTAINER_ID,
     name: "worker",
-    stable_id: "worker",
-    recovery_id: "worker",
+    stable_id: stableId,
+    recovery_id: recoveryId,
     status: step.status,
     state: {
       Status: step.status,
@@ -154,7 +158,8 @@ function runScenario(scenario) {
           status,
           message,
         })),
-      quarantined: engine.quarantined.has("worker"),
+      quarantined: engine.quarantined.has(recoveryId),
+      quarantine_key: recoveryId,
     };
   });
 }

@@ -34,6 +34,25 @@ function refName(ref) {
 
 const fail = (type, msg) => ({ error: { type, msg } });
 
+// The JSON Schema keywords this file implements. A refreshed schemas.json
+// using any other (enum, maxLength, pattern, ...) would be silently ignored,
+// so schema.test.js fails on one until it is implemented here.
+export const SUPPORTED_KEYWORDS = new Set([
+  "$defs",
+  "$ref",
+  "additionalProperties",
+  "anyOf",
+  "default",
+  "description",
+  "items",
+  "maximum",
+  "minimum",
+  "properties",
+  "required",
+  "title",
+  "type",
+]);
+
 /** Pydantic's lax int: booleans, whole floats and integer strings convert. */
 export function laxInt(value) {
   if (typeof value === "boolean") return { value: value ? 1 : 0 };
@@ -124,9 +143,9 @@ const SCALARS = {
 };
 
 /** Validate `value` against one property schema; push errors onto `errors`. */
-function validateValue(schema, value, loc, errors) {
+function validateValue(schema, value, loc, errors, options) {
   if (schema.$ref)
-    return validateModel(refName(schema.$ref), value, loc, errors);
+    return validateModel(refName(schema.$ref), value, loc, errors, options);
   if (schema.anyOf) {
     // Only Optional[X] is used: null, or the one other branch.
     if (value === null) return null;
@@ -135,6 +154,7 @@ function validateValue(schema, value, loc, errors) {
       value,
       loc,
       errors,
+      options,
     );
   }
   if (schema.type === "array") {
@@ -147,7 +167,7 @@ function validateValue(schema, value, loc, errors) {
       return undefined;
     }
     return value.map((item, index) =>
-      validateValue(schema.items, item, [...loc, index], errors),
+      validateValue(schema.items, item, [...loc, index], errors, options),
     );
   }
   if (schema.type === "object") {
@@ -166,6 +186,7 @@ function validateValue(schema, value, loc, errors) {
         item,
         [...loc, key],
         errors,
+        options,
       );
     }
     return result;
@@ -195,15 +216,25 @@ function validateValue(schema, value, loc, errors) {
  * Model.model_validate(value): every field in the model's order, unknown keys
  * dropped, missing ones defaulted (or "Field required"). Errors are pushed onto
  * `errors` with locations under `loc`; the result is only usable if none were.
+ * With `fastapiBody`, a nested model that isn't an object gets the message
+ * FastAPI's request-body validation gives instead of model_validate's.
  */
-export function validateModel(name, value, loc, errors) {
+export function validateModel(name, value, loc, errors, options = {}) {
   const model = DEFS[name];
   if (!isObject(value)) {
-    errors.push({
-      type: "model_type",
-      loc,
-      msg: `Input should be a valid dictionary or instance of ${model.title}`,
-    });
+    errors.push(
+      options.fastapiBody
+        ? {
+            type: "model_attributes_type",
+            loc,
+            msg: "Input should be a valid dictionary or object to extract fields from",
+          }
+        : {
+            type: "model_type",
+            loc,
+            msg: `Input should be a valid dictionary or instance of ${model.title}`,
+          },
+    );
     return undefined;
   }
   const required = new Set(model.required ?? []);
@@ -215,6 +246,7 @@ export function validateModel(name, value, loc, errors) {
         value[field],
         [...loc, field],
         errors,
+        options,
       );
     } else if (required.has(field)) {
       errors.push({
