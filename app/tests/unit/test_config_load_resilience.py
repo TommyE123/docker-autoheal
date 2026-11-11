@@ -138,6 +138,22 @@ def test_single_invalid_section_only_resets_that_section(isolated_config_manager
     assert "Resetting config section 'restart' to defaults" in caplog.text
 
 
+def test_invalid_restart_mode_resets_restart_section_without_logging_the_value(
+    isolated_config_manager, caplog
+):
+    payload = _valid_config_dict()
+    payload["restart"]["mode"] = "SECRET-MODE-123"
+    _write_config(isolated_config_manager, payload)
+
+    config = isolated_config_manager._load_config()
+
+    assert config.restart == AutoHealConfig().restart
+    assert config.restart.mode == "on-failure"
+    assert config.monitor.interval_seconds == 45
+    assert "Resetting config section 'restart' to defaults" in caplog.text
+    assert "SECRET-MODE-123" not in caplog.text
+
+
 def test_multiple_invalid_sections_are_each_reset_independently(isolated_config_manager, caplog):
     payload = _valid_config_dict()
     payload["restart"]["cooldown_seconds"] = "not-a-number"

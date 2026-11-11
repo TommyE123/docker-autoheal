@@ -52,11 +52,27 @@ async def update_monitor_config(monitor_config: MonitorConfig):
     return {"status": "success", "message": "Monitor configuration updated"}
 
 
-@router.put("/api/config/restart")
-async def update_restart_config(restart_config: RestartConfig):
+@router.put(
+    "/api/config/restart",
+    # The body is a dict (see below), so point the documented schema back at the model.
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/json": {"schema": {"$ref": "#/components/schemas/RestartConfig"}}
+            },
+        }
+    },
+    responses={422: {"description": "Not a valid restart configuration"}},
+)
+async def update_restart_config(restart_config: dict):
     """Update restart configuration"""
+    # Validated here, not as a typed body, so a rejected value (for example a mistyped
+    # mode) is not echoed back in FastAPI's own 422 detail.
+    with invalid_input_as_422():
+        validated = RestartConfig.model_validate(restart_config)
     config = config_manager.get_config()
-    config.restart = restart_config
+    config.restart = validated
     config_manager.update_config(config)
     return {"status": "success", "message": "Restart configuration updated"}
 
