@@ -166,7 +166,7 @@ The suite focuses on the monitoring engine and its restart/recovery behaviour:
 The frontend unit and component tests use Vitest and live beside the code as `*.test.*`
 files under `frontend/src/`. From `frontend/`, run them with `npm run test` (`npm run
 test:watch` and `npm run test:coverage` are also defined). `npm run lint` runs ESLint using
-`frontend/eslint.config.js` — see [Frontend Development](frontend.md#linting). The browser
+`frontend/eslint.config.js` — see [Frontend Development](frontend.md#linting-and-formatting). The browser
 tests are the separate Playwright suite described below.
 
 ## UI E2E suite (Playwright)

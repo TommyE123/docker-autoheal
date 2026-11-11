@@ -2,8 +2,9 @@
 
 ## Automated (this is how every release actually happens)
 
-Publishing happens only when a [Release Please](https://github.com/googleapis/release-please)
-release PR is merged - **not** on every ordinary merge to `main`.
+A versioned release is published only when a [Release Please](https://github.com/googleapis/release-please)
+release PR is merged - **not** on every ordinary merge to `main`. (Every merge does refresh the
+`beta` image; see step 5.)
 `.github/workflows/release-please.yml` ("Release Please") runs on every push to `main` and:
 
 1. Runs the `release-please` job. On an ordinary application PR merging to `main`, this only
@@ -20,10 +21,12 @@ release PR is merged - **not** on every ordinary merge to `main`.
    and `latest`. The version is never recalculated here - it comes directly from Release Please.
 4. Updates the Docker Hub repository description from
    [`docs/maintainer/docker-hub-readme.md`](./docker-hub-readme.md).
-5. Runs the `beta-build` job on **every** push to `main`, including release merges, once the
-   `release-please` job has finished. It builds `linux/amd64` and `linux/arm64` and pushes
-   a `beta` image to Docker Hub and GHCR, plus an immutable `beta-<shortsha>` tag to GHCR only.
-   `beta` is mutable and always tracks the current `main`. After each push, old
+5. Runs the `beta-build` job on every push to `main`, including release merges, as long as the
+   `release-please` job succeeded (if it fails or is cancelled, `beta-build` is skipped and
+   `beta` stays on an older commit). It builds `linux/amd64` and `linux/arm64` and pushes
+   a `beta` image to Docker Hub and GHCR, plus a per-commit `beta-<shortsha>` tag to GHCR only.
+   A rerun can overwrite that tag, so use the image digest to refer to one exact image.
+   `beta` is mutable and tracks the current `main`. After each push, old
    `beta-<shortsha>` GHCR tags are cleaned up, keeping the newest 20. This image is not a
    release and has no version tag or `latest`.
 

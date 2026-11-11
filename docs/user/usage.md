@@ -50,7 +50,8 @@ started with the `autoheal=true` label. The UI shows the most recent entries (up
 the API and kept across Refresh and the automatic 5-second refresh. **Clear Filters**
 resets Event Type and Container but keeps Limit. The API accepts any `limit`, but it can
 never return more events than are stored, which is `ui.max_log_entries` (raise that setting to
-keep more history):
+keep more history; lowering it takes effect when the next event is added, so older stored events
+remain until then):
 
 ```bash
 curl "http://localhost:3131/api/events?limit=100"

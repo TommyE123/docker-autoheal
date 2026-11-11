@@ -149,9 +149,10 @@ proposing it. `internalChecksFilter: "strict"` makes Renovate skip releases that
 cleared this window instead of selecting a newer, still-pending release. Security updates
 bypass the minimum release age so that vulnerability fixes are not delayed.
 
-Two things run only on Saturdays: FastAPI updates (a `packageRules` entry with
+Two things run only on Saturdays: regular FastAPI updates (a `packageRules` entry with
 `schedule: ["* * * * 6"]`) and lockfile maintenance (`lockFileMaintenance`, Saturdays from
-00:00 to 03:59, Europe/London time). Lockfile maintenance is never automerged.
+00:00 to 03:59, Europe/London time). Lockfile maintenance is never automerged. Renovate ignores `schedule` for vulnerability-alert
+PRs, so a FastAPI security update can still appear on another day.
 
 Renovate automatically merges only **eligible patch updates**, and only once every required
 GitHub status check has passed. An update is eligible when:
