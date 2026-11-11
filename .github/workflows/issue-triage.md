@@ -218,7 +218,9 @@ combinations are the `github issue_read ... | jq ...` fetch pipe and the
    **A. Confident classification** — you can determine exactly one `kind:*`
    and one to three `area:*` labels with reasonable confidence. Use more than
    one `area:*` only when the issue clearly covers each of those areas, and
-   never more than three. A title-only
+   never more than three. If another area might also apply and you are not
+   sure, or the issue is documentation-wide (it names documents or topics
+   across many areas), use outcome C, even when some areas clearly fit. A title-only
    issue can still be enough on its own (for example "Container does not
    restart after Uptime Kuma reports DOWN" is classifiable even with an
    empty body) — do not require a minimum body length.
@@ -257,7 +259,8 @@ combinations are the `github issue_read ... | jq ...` fetch pipe and the
 
    **C. Uncertain, but not insufficient** — there is real content, but you
    cannot confidently settle on one `kind:*` and the `area:*` labels (for
-   example the area is unclear, or the issue spans more than three areas).
+   example the area is unclear, another area might also apply, the issue is
+   documentation-wide, or it spans more than three areas).
    - Add `status:needs-triage` if not already present.
    - Remove `status:needs-information` if present.
    - If exactly one `kind:*` is clear, add it and remove any other `kind:*`
