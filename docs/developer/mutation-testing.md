@@ -180,8 +180,8 @@ and use the commands above.
 ## Targeted run: API server smoke test ([#412](https://github.com/TommyE123/docker-autoheal/issues/412))
 
 `app/tests/unit/test_main_api_server_smoke.py` is part of the normal unit suite and the
-mutation run (Mutmut ignores only the repository-file tests `test_release_please_workflow.py`
-and `test_dev_stack_files.py`). It runs the real
+mutation run (Mutmut ignores only the repository-file tests `test_release_please_workflow.py`,
+`test_dev_stack_files.py` and `test_badge_ci_scripts.py`). It runs the real
 `app.main.run_api_server()` against a real Uvicorn server. The code it exercises is mutated as
 follows (focused runs; the verdicts are valid because `mutation.sh` starts from an empty
 `mutants/`):
@@ -216,11 +216,11 @@ of the rest are noise (log messages, string literals, cosmetic constants).
 still own test and coverage settings. Every non-default setting has a reason from the
 Phase 1 evaluation in [#333](https://github.com/TommyE123/docker-autoheal/issues/333):
 
-| Setting                              | Why                                                                                                                                                                                                            |
-|--------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `source_paths = ["app"]`             | Required: Mutmut's automatic detection fails for this repository's directory name.                                                                                                                             |
-| `do_not_mutate`                      | Without `app/tests/*` Mutmut mutates the tests themselves (about 13.6k extra mutants, including the integration suite). `.coveragerc` omits it too.                                                            |
-| `pytest_add_cli_args_test_selection` | `test_release_please_workflow.py` and `test_dev_stack_files.py` read `.github/`, `.vscode/` and Compose files that do not exist inside `mutants/` and abort stats collection. They import nothing from `app/`. |
+| Setting                              | Why                                                                                                                                                                                                                                                                |
+|--------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `source_paths = ["app"]`             | Required: Mutmut's automatic detection fails for this repository's directory name.                                                                                                                                                                                 |
+| `do_not_mutate`                      | Without `app/tests/*` Mutmut mutates the tests themselves (about 13.6k extra mutants, including the integration suite). `.coveragerc` omits it too.                                                                                                                |
+| `pytest_add_cli_args_test_selection` | `test_release_please_workflow.py`, `test_dev_stack_files.py` and `test_badge_ci_scripts.py` read `.github/` (workflows and scripts), `.vscode/` and Compose files that do not exist inside `mutants/` and abort stats collection. They import nothing from `app/`. |
 
 Deliberately left at Mutmut's defaults:
 
