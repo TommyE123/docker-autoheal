@@ -440,7 +440,8 @@ the repository and must be verified in the repository's settings:
 ### Limitations
 
 * Automerge only runs when Renovate next processes the PR, so a merge may lag a green check.
-* Each PR waits for the seven-day minimum release age before Renovate proposes it.
+* Most PRs wait for the seven-day minimum release age before Renovate proposes them. The Python
+  runtime group and security updates do not.
 * Patch updates that fail CI or depend on an unmerged PR are not merged.
 
 This policy is intentionally narrow while the project's test coverage, integration testing and
