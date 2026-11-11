@@ -25,13 +25,13 @@ updates are reviewed and merged.
 
 The standard `config:recommended` preset provides the managers for the main dependency
 ecosystems above. A custom Renovate manager is also enabled for
-pinned versions of apt packages in the Dockerfiles.
+pinned versions of apt packages in the `Dockerfile`.
 
 The Dev Container's features, base image and runtime versions are managed too. Only its npm
 linters and `mise` tools float. See
 [Pinned and floating dependencies](#pinned-and-floating-dependencies).
 
-Currently, `curl` is pinned in the Dockerfiles so that its version can be tracked and updated
+Currently, `curl` is pinned in the `Dockerfile` so that its version can be tracked and updated
 by Renovate. This allows the Dockerfile dependency to receive a normal Renovate PR rather than
 floating to whatever version happens to be available from the Debian package repository at
 build time.
@@ -128,7 +128,7 @@ excludes `.devcontainer/package.json` from analysis (`sonar.exclusions`).
 
     Renovate is explicitly configured not to manage this image.
 
-* **Dockerfile apt packages**: versions are explicitly pinned where required by the Dockerfile
+* **Dockerfile apt packages**: versions are explicitly pinned where required by the `Dockerfile`
   linting policy. Renovate's `customManagers:dockerfileVersions` manager tracks these pins and
   can create update PRs when newer package versions are available.
 
@@ -148,6 +148,11 @@ For regular dependency updates, Renovate waits at least seven days after a relea
 proposing it. `internalChecksFilter: "strict"` makes Renovate skip releases that have not
 cleared this window instead of selecting a newer, still-pending release. Security updates
 bypass the minimum release age so that vulnerability fixes are not delayed.
+
+Two things run only on Saturdays: regular FastAPI updates (a `packageRules` entry with
+`schedule: ["* * * * 6"]`) and lockfile maintenance (`lockFileMaintenance`, Saturdays from
+00:00 to 03:59, Europe/London time). Lockfile maintenance is never automerged. Renovate ignores `schedule` for vulnerability-alert
+PRs, so a FastAPI security update can still appear on another day.
 
 Renovate automatically merges only **eligible patch updates**, and only once every required
 GitHub status check has passed. An update is eligible when:
