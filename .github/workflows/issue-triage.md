@@ -162,7 +162,9 @@ you run from the shell:
 - **Writes: `safeoutputs`**. Pass one JSON object as a single quoted argument.
   Do not pass an issue number: the workflow fixes the target of every write to
   the issue being triaged, and a write cannot go anywhere else:
-  - `safeoutputs add_labels '{"labels":["kind:bug","area:restart"]}'`
+  - `safeoutputs add_labels '{"labels":["kind:bug","area:restart"]}'` (all the
+    labels of a classification go in one call, up to one kind and three areas,
+    for example `{"labels":["kind:bug","area:docker","area:restart","area:config"]}`)
   - `safeoutputs remove_labels '{"labels":["status:needs-triage"]}'`
   - `safeoutputs noop '{"message":"..."}'`
   - `safeoutputs report_incomplete '{"reason":"..."}'`
@@ -210,18 +212,23 @@ combinations are the `github issue_read ... | jq ...` fetch pipe and the
    the reason and stop. Never call `noop` for this.
 3. Decide which of these three outcomes applies. Apart from the failure
    handling in steps 1 and 2, do not take any label action until you have
-   decided, and do not partially apply an outcome.
+   decided, and do not partially apply an outcome. (Adding only the kind in
+   outcome C is part of that outcome, not a partial one.)
 
    **A. Confident classification** — you can determine exactly one `kind:*`
-   and exactly one `area:*` label with reasonable confidence. A title-only
+   and one to three `area:*` labels with reasonable confidence. Use more than
+   one `area:*` only when the issue clearly covers each of those areas, and
+   never more than three. A title-only
    issue can still be enough on its own (for example "Container does not
    restart after Uptime Kuma reports DOWN" is classifiable even with an
    empty body) — do not require a minimum body length.
-   - Add the new `kind:*` and `area:*` labels.
+   - Add the new `kind:*` and `area:*` labels, all in one `add_labels` call.
+     If the issue already has exactly one `kind:*` that still fits, or an
+     `area:*` that still fits, keep it rather than swapping it.
    - Then remove every `kind:*`, `area:*`, `status:needs-triage`, and
      `status:needs-information` label currently on the issue **other than**
-     the two you just added, so the issue ends up with exactly one `kind:*`
-     and exactly one `area:*`, and neither status label.
+     the ones you just added, so the issue ends up with exactly one `kind:*`
+     and the one to three `area:*` labels you chose, and neither status label.
 
    **B. Genuinely insufficient content** — the title, body, and any comments
    together give you nothing to classify (for example a title of "help" with an empty
@@ -249,10 +256,15 @@ combinations are the `github issue_read ... | jq ...` fetch pipe and the
      duplicate. If a comment with the token already exists, do not add another.
 
    **C. Uncertain, but not insufficient** — there is real content, but you
-   cannot confidently settle on one `kind:*` and one `area:*`.
+   cannot confidently settle on one `kind:*` and the `area:*` labels (for
+   example the area is unclear, or the issue spans more than three areas).
    - Add `status:needs-triage` if not already present.
    - Remove `status:needs-information` if present.
-   - Do not add or remove any `kind:*` or `area:*` label.
+   - If exactly one `kind:*` is clear, add it and remove any other `kind:*`
+     label, so a person only has to choose the area. If the issue already has
+     exactly one `kind:*` that still fits, leave it as it is. If the kind is not clear
+     either, do not add or remove any `kind:*` label.
+   - Do not add or remove any `area:*` label.
 
 ## Stay on task
 
