@@ -132,6 +132,18 @@ def test_python_runtime_group_has_no_release_age_after_catch_all_rule():
     assert rules[group]["minimumReleaseAge"] is None
     assert group > catch_all
 
+    python_names = set(rules[group]["matchPackageNames"])
+    python_managers = {"dockerfile", "devcontainer", "custom.regex"}
+    for later in rules[group + 1 :]:
+        if "minimumReleaseAge" not in later:
+            continue
+        names = set(later.get("matchPackageNames", []))
+        managers = set(later.get("matchManagers", []))
+        scoped_away = (names and names.isdisjoint(python_names | {"*"})) or (
+            managers and managers.isdisjoint(python_managers)
+        )
+        assert scoped_away, f"Rule after the Python group could set its release age: {later}"
+
 
 def test_python_runtime_versions_are_aligned():
     """All Python runtime and tooling targets must use the same version."""
