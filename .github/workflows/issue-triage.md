@@ -81,6 +81,7 @@ tools:
     # limited to the label and comment safe-outputs below.
     min-integrity: none
 safe-outputs:
+  staged: true
   threat-detection: false
   # Every write below is pinned to the issue being triaged: the triggering issue
   # on an event run, the issue_number input on a dispatch. The agent does not
