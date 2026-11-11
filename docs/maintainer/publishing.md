@@ -20,12 +20,20 @@ release PR is merged - **not** on every ordinary merge to `main`.
    and `latest`. The version is never recalculated here - it comes directly from Release Please.
 4. Updates the Docker Hub repository description from
    [`docs/maintainer/docker-hub-readme.md`](./docker-hub-readme.md).
+5. Runs the `beta-build` job on **every** push to `main`, including release merges, once the
+   `release-please` job has finished. It builds `linux/amd64` and `linux/arm64` and pushes
+   a `beta` image to Docker Hub and GHCR, plus an immutable `beta-<shortsha>` tag to GHCR only.
+   `beta` is mutable and always tracks the current `main`. After each push, old
+   `beta-<shortsha>` GHCR tags are cleaned up, keeping the newest 20. This image is not a
+   release and has no version tag or `latest`.
 
 In other words: **merging an ordinary Conventional Commit PR never publishes a release** — it
 only updates the Release PR. A human decides when to actually release by merging that PR.
 
-**Required repository secrets:** `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`. GHCR push uses the
-workflow's own `GITHUB_TOKEN` — no extra secret needed. Newly published GHCR packages default
+**Required repository secrets:** `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, and
+`RELEASE_PLEASE_TOKEN`, a personal access token the `release-please` job uses to open and
+update the Release PR (see below). GHCR push uses the workflow's own `GITHUB_TOKEN` — no
+extra secret needed. Newly published GHCR packages default
 to **private**; someone with admin access needs to switch the package to public in its GitHub
 package settings before `docker pull ghcr.io/...` works for everyone (see the note in
 `docs/maintainer/docker-hub-readme.md`).
@@ -33,13 +41,13 @@ package settings before `docker pull ghcr.io/...` works for everyone (see the no
 ## PR-time build verification
 
 `.github/workflows/docker-build.yml` ("Docker Build") runs on every pull request to
-`main`, including the Release PR itself. However, Release Please opens and updates that PR
-using the default `GITHUB_TOKEN`, so its `pull_request` runs require a maintainer to manually
-approve the workflow run before they execute — they are not automatic like an ordinary
-contributor PR's checks. When it does run, it builds the image for both platforms but does
-**not** push anywhere unless the PR is from a branch on this repository itself (not a fork), in
-which case it pushes a `pr-<number>` / commit-SHA tagged image to GHCR as a build cache/
-verification artifact. This is separate from, and has no effect on, the release process above.
+`main`, including the Release PR itself. Release Please authenticates with the
+`RELEASE_PLEASE_TOKEN` personal access token rather than the default `GITHUB_TOKEN`. GitHub
+does not let `GITHUB_TOKEN`-authored PRs trigger other workflows, so the Release PR would
+never get its required checks; with the token it behaves like any other PR. The workflow builds
+the image for both platforms (the production checks run on the amd64 build and the arm64
+build is started under emulation) but does **not** push anywhere, for any pull request. This is
+separate from, and has no effect on, the release process above.
 
 ## Manual publishing
 

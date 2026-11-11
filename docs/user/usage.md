@@ -48,10 +48,12 @@ started with the `autoheal=true` label. The UI shows the most recent entries (up
 `ui.max_log_entries`, 50 by default). Use the **Event Type**, **Container** and
 **Limit** (25, 50 or 100) dropdowns above the list to narrow it; they are applied by
 the API and kept across Refresh and the automatic 5-second refresh. **Clear Filters**
-resets Event Type and Container but keeps Limit. Fetch more via the API:
+resets Event Type and Container but keeps Limit. The API accepts any `limit`, but it can
+never return more events than are stored, which is `ui.max_log_entries` (raise that setting to
+keep more history):
 
 ```bash
-curl "http://localhost:3131/api/events?limit=200"
+curl "http://localhost:3131/api/events?limit=100"
 ```
 
 `GET /api/events` also accepts optional filters, applied before `limit`:
