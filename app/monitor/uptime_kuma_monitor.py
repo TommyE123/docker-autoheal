@@ -101,6 +101,10 @@ class UptimeKumaMonitor:
             except Exception as e:
                 logger.warning("Error stopping Uptime-Kuma task: %s", e)
 
+        # Drop cached statuses so a stale DOWN can never drive a restart after stopping
+        self._container_status_cache.clear()
+        self._container_status_mapping_cache.clear()
+
         logger.info("Uptime-Kuma monitoring stopped")
 
     async def _refresh_monitor_cache(self) -> None:
@@ -271,6 +275,10 @@ class UptimeKumaMonitor:
 
     async def should_restart_from_uptime_kuma(self, stable_id: str) -> bool:
         config = config_manager.get_config()
+
+        # A disabled integration never requests a restart
+        if not config.uptime_kuma.enabled:
+            return False
 
         # Check if auto-restart on down is enabled
         if not config.uptime_kuma.auto_restart_on_down:

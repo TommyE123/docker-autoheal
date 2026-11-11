@@ -70,6 +70,45 @@ class TestExitStatusEvaluation:
         assert needs_restart is False
         assert reason == ""
 
+    @pytest.mark.parametrize("status", ["exited", "stopped", "dead"])
+    @pytest.mark.parametrize("mode", ["health", "both"])
+    async def test_cleanly_stopped_container_not_restarted_by_failing_custom_check(
+        self, engine, update_config, mode, status
+    ):
+        """A deliberately stopped container is not restarted because its check fails."""
+        update_config(lambda c: setattr(c.restart, "mode", mode))
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=80)
+        )
+        engine._health_evaluator.perform_custom_health_check = AsyncMock(return_value=False)
+        container, info = make_container(name="web", status=status, exit_code=0)
+
+        needs_restart, reason = await engine._evaluate_container_health(container, info)
+
+        assert needs_restart is False
+        assert reason == "Manual stop (exit 0)"
+        engine._health_evaluator.perform_custom_health_check.assert_not_called()
+
+    async def test_clean_exit_in_health_mode_restarts_when_manual_stop_not_respected(
+        self, engine, update_config
+    ):
+        update_config(
+            lambda c: (
+                setattr(c.restart, "mode", "health"),
+                setattr(c.restart, "respect_manual_stop", False),
+            )
+        )
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="web", check_type="tcp", tcp_port=80)
+        )
+        engine._health_evaluator.perform_custom_health_check = AsyncMock(return_value=False)
+        container, info = make_container(name="web", status="exited", exit_code=0)
+
+        needs_restart, reason = await engine._evaluate_container_health(container, info)
+
+        assert needs_restart is True
+        assert reason == "Custom health check failed (tcp)"
+
 
 @pytest.mark.asyncio
 class TestDockerNativeHealthEvaluation:

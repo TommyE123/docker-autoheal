@@ -10,7 +10,9 @@ Docker Autoheal decides whether a container needs healing based on `restart.mode
   condition
 
 A container that exits cleanly (exit code `0`) is **not** restarted by default —
-`restart.respect_manual_stop` treats that as an intentional stop.
+`restart.respect_manual_stop` treats that as an intentional stop. This applies in every
+restart mode, so a cleanly stopped container is not restarted because its custom health
+check or Uptime Kuma monitor reports it down.
 
 ## Docker's native health check
 

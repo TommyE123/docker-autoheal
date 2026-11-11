@@ -643,6 +643,32 @@ class TestShouldRestartFromUptimeKuma:
         assert result is False
         assert fake_client.get_all_monitors_calls == 0  # cache refresh skipped entirely
 
+    async def test_false_when_integration_disabled_despite_cached_down(self):
+        _enable_uptime_kuma(auto_restart_on_down=True)
+        _add_mapping("web", "Web Monitor")
+        monitor = UptimeKumaMonitor()
+        fake_client = FakeUptimeKumaClient(monitors=[{"friendly_name": "Web Monitor", "status": 0}])
+        _install_client(monitor, fake_client)
+        assert await monitor.should_restart_from_uptime_kuma("web") is True
+        calls_before = fake_client.get_all_monitors_calls
+
+        config = config_manager.get_config()
+        config.uptime_kuma.enabled = False
+        config_manager.update_config(config)
+
+        assert await monitor.should_restart_from_uptime_kuma("web") is False
+        assert fake_client.get_all_monitors_calls == calls_before  # no refresh when disabled
+
+    async def test_stop_clears_cached_statuses(self):
+        monitor = UptimeKumaMonitor()
+        monitor._container_status_cache["web"] = 0
+        monitor._container_status_mapping_cache["web"] = "Web Monitor"
+
+        await monitor.stop()
+
+        assert monitor.get_container_status("web") is None
+        assert monitor._container_status_mapping_cache == {}
+
     async def test_false_when_container_not_mapped(self):
         _enable_uptime_kuma(auto_restart_on_down=True)
         monitor = UptimeKumaMonitor()
