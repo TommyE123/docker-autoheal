@@ -26,7 +26,6 @@ from app.api.routes.config import update_config as api_update_config
 from app.config.config_manager import (
     HealthCheckConfig,
     MonitorConfig,
-    RestartConfig,
     config_manager,
 )
 
@@ -82,19 +81,50 @@ class TestConfigurationEndpoints:
     async def test_update_restart_config_only_changes_restart_section(self):
         original_interval = config_manager.get_config().monitor.interval_seconds
 
-        await update_restart_config(RestartConfig(mode="both", max_restarts=7))
+        await update_restart_config({"mode": "both", "max_restarts": 7})
 
         updated = config_manager.get_config()
         assert updated.restart.mode == "both"
         assert updated.restart.max_restarts == 7
         assert updated.monitor.interval_seconds == original_interval
 
+    @pytest.mark.parametrize("mode", ["on_failure", "ON-FAILURE", "", "SECRET-MODE-123", 5, None])
+    async def test_update_restart_config_with_invalid_mode_returns_422(self, mode):
+        before = config_manager.get_config().restart.model_dump()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await update_restart_config({"mode": mode})
+
+        assert exc_info.value.status_code == 422
+        assert exc_info.value.detail.startswith("mode: ")
+        assert "SECRET-MODE-123" not in exc_info.value.detail
+        assert config_manager.get_config().restart.model_dump() == before
+
+    @pytest.mark.parametrize("mode", ["on-failure", "health", "both"])
+    async def test_update_restart_config_accepts_each_recognised_mode(self, mode):
+        await update_restart_config({"mode": mode})
+
+        assert config_manager.get_config().restart.mode == mode
+
+    async def test_import_config_with_invalid_restart_mode_returns_422(self):
+        before = config_manager.get_config()
+        payload = {"restart": {"mode": "SECRET-MODE-123"}}
+        upload = UploadFile(file=BytesIO(json.dumps(payload).encode()), filename="config.json")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await api_import_config(upload)
+
+        assert exc_info.value.status_code == 422
+        assert exc_info.value.detail.startswith("restart.mode: ")
+        assert "SECRET-MODE-123" not in exc_info.value.detail
+        assert config_manager.get_config() == before
+
     @pytest.mark.parametrize(
         ("endpoint", "payload"),
         [
             (api_update_config, None),
             (update_monitor_config, MonitorConfig(interval_seconds=15)),
-            (update_restart_config, RestartConfig(mode="both", max_restarts=7)),
+            (update_restart_config, {"mode": "both", "max_restarts": 7}),
         ],
     )
     async def test_configuration_update_errors_propagate(self, monkeypatch, endpoint, payload):
