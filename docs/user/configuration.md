@@ -7,7 +7,8 @@ the file directly (the service reloads it on restart). Sensible defaults are wri
 
 > The only environment variables Docker Autoheal's own code reads are `AUTOHEAL_PUBLIC_PORT` and
 > `AUTOHEAL_PUBLIC_HOST`. They change only the UI URL printed in the startup logs (the host
-> and published port), not any setting. (Libraries it uses may read their own variables; those aren't Autoheal settings.)
+> and published port), not any setting. (Libraries it uses may read their own variables; those
+> aren't Autoheal settings.)
 >
 > If you've seen older documentation or blog posts referencing environment variables like
 > `AUTOHEAL_INTERVAL` or `AUTOHEAL_LOG_LEVEL` — those do not exist in the current

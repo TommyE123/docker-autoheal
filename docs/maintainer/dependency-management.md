@@ -154,7 +154,8 @@ The Python runtime group is the exception and has no minimum release age (see
 
 Two things run only on Saturdays: regular FastAPI updates (a `packageRules` entry with
 `schedule: ["* * * * 6"]`) and lockfile maintenance (`lockFileMaintenance`, Saturdays from
-00:00 to 03:59, Europe/London time). Lockfile maintenance is never automerged. Renovate ignores `schedule` for vulnerability-alert
+00:00 to 03:59, Europe/London time). Lockfile maintenance is never automerged. Renovate ignores
+`schedule` for vulnerability-alert
 PRs, so a FastAPI security update can still appear on another day.
 
 Renovate automatically merges only **eligible patch updates**, and only once every required
@@ -226,7 +227,8 @@ available, not reachable in the build". GitHub's Dependabot alerts can also repo
 
 Python transitive dependencies are not pinned in `requirements.txt` and there is no Python
 lockfile, so a lockfile scan, from Trivy or SonarCloud, only sees the direct dependencies
-there. The transitive Python packages and the operating system packages in the built image are not scanned. They are
+there. The transitive Python packages and the operating system packages in the built image are not
+scanned. They are
 resolved at build time, and a finding in them is rarely something the project can fix itself.
 Renovate keeps the base image and the shipped dependencies current instead.
 
@@ -257,7 +259,8 @@ they follow the same releases as the `Dockerfile` image. The Dev Container image
 Dockerfile `FROM` line, read by the `dockerfile` manager.
 
 A package rule groups all five updates into one "Python runtime" pull request, so a new Python
-version moves them together. The tag formats differ (`3.15-slim`, `3.15-bookworm` and plain `3.15`), but Renovate resolves each to the same release. A new Python version is a minor or
+version moves them together. The tag formats differ (`3.15-slim`, `3.15-bookworm` and plain `3.15`),
+but Renovate resolves each to the same release. A new Python version is a minor or
 major update, so the grouped pull request needs manual review and merge like any other, and
 automerge stays disabled.
 
