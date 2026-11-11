@@ -132,7 +132,9 @@ Uptime Kuma** in the UI, or via `/api/uptime-kuma/*`:
 | `auto_restart_on_down`   | `true`   | Restart the mapped container when its Uptime Kuma monitor reports DOWN |
 
 Containers are mapped to Uptime Kuma monitors automatically when you enable the
-integration, or manually via **Configuration → Uptime Kuma → Mappings**.
+integration, or manually via **Configuration → Uptime Kuma → Mappings**. A container has
+one mapping: creating a mapping for a container that already has one (via the UI or
+`POST /api/uptime-kuma/mappings`) replaces it rather than adding a second.
 
 Auto-mapping compares a monitor's name against the container name and, for Docker Compose
 containers, the Compose service name — so `vpn-apps-trawl-1` matches a monitor named
