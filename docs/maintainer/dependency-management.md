@@ -268,8 +268,8 @@ upstream image, so the pull request may appear later than the `Dockerfile` updat
 
 The seven-day minimum release age does not apply to this group. The `python` image tags
 (`3.15-slim`, `3.15`) are floating tags that the image publishers rebuild every few days, and each
-rebuild restarts the seven-day clock. With the age check on, the `Dockerfile` pin and the three
-version pins could never all clear it together, so the group stayed below `minimumGroupSize`
+rebuild restarts the seven-day clock. With the age check on, the `Dockerfile` and Dev Container images and the three
+tool pins could never all clear it together, so the group stayed below `minimumGroupSize`
 and no pull request appeared. The pull request still needs manual review and merge. The rule sits
 after the general `minimumReleaseAge` rule in `renovate.json` because later rules win.
 

@@ -123,6 +123,21 @@ def _renovate_group_minimum(group_name):
     return sizes[0]
 
 
+def test_python_runtime_group_has_no_release_age_after_catch_all_rule():
+    """The Python group must clear minimumReleaseAge, and sit after the rule that sets it for all.
+
+    The python image tags float and are rebuilt every few days, which restarts the age clock, so
+    the five pins never clear it together. Renovate applies later rules last, so a group rule
+    placed before the catch-all rule has its value overwritten and the group never forms.
+    """
+    rules = json.loads((REPO_ROOT / "renovate.json").read_text(encoding="utf-8"))["packageRules"]
+    group = next(i for i, r in enumerate(rules) if r.get("groupName") == "Python runtime")
+    catch_all = next(i for i, r in enumerate(rules) if r.get("matchPackageNames") == ["*"])
+
+    assert rules[group]["minimumReleaseAge"] is None
+    assert group > catch_all
+
+
 def test_python_runtime_versions_are_aligned():
     """All Python runtime and tooling targets must use the same version."""
     dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
