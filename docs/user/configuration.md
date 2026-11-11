@@ -1,10 +1,14 @@
 # Configuration
 
-Docker Autoheal has **no environment-variable configuration**. All settings live in
+Docker Autoheal has **no environment-variable configuration** for its behaviour. All settings live in
 `/data/config.json` and can be changed through the web UI, the REST API, or by editing
 the file directly (the service reloads it on restart). Sensible defaults are written to
 `/data/config.json` the first time the service starts.
 
+> The only environment variables Docker Autoheal's own code reads are `AUTOHEAL_PUBLIC_PORT` and
+> `AUTOHEAL_PUBLIC_HOST`. They change only the UI URL printed in the startup logs (the host
+> and published port), not any setting. (Libraries it uses may read their own variables; those aren't Autoheal settings.)
+>
 > If you've seen older documentation or blog posts referencing environment variables like
 > `AUTOHEAL_INTERVAL` or `AUTOHEAL_LOG_LEVEL` — those do not exist in the current
 > application. Use the web UI's **Configuration** tab or the `/api/config` endpoints
@@ -94,12 +98,12 @@ precedence.
 
 ### `ui`
 
-| Field                                     | Default   | Description                                                        |
-|-------------------------------------------|-----------|--------------------------------------------------------------------|
-| `listen_address`                          | `0.0.0.0` | Address the web UI/API binds to                                    |
-| `listen_port`                             | `3131`    | Port the web UI/API binds to                                       |
-| `max_log_entries`                         | `50`      | Maximum number of events kept in the in-memory/persisted event log |
-| `allow_export_json` / `allow_import_json` | `true`    | Enable/disable config export and import from the UI                |
+| Field                                     | Default   | Description                                                                                              |
+|-------------------------------------------|-----------|----------------------------------------------------------------------------------------------------------|
+| `listen_address`                          | `0.0.0.0` | Address the web UI/API binds to                                                                          |
+| `listen_port`                             | `3131`    | Port the web UI/API binds to                                                                             |
+| `max_log_entries`                         | `50`      | Maximum number of events kept in the in-memory/persisted event log; applied when the next event is added |
+| `allow_export_json` / `allow_import_json` | `true`    | Stored but currently have no effect: export and import are always available                              |
 
 ### `alerts`
 
