@@ -14,8 +14,10 @@ How was this verified? (unit tests, manual testing steps, screenshots, etc.)
 
 ## Configuration / documentation changes (if applicable)
 
-Does this require changes to environment variables, config files, or documentation? If so, describe them.
+Does this require changes to environment variables, config files, or documentation? If so, describe
+them.
 
 ## Breaking changes (if applicable)
 
-Does this change anything that could break existing deployments or configurations? If so, describe the impact and any migration steps.
+Does this change anything that could break existing deployments or configurations? If so, describe
+the impact and any migration steps.
