@@ -196,7 +196,7 @@ async def get_uptime_kuma_mappings():
     },
 )
 async def create_uptime_kuma_mapping(docker_client: DockerClientDep, mapping: dict):
-    """Create a new container-to-monitor mapping"""
+    """Create a container-to-monitor mapping, replacing any existing one for that container"""
     container_ref = mapping.get("container_id")
     monitor_name = mapping.get("monitor_friendly_name")
     if not (
@@ -215,19 +215,23 @@ async def create_uptime_kuma_mapping(docker_client: DockerClientDep, mapping: di
         raise HTTPException(status_code=404, detail="Container not found")
 
     info = await asyncio.to_thread(docker_client.get_container_info, container)
-    stable_id = info.get("stable_id")
+    stable_id = info.get("stable_id") if info else None
     if stable_id is None:
         raise HTTPException(status_code=500, detail="Unable to resolve container stable identifier")
 
-    config = config_manager.get_config()
     new_mapping = UptimeKumaMapping(
         container_id=stable_id,
         monitor_friendly_name=monitor_name,
         auto_mapped=False,
     )
 
-    config.uptime_kuma_mappings.append(new_mapping)
-    config_manager.update_config(config)
+    # A container has one mapping: a repeat for the same stable_id replaces the existing
+    # one (idempotent, and re-points the container at another monitor) instead of
+    # adding a duplicate. Done in one mutate() so concurrent changes are merged.
+    with config_manager.mutate() as config:
+        config.uptime_kuma_mappings = [
+            m for m in config.uptime_kuma_mappings if m.container_id != stable_id
+        ] + [new_mapping]
 
     logger.info(
         "Created Uptime-Kuma mapping: %s -> %s",
