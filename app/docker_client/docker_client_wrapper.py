@@ -5,7 +5,9 @@ Provides interface to Docker API for monitoring and management
 
 import logging
 import socket
+import threading
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlsplit, urlunsplit
 
 import docker
 import docker.errors
@@ -23,6 +25,19 @@ def _require_container_id(container: Container) -> str:
     if container_id is None:
         raise ValueError("container has no id")
     return container_id
+
+
+def _rewrite_loopback_host(endpoint: str, ip_address: str) -> str:
+    """Replace the URL host with ip_address if it is exactly localhost or 127.0.0.1.
+
+    Credentials, port, path, query and fragment are kept as configured.
+    """
+    parts = urlsplit(endpoint)
+    if parts.hostname not in ("localhost", "127.0.0.1"):
+        return endpoint
+    userinfo, at, _ = parts.netloc.rpartition("@")
+    port = f":{parts.port}" if parts.port is not None else ""
+    return urlunsplit(parts._replace(netloc=f"{userinfo}{at}{ip_address}{port}"))
 
 
 def recovery_identifier[S](stable_id: S, labels: dict) -> S | str:
@@ -310,7 +325,8 @@ class DockerClientWrapper:
             output = exec_result.output
             if exit_code is None or not isinstance(output, bytes):
                 raise TypeError("unexpected exec_run result")
-            return exit_code, output.decode("utf-8")
+            # Only the exit code decides health; undecodable bytes must not fail a passing command.
+            return exit_code, output.decode("utf-8", errors="replace")
         except Exception as e:
             logger.error("Failed to execute command in container %s: %s", container.name, e)
             return -1, str(e)
@@ -349,9 +365,11 @@ class DockerClientWrapper:
                 return False
 
             # Replace localhost/127.0.0.1 with container IP
-            endpoint = endpoint.replace("localhost", ip_address).replace("127.0.0.1", ip_address)
+            endpoint = _rewrite_loopback_host(endpoint, ip_address)
 
-            response = requests.get(endpoint, timeout=timeout)
+            # Do not follow redirects: compare the configured endpoint's own status, and never
+            # let a redirect send the request to a host the user did not configure.
+            response = requests.get(endpoint, timeout=timeout, allow_redirects=False)
         except Exception as e:
             logger.warning("HTTP health check failed for %s: %s", container.name, e)
             return False
@@ -412,17 +430,35 @@ class DockerClientWrapper:
         else:
             return result == 0
 
-    def check_exec_health(self, container: Container, command: list[str]) -> bool:
+    def check_exec_health(
+        self, container: Container, command: list[str], timeout: int = 10
+    ) -> bool:
         """
         Perform exec-based health check on container
         Args:
             container: Container object
             command: Command to execute
+            timeout: Seconds to wait for the command before reporting it failed
         Returns:
-            True if command exits with 0, False otherwise
+            True if command exits with 0 within the timeout, False otherwise
+        Note:
+            The Docker SDK cannot cancel a running exec, so on timeout the check stops
+            waiting and fails, but the command may keep running inside the container.
         """
-        exit_code, _ = self.execute_command(container, command)
-        return exit_code == 0
+        result: list[int] = []
+
+        def run() -> None:
+            result.append(self.execute_command(container, command)[0])
+
+        worker = threading.Thread(target=run, name="exec-health-check", daemon=True)
+        worker.start()
+        worker.join(timeout)
+        if worker.is_alive():
+            logger.warning(
+                "Exec health check for %s timed out after %s seconds", container.name, timeout
+            )
+            return False
+        return bool(result) and result[0] == 0
 
     def get_docker_native_health(self, container: Container) -> str | None:
         """

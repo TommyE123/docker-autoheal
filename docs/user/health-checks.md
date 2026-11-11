@@ -64,6 +64,12 @@ Supported `check_type` values:
 | `exec`   | Runs `exec_command` inside the container and checks its exit code                                   |
 | `docker` | Defers to Docker's native health status (equivalent to not setting a custom check)                  |
 
+HTTP checks do not follow redirects, so `http_expected_status` is compared with the status of
+the configured endpoint itself (for example `302`). Only a host of exactly `localhost` or
+`127.0.0.1` is replaced with the container's IP address; the rest of the URL is sent as written.
+An `exec` check that has not finished after `timeout_seconds` is reported as failed, although
+Docker cannot stop the command, so it may keep running inside the container.
+
 Each type must supply the fields it uses (`http_endpoint` and `http_expected_status` for `http`,
 `tcp_port` for `tcp`, `exec_command` for `exec`), and `check_type` must be one of the values
 above. The values must also be usable: `tcp_port` between 1 and 65535, `exec_command` a

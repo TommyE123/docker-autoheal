@@ -8,6 +8,8 @@ inspection results and graceful handling of Docker API failures.
 
 import logging
 import socket
+import threading
+import time
 from unittest.mock import MagicMock, patch
 
 import docker
@@ -449,6 +451,37 @@ class TestContainerActions:
 
         assert wrapper.execute_command(container, ["x"]) == (3, "é")
 
+    def test_exec_health_check_passes_when_exit_zero_output_is_not_utf8(self, wrapper):
+        container = make_sdk_container()
+        container.exec_run.return_value = MagicMock(exit_code=0, output=b"\xe9")
+
+        assert wrapper.check_exec_health(container, ["true"]) is True
+        assert wrapper.execute_command(container, ["x"]) == (0, "\ufffd")
+
+    def test_exec_health_check_fails_when_command_exceeds_timeout(self, wrapper, caplog):
+        container = make_sdk_container()
+        release = threading.Event()
+
+        def slow_exec(_command):
+            release.wait(5)
+            return MagicMock(exit_code=0, output=b"")
+
+        container.exec_run.side_effect = slow_exec
+        try:
+            started = time.monotonic()
+            with caplog.at_level(logging.WARNING):
+                assert wrapper.check_exec_health(container, ["sleep", "30"], timeout=1) is False
+            assert time.monotonic() - started < 4
+        finally:
+            release.set()
+        assert "timed out after 1 seconds" in caplog.text
+
+    def test_exec_health_check_returns_within_timeout_for_fast_command(self, wrapper):
+        container = make_sdk_container()
+        container.exec_run.return_value = MagicMock(exit_code=0, output=b"")
+
+        assert wrapper.check_exec_health(container, ["true"], timeout=1) is True
+
     def test_execute_command_rejects_missing_exit_code(self, wrapper):
         container = make_sdk_container()
         container.exec_run.return_value = MagicMock(exit_code=None, output=b"ok")
@@ -707,7 +740,49 @@ class TestHttpHealth:
             )
 
         # localhost is rewritten to the container's IP before the request is made.
-        mock_get.assert_called_with("http://172.17.0.2:3131/health", timeout=5)
+        mock_get.assert_called_with(
+            "http://172.17.0.2:3131/health", timeout=5, allow_redirects=False
+        )
+
+    @pytest.mark.parametrize(
+        ("endpoint", "expected"),
+        [
+            (
+                "http://localhost:8080/health?redirect=http://localhost/status#localhost",
+                "http://172.17.0.2:8080/health?redirect=http://localhost/status#localhost",
+            ),
+            ("http://127.0.0.1/x", "http://172.17.0.2/x"),
+            ("http://user:pw@localhost:81/p", "http://user:pw@172.17.0.2:81/p"),
+            ("http://localhost.internal:8080/", "http://localhost.internal:8080/"),
+            ("http://example.com/localhost/127.0.0.1", "http://example.com/localhost/127.0.0.1"),
+        ],
+    )
+    def test_http_health_check_rewrites_only_an_exact_loopback_host(
+        self, wrapper, endpoint, expected
+    ):
+        container = make_sdk_container()
+
+        with patch("app.docker_client.docker_client_wrapper.requests.get") as mock_get:
+            mock_get.return_value = MagicMock(status_code=200)
+            assert wrapper.check_http_health(container, endpoint) is True
+
+        mock_get.assert_called_once_with(expected, timeout=5, allow_redirects=False)
+
+    def test_http_health_check_compares_the_redirect_status_itself(self, wrapper):
+        container = make_sdk_container()
+
+        with patch("app.docker_client.docker_client_wrapper.requests.get") as mock_get:
+            mock_get.return_value = MagicMock(status_code=302)
+            assert (
+                wrapper.check_http_health(
+                    container, "http://localhost:3131/?next=localhost", expected_status=302
+                )
+                is True
+            )
+            assert wrapper.check_http_health(container, "http://localhost:3131/") is False
+
+        assert mock_get.call_args_list[0].args == ("http://172.17.0.2:3131/?next=localhost",)
+        assert all(c.kwargs["allow_redirects"] is False for c in mock_get.call_args_list)
 
     def test_http_health_check_fails_when_the_request_raises(self, wrapper):
         container = make_sdk_container()
