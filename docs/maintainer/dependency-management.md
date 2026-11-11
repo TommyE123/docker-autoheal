@@ -68,8 +68,9 @@ Trade-offs:
 * `ghcr.io` and `mcr.microsoft.com` give Renovate no release timestamps, so Dev Container feature
   and base image updates skip the seven-day minimum release age
   (`minimumReleaseAgeBehaviour: timestamp-optional`). The rule is scoped to
-  `.devcontainer/devcontainer.json` and `.devcontainer/Dockerfile`, so production images keep the
-  full wait. Those updates are major or minor, so they need a manual merge, and the
+  `.devcontainer/devcontainer.json` and `.devcontainer/Dockerfile`, so it does not change the wait
+  for production images. The Python runtime group has a separate exception, described below. Those
+  Dev Container updates are major or minor, so they need a manual merge, and the
   `Build and test Dev Container` check runs on each one.
 
 Do not add `mise.lock`, `.mise/locks/`, `.devcontainer/package-lock.json` or
@@ -266,12 +267,14 @@ create no branch and no pull request, so a partial runtime upgrade cannot be pro
 Dev Container image can lag a new Python release, because Microsoft publishes it after the
 upstream image, so the pull request may appear later than the `Dockerfile` update alone would.
 
-The seven-day minimum release age does not apply to this group. The `python` image tags
-(`3.15-slim`, `3.15`) are floating tags that the image publishers rebuild every few days, and each
-rebuild restarts the seven-day clock. With the age check on, the `Dockerfile` and Dev Container images and the three
-tool pins could never all clear it together, so the group stayed below `minimumGroupSize`
-and no pull request appeared. The pull request still needs manual review and merge. The rule sits
-after the general `minimumReleaseAge` rule in `renovate.json` because later rules win.
+The seven-day minimum release age does not apply to this group. The likely cause of the group
+not forming is that the `python` image tags (`3.15-slim`, `3.15`) are floating tags that the image
+publishers rebuild, which restarts the seven-day clock each time. The Renovate log showed the
+`Dockerfile` and tool pins held back by the age check while the Dev Container image, which has no
+release timestamp, was not. The repeated rebuilds were inferred from Docker Hub timestamps, not
+observed. Either way, the pins could not all clear the check together, and the group stayed below
+`minimumGroupSize`. The pull request still needs manual review and merge. The rule sits after the
+general `minimumReleaseAge` rule in `renovate.json` because later rules win.
 
 Two things to know about the minimum:
 
@@ -282,8 +285,7 @@ Two things to know about the minimum:
   not grouped, so they are not held back by the minimum.
 
 `minimumGroupSize` guarantees how many updates are in the group, not that their target versions
-match. The plain and `-slim` tags can clear the age check at different times, so before merging
-a "Python runtime" pull request, compare the versions in all five files.
+match. Before merging a "Python runtime" pull request, compare the versions in all five files.
 
 The general digest pinning rule is switched off for `.sonarcloud.properties`,
 `pyrightconfig.json` and `.linter-rules/.ruff.toml` because those tools need a bare version
