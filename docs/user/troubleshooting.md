@@ -68,7 +68,8 @@ count only increases when *it* restarts a container, and it persists across cont
 recreation; Docker's own count resets when the container is recreated and also includes
 restarts from Docker's own `restart:` policy. If you need to reset the tracked count, use
 un-quarantine (which clears it) or edit `containers.restart_counts` in `config.json`
-directly; `PUT /api/config` ignores the restart counts and history in its request body. Quarantine is decided by `containers.restart_history` instead: only restarts within
+directly; `PUT /api/config` ignores the restart counts and history in its request body. Quarantine
+is decided by `containers.restart_history` instead: only restarts within
 the last `max_restarts_window_seconds` count towards `max_restarts`, so older restarts age out
 on their own. Counts recorded by versions that did not track timestamps have no history and
 never count towards quarantine.

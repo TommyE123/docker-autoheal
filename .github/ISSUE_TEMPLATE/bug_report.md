@@ -38,4 +38,5 @@ paste logs here
 
 ## Additional context (optional)
 
-Anything else that might help, e.g. relevant configuration, labels, or container health status. Please redact any secrets or sensitive information.
+Anything else that might help, e.g. relevant configuration, labels, or container health status.
+Please redact any secrets or sensitive information.

@@ -95,17 +95,21 @@ to your desktop; see [Docker isolation](#docker-isolation) and the logging notes
 [UI E2E suite (Playwright)](testing.md#ui-e2e-suite-playwright)). It asks which tests to run
 (a quick check of the basics, everything, or one area such as the event log) and how: in the
 background with no window, or in a browser panel where you can watch and debug
-([Playwright's UI mode](https://playwright.dev/docs/test-ui-mode)). It then starts the dev stack in the
+([Playwright's UI mode](https://playwright.dev/docs/test-ui-mode)). It then starts the dev stack in
+the
 background (`up --build -d --wait`, which waits for the image's healthcheck) on the Dev
 Container's isolated daemon and runs the same tests in every mode. It reads the published
 port back from Compose (`3132` unless `AUTOHEAL_DEV_PORT` is set) and reaches it on
 `localhost`. It removes the dev stack afterwards (printing its last logs first if the run
 failed), unless the stack was already running when the task started, in which case it is
-left alone. In the browser-panel (`ui`) mode the task keeps running until you stop it (**Ctrl+C** in its
+left alone. In the browser-panel (`ui`) mode the task keeps running until you stop it (**Ctrl+C** in
+its
 terminal); open the forwarded **Playwright UI** port (the Ports tab, or the link in the
 terminal) in your browser. Chromium and its system libraries are installed by
-`post-create.sh`. CI does not use the dev stack: it runs the same suite against the image built for the pull
-request (see [UI E2E CI](testing.md#ci)). After pulling this change into an existing Dev Container, run
+`post-create.sh`. CI does not use the dev stack: it runs the same suite against the image built for
+the pull
+request (see [UI E2E CI](testing.md#ci)). After pulling this change into an existing Dev Container,
+run
 **Dev Containers: Rebuild Container** once.
 
 **Autoheal: Install gh-aw** installs the `github/gh-aw` extension pinned to the
@@ -171,7 +175,8 @@ seconds, `--restart no`, labelled for the dev monitor), checks that the dev Auto
 the victim, and removes both. Auto-monitoring adds the victim to the saved configuration, so the
 script snapshots `/api/config` first and puts it back on exit, even when a check fails; a failed
 restore fails the script. Only the event log keeps this run's entries, because events cannot be
-deleted one at a time. The probes are created on demand and are not part of any Compose file. To confirm the other direction, run `docker ps` **on the host** while
+deleted one at a time. The probes are created on demand and are not part of any Compose file. To
+confirm the other direction, run `docker ps` **on the host** while
 the probes exist: neither appears, and the host's containers are unchanged.
 
 **Migrating from the old setup.** Earlier versions used `docker-outside-of-docker`, which
@@ -322,10 +327,10 @@ Ruff's `ANN` (type annotation) rules are enabled; the policy and retained findin
 
 Markdown *is* fully enforced — neither `MARKDOWN_MARKDOWNLINT` nor
 `MARKDOWN_MARKDOWN_TABLE_FORMATTER` is in that disabled list, so every Markdown file must
-pass both. `.linter-rules/.markdownlint.jsonc` turns off only `MD013` (line length) and
-`MD060` (table pipe spacing), which conflict with this repo's established long-prose
-style — everything else is at markdownlint's defaults. Run both locally before pushing
-docs changes:
+pass both. `.linter-rules/.markdownlint.jsonc` enables `MD013` with a 100-character limit
+(120 in code blocks, tables exempt) and `MD060` with the `aligned` style, so table pipes
+line up vertically — everything else is at markdownlint's defaults. Run both locally
+before pushing docs changes:
 
 ```bash
 npx markdownlint-cli2 --config .linter-rules/.markdownlint.jsonc "**/*.md" "#node_modules" "#frontend/node_modules" "#.devcontainer/node_modules"

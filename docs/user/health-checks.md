@@ -74,7 +74,8 @@ that could never pass and would restart the container every cycle.
 A check already saved in `config.json` that fails these rules (including an unknown
 `check_type`, or an unusable value such as `tcp_port: 0`) is skipped with a warning when the
 configuration loads, so it no longer restarts the container and does not affect other checks. It
-is removed from `config.json` the next time the configuration is saved. Importing a configuration that contains one is rejected as a whole.
+is removed from `config.json` the next time the configuration is saved. Importing a configuration
+that contains one is rejected as a whole.
 
 If a custom health check is configured, it's evaluated in addition to Docker's native
 health status — either one reporting unhealthy is enough to trigger a restart.

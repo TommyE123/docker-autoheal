@@ -3,18 +3,19 @@
   // https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
   "default": true,
 
-  // Every Markdown file in this repository - long before markdownlint was ever
-  // enabled, and independent of any single PR - wraps prose in long lines rather
-  // than hard-wrapping at 80 characters. Enforcing MD013 would mean rewrapping
-  // every paragraph in every doc for no readability gain (GitHub and every editor
-  // used here soft-wrap long lines anyway).
-  "MD013": false,
+  // Line length matches the 100 characters Ruff uses for Python. Tables are
+  // exempt here because MD060 governs their formatting.
+  "MD013": {
+    "line_length": 100,
+    "heading_line_length": 100,
+    "code_block_line_length": 120,
+    "code_blocks": true,
+    "tables": false,
+    "headings": true
+  },
 
-  // Same story for table formatting: every table in this repo uses padded GFM
-  // pipes (`| Col |`) for readability as plain text, not the "compact" style
-  // (`|Col|`) this rule's default wants. Padded pipes are also the far more
-  // common GFM convention.
-  "MD060": false,
+  // Tables use aligned formatting: pipes line up vertically in the source.
+  "MD060": { "style": "aligned" },
 
   // Docs in this repo legitimately repeat headings (e.g. the same subsection
   // name) under different parent headings - siblings_only only flags
