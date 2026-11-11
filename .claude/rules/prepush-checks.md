@@ -22,7 +22,8 @@ lines to 100 characters. For example, Markdown has more than one linter, and a t
 markdownlint and still fail the table formatter. Also check what the repo's static analysis flags
 in the code you touched, such as Semgrep rules on logging calls. For Python, run pyright as well as
 ruff, and run ruff with `--config .linter-rules/.ruff.toml` on the files you changed only, because
-the config isn't in the root, so the default settings reformat unrelated code, and repo-wide runs report or fix findings the PR didn't introduce.
+the config isn't in the root, so the default settings reformat unrelated code, and repo-wide runs
+report or fix findings the PR didn't introduce.
 
 ## 3. Python version and coverage
 
