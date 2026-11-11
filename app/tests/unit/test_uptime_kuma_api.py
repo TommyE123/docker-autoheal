@@ -563,6 +563,57 @@ class TestUptimeKumaIntegration:
         assert exc_info.value.status_code == 500
         assert config_manager.get_config().uptime_kuma_mappings == []
 
+    async def test_create_mapping_twice_does_not_duplicate(self, wired_api):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+        body = {"container_id": "a" * 64, "monitor_friendly_name": "web"}
+
+        await create_uptime_kuma_mapping(get_docker_client(), body)
+        await create_uptime_kuma_mapping(get_docker_client(), body)
+
+        mappings = config_manager.get_config().uptime_kuma_mappings
+        assert [(m.container_id, m.monitor_friendly_name) for m in mappings] == [("web", "web")]
+
+    async def test_create_mapping_replaces_existing_mapping_for_container(self, wired_api):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+        with config_manager.mutate() as config:
+            config.uptime_kuma_mappings = [
+                UptimeKumaMapping(
+                    container_id="web", monitor_friendly_name="old", auto_mapped=True
+                ),
+                UptimeKumaMapping(container_id="db", monitor_friendly_name="db-mon"),
+            ]
+
+        created = await create_uptime_kuma_mapping(
+            get_docker_client(), {"container_id": "a" * 64, "monitor_friendly_name": "new"}
+        )
+
+        assert created["mapping"]["monitor_friendly_name"] == "new"
+        assert created["mapping"]["auto_mapped"] is False
+        mappings = config_manager.get_config().uptime_kuma_mappings
+        assert {(m.container_id, m.monitor_friendly_name, m.auto_mapped) for m in mappings} == {
+            ("db", "db-mon", False),
+            ("web", "new", False),
+        }
+        assert len(mappings) == 2
+
+    async def test_create_mapping_with_no_container_info_returns_500(self, wired_api, monkeypatch):
+        docker_client, _engine = wired_api
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+        monkeypatch.setattr(docker_client, "get_container_info", lambda _container: None)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await create_uptime_kuma_mapping(
+                get_docker_client(), {"container_id": "a" * 64, "monitor_friendly_name": "Monitor"}
+            )
+
+        assert exc_info.value.status_code == 500
+        assert config_manager.get_config().uptime_kuma_mappings == []
+
     async def test_delete_mapping_persistence_error_propagates(self, monkeypatch):
         monkeypatch.setattr(
             config_manager,

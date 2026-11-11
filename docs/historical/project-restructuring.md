@@ -31,7 +31,6 @@ docker-autoheal/
 │   ├── config/config_manager.py
 │   ├── docker_client/docker_client_wrapper.py
 │   └── monitor/monitoring_engine.py
-└── run.py
 ```
 
 Import changes made at the time:
@@ -43,6 +42,5 @@ Import changes made at the time:
 | `from monitor import MonitoringEngine`          | `from app.monitor.monitoring_engine import MonitoringEngine`              |
 | `from api import app, init_api`                 | `from app.api.api import app, init_api`                                   |
 
-Running the application was, and still is, done with `python -m app.main` or `python
-run.py`. The Dockerfile was updated at the same time to copy `app/` instead of loose
+Running the application is done with `python -m app.main`. The Dockerfile was updated at the same time to copy `app/` instead of loose
 `*.py` files.
