@@ -65,15 +65,6 @@
   ],
   "packageRules": [
     {
-      "description": "Update the Python version everywhere in one PR: the Dockerfile image, the Dev Container image, sonar.python.version, pythonVersion in pyrightconfig.json and target-version in .linter-rules/.ruff.toml. minimumGroupSize must equal the number of pins, so the PR is only created once all of them have an update (the Dev Container image can lag a new Python release). The contract test in app/tests/unit/test_dev_stack_files.py checks that they agree. Only major and minor updates are grouped, so routine digest refreshes of the existing tags are not held back by the minimum. Python releases are minor or major updates, so automerge stays disabled.",
-      "matchDatasources": ["docker"],
-      "matchPackageNames": ["python", "mcr.microsoft.com/devcontainers/python"],
-      "matchUpdateTypes": ["major", "minor"],
-      "groupName": "Python runtime",
-      "minimumGroupSize": 5,
-      "minimumReleaseAge": "7 days"
-    },
-    {
       "description": "Update the Node major everywhere in one PR: the Dockerfile image, node-version in tests.yml and production-smoke-test.yml, and the node feature's version option in devcontainer.json (read by Renovate's built-in devcontainer manager). minimumGroupSize must equal the number of pins, so the PR is only created once all of them have an update. The contract test in app/tests/unit/test_dev_stack_files.py checks that they agree. Only major updates are grouped, so digest refreshes are not held back by the minimum. Node majors need a manual merge. The rule matches the dependency name rather than the package name, because the setup-node pins in the workflows have the package name actions/node-versions while the Dockerfile and Dev Container pins are named node.",
       "matchDepNames": ["node"],
       "matchUpdateTypes": ["major"],
@@ -86,6 +77,15 @@
       "matchPackageNames": ["*"],
       "automerge": false,
       "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Update the Python version everywhere in one PR: the Dockerfile image, the Dev Container image, sonar.python.version, pythonVersion in pyrightconfig.json and target-version in .linter-rules/.ruff.toml. minimumGroupSize must equal the number of pins, so the PR is only created once all of them have an update (the Dev Container image can lag a new Python release). The contract test in app/tests/unit/test_dev_stack_files.py checks that they agree. Only major and minor updates are grouped, so routine digest refreshes of the existing tags are not held back by the minimum. Python releases are minor or major updates, so automerge stays disabled. The release age is switched off for this group because the python image tags (3.15-slim, 3.15) are floating tags that are rebuilt every few days, which restarts the seven-day clock each time, so the Dockerfile and the three version pins could never all clear it together and the group never formed. This rule must stay after the general minimumReleaseAge rule below it, because later rules win.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["python", "mcr.microsoft.com/devcontainers/python"],
+      "matchUpdateTypes": ["major", "minor"],
+      "groupName": "Python runtime",
+      "minimumGroupSize": 5,
+      "minimumReleaseAge": null
     },
     {
       "description": "Group Prettier dependency updates across package files into one PR.",

@@ -148,6 +148,8 @@ For regular dependency updates, Renovate waits at least seven days after a relea
 proposing it. `internalChecksFilter: "strict"` makes Renovate skip releases that have not
 cleared this window instead of selecting a newer, still-pending release. Security updates
 bypass the minimum release age so that vulnerability fixes are not delayed.
+The Python runtime group is the exception and has no minimum release age (see
+"Python runtime version updates").
 
 Two things run only on Saturdays: regular FastAPI updates (a `packageRules` entry with
 `schedule: ["* * * * 6"]`) and lockfile maintenance (`lockFileMaintenance`, Saturdays from
@@ -263,6 +265,13 @@ create the branch until all five have an update available. Fewer than five avail
 create no branch and no pull request, so a partial runtime upgrade cannot be proposed. The
 Dev Container image can lag a new Python release, because Microsoft publishes it after the
 upstream image, so the pull request may appear later than the `Dockerfile` update alone would.
+
+The seven-day minimum release age does not apply to this group. The `python` image tags
+(`3.15-slim`, `3.15`) are floating tags that the image publishers rebuild every few days, and each
+rebuild restarts the seven-day clock. With the age check on, the `Dockerfile` pin and the three
+version pins could never all clear it together, so the group stayed below `minimumGroupSize`
+and no pull request appeared. The pull request still needs manual review and merge. The rule sits
+after the general `minimumReleaseAge` rule in `renovate.json` because later rules win.
 
 Two things to know about the minimum:
 
