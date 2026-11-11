@@ -52,7 +52,19 @@ async def update_monitor_config(monitor_config: MonitorConfig):
     return {"status": "success", "message": "Monitor configuration updated"}
 
 
-@router.put("/api/config/restart")
+@router.put(
+    "/api/config/restart",
+    # The body is a dict (see below), so point the documented schema back at the model.
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/json": {"schema": {"$ref": "#/components/schemas/RestartConfig"}}
+            },
+        }
+    },
+    responses={422: {"description": "Not a valid restart configuration"}},
+)
 async def update_restart_config(restart_config: dict):
     """Update restart configuration"""
     # Validated here, not as a typed body, so a rejected value (for example a mistyped
