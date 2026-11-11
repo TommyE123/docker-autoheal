@@ -16,13 +16,13 @@ when `branch-currency.md` says it matters.
 ## 2. Lint the file types you changed
 
 `.linter-rules/.mega-linter.yml` lists which linters run, and most configs are in `.linter-rules/`.
-Run the linters for each file type you changed, not just one. Skip this for comment-only and
-prose-only edits, as `.claude/rules/testing.md` allows. For example, Markdown has more than one
-linter, and a table can pass markdownlint and still fail the table formatter. Also check what the
-repo's static analysis flags in the code you touched, such as Semgrep rules on logging calls. For
-Python, run pyright as well as ruff, and run ruff with `--config .linter-rules/.ruff.toml` on the
-files you changed only, because the config isn't in the root, so the default settings reformat
-unrelated code, and repo-wide runs report or fix findings the PR didn't introduce.
+Run the linters for each file type you changed, not just one. Skip this for comment-only edits, as
+`.claude/rules/testing.md` allows. Prose-only Markdown edits are not exempt, because `MD013` limits
+lines to 100 characters. For example, Markdown has more than one linter, and a table can pass
+markdownlint and still fail the table formatter. Also check what the repo's static analysis flags
+in the code you touched, such as Semgrep rules on logging calls. For Python, run pyright as well as
+ruff, and run ruff with `--config .linter-rules/.ruff.toml` on the files you changed only, because
+the config isn't in the root, so the default settings reformat unrelated code, and repo-wide runs report or fix findings the PR didn't introduce.
 
 ## 3. Python version and coverage
 

@@ -7,10 +7,10 @@ How much validation a change needs, and when to skip a rerun.
 For:
 
 - comment-only changes
-- prose-only edits to existing Markdown structure
 
-Markdown in this repository is linted, so adding or changing Markdown structure (headings, lists,
-tables, code fences, links) is a targeted-validation change, not a no-validation one.
+Markdown in this repository is linted, including a 100-character line limit (`MD013`), so any
+change to a Markdown file, prose included, is a targeted-validation change, not a no-validation
+one.
 
 This also does **not** include: docstrings, CLI help text, runtime-consumed text, generated/runtime
 behaviour, anything consumed by a linter, or anything covered by doctests — those need validation
@@ -19,7 +19,7 @@ like any other behaviour change.
 ## 2. Targeted validation
 
 Use the smallest relevant test or check for the changed behaviour. Everything outside comment-only
-and prose-only changes should receive at least this.
+changes should receive at least this.
 
 ## 3. Broader validation
 
