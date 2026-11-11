@@ -113,11 +113,7 @@ safe-outputs:
     max: 1
     pull-requests: false
     target: ${{ github.event.issue.number || github.event.inputs.issue_number }}
-  # gh-aw's own system outputs can open a tracking issue ("[aw] Issue Triage: reported
-  # incomplete result") when a run fails or the agent reports an incomplete result. They
-  # stay off here. In most failure paths triage already flags the issue with status:needs-triage,
-  # a failed run shows red on the Actions page, and #157 (Gemini CLI refusing allowed github commands)
-  # made them a recurring duplicate: #129, #170, #186 and #216 were all that bug.
+  # gh-aw does not open its own tracking issues for failed or incomplete runs.
   noop:
     report-as-issue: false
   report-incomplete:
