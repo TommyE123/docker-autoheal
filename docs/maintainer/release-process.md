@@ -12,7 +12,7 @@ sets `skip-changelog: true`, so no `CHANGELOG.md` is committed to the repository
 ## Release Please, not a "release on every merge"
 
 There is no manual "cut a release" step, and merging an ordinary PR to `main` does **not**
-publish anything. `.github/workflows/release-please.yml` runs on every push to `main`:
+publish a release (it only refreshes the `beta` image, below). `.github/workflows/release-please.yml` runs on every push to `main`:
 
 1. The `release-please` job parses Conventional Commit messages (PR titles, since PRs are
    squash-merged — already required by `semantic-pr-title.yml`) merged since the last release
@@ -23,11 +23,15 @@ publish anything. `.github/workflows/release-please.yml` runs on every push to `
 3. Only then does the `docker-release` job run, building and publishing the Docker image for
    that exact tag.
 
+Separately, every push to `main` also publishes a `beta` image (and a `beta-<shortsha>` tag on
+GHCR) from the `beta-build` job, provided the `release-please` job succeeded. It tracks the current `main`, carries no version number and
+is not a release.
+
 See [Publishing](publishing.md) for the full mechanics.
 
 **Practical implication:** a normal PR merge is safe by default — it can never accidentally
-publish a production image. Publishing is a deliberate second step: reviewing and merging the
-Release PR when you're ready to ship.
+publish a versioned or `latest` production image (only the `beta` image is refreshed).
+Publishing is a deliberate second step: reviewing and merging the Release PR when you're ready to ship.
 
 ## Existing release history
 
