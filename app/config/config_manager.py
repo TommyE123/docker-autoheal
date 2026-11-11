@@ -14,7 +14,7 @@ import time
 import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import (
     BaseModel,
@@ -56,7 +56,13 @@ class BackoffConfig(BaseModel):
 class RestartConfig(BaseModel):
     """Restart policy configuration"""
 
-    mode: str = Field(default="on-failure", description="Restart mode: on-failure, health, or both")
+    # An unrecognised mode silently disables restarts, so reject it. Keep the rejected
+    # value out of the ValidationError text that the API and the load path log.
+    model_config = ConfigDict(hide_input_in_errors=True)
+
+    mode: Literal["on-failure", "health", "both"] = Field(
+        default="on-failure", description="Restart mode: on-failure, health, or both"
+    )
     cooldown_seconds: int = Field(default=60, ge=0, description="Cooldown between restarts")
     max_restarts: int = Field(default=3, ge=1, description="Maximum restarts within window")
     max_restarts_window_seconds: int = Field(

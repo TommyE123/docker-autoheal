@@ -57,6 +57,10 @@ configuration between environments.
 | `backoff.multiplier`          | `2.0`        | Multiplier applied to the delay after each restart                                             |
 | `backoff.max_seconds`         | `300`        | Upper limit on the backoff delay                                                               |
 
+Any other `mode` value is rejected: the API and config import return HTTP 422, and a saved
+`config.json` with one resets the whole `restart` section to its defaults when loaded (a
+warning is logged).
+
 ### `filters`
 
 Whitelist/blacklist containers by name pattern (glob-style, e.g. `web-*`) or by label
