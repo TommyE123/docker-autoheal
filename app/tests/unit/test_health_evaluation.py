@@ -362,6 +362,20 @@ class TestUptimeKumaEvaluation:
         assert reason == "Uptime-Kuma monitor reports DOWN"
         engine.uptime_kuma_monitor.should_restart_from_uptime_kuma.assert_awaited_once_with("web")
 
+    async def test_down_monitor_does_not_restart_cleanly_stopped_container_in_health_mode(
+        self, engine, update_config
+    ):
+        update_config(lambda c: setattr(c.restart, "mode", "health"))
+        engine.uptime_kuma_monitor = MagicMock()
+        engine.uptime_kuma_monitor.should_restart_from_uptime_kuma = AsyncMock(return_value=True)
+        container, info = make_container(name="web", status="exited", exit_code=0)
+
+        needs_restart, reason = await engine._evaluate_container_health(container, info)
+
+        assert needs_restart is False
+        assert reason == "Manual stop (exit 0)"
+        engine.uptime_kuma_monitor.should_restart_from_uptime_kuma.assert_not_called()
+
     async def test_monitor_up_needs_no_restart(self, engine):
         engine.uptime_kuma_monitor = MagicMock()
         engine.uptime_kuma_monitor.should_restart_from_uptime_kuma = AsyncMock(return_value=False)
