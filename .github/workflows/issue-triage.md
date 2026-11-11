@@ -227,7 +227,7 @@ combinations are the `github issue_read ... | jq ...` fetch pipe and the
      `area:*` that still fits, keep it rather than swapping it.
    - Then remove every `kind:*`, `area:*`, `status:needs-triage`, and
      `status:needs-information` label currently on the issue **other than**
-     the ones you just added, so the issue ends up with exactly one `kind:*`
+     the ones you just added or kept, so the issue ends up with exactly one `kind:*`
      and the one to three `area:*` labels you chose, and neither status label.
 
    **B. Genuinely insufficient content** — the title, body, and any comments
