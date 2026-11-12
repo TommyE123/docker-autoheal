@@ -65,10 +65,16 @@ describe("UptimeKumaMappings", () => {
 
   it("lists unmapped containers and monitors first, each group alphabetical", () => {
     const unsortedContainers = [
-      { id: "c1", name: "zeta", status: "running" },
-      { id: "c2", name: "Alpha", status: "running" },
-      { id: "c3", name: "beta", status: "running" },
-      { id: "c4", name: "mapped-a", status: "running" },
+      { id: "c1", stable_id: "zeta", name: "zeta", status: "running" },
+      { id: "c2", stable_id: "Alpha", name: "Alpha", status: "running" },
+      { id: "c3", stable_id: "beta", name: "beta", status: "running" },
+      // Docker ID differs from the stable ID the mapping is stored under
+      {
+        id: "c4",
+        stable_id: "proj_mapped-a",
+        name: "mapped-a",
+        status: "running",
+      },
     ];
     const unsortedMonitors = [
       { friendly_name: "zulu" },
@@ -79,7 +85,12 @@ describe("UptimeKumaMappings", () => {
 
     render(
       <UptimeKumaMappings
-        mappings={[{ container_id: "c4", monitor_friendly_name: "mapped-mon" }]}
+        mappings={[
+          {
+            container_id: "proj_mapped-a",
+            monitor_friendly_name: "mapped-mon",
+          },
+        ]}
         monitors={unsortedMonitors}
         containers={unsortedContainers}
         onAddMapping={vi.fn()}

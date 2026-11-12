@@ -90,6 +90,7 @@ async def list_containers(docker_client: DockerClientDep, include_stopped: bool 
 
         container_info = ContainerInfo(
             id=info.get("id"),
+            stable_id=stable_id,
             name=info.get("name"),
             image=info.get("image"),
             status=info.get("status"),

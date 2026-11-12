@@ -107,6 +107,8 @@ class TestListContainers:
 
         assert result[0].uptime_kuma_status == 1
         assert result[0].uptime_kuma_monitor_name == "Web Monitor"
+        # The stable ID is exposed so the UI can match mappings, which are stored under it
+        assert result[0].stable_id == "web"
 
     async def test_reports_unknown_status_when_uptime_kuma_monitor_not_initialized(self, wired_api):
         docker_client, engine = wired_api

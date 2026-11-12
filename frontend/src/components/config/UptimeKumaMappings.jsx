@@ -39,10 +39,9 @@ function UptimeKumaMappings({
   };
 
   const isContainerMapped = (container) => {
+    // Mappings are stored under the backend stable_id, not the Docker ID.
     return mappings.some(
-      (mapping) =>
-        container.id === mapping.container_id ||
-        container.id.startsWith(mapping.container_id),
+      (mapping) => mapping.container_id === container.stable_id,
     );
   };
 
