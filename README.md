@@ -177,4 +177,5 @@ for a security problem.
 
 [MIT](LICENSE)
 
-This project was originally created by [@satya-sovan](https://github.com/satya-sovan). Thank you to the original author for making the project available as open source.
+This project was originally created by [@satya-sovan](https://github.com/satya-sovan). Thank you to
+the original author for making the project available as open source.

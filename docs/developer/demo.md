@@ -80,8 +80,8 @@ environment.
   or a release tag to go back to a release.
 
 There is one demo, so each deployment replaces the last one. If the build or its smoke
-test fails, nothing is deployed and the live demo stays as it was. The banner shows the release tag, or the
-branch and short commit for anything else.
+test fails, nothing is deployed and the live demo stays as it was. The banner shows the
+release tag, or the branch and short commit for anything else.
 
 One-off repository setup:
 
