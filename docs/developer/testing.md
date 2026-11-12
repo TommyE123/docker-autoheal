@@ -48,7 +48,8 @@ backend run directly with **Autoheal: Run Backend** (it listens on `3131`, metri
 inside the Dev Container), use `AUTOHEAL_BASE_URL=http://localhost:3131` and
 `AUTOHEAL_METRICS_URL=http://localhost:9090`. In the
 Dev Container, Docker is the isolated inner daemon, so these tests never touch production
-containers; see [Docker isolation](development-setup.md#docker-isolation). Every test skips itself - rather than failing - when the
+containers; see [Docker isolation](development-setup.md#docker-isolation). Every test skips itself -
+rather than failing - when the
 resource it needs isn't available, so it's safe to run with only some of those
 resources present.
 
@@ -84,7 +85,8 @@ would also do, and undo the ones with lasting effect:
   `disposable_container`, so they never collide with anything already running.
 * `test_auto_monitor.py` labels its container with the running service's own
   configured monitor label (`autoheal.dev=true` for the dev stack) and removes the
-  container it caused to be auto-selected from `containers.selected` afterward (via `GET`/`PUT /api/config` - not
+  container it caused to be auto-selected from `containers.selected` afterward (via
+  `GET`/`PUT /api/config` - not
   `POST /api/containers/select`, which moves it to `containers.excluded`
   instead of clearing it). The `auto_monitor` event itself is left in the
   log, same as it would be from real usage, because the API only exposes
@@ -230,7 +232,8 @@ bash frontend/e2e-ui/run.sh full headless  # everything (what CI runs)
 bash frontend/e2e-ui/run.sh events ui      # one area, in Playwright's UI mode
 ```
 
-The scope is `smoke` (a quick local check), `full` (what CI runs), or a functional tag below. The task's menu words these in plain
+The scope is `smoke` (a quick local check), `full` (what CI runs), or a functional tag below. The
+task's menu words these in plain
 language ("Quick check of the basics", "Everything", "The event log" and so on); the script takes
 the short names. The mode is one of two:
 
@@ -307,7 +310,8 @@ publishes no port, or runs on the host network, cannot be reached this way and t
 fails with a message saying so.
 
 The restart test enables the integration with auto-restart on and a 2 second monitoring
-interval and no restart cooldown or backoff, maps a healthy disposable container to a monitor, and flips the monitor to
+interval and no restart cooldown or backoff, maps a healthy disposable container to a monitor, and
+flips the monitor to
 DOWN. It asserts a real Docker restart (`State.StartedAt` changes, same container ID,
 healthy again), the matching successful `restart` event with the "Uptime-Kuma monitor
 reports DOWN" reason, that returning to UP causes no further restart over three

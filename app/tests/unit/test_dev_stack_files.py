@@ -123,6 +123,28 @@ def _renovate_group_minimum(group_name):
     return sizes[0]
 
 
+def test_python_runtime_group_has_no_release_age_after_catch_all_rule():
+    """The Python runtime Renovate group has no release age and follows the catch-all rule."""
+    rules = json.loads((REPO_ROOT / "renovate.json").read_text(encoding="utf-8"))["packageRules"]
+    group = next(i for i, r in enumerate(rules) if r.get("groupName") == "Python runtime")
+    catch_all = next(i for i, r in enumerate(rules) if r.get("matchPackageNames") == ["*"])
+
+    assert rules[group]["minimumReleaseAge"] is None
+    assert group > catch_all
+
+    python_names = set(rules[group]["matchPackageNames"])
+    python_managers = {"dockerfile", "devcontainer", "custom.regex"}
+    for later in rules[group + 1 :]:
+        if "minimumReleaseAge" not in later:
+            continue
+        names = set(later.get("matchPackageNames", []))
+        managers = set(later.get("matchManagers", []))
+        scoped_away = (names and names.isdisjoint(python_names | {"*"})) or (
+            managers and managers.isdisjoint(python_managers)
+        )
+        assert scoped_away, f"Rule after the Python group could set its release age: {later}"
+
+
 def test_python_runtime_versions_are_aligned():
     """All Python runtime and tooling targets must use the same version."""
     dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")

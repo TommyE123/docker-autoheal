@@ -2,11 +2,17 @@
 
 This document defines repository-specific review guidance for `docker-autoheal`.
 
-Review the actual changes in the PR and focus on issues that could affect correctness, reliability, security, maintainability, observability, or production behaviour.
+Review the actual changes in the PR and focus on issues that could affect correctness, reliability,
+security, maintainability, observability, or production behaviour.
 
 Do not manufacture findings. If no actionable issue exists, state that clearly.
 
-**Audience:** this document is addressed to the reviewing agent producing a local PR review, and applies in full whenever Claude is asked to review a PR itself. CodeRabbit's GitHub review may use a different format; assess its findings against the Evidence Threshold and Scope and Noise sections rather than assuming it follows the status and verdict format below. When Claude is instead _assessing and fixing_ another reviewer's findings, the review status, per-finding tag, and verdict formats do not apply to it, and neither does "Review only — do not push commits to the PR."
+**Audience:** this document is addressed to the reviewing agent producing a local PR review, and
+applies in full whenever Claude is asked to review a PR itself. CodeRabbit's GitHub review may use a
+different format; assess its findings against the Evidence Threshold and Scope and Noise sections
+rather than assuming it follows the status and verdict format below. When Claude is instead
+_assessing and fixing_ another reviewer's findings, the review status, per-finding tag, and verdict
+formats do not apply to it, and neither does "Review only — do not push commits to the PR."
 
 ---
 
@@ -26,9 +32,11 @@ No blocking issue was found, but worthwhile actionable improvements remain.
 
 ### 🔴 RED — CHANGES REQUIRED
 
-A genuine correctness, security, reliability, or regression issue must be resolved before the PR is ready.
+A genuine correctness, security, reliability, or regression issue must be resolved before the PR is
+ready.
 
-The status is a summary of the review outcome, not a score. Do not invent findings simply to avoid a GREEN review.
+The status is a summary of the review outcome, not a score. Do not invent findings simply to avoid a
+GREEN review.
 
 ---
 
@@ -40,9 +48,12 @@ Every individual finding also gets its own tag, separate from the overall review
 - 🟠 **AMBER** — worth fixing, not necessarily blocking
 - 🟢 **GREEN** — something the PR gets right, or a minor/non-blocking observation worth noting
 
-Only 🔴 RED and 🟠 AMBER findings are actionable. A 🟢 GREEN finding does not affect the overall review status — a review can carry GREEN call-outs and still conclude an overall GREEN — READY status, since GREEN findings are not actionable.
+Only 🔴 RED and 🟠 AMBER findings are actionable. A 🟢 GREEN finding does not affect the overall review
+status — a review can carry GREEN call-outs and still conclude an overall GREEN — READY status,
+since GREEN findings are not actionable.
 
-Report at most 5 🟠 AMBER findings per review; prefer fewer, high-confidence findings over an exhaustive list.
+Report at most 5 🟠 AMBER findings per review; prefer fewer, high-confidence findings over an
+exhaustive list.
 
 For each 🔴/🟠 finding, give:
 
@@ -53,7 +64,8 @@ For each 🔴/🟠 finding, give:
 - whether this PR introduced it or it is pre-existing
 - whether a regression test is required
 
-Inspect the surrounding repository, not just the changed lines. Do not treat the PR description or a passing test suite as proof of correctness.
+Inspect the surrounding repository, not just the changed lines. Do not treat the PR description or a
+passing test suite as proof of correctness.
 
 End every review with exactly one verdict:
 
@@ -67,7 +79,10 @@ Review only — do not push commits to the PR.
 
 ## Evidence Threshold
 
-Only raise a finding when the issue can be reasonably demonstrated from the changed code and represents a realistic failure scenario, and is introduced or materially worsened by the PR. Avoid speculation — point to the specific code path that produces the problem. A GREEN review is preferred over a weak, speculative, or low-confidence finding.
+Only raise a finding when the issue can be reasonably demonstrated from the changed code and
+represents a realistic failure scenario, and is introduced or materially worsened by the PR. Avoid
+speculation — point to the specific code path that produces the problem. A GREEN review is preferred
+over a weak, speculative, or low-confidence finding.
 
 ---
 
@@ -88,7 +103,8 @@ Pay particular attention to:
 - Logic that could affect the wrong container.
 - Situations that could create restart loops or prevent recovery.
 
-Findings in this area may have significant production impact, so ensure they are supported by a clearly explained failure path.
+Findings in this area may have significant production impact, so ensure they are supported by a
+clearly explained failure path.
 
 ---
 
@@ -134,13 +150,15 @@ Look for:
 - Tests that only verify implementation details where observable behaviour matters.
 - Missing coverage for important error paths introduced by the change.
 
-Do not request new tests for purely mechanical or low-risk changes where additional coverage provides little value.
+Do not request new tests for purely mechanical or low-risk changes where additional coverage
+provides little value.
 
 ---
 
 ## Documentation
 
-Flag documentation only when the PR introduces behaviour that makes existing documentation inaccurate or misleading.
+Flag documentation only when the PR introduces behaviour that makes existing documentation
+inaccurate or misleading.
 
 Pay particular attention to:
 
