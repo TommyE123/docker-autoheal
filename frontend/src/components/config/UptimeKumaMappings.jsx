@@ -38,6 +38,34 @@ function UptimeKumaMappings({
     );
   };
 
+  const isContainerMapped = (container) => {
+    // Mappings are stored under the backend stable_id, not the Docker ID.
+    return mappings.some(
+      (mapping) => mapping.container_id === container.stable_id,
+    );
+  };
+
+  // Unmapped entries first, then alphabetical (case-insensitive) within each group.
+  const sortUnmappedFirst = (items, getName, isMapped) =>
+    [...items].sort(
+      (a, b) =>
+        Number(isMapped(a)) - Number(isMapped(b)) ||
+        getName(a).localeCompare(getName(b), undefined, {
+          sensitivity: "base",
+        }),
+    );
+
+  const sortedContainers = sortUnmappedFirst(
+    containers,
+    (c) => c.name,
+    isContainerMapped,
+  );
+  const sortedMonitors = sortUnmappedFirst(
+    monitors,
+    (m) => m.friendly_name,
+    (m) => isMonitorMapped(m.friendly_name),
+  );
+
   const handleAddMapping = () => {
     if (!newMapping.container_id || !newMapping.monitor_friendly_name) {
       return;
@@ -110,7 +138,7 @@ function UptimeKumaMappings({
                 }
               >
                 <option value="">Select Container...</option>
-                {containers.map((c) => (
+                {sortedContainers.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} ({c.status})
                   </option>
@@ -131,7 +159,7 @@ function UptimeKumaMappings({
                 }
               >
                 <option value="">Select Monitor...</option>
-                {monitors.map((m) => {
+                {sortedMonitors.map((m) => {
                   const isMapped = isMonitorMapped(m.friendly_name);
                   return (
                     <option
