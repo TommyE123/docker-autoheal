@@ -62,4 +62,43 @@ describe("UptimeKumaMappings", () => {
 
     expect(onDeleteMapping).toHaveBeenCalledWith("abc123");
   });
+
+  it("lists unmapped containers and monitors first, each group alphabetical", () => {
+    const unsortedContainers = [
+      { id: "c1", name: "zeta", status: "running" },
+      { id: "c2", name: "Alpha", status: "running" },
+      { id: "c3", name: "beta", status: "running" },
+      { id: "c4", name: "mapped-a", status: "running" },
+    ];
+    const unsortedMonitors = [
+      { friendly_name: "zulu" },
+      { friendly_name: "mapped-mon" },
+      { friendly_name: "Bravo" },
+      { friendly_name: "alpha" },
+    ];
+
+    render(
+      <UptimeKumaMappings
+        mappings={[{ container_id: "c4", monitor_friendly_name: "mapped-mon" }]}
+        monitors={unsortedMonitors}
+        containers={unsortedContainers}
+        onAddMapping={vi.fn()}
+        onDeleteMapping={vi.fn()}
+      />,
+    );
+
+    const optionValues = (label) =>
+      Array.from(screen.getByLabelText(label).querySelectorAll("option"))
+        .map((o) => o.value)
+        .filter(Boolean);
+
+    expect(optionValues("Container")).toEqual(["c2", "c3", "c1", "c4"]);
+    expect(optionValues("Monitor")).toEqual([
+      "alpha",
+      "Bravo",
+      "zulu",
+      "mapped-mon",
+    ]);
+    expect(unsortedContainers[0].name).toBe("zeta");
+  });
 });
