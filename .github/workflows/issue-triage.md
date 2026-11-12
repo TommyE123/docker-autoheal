@@ -147,6 +147,7 @@ you run from the shell:
   at `/`: pass the part before the slash as `--owner` and the part after it as
   `--repo`. Never pass the combined `OWNER/REPO` value to either flag. To fetch
   an issue with its current labels, run
+  <!-- markdownlint-disable-next-line MD013 -->
   `github issue_read --method get --owner OWNER --repo REPO --issue_number N | jq '.[0] | {title, body, comments, labels: ((.labels // []) | map(if type == "object" then .name else . end))}'`.
   The response leaves out a field that is empty: an issue with no labels has no
   `labels` field and one with no comments has no `comments` field. The command
@@ -154,10 +155,12 @@ you run from the shell:
   none; do not look for them another way. A `null` title means the fetch
   failed. If the `jq` filter fails, run the command once more without the pipe.
   To fetch its comments, run
+  <!-- markdownlint-disable-next-line MD013 -->
   `github issue_read --method get_comments --owner OWNER --repo REPO --issue_number N --perPage 100 --page 1`
   without the `jq` pipe, so the whole page is kept (the filter above keeps
   only the first item). Continue with `--page 2`, `--page 3` and so on only
-  when the current page contains exactly 100 comments. Stop when a page contains fewer than 100. If a flag is rejected,
+  when the current page contains exactly 100 comments. Stop when a page contains fewer than 100. If
+  a flag is rejected,
   run `github issue_read --help` and use the flags it lists.
 - **Writes: `safeoutputs`**. Pass one JSON object as a single quoted argument.
   Do not pass an issue number: the workflow fixes the target of every write to

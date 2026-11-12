@@ -68,8 +68,9 @@ Trade-offs:
 * `ghcr.io` and `mcr.microsoft.com` give Renovate no release timestamps, so Dev Container feature
   and base image updates skip the seven-day minimum release age
   (`minimumReleaseAgeBehaviour: timestamp-optional`). The rule is scoped to
-  `.devcontainer/devcontainer.json` and `.devcontainer/Dockerfile`, so production images keep the
-  full wait. Those updates are major or minor, so they need a manual merge, and the
+  `.devcontainer/devcontainer.json` and `.devcontainer/Dockerfile`, so it does not change the wait
+  for production images. The Python runtime group has a separate exception, described below. Those
+  Dev Container updates are major or minor, so they need a manual merge, and the
   `Build and test Dev Container` check runs on each one.
 
 Do not add `mise.lock`, `.mise/locks/`, `.devcontainer/package-lock.json` or
@@ -148,10 +149,13 @@ For regular dependency updates, Renovate waits at least seven days after a relea
 proposing it. `internalChecksFilter: "strict"` makes Renovate skip releases that have not
 cleared this window instead of selecting a newer, still-pending release. Security updates
 bypass the minimum release age so that vulnerability fixes are not delayed.
+The Python runtime group is the exception and has no minimum release age (see
+"Python runtime version updates").
 
 Two things run only on Saturdays: regular FastAPI updates (a `packageRules` entry with
 `schedule: ["* * * * 6"]`) and lockfile maintenance (`lockFileMaintenance`, Saturdays from
-00:00 to 03:59, Europe/London time). Lockfile maintenance is never automerged. Renovate ignores `schedule` for vulnerability-alert
+00:00 to 03:59, Europe/London time). Lockfile maintenance is never automerged. Renovate ignores
+`schedule` for vulnerability-alert
 PRs, so a FastAPI security update can still appear on another day.
 
 Renovate automatically merges only **eligible patch updates**, and only once every required
@@ -223,7 +227,8 @@ available, not reachable in the build". GitHub's Dependabot alerts can also repo
 
 Python transitive dependencies are not pinned in `requirements.txt` and there is no Python
 lockfile, so a lockfile scan, from Trivy or SonarCloud, only sees the direct dependencies
-there. The transitive Python packages and the operating system packages in the built image are not scanned. They are
+there. The transitive Python packages and the operating system packages in the built image are not
+scanned. They are
 resolved at build time, and a finding in them is rarely something the project can fix itself.
 Renovate keeps the base image and the shipped dependencies current instead.
 
@@ -254,7 +259,8 @@ they follow the same releases as the `Dockerfile` image. The Dev Container image
 Dockerfile `FROM` line, read by the `dockerfile` manager.
 
 A package rule groups all five updates into one "Python runtime" pull request, so a new Python
-version moves them together. The tag formats differ (`3.15-slim`, `3.15-bookworm` and plain `3.15`), but Renovate resolves each to the same release. A new Python version is a minor or
+version moves them together. The tag formats differ (`3.15-slim`, `3.15-bookworm` and plain `3.15`),
+but Renovate resolves each to the same release. A new Python version is a minor or
 major update, so the grouped pull request needs manual review and merge like any other, and
 automerge stays disabled.
 
@@ -263,6 +269,15 @@ create the branch until all five have an update available. Fewer than five avail
 create no branch and no pull request, so a partial runtime upgrade cannot be proposed. The
 Dev Container image can lag a new Python release, because Microsoft publishes it after the
 upstream image, so the pull request may appear later than the `Dockerfile` update alone would.
+
+The seven-day minimum release age does not apply to this group. The likely cause of the group
+not forming is that the `python` image tags (`3.15-slim`, `3.15`) are floating tags that the image
+publishers rebuild, which restarts the seven-day clock each time. The Renovate log showed the
+`Dockerfile` and tool pins held back by the age check while the Dev Container image, which has no
+release timestamp, was not. The repeated rebuilds were inferred from Docker Hub timestamps, not
+observed. Either way, the pins could not all clear the check together, and the group stayed below
+`minimumGroupSize`. The pull request still needs manual review and merge. The rule sits after the
+general `minimumReleaseAge` rule in `renovate.json` because later rules win.
 
 Two things to know about the minimum:
 
@@ -273,8 +288,7 @@ Two things to know about the minimum:
   not grouped, so they are not held back by the minimum.
 
 `minimumGroupSize` guarantees how many updates are in the group, not that their target versions
-match. The plain and `-slim` tags can clear the age check at different times, so before merging
-a "Python runtime" pull request, compare the versions in all five files.
+match. Before merging a "Python runtime" pull request, compare the versions in all five files.
 
 The general digest pinning rule is switched off for `.sonarcloud.properties`,
 `pyrightconfig.json` and `.linter-rules/.ruff.toml` because those tools need a bare version
@@ -429,7 +443,8 @@ the repository and must be verified in the repository's settings:
 ### Limitations
 
 * Automerge only runs when Renovate next processes the PR, so a merge may lag a green check.
-* Each PR waits for the seven-day minimum release age before Renovate proposes it.
+* Most PRs wait for the seven-day minimum release age before Renovate proposes them. The Python
+  runtime group and security updates do not.
 * Patch updates that fail CI or depend on an unmerged PR are not merged.
 
 This policy is intentionally narrow while the project's test coverage, integration testing and
