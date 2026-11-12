@@ -118,7 +118,9 @@ describe("demo mock API", () => {
     await api.delete("/notifications/services/Team%20chat");
     expect(state.config.notifications.services).toHaveLength(1);
     for (const url of ["/notifications/test", "/notifications/test/ops"]) {
-      expect((await api.post(url, {})).data.message).toContain("Demo");
+      expect((await failure(api.post(url, {}))).data.detail).toMatch(
+        /^Demo: nothing was sent/,
+      );
     }
   });
 

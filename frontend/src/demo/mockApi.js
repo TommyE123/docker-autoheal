@@ -16,8 +16,10 @@ const minutesAgo = (minutes) =>
 // A sample container's 64-character ID, from its position in the list.
 const fullId = (index) => String(index).repeat(64);
 
+// Answered as an error so the UI shows it: on success the page shows its own
+// "sent" message, which would claim a notification went out.
 const DEMO_MESSAGE =
-  "Demo: nothing was sent. A real install would contact the service.";
+  "Demo: nothing was sent. A real install sends a test message to the service.";
 
 function sampleContainer(index, name, image, options = {}) {
   const {
@@ -382,12 +384,16 @@ const routes = [
   [
     "post",
     "/api/notifications/test",
-    () => ({ status: "success", message: DEMO_MESSAGE }),
+    () => {
+      throw new ApiError(400, DEMO_MESSAGE);
+    },
   ],
   [
     "post",
     "/api/notifications/test/:id",
-    () => ({ status: "success", message: DEMO_MESSAGE }),
+    () => {
+      throw new ApiError(400, DEMO_MESSAGE);
+    },
   ],
   [
     "post",
