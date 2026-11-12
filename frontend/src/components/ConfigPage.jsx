@@ -348,7 +348,7 @@ function ConfigPage() {
 
   const handleDeleteMapping = (containerId) => {
     const container = containers.find(
-      (c) => c.id === containerId || c.id.startsWith(containerId),
+      (c) => c.stable_id === containerId,
     );
     const containerName = container ? container.name : containerId;
     setDeleteMappingModal({ show: true, containerId, containerName });

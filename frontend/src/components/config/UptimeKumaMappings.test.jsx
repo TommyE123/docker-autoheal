@@ -3,7 +3,9 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import UptimeKumaMappings from "./UptimeKumaMappings";
 
-const containers = [{ id: "abc123", name: "web-app", status: "running" }];
+const containers = [
+  { id: "abc123", stable_id: "abc123", name: "web-app", status: "running" },
+];
 const monitors = [{ friendly_name: "web-monitor" }];
 
 describe("UptimeKumaMappings", () => {
@@ -111,5 +113,34 @@ describe("UptimeKumaMappings", () => {
       "mapped-mon",
     ]);
     expect(unsortedContainers[0].name).toBe("zeta");
+  });
+
+  it("shows the container name for a mapping stored under a stable id that differs from the docker id", () => {
+    render(
+      <UptimeKumaMappings
+        mappings={[
+          {
+            container_id: "proj_web",
+            monitor_friendly_name: "web-monitor",
+            auto_mapped: false,
+          },
+        ]}
+        monitors={monitors}
+        containers={[
+          {
+            id: "d0c4e7aa9912",
+            stable_id: "proj_web",
+            name: "web-app",
+            status: "running",
+          },
+        ]}
+        onAddMapping={vi.fn()}
+        onDeleteMapping={vi.fn()}
+      />,
+    );
+
+    const cell = screen.getByRole("cell", { name: "web-app" });
+    expect(cell).toBeInTheDocument();
+    expect(screen.queryByText("proj_web")).not.toBeInTheDocument();
   });
 });
