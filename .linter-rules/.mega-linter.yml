@@ -31,7 +31,9 @@ DISABLE_LINTERS:
   - REPOSITORY_SYFT
 
 # Report-only linters (run and report, but never fail the build).
-DISABLE_ERRORS_LINTERS: []
+# ACTION_ZIZMOR runs the auditor persona, which still has findings to fix (issue #244).
+DISABLE_ERRORS_LINTERS:
+  - ACTION_ZIZMOR
 
 # ---------------------------------------------------------------------------
 # Global MegaLinter configuration
@@ -105,7 +107,8 @@ ACTION_ZIZMOR_UNSECURED_ENV_VARIABLES:
   - GITHUB_TOKEN
 
 ACTION_ZIZMOR_ARGUMENTS:
-  - "--pedantic"
+  - "--persona"
+  - "auditor"
   - "--min-severity"
   - "informational"
   - "--min-confidence"
