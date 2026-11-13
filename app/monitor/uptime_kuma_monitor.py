@@ -291,6 +291,10 @@ class UptimeKumaMonitor:
         # Update cache (async)
         await self._update_status_cache()
 
+        # The integration can be disabled while the refresh is in flight
+        if not config_manager.get_config().uptime_kuma.enabled:
+            return False
+
         # Check monitor status
         status = self.get_container_status(stable_id)
 
