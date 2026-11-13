@@ -10,6 +10,11 @@ on:
 permissions:
   contents: read
 
+# Two manual runs would otherwise sync the same label set at once; the second waits.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   sync-labels:
     name: Sync labels.yml to GitHub

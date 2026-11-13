@@ -25,7 +25,7 @@ jobs:
       # be granted `workflows`, which GitHub requires to push a recompiled
       # *.lock.yml, and PRs/pushes made with it do not trigger CI. checkout
       # persists the PAT as the git credential used by the push below.
-      - name: Checkout main
+      - name: Checkout main # zizmor: ignore[artipacked] - the push below needs the persisted PAT, see comment above.
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main

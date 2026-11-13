@@ -10,6 +10,11 @@ on: # zizmor: ignore[dangerous-triggers] - Needed to greet fork PRs.
     types:
       - opened
 
+# One greeting run per issue or pull request; a repeat event waits rather than being cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: false
+
 jobs:
   greeting:
     name: Greet first-time contributors
