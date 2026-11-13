@@ -72,7 +72,9 @@ const kumaEnabledConfig = {
   },
 };
 
-const containers = [{ id: "abc123", name: "web-app", status: "running" }];
+const containers = [
+  { id: "abc123", stable_id: "abc123", name: "web-app", status: "running" },
+];
 const monitors = [{ friendly_name: "web-monitor", status: 1 }];
 const mappings = [
   {
@@ -973,8 +975,8 @@ describe("ConfigPage", () => {
 
     it.each([
       [
-        "a full container id",
-        [{ id: "abc123456", name: "web-app" }],
+        "a container whose docker id differs from its stable id",
+        [{ id: "d0c4e7aa9912", stable_id: "abc123", name: "web-app" }],
         "web-app",
       ],
       ["an unknown container", [], "abc123"],
