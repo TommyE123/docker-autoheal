@@ -30,8 +30,8 @@ DISABLE_LINTERS:
   - REPOSITORY_OSV_SCANNER
   - REPOSITORY_SYFT
 
-DISABLE_ERRORS_LINTERS:
-  - ACTION_ZIZMOR
+# Report-only linters (run and report, but never fail the build).
+DISABLE_ERRORS_LINTERS: []
 
 # ---------------------------------------------------------------------------
 # Global MegaLinter configuration
@@ -113,7 +113,6 @@ ACTION_ZIZMOR_ARGUMENTS:
   - "--format"
   - "plain"
   - "--no-progress"
-  - "--no-ignores"
 
 REPOSITORY_TRIVY_CONFIG_FILE: .trivy.yaml
 
