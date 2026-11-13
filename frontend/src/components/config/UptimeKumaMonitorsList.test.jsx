@@ -11,7 +11,7 @@ describe("UptimeKumaMonitorsList", () => {
     const mappings = [
       { monitor_friendly_name: "web-monitor", container_id: "abc123" },
     ];
-    const containers = [{ id: "abc123", name: "web-app" }];
+    const containers = [{ id: "d0c4e7", stable_id: "abc123", name: "web-app" }];
 
     render(
       <UptimeKumaMonitorsList
@@ -46,7 +46,7 @@ describe("UptimeKumaMonitorsList", () => {
     expect(screen.getByText(label)).toBeInTheDocument();
   });
 
-  it("falls back to the raw id when the mapped container is unknown, and matches id prefixes", () => {
+  it("shows the container name by stable id and falls back to the raw id when unknown", () => {
     render(
       <UptimeKumaMonitorsList
         monitors={[
@@ -55,9 +55,11 @@ describe("UptimeKumaMonitorsList", () => {
         ]}
         mappings={[
           { monitor_friendly_name: "a", container_id: "gone999" },
-          { monitor_friendly_name: "b", container_id: "abc" },
+          { monitor_friendly_name: "b", container_id: "proj_web" },
         ]}
-        containers={[{ id: "abc123456", name: "web-app" }]}
+        containers={[
+          { id: "abc123456", stable_id: "proj_web", name: "web-app" },
+        ]}
       />,
     );
 
