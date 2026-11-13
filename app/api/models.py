@@ -21,6 +21,7 @@ class ContainerSelectionRequest(BaseModel):
 
 class ContainerInfo(BaseModel):
     id: str
+    stable_id: str | None = None  # Identifier Uptime Kuma mappings are stored under
     name: str
     image: str
     status: str
