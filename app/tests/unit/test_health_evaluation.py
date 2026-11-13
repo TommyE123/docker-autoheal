@@ -325,7 +325,11 @@ class TestCustomHealthChecks:
                 ("http://localhost/health", 204, 7),
             ),
             ("check_tcp_health", {"tcp_port": 8080, "timeout_seconds": 7}, (8080, 7)),
-            ("check_exec_health", {"exec_command": ["true", "-x"]}, (["true", "-x"],)),
+            (
+                "check_exec_health",
+                {"exec_command": ["true", "-x"], "timeout_seconds": 7},
+                (["true", "-x"], 7),
+            ),
         ],
     )
     async def test_valid_check_passes_configured_values_to_docker_client(

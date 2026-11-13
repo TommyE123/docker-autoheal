@@ -186,6 +186,7 @@ class HealthEvaluator:
                     self.docker_client.check_exec_health,
                     container,
                     command,
+                    health_check.timeout_seconds,
                 )
             if check_type == "docker":
                 status = await asyncio.to_thread(
