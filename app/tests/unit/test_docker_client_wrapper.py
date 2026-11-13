@@ -476,6 +476,61 @@ class TestContainerActions:
             release.set()
         assert "timed out after 1 seconds" in caplog.text
 
+    def test_exec_health_check_does_not_start_another_exec_while_one_is_running(
+        self, wrapper, caplog
+    ):
+        container = make_sdk_container()
+        release = threading.Event()
+
+        def slow_exec(_command):
+            release.wait(5)
+            return MagicMock(exit_code=0, output=b"")
+
+        container.exec_run.side_effect = slow_exec
+        try:
+            assert wrapper.check_exec_health(container, ["hang"], timeout=0.2) is False
+            with caplog.at_level(logging.WARNING):
+                assert wrapper.check_exec_health(container, ["hang"], timeout=0.2) is False
+            assert container.exec_run.call_count == 1
+            assert "previous run is still in progress" in caplog.text
+        finally:
+            release.set()
+
+        # Once the original worker finishes, the next check runs normally.
+        deadline = time.monotonic() + 2
+        while wrapper._exec_in_flight and time.monotonic() < deadline:
+            time.sleep(0.01)
+        container.exec_run.side_effect = None
+        container.exec_run.return_value = MagicMock(exit_code=0, output=b"")
+        assert wrapper.check_exec_health(container, ["hang"], timeout=1) is True
+        assert container.exec_run.call_count == 2
+
+    def test_exec_health_check_releases_guard_when_worker_cannot_start(self, wrapper):
+        container = make_sdk_container()
+        container.exec_run.return_value = MagicMock(exit_code=0, output=b"")
+
+        with (
+            patch.object(threading.Thread, "start", side_effect=RuntimeError("no threads")),
+            pytest.raises(RuntimeError),
+        ):
+            wrapper.check_exec_health(container, ["true"])
+
+        assert wrapper.check_exec_health(container, ["true"]) is True
+
+    def test_exec_health_check_guard_is_per_container_and_command(self, wrapper):
+        first = make_sdk_container(container_id="a" * 64)
+        other = make_sdk_container(name="db", container_id="b" * 64)
+        release = threading.Event()
+        first.exec_run.side_effect = lambda _c: (release.wait(5), MagicMock(exit_code=0))[1]
+        other.exec_run.return_value = MagicMock(exit_code=0, output=b"")
+        try:
+            assert wrapper.check_exec_health(first, ["hang"], timeout=0.2) is False
+            assert wrapper.check_exec_health(other, ["hang"], timeout=1) is True
+            assert wrapper.check_exec_health(first, ["other"], timeout=0.2) is False
+            assert first.exec_run.call_count == 2
+        finally:
+            release.set()
+
     def test_exec_health_check_returns_within_timeout_for_fast_command(self, wrapper):
         container = make_sdk_container()
         container.exec_run.return_value = MagicMock(exit_code=0, output=b"")

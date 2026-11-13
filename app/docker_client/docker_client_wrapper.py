@@ -87,6 +87,9 @@ class DockerClientWrapper:
         """
         self.base_url = base_url
         self._client: docker.DockerClient | None = None
+        # Exec checks whose worker is still running, keyed by (container id, command).
+        self._exec_in_flight: dict[tuple[str, tuple[str, ...]], threading.Thread] = {}
+        self._exec_lock = threading.Lock()
         self._connect()
 
     def _connect(self) -> None:
@@ -444,14 +447,35 @@ class DockerClientWrapper:
         Note:
             The Docker SDK cannot cancel a running exec, so on timeout the check stops
             waiting and fails, but the command may keep running inside the container.
+            While that earlier run is still going, further checks of the same container
+            and command fail without starting another exec, so a hung command cannot pile up.
         """
+        key = (container.id or "", tuple(command))
         result: list[int] = []
 
         def run() -> None:
-            result.append(self.execute_command(container, command)[0])
+            try:
+                result.append(self.execute_command(container, command)[0])
+            finally:
+                with self._exec_lock:
+                    self._exec_in_flight.pop(key, None)
 
         worker = threading.Thread(target=run, name="exec-health-check", daemon=True)
-        worker.start()
+        with self._exec_lock:
+            if key in self._exec_in_flight:
+                logger.warning(
+                    "Exec health check for %s skipped: a previous run is still in progress",
+                    container.name,
+                )
+                return False
+            self._exec_in_flight[key] = worker
+        try:
+            worker.start()
+        except BaseException:
+            # run() never started, so nothing else would release the guard.
+            with self._exec_lock:
+                self._exec_in_flight.pop(key, None)
+            raise
         worker.join(timeout)
         if worker.is_alive():
             logger.warning(
