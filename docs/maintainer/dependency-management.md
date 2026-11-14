@@ -331,6 +331,24 @@ no error is shown. Only major updates are grouped, so digest refreshes are not h
 Node major needs a manual merge. `test_node_runtime_versions_are_aligned` in
 `app/tests/unit/test_dev_stack_files.py` fails if the four places disagree.
 
+### Agentic workflow updates (gh-aw and the Gemini CLI)
+
+Renovate does not manage the agentic workflows. `issue-triage.lock.yml` is compiled from
+`issue-triage.md` by the `gh aw` CLI and is in Renovate's `ignorePaths`, and Renovate cannot run
+`gh aw compile`, so a Renovate PR that edited the pinned Gemini CLI version would leave the lock
+file stale. The "Upgrade gh-aw" workflow (`.github/workflows/gh-aw-upgrade.yml`) covers both
+updates in one PR, so two PRs never race to rewrite the same lock file:
+
+* It runs `gh aw upgrade`, which updates the gh-aw action pins, applies codemods and recompiles.
+* Before that, it raises `engine.version` in `issue-triage.md` to the newest stable
+  `@google/gemini-cli` release that is at least three days old. That matches
+  `NPM_CONFIG_MIN_RELEASE_AGE` in the lock file, which would refuse anything newer at install
+  time. Nightly and preview versions are never used.
+* It opens one PR, never automerged. While an upgrade PR is open, no new one is created.
+
+CI cannot show that a new Gemini CLI still authenticates under the current AWF, so run
+issue-triage once from the PR branch before merging a Gemini CLI bump.
+
 ### Rebasing
 
 `rebaseWhen: "behind-base-branch"` is enabled.

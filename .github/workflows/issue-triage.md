@@ -49,9 +49,10 @@ engine:
   # Gemini CLI 0.60 to 0.65 under older AWF versions skipped the AWF system
   # settings file and exited 41 "Invalid auth method selected" (gh-aw-firewall
   # #10246, fixed by #10260 in AWF v0.28.70). 0.66.0 authenticates normally
-  # under any AWF at or above that. The pin is not updated by `gh aw upgrade`:
-  # to bump it, edit `version`, run `gh aw compile`, and commit the .md and
-  # lock file together after checking the new CLI authenticates.
+  # under any AWF at or above that. The Upgrade gh-aw workflow bumps `version`
+  # and recompiles the lock file; check that the new CLI authenticates (run this
+  # workflow from the PR branch) before merging. To bump by hand, edit `version`,
+  # run `gh aw compile`, and commit the .md and lock file together.
   # The model is pinned because the default Pro-class model has no free-tier
   # quota for this key. Flash Lite is used because the full Flash models are
   # capped at 20 requests/day on the free tier, which one triage run can
