@@ -166,7 +166,7 @@ def test_release_please_and_docker_publish_are_one_workflow_run():
 
 
 def test_docker_publishing_targets_are_unchanged():
-    assert "docker.io/${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal" in WORKFLOW
+    assert "docker.io/${{ vars.DOCKERHUB_USERNAME }}/docker-autoheal" in WORKFLOW
     assert "ghcr.io/${{ github.repository_owner }}/docker-autoheal" in WORKFLOW
     assert "linux/amd64,linux/arm64" in WORKFLOW
 
