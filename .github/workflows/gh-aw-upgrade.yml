@@ -59,23 +59,24 @@ jobs:
 
       # engine.version in issue-triage.md is not touched by `gh aw upgrade`, and
       # Renovate cannot recompile the lock file, so bump it here and let the
-      # upgrade step below recompile. Only stable releases at least
-      # MIN_AGE_DAYS old are eligible, matching NPM_CONFIG_MIN_RELEASE_AGE in the
-      # lock file, which would refuse a newer version at install time.
+      # upgrade step below recompiles. Only stable releases at least as old as
+      # NPM_CONFIG_MIN_RELEASE_AGE in the lock file are eligible, because the
+      # lock file would refuse anything newer at install time.
       - name: Bump the Gemini CLI pin
         id: gemini
         if: steps.existing.outputs.pr == ''
-        env:
-          MIN_AGE_DAYS: "3"
         run: |
           set -euo pipefail
           file=.github/workflows/issue-triage.md
+          lock=.github/workflows/issue-triage.lock.yml
+          min_age=$(sed -nE "s/.*NPM_CONFIG_MIN_RELEASE_AGE: '([0-9]+)'.*/\1/p;T;q" "$lock")
+          [ -n "$min_age" ] || { echo "::error::no NPM_CONFIG_MIN_RELEASE_AGE found in $lock"; exit 1; }
           current=$(sed -nE 's/^  version: "([0-9]+\.[0-9]+\.[0-9]+)"$/\1/p' "$file")
           if [ "$(printf '%s\n' "$current" | grep -c .)" != 1 ]; then
             echo "::error::expected exactly one 'version: \"x.y.z\"' line in $file"
             exit 1
           fi
-          latest=$(npm view @google/gemini-cli time --json | CURRENT="$current" node -e '
+          latest=$(npm view @google/gemini-cli time --json | CURRENT="$current" MIN_AGE_DAYS="$min_age" node -e '
             const times = JSON.parse(require("fs").readFileSync(0, "utf8"));
             const cutoff = Date.now() - Number(process.env.MIN_AGE_DAYS) * 864e5;
             const parts = (v) => v.split(".").map(Number);
@@ -91,7 +92,7 @@ jobs:
             console.log(best);
           ')
           [ -n "$latest" ] || { echo "::error::could not work out the latest Gemini CLI version"; exit 1; }
-          echo "Gemini CLI pin: $current, newest eligible: $latest"
+          echo "Gemini CLI pin: $current, newest eligible (at least $min_age days old): $latest"
           if [ "$latest" != "$current" ]; then
             sed -i -E "s/^(  version: \")[0-9.]+(\")$/\1$latest\2/" "$file"
             echo "version=$latest" >> "$GITHUB_OUTPUT"

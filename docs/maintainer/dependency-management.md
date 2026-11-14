@@ -341,9 +341,9 @@ updates in one PR, so two PRs never race to rewrite the same lock file:
 
 * It runs `gh aw upgrade`, which updates the gh-aw action pins, applies codemods and recompiles.
 * Before that, it raises `engine.version` in `issue-triage.md` to the newest stable
-  `@google/gemini-cli` release that is at least three days old. That matches
-  `NPM_CONFIG_MIN_RELEASE_AGE` in the lock file, which would refuse anything newer at install
-  time. Nightly and preview versions are never used.
+  `@google/gemini-cli` release that is at least as old as `NPM_CONFIG_MIN_RELEASE_AGE` in the lock
+  file (three days at the moment), read from that file because the install would refuse anything
+  newer. Nightly and preview versions are never used.
 * It opens one PR, never automerged. While an upgrade PR is open, no new one is created.
 
 CI cannot show that a new Gemini CLI still authenticates under the current AWF, so run
