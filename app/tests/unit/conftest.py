@@ -259,7 +259,7 @@ class FakeDockerClient:
             raise self.health_check_error
         return self.health_results.get(container.name, True)
 
-    def check_exec_health(self, container: Any, command: list[str]) -> bool:
+    def check_exec_health(self, container: Any, command: list[str], timeout: int = 10) -> bool:
         if self.health_check_error is not None:
             raise self.health_check_error
         return self.health_results.get(container.name, True)
