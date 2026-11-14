@@ -51,7 +51,7 @@ jobs:
         with:
           registry: docker.io
           username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }} # zizmor: ignore[secrets-outside-env] - pull request jobs cannot use a main-only environment; the login only avoids Docker Hub rate limits.
 
       # Pull the sentinel's image first: the Google mirror, then Docker Hub, with retries, so a
       # Docker Hub error or rate limit does not fail the job on its first command.

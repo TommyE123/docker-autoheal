@@ -314,9 +314,8 @@ test isolation works.
 pull request targeting `main`, covering Python, JavaScript, YAML, Dockerfile,
 Markdown, and security checks provided by Ruff's `S` rules — see `.linter-rules/.mega-linter.yml`
 for the exact set. The linters listed in `.linter-rules/.mega-linter.yml`'s
-`DISABLE_ERRORS_LINTERS` currently have pre-existing findings and are configured not to
-fail the build over them; they still run and report. Ruff is not in that list, so any ruff
-finding fails the MegaLinter check. There is no
+`DISABLE_ERRORS_LINTERS` are configured not to fail the build; they still run and report.
+Ruff is not in that list, so any ruff finding fails the MegaLinter check. There is no
 repository-wide Python formatter/import-sorter enforced beyond what MegaLinter reports.
 On pull requests from branches in this repository, MegaLinter posts a PR comment and per-linter
 statuses. Fork pull requests get a read-only token, so there the results are only in
@@ -375,10 +374,12 @@ formatter is CLI-only.
 | `Dockerfile*`   | hadolint                  | none                     | Yes              |
 | Every file      | editorconfig-checker      | —                        | Yes              |
 
-Workflow files are additionally scanned by zizmor, which is report-only. Repository-wide
-scanners (checkov, semgrep, trivy, trufflehog, betterleaks, secretlint,
-ls-lint, git_diff) run against the project rather than a file type. The report-only
-linters are the ones listed in `.linter-rules/.mega-linter.yml`'s `DISABLE_ERRORS_LINTERS`.
+Workflow files are additionally scanned by zizmor with its auditor persona, which reports
+every finding and is report-only. A deliberate exception can be accepted with an inline
+`# zizmor: ignore[rule] - reason` comment. Repository-wide scanners (checkov, semgrep, trivy,
+trufflehog, betterleaks, secretlint, ls-lint, git_diff) run against the project rather than a
+file type. The report-only linters are the ones listed in `.linter-rules/.mega-linter.yml`'s
+`DISABLE_ERRORS_LINTERS`.
 
 The Dev Container installs an equivalent of each of these, so every row above has a
 matching `Autoheal:` task. The binaries and Python tools are installed by mise from
