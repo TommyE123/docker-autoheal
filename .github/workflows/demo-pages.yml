@@ -1,0 +1,109 @@
+name: Demo (GitHub Pages)
+
+# Builds the public browser demo (frontend `--mode demo`: the real UI with sample
+# data and a mock API, see frontend/src/demo/) and deploys it to GitHub Pages.
+#   - release published: deploys that release's tag.
+#   - manual run: deploys the branch or tag picked in "Use workflow from" (main by
+#     default, to show merged work before the next release; or a release tag).
+# There is one demo: each deployment replaces the previous one. If the build
+# fails nothing is deployed, so the live demo stays as it was.
+on: # yamllint disable-line rule:truthy
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Deploy one at a time, in order; never cancel a deployment part-way.
+concurrency:
+  group: demo-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build demo
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # Checks out the release tag, or the branch or tag the run was started from.
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The banner shows the release tag, or the branch and short commit.
+      - name: Work out the version label
+        id: version
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          if [ "$REF_TYPE" = "tag" ]; then
+            label="$REF_NAME"
+          else
+            label="$REF_NAME @ $(git rev-parse --short HEAD)"
+          fi
+          echo "Deploying $label"
+          echo "label=$label" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+          # No dependency cache: this workflow publishes what it builds, so a
+          # poisoned cache entry would reach the live site.
+          package-manager-cache: false
+
+      # No install scripts: nothing the build needs runs one (Playwright's
+      # browser is installed by its own step), and it shuts out a compromised
+      # package's script from a job that publishes what it builds.
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci --ignore-scripts
+
+      - name: Build demo
+        working-directory: frontend
+        env:
+          VITE_DEMO_VERSION: ${{ steps.version.outputs.label }}
+          # Optional Cloudflare Web Analytics site token (a public value, set as a
+          # repository variable). Unset: no analytics.
+          VITE_CF_ANALYTICS_TOKEN: ${{ vars.CF_ANALYTICS_TOKEN }}
+        run: |
+          npm run build:demo
+          # GitHub Pages serves 404.html for unknown paths, so deep links and
+          # refreshes on client-side routes still load the app.
+          cp dist/index.html dist/404.html
+
+      # Test the exact files about to be deployed; a failure deploys nothing.
+      # The lockfile-pinned Playwright from node_modules, not an npx download.
+      - name: Install Chromium and its system dependencies
+        working-directory: frontend
+        run: npm run test:demo-e2e:install
+
+      - name: Smoke-test the demo
+        working-directory: frontend
+        run: npm run test:demo-e2e
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: frontend/dist
+
+  deploy:
+    name: Deploy demo
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write # Needed to deploy to GitHub Pages
+      id-token: write # Needed by deploy-pages to verify the deployment source
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

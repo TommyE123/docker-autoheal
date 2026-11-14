@@ -31,8 +31,8 @@ The container provides:
   (markdownlint, prettier, stylelint and the rest) in `.devcontainer/package.json` are
   unpinned and have no lockfile, so each rebuild installs the latest releases
 - Shared VS Code settings, a shared set of installed VS Code extensions, and forwarded
-  ports for the frontend (3000), the dev stack's UI/API (3132) and metrics (9091), and
-  Playwright's UI (9323)
+  ports for the frontend (3000), the dev stack's UI/API (3132) and metrics (9091), the
+  browser demo (3133), and Playwright's UI (9323)
 
 Application services are **not** started automatically — use the tasks below.
 
@@ -111,6 +111,11 @@ the pull
 request (see [UI E2E CI](testing.md#ci)). After pulling this change into an existing Dev Container,
 run
 **Dev Containers: Rebuild Container** once.
+
+**Autoheal: Run Demo** serves the [browser demo](demo.md) with the Vite dev server (hot
+reload, no backend or Docker needed) on port 3133, next to the app's 3131 and the dev
+stack's 3132, so it can run beside **Run React Frontend**. Open
+`http://localhost:3133/docker-autoheal/`.
 
 **Autoheal: Install gh-aw** installs the `github/gh-aw` extension pinned to the
 `compiler_version` recorded in the header of `.github/workflows/issue-triage.lock.yml`, so

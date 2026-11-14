@@ -7,7 +7,16 @@ import eslintConfigPrettier from "eslint-config-prettier";
 import local from "./eslint-rules/jsx-no-duplicate-props.js";
 
 export default [
-  { ignores: ["dist", "coverage", "test-results-ui", "playwright-report-ui"] },
+  {
+    ignores: [
+      "dist",
+      "coverage",
+      "test-results-ui",
+      "playwright-report-ui",
+      "test-results-demo",
+      "playwright-report-demo",
+    ],
+  },
   {
     files: ["**/*.{js,jsx}"],
     languageOptions: {
@@ -56,7 +65,12 @@ export default [
     },
   },
   {
-    files: ["**/playwright.ui.config.js", "**/e2e-ui/**/*.js"],
+    files: [
+      "**/playwright.ui.config.js",
+      "**/e2e-ui/**/*.js",
+      "**/playwright.demo.config.js",
+      "**/e2e-demo/**/*.js",
+    ],
     languageOptions: { globals: globals.node },
   },
   eslintConfigPrettier,

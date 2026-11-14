@@ -226,7 +226,7 @@ def test_node_runtime_versions_are_aligned():
         "Dockerfile": docker_version.group(1),
         "Dev Container": feature_version.group(1),
     }
-    for workflow in ("tests.yml", "production-smoke-test.yml"):
+    for workflow in ("tests.yml", "production-smoke-test.yml", "demo-pages.yml"):
         text = (REPO_ROOT / ".github" / "workflows" / workflow).read_text(encoding="utf-8")
         found = re.findall(r"^\s*node-version:\s*(\d+)\s*$", text, re.MULTILINE)
         assert found, f"node-version not found in {workflow}"
