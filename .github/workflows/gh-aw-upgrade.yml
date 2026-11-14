@@ -113,8 +113,15 @@ jobs:
           version=$(gh aw --version 2>&1 | awk '{print $NF}')
           [ -n "$version" ] || { echo "::error::could not read the gh-aw version"; exit 1; }
           echo "gh-aw $version"
-          previous=$(grep -m1 -oE '"compiler_version":"[^"]+"' .github/workflows/issue-triage.lock.yml | cut -d'"' -f4)
+          previous=$(grep -m1 -oE '"compiler_version":"[^"]+"' .github/workflows/issue-triage.lock.yml | cut -d'"' -f4 || true)
           gh aw upgrade
+
+          # The bump only counts if the recompile picked it up.
+          if [ -n "$GEMINI_VERSION" ] &&
+             ! grep -q "\"gemini\":\"$GEMINI_VERSION\"" .github/workflows/issue-triage.lock.yml; then
+            echo "::error::issue-triage.lock.yml was not recompiled for Gemini CLI $GEMINI_VERSION"
+            exit 1
+          fi
 
           rm -f -- .github/skills/agentic-workflows/SKILL.md
 
