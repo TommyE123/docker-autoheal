@@ -117,10 +117,11 @@ jobs:
           gh aw upgrade
 
           # The bump only counts if the recompile picked it up.
-          if [ -n "$GEMINI_VERSION" ] &&
-             ! grep -q "\"gemini\":\"$GEMINI_VERSION\"" .github/workflows/issue-triage.lock.yml; then
-            echo "::error::issue-triage.lock.yml was not recompiled for Gemini CLI $GEMINI_VERSION"
-            exit 1
+          if [ -n "$GEMINI_VERSION" ]; then
+            if ! grep -q "\"gemini\":\"$GEMINI_VERSION\"" .github/workflows/issue-triage.lock.yml; then
+              echo "::error::issue-triage.lock.yml was not recompiled for Gemini CLI $GEMINI_VERSION"
+              exit 1
+            fi
           fi
 
           rm -f -- .github/skills/agentic-workflows/SKILL.md
