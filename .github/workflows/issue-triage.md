@@ -54,7 +54,7 @@ engine:
   # is used because the full Flash models are capped at 20 requests/day on the
   # free tier, which one triage run can exhaust; Flash Lite allows 500/day and
   # 15/minute.
-  version: "0.66.0"
+  version: "0.68.0"
   model: gemini-3.5-flash-lite
 # Top-level AWF cap on model requests for one run (the default is 500). Flash
 # Lite often makes one tool call per request, so a run needs headroom, while a
