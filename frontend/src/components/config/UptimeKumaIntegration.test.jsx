@@ -197,10 +197,17 @@ describe("UptimeKumaIntegration", () => {
         { friendly_name: "web-monitor", status: 1 },
         { friendly_name: "db-monitor", status: 0 },
       ],
-      containers: [{ id: "abc123", name: "web-app", status: "running" }],
+      containers: [
+        {
+          id: "d0c4e7aa9912",
+          stable_id: "proj_web-app",
+          name: "web-app",
+          status: "running",
+        },
+      ],
       mappings: [
         {
-          container_id: "abc123",
+          container_id: "proj_web-app",
           monitor_friendly_name: "web-monitor",
           auto_mapped: false,
         },

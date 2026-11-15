@@ -73,12 +73,17 @@ const kumaEnabledConfig = {
 };
 
 const containers = [
-  { id: "abc123", stable_id: "abc123", name: "web-app", status: "running" },
+  {
+    id: "d0c4e7aa9912",
+    stable_id: "proj_web-app",
+    name: "web-app",
+    status: "running",
+  },
 ];
 const monitors = [{ friendly_name: "web-monitor", status: 1 }];
 const mappings = [
   {
-    container_id: "abc123",
+    container_id: "proj_web-app",
     monitor_friendly_name: "web-monitor",
     auto_mapped: false,
   },
@@ -801,7 +806,7 @@ describe("ConfigPage", () => {
         .closest(".card");
       const [containerSelect, monitorSelect] =
         within(mappingsCard).getAllByRole("combobox");
-      await user.selectOptions(containerSelect, "abc123");
+      await user.selectOptions(containerSelect, "d0c4e7aa9912");
       await user.selectOptions(monitorSelect, "web-monitor");
       await user.click(
         within(mappingsCard).getByRole("button", { name: /^add$/i }),
@@ -811,7 +816,7 @@ describe("ConfigPage", () => {
         await screen.findByText(/mapping added successfully!/i),
       ).toBeInTheDocument();
       expect(api.post).toHaveBeenCalledWith("/uptime-kuma/mappings", {
-        container_id: "abc123",
+        container_id: "d0c4e7aa9912",
         monitor_friendly_name: "web-monitor",
       });
     });
@@ -830,7 +835,7 @@ describe("ConfigPage", () => {
         .closest(".card");
       const [containerSelect, monitorSelect] =
         within(mappingsCard).getAllByRole("combobox");
-      await user.selectOptions(containerSelect, "abc123");
+      await user.selectOptions(containerSelect, "d0c4e7aa9912");
       await user.selectOptions(monitorSelect, "web-monitor");
       await user.click(
         within(mappingsCard).getByRole("button", { name: /^add$/i }),
@@ -875,7 +880,9 @@ describe("ConfigPage", () => {
       );
 
       expect(await screen.findByText(/mapping deleted!/i)).toBeInTheDocument();
-      expect(api.delete).toHaveBeenCalledWith("/uptime-kuma/mappings/abc123");
+      expect(api.delete).toHaveBeenCalledWith(
+        "/uptime-kuma/mappings/proj_web-app",
+      );
     });
 
     it("shows an alert when deleting a mapping fails", async () => {
@@ -976,10 +983,10 @@ describe("ConfigPage", () => {
     it.each([
       [
         "a container whose docker id differs from its stable id",
-        [{ id: "d0c4e7aa9912", stable_id: "abc123", name: "web-app" }],
+        [{ id: "d0c4e7aa9912", stable_id: "proj_web-app", name: "web-app" }],
         "web-app",
       ],
-      ["an unknown container", [], "abc123"],
+      ["an unknown container", [], "proj_web-app"],
     ])(
       "names the mapped container in the delete confirmation for %s",
       async (_label, knownContainers, expectedName) => {
