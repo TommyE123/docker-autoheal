@@ -54,6 +54,12 @@ class TestStableIdentifier:
 
         assert engine.get_stable_identifier(info) == "web"
 
+    def test_stable_id_option_differs_from_name_and_docker_id(self, engine):
+        _, info = make_container(name="web", container_id="d" * 64, stable_id="proj_web")
+
+        assert engine.get_stable_identifier(info) == "proj_web"
+        assert info["stable_id"] not in (info["name"], info["id"], info["full_id"])
+
     def test_falls_back_to_container_name(self, engine):
         _, info = make_container(name="lonely-container", labels={"autoheal": "true"})
 

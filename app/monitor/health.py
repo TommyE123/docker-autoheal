@@ -83,7 +83,7 @@ class HealthEvaluator:
         config: AutoHealConfig, info: dict, state: dict
     ) -> tuple[bool, str] | None:
         """
-        Restart decision for an exited container, or None when the restart mode ignores exits
+        Restart decision for an exited container, or None when exit codes alone decide nothing
         Args:
             config: Current configuration
             info: Container information dict
@@ -91,17 +91,19 @@ class HealthEvaluator:
         Returns:
             Tuple of (needs_restart: bool, reason: str), or None
         """
-        if config.restart.mode not in ["on-failure", "both"]:
-            return None
-
         exit_code = state.get("ExitCode", 0)
-        # If exit code is 0 (clean stop) and we respect manual stops, don't restart
+        # If exit code is 0 (clean stop) and we respect manual stops, don't restart, in every
+        # mode: health checks of a deliberately stopped container fail by definition
         if exit_code == 0 and config.restart.respect_manual_stop:
             logger.debug(
                 "Container %s stopped cleanly (exit 0), respecting manual stop",
                 info.get("name"),
             )
             return False, "Manual stop (exit 0)"
+
+        # The remaining exit-code restarts apply only to these modes
+        if config.restart.mode not in ["on-failure", "both"]:
+            return None
 
         # For non-zero exit codes or if we don't respect manual stops, restart
         if exit_code != 0:

@@ -4,7 +4,12 @@ import userEvent from "@testing-library/user-event";
 import UptimeKumaMappings from "./UptimeKumaMappings";
 
 const containers = [
-  { id: "abc123", stable_id: "abc123", name: "web-app", status: "running" },
+  {
+    id: "d0c4e7aa9912",
+    stable_id: "proj_web-app",
+    name: "web-app",
+    status: "running",
+  },
 ];
 const monitors = [{ friendly_name: "web-monitor" }];
 
@@ -28,14 +33,14 @@ describe("UptimeKumaMappings", () => {
 
     const containerSelect = screen.getByLabelText("Container");
     const monitorSelect = screen.getByLabelText("Monitor");
-    await user.selectOptions(containerSelect, "abc123");
+    await user.selectOptions(containerSelect, "d0c4e7aa9912");
     await user.selectOptions(monitorSelect, "web-monitor");
 
     expect(addButton).toBeEnabled();
     await user.click(addButton);
 
     expect(onAddMapping).toHaveBeenCalledWith({
-      container_id: "abc123",
+      container_id: "d0c4e7aa9912",
       monitor_friendly_name: "web-monitor",
     });
   });
@@ -48,7 +53,7 @@ describe("UptimeKumaMappings", () => {
       <UptimeKumaMappings
         mappings={[
           {
-            container_id: "abc123",
+            container_id: "proj_web-app",
             monitor_friendly_name: "web-monitor",
             auto_mapped: false,
           },
@@ -62,7 +67,7 @@ describe("UptimeKumaMappings", () => {
 
     await user.click(screen.getByRole("button", { name: /delete/i }));
 
-    expect(onDeleteMapping).toHaveBeenCalledWith("abc123");
+    expect(onDeleteMapping).toHaveBeenCalledWith("proj_web-app");
   });
 
   it("lists unmapped containers and monitors first, each group alphabetical", () => {
