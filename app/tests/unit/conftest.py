@@ -93,6 +93,7 @@ def make_container(  # noqa: PLR0913 - keyword-only options mirror the info dict
     labels: dict | None = None,
     health: dict | None = None,
     exit_code: int = 0,
+    stable_id: str | None = None,
 ) -> tuple[FakeContainer, dict]:
     """
     Build a ``(container, info)`` pair shaped like the real
@@ -106,11 +107,15 @@ def make_container(  # noqa: PLR0913 - keyword-only options mirror the info dict
             container is monitored under the default configuration.
         health: Docker native health dict, e.g. ``{"status": "unhealthy"}``.
         exit_code: Exit code reported in the container state.
+        stable_id: Optional ``monitoring.id`` label value, so a test can use a
+            stable ID that is neither the name nor the Docker ID.
 
     Returns:
         Tuple of the fake container object and its info dictionary.
     """
     labels = {"autoheal": "true"} if labels is None else labels
+    if stable_id is not None:
+        labels = {**labels, "monitoring.id": stable_id}
     container = FakeContainer(name=name, container_id=container_id, status=status)
 
     if "monitoring.id" in labels:
