@@ -84,8 +84,9 @@ configuration loads, so it no longer restarts the container and does not affect 
 is removed from `config.json` the next time the configuration is saved. Importing a configuration
 that contains one is rejected as a whole.
 
-A custom check runs once per monitoring cycle (`monitor.interval_seconds`) and has no retry or
-interval setting of its own. One failed check marks the container unhealthy for that cycle, and
+A custom check runs once per monitoring cycle (`monitor.interval_seconds`), only when `restart.mode`
+is `health` or `both` (not in the default `on-failure` mode). It has no retry or interval setting
+of its own. One failed check marks the container unhealthy for that cycle, and
 the [restart behavior](#restart-behavior-once-a-check-fails) below, in particular the backoff
 wait, decides when it is actually restarted. Earlier versions accepted `interval_seconds` and
 `retries` on a custom check but ignored them. They are still accepted, in `POST /api/healthchecks`,
