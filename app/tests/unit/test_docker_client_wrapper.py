@@ -763,6 +763,50 @@ class TestTcpHealth:
 
         mock_get.assert_not_called()
 
+    @pytest.mark.parametrize(
+        ("host_config", "networks"),
+        [
+            ({"NetworkMode": "host"}, {"host": {"IPAddress": ""}}),
+            ({"NetworkMode": "host"}, {}),
+            ({}, {"host": {"IPAddress": ""}}),
+        ],
+    )
+    def test_http_health_check_reports_host_networking(
+        self, wrapper, caplog, host_config, networks
+    ):
+        container = make_sdk_container()
+        container.name = "web"
+        container.attrs["HostConfig"] = host_config
+        container.attrs["NetworkSettings"] = {"Networks": networks}
+
+        with patch("app.docker_client.docker_client_wrapper.requests.get") as mock_get:
+            assert wrapper.check_http_health(container, "http://localhost:8080/health") is False
+
+        mock_get.assert_not_called()
+        assert "Container web uses host networking" in caplog.text
+        assert "Cannot get IP address" not in caplog.text
+
+    @pytest.mark.parametrize(
+        ("host_config", "networks"),
+        [
+            ({"NetworkMode": "host"}, {"host": {"IPAddress": ""}}),
+            ({"NetworkMode": "host"}, {}),
+            ({}, {"host": {"IPAddress": ""}}),
+        ],
+    )
+    def test_tcp_health_check_reports_host_networking(self, wrapper, caplog, host_config, networks):
+        container = make_sdk_container()
+        container.name = "web"
+        container.attrs["HostConfig"] = host_config
+        container.attrs["NetworkSettings"] = {"Networks": networks}
+
+        with patch("app.docker_client.docker_client_wrapper.socket.socket") as mock_socket_cls:
+            assert wrapper.check_tcp_health(container, port=8080) is False
+
+        mock_socket_cls.assert_not_called()
+        assert "Container web uses host networking" in caplog.text
+        assert "Cannot get IP address" not in caplog.text
+
     def test_tcp_health_check_fails_when_container_disappears_during_inspection(self, wrapper):
         container = make_sdk_container()
         container.reload.side_effect = docker.errors.NotFound("no such container")
