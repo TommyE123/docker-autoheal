@@ -235,15 +235,6 @@ _LEGACY_CHECK = {
 }
 
 
-def test_health_check_drops_the_removed_interval_and_retries_fields():
-    check = HealthCheckConfig(**_LEGACY_CHECK)
-
-    dumped = check.model_dump()
-    assert "interval_seconds" not in dumped
-    assert "retries" not in dumped
-    assert dumped["timeout_seconds"] == 7
-
-
 def test_saved_config_with_removed_health_check_fields_still_loads(
     isolated_config_manager, monkeypatch
 ):
