@@ -40,21 +40,16 @@ def _rewrite_loopback_host(endpoint: str, ip_address: str) -> str:
     return urlunsplit(parts._replace(netloc=f"{userinfo}{at}{ip_address}{port}"))
 
 
-def _container_ip(container: Container) -> str | None:
-    """Return the container's IP on a Docker network, or None (after logging why) if it has none.
-
-    A host-network container has no IP of its own, so Autoheal cannot reach it from its own
-    network namespace; that case is logged separately from an ordinary missing IP.
-    """
+def _uses_host_networking(container: Container) -> bool:
+    """Whether the container shares the host's network namespace and so has no IP of its own."""
     attrs = container.attrs
     networks = attrs.get("NetworkSettings", {}).get("Networks", {})
-    if attrs.get("HostConfig", {}).get("NetworkMode") == "host" or "host" in networks:
-        logger.warning(
-            "Container %s uses host networking, so HTTP and TCP health checks cannot reach it "
-            "from Autoheal; use an exec or docker health check instead",
-            container.name,
-        )
-        return None
+    return attrs.get("HostConfig", {}).get("NetworkMode") == "host" or "host" in networks
+
+
+def _container_ip(container: Container) -> str | None:
+    """Return the container's IP on a Docker network, or None (after logging why) if it has none."""
+    networks = container.attrs.get("NetworkSettings", {}).get("Networks", {})
     for network_info in networks.values():
         ip_address = network_info.get("IPAddress")
         if ip_address:
@@ -363,7 +358,7 @@ class DockerClientWrapper:
         endpoint: str,
         expected_status: int = 200,
         timeout: int = 5,
-    ) -> bool:
+    ) -> bool | None:
         """
         Perform HTTP health check on container
         Args:
@@ -372,10 +367,13 @@ class DockerClientWrapper:
             expected_status: Expected HTTP status code
             timeout: Request timeout
         Returns:
-            True if health check passes, False otherwise
+            True if health check passes, False if it fails, None if it cannot run because the
+            container uses host networking and Autoheal cannot reach it
         """
         try:
             container.reload()
+            if _uses_host_networking(container):
+                return None
             ip_address = _container_ip(container)
             if not ip_address:
                 return False
@@ -413,7 +411,7 @@ class DockerClientWrapper:
             logger.error("Failed to get events stream: %s", e)
             return None
 
-    def check_tcp_health(self, container: Container, port: int, timeout: int = 5) -> bool:
+    def check_tcp_health(self, container: Container, port: int, timeout: int = 5) -> bool | None:
         """
         Perform TCP health check on container
         Args:
@@ -421,10 +419,13 @@ class DockerClientWrapper:
             port: TCP port to check
             timeout: Connection timeout
         Returns:
-            True if TCP connection successful, False otherwise
+            True if the TCP connection succeeds, False if it fails, None if the check cannot run
+            because the container uses host networking and Autoheal cannot reach it
         """
         try:
             container.reload()
+            if _uses_host_networking(container):
+                return None
             ip_address = _container_ip(container)
             if not ip_address:
                 return False

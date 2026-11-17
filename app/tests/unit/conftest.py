@@ -193,7 +193,7 @@ class FakeDockerClient:
         self.list_containers_error: Exception | None = None
         self.events: Any = []
         self.events_since: list[Any] = []
-        self.health_results: dict[str, bool] = {}
+        self.health_results: dict[str, bool | None] = {}
         self.native_health: dict[str, str | None] = {}
         self.health_check_error: Exception | None = None
         self.info_errors: dict[str, Exception] = {}
@@ -254,12 +254,12 @@ class FakeDockerClient:
 
     def check_http_health(
         self, container: Any, endpoint: str, expected_status: int = 200, timeout: int = 5
-    ) -> bool:
+    ) -> bool | None:
         if self.health_check_error is not None:
             raise self.health_check_error
         return self.health_results.get(container.name, True)
 
-    def check_tcp_health(self, container: Any, port: int, timeout: int = 5) -> bool:
+    def check_tcp_health(self, container: Any, port: int, timeout: int = 5) -> bool | None:
         if self.health_check_error is not None:
             raise self.health_check_error
         return self.health_results.get(container.name, True)
@@ -267,7 +267,7 @@ class FakeDockerClient:
     def check_exec_health(self, container: Any, command: list[str], timeout: int = 10) -> bool:
         if self.health_check_error is not None:
             raise self.health_check_error
-        return self.health_results.get(container.name, True)
+        return self.health_results.get(container.name, True) is not False
 
     def get_docker_native_health(self, container: Any) -> str | None:
         if self.health_check_error is not None:
