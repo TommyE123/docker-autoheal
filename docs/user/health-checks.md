@@ -67,6 +67,9 @@ Supported `check_type` values:
 HTTP checks do not follow redirects, so `http_expected_status` is compared with the status of
 the configured endpoint itself (for example `302`). Only a host of exactly `localhost` or
 `127.0.0.1` is replaced with the container's IP address; the rest of the URL is sent as written.
+`http` and `tcp` checks need the container's IP address on a Docker network, so they cannot check
+a container that uses host networking (`network_mode: host`). Such a check always fails and logs
+that the container uses host networking; use an `exec` check or a Docker `HEALTHCHECK` instead.
 An `exec` check that has not finished after `timeout_seconds` is reported as failed, although
 Docker cannot stop the command, so it may keep running inside the container. Until it
 finishes, later checks of the same container and command fail without starting another one.
