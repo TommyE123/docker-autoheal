@@ -40,6 +40,29 @@ def _rewrite_loopback_host(endpoint: str, ip_address: str) -> str:
     return urlunsplit(parts._replace(netloc=f"{userinfo}{at}{ip_address}{port}"))
 
 
+def _container_ip(container: Container) -> str | None:
+    """Return the container's IP on a Docker network, or None (after logging why) if it has none.
+
+    A host-network container has no IP of its own, so Autoheal cannot reach it from its own
+    network namespace; that case is logged separately from an ordinary missing IP.
+    """
+    attrs = container.attrs
+    networks = attrs.get("NetworkSettings", {}).get("Networks", {})
+    if attrs.get("HostConfig", {}).get("NetworkMode") == "host" or "host" in networks:
+        logger.warning(
+            "Container %s uses host networking, so HTTP and TCP health checks cannot reach it "
+            "from Autoheal; use an exec or docker health check instead",
+            container.name,
+        )
+        return None
+    for network_info in networks.values():
+        ip_address = network_info.get("IPAddress")
+        if ip_address:
+            return ip_address
+    logger.warning("Cannot get IP address for container %s", container.name)
+    return None
+
+
 def recovery_identifier[S](stable_id: S, labels: dict) -> S | str:
     """
     Key for one running container's recovery state, derived from its labels.
@@ -352,19 +375,9 @@ class DockerClientWrapper:
             True if health check passes, False otherwise
         """
         try:
-            # Get container's network settings
             container.reload()
-            networks = container.attrs.get("NetworkSettings", {}).get("Networks", {})
-
-            # Try to get IP address from any network
-            ip_address = None
-            for network_info in networks.values():
-                ip_address = network_info.get("IPAddress")
-                if ip_address:
-                    break
-
+            ip_address = _container_ip(container)
             if not ip_address:
-                logger.warning("Cannot get IP address for container %s", container.name)
                 return False
 
             # Replace localhost/127.0.0.1 with container IP
@@ -412,16 +425,8 @@ class DockerClientWrapper:
         """
         try:
             container.reload()
-            networks = container.attrs.get("NetworkSettings", {}).get("Networks", {})
-
-            ip_address = None
-            for network_info in networks.values():
-                ip_address = network_info.get("IPAddress")
-                if ip_address:
-                    break
-
+            ip_address = _container_ip(container)
             if not ip_address:
-                logger.warning("Cannot get IP address for container %s", container.name)
                 return False
 
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:

@@ -1,7 +1,9 @@
 name: Upgrade gh-aw
 
 # Runs `gh aw upgrade` on main and, only if something wanted changes, opens a
-# normal PR for it. Triggered by cron-job.org through workflow_dispatch (no
+# normal PR for it. The Gemini CLI version pinned in issue-triage.md is bumped
+# first, so the same run recompiles the lock file against it (Renovate cannot
+# recompile it). Triggered by cron-job.org through workflow_dispatch (no
 # GitHub Actions schedule here); can also be run by hand. See #384.
 on: # yamllint disable-line rule:truthy
   workflow_dispatch:
@@ -55,6 +57,47 @@ jobs:
           curl -fsSL -o "$RUNNER_TEMP/install-gh-aw.sh" https://raw.githubusercontent.com/github/gh-aw/main/install-gh-aw.sh
           bash "$RUNNER_TEMP/install-gh-aw.sh"
 
+      # engine.version in issue-triage.md is not touched by `gh aw upgrade`, and
+      # Renovate cannot recompile the lock file, so bump it here and let the
+      # upgrade step below recompiles. Only stable releases at least as old as
+      # NPM_CONFIG_MIN_RELEASE_AGE in the lock file are eligible, because the
+      # lock file would refuse anything newer at install time.
+      - name: Bump the Gemini CLI pin
+        id: gemini
+        if: steps.existing.outputs.pr == ''
+        run: |
+          set -euo pipefail
+          file=.github/workflows/issue-triage.md
+          lock=.github/workflows/issue-triage.lock.yml
+          min_age=$(sed -nE "s/.*NPM_CONFIG_MIN_RELEASE_AGE: '([0-9]+)'.*/\1/p;T;q" "$lock")
+          [ -n "$min_age" ] || { echo "::error::no NPM_CONFIG_MIN_RELEASE_AGE found in $lock"; exit 1; }
+          current=$(sed -nE 's/^  version: "([0-9]+\.[0-9]+\.[0-9]+)"$/\1/p' "$file")
+          if [ "$(printf '%s\n' "$current" | grep -c .)" != 1 ]; then
+            echo "::error::expected exactly one 'version: \"x.y.z\"' line in $file"
+            exit 1
+          fi
+          latest=$(npm view @google/gemini-cli time --json | CURRENT="$current" MIN_AGE_DAYS="$min_age" node -e '
+            const times = JSON.parse(require("fs").readFileSync(0, "utf8"));
+            const cutoff = Date.now() - Number(process.env.MIN_AGE_DAYS) * 864e5;
+            const parts = (v) => v.split(".").map(Number);
+            const newer = (a, b) => {
+              const [x, y] = [parts(a), parts(b)];
+              for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i];
+              return false;
+            };
+            let best = process.env.CURRENT;
+            for (const [v, when] of Object.entries(times)) {
+              if (/^\d+\.\d+\.\d+$/.test(v) && Date.parse(when) <= cutoff && newer(v, best)) best = v;
+            }
+            console.log(best);
+          ')
+          [ -n "$latest" ] || { echo "::error::could not work out the latest Gemini CLI version"; exit 1; }
+          echo "Gemini CLI pin: $current, newest eligible (at least $min_age days old): $latest"
+          if [ "$latest" != "$current" ]; then
+            sed -i -E "s/^(  version: \")[0-9.]+(\")$/\1$latest\2/" "$file"
+            echo "version=$latest" >> "$GITHUB_OUTPUT"
+          fi
+
       # `gh aw upgrade` generates a skill file this repo does not keep; it is
       # removed if present. Nothing is branched, committed or pushed here. Only the files gh-aw manages are staged (the
       # gh-aw actions lock, workflow sources it applies codemods to, and
@@ -65,12 +108,22 @@ jobs:
         if: steps.existing.outputs.pr == ''
         env:
           GH_TOKEN: ${{ secrets.GH_AW_UPGRADE_TOKEN }}
+          GEMINI_VERSION: ${{ steps.gemini.outputs.version }}
         run: |
           set -euo pipefail
           version=$(gh aw --version 2>&1 | awk '{print $NF}')
           [ -n "$version" ] || { echo "::error::could not read the gh-aw version"; exit 1; }
           echo "gh-aw $version"
+          previous=$(grep -m1 -oE '"compiler_version":"[^"]+"' .github/workflows/issue-triage.lock.yml | cut -d'"' -f4 || true)
           gh aw upgrade
+
+          # The bump only counts if the recompile picked it up.
+          if [ -n "$GEMINI_VERSION" ]; then
+            if ! grep -q "\"gemini\":\"$GEMINI_VERSION\"" .github/workflows/issue-triage.lock.yml; then
+              echo "::error::issue-triage.lock.yml was not recompiled for Gemini CLI $GEMINI_VERSION"
+              exit 1
+            fi
+          fi
 
           rm -f -- .github/skills/agentic-workflows/SKILL.md
 
@@ -89,22 +142,49 @@ jobs:
           fi
           git diff --cached --stat
           echo "changed=true" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          # The branch keeps the chore/upgrade-gh-aw- prefix that the open-PR check
+          # above looks for. The title and body say which of the two changed.
+          note=""
+          if [ -n "$GEMINI_VERSION" ]; then
+            note="The Gemini CLI pin in issue-triage.md is now $GEMINI_VERSION."
+            note="$note CI cannot show that it still authenticates under the current AWF,"
+            note="$note so run issue-triage once from this branch before merging."
+          fi
+          if [ "$version" != "$previous" ] && [ -n "$GEMINI_VERSION" ]; then
+            branch="chore/upgrade-gh-aw-$version-gemini-cli-$GEMINI_VERSION"
+            title="chore: upgrade agentic workflows to $version and Gemini CLI to $GEMINI_VERSION"
+          elif [ -n "$GEMINI_VERSION" ]; then
+            branch="chore/upgrade-gh-aw-gemini-cli-$GEMINI_VERSION"
+            title="chore: upgrade the issue-triage Gemini CLI to $GEMINI_VERSION"
+          else
+            branch="chore/upgrade-gh-aw-$version"
+            title="chore: upgrade agentic workflows to $version"
+          fi
+          {
+            echo "branch=$branch"
+            echo "title=$title"
+            echo "note=$note"
+            echo "version=$version"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create upgrade PR
         if: steps.existing.outputs.pr == '' && steps.upgrade.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GH_AW_UPGRADE_TOKEN }}
           VERSION: ${{ steps.upgrade.outputs.version }}
+          BRANCH: ${{ steps.upgrade.outputs.branch }}
+          TITLE: ${{ steps.upgrade.outputs.title }}
+          NOTE: ${{ steps.upgrade.outputs.note }}
         run: |
-          branch="chore/upgrade-gh-aw-$VERSION"
+          branch="$BRANCH"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$branch"
-          git commit -m "chore: upgrade agentic workflows to $VERSION"
+          git commit -m "$TITLE"
           # No upgrade PR is open (checked above), so a same-named remote branch
           # is a leftover from a PR that was closed without merging: replace it.
           git push --force -u origin "$branch"
           gh pr create --base main --head "$branch" \
-            --title "chore: upgrade agentic workflows to $VERSION" \
-            --body "Automatically generated by the Upgrade gh-aw workflow (gh aw upgrade, gh-aw $VERSION). Review the generated workflow and lock file changes as normal."
+            --title "$TITLE" \
+            --body "Automatically generated by the Upgrade gh-aw workflow (gh aw upgrade, gh-aw $VERSION). Review the generated workflow and lock file changes as normal. $NOTE"
