@@ -252,9 +252,7 @@ class HealthCheckConfig(BaseModel):
 
     container_id: str
     check_type: str = Field(description="Type: http, tcp, exec, or docker")
-    interval_seconds: int = Field(default=30, ge=1)
     timeout_seconds: int = Field(default=10, ge=1)
-    retries: int = Field(default=3, ge=1)
     # For HTTP checks
     http_endpoint: str | None = None
     http_expected_status: int | None = 200
