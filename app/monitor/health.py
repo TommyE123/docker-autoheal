@@ -137,9 +137,9 @@ class HealthEvaluator:
                     break
         if custom_hc:
             result = await self.perform_custom_health_check(container, custom_hc)
+            self._note_custom_check_result(info, custom_hc.check_type, skipped=result is None)
             if result is False:
                 return f"Custom health check failed ({custom_hc.check_type})"
-            self._note_custom_check_result(info, custom_hc.check_type, skipped=result is None)
 
         # Then check Docker native health
         health = info.get("health")

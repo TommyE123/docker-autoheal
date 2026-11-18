@@ -449,12 +449,14 @@ class TestSkippedCustomHealthChecks:
         events = [e for e in config_manager.get_events() if e.event_type == "health_check_skipped"]
         assert sorted(e.container_name for e in events) == ["db", "web"]
 
-    async def test_skip_is_reported_again_after_the_check_runs(self, engine, docker_client):
+    @pytest.mark.parametrize("ran", [True, False])
+    async def test_skip_is_reported_again_after_the_check_runs(self, engine, docker_client, ran):
+        """The check running again resets the skip record, whether it passes or fails."""
         container, info = make_container(name="web")
         docker_client.add_container(container, info)
         self._add_check("tcp")
 
-        for result in (None, True, None):
+        for result in (None, ran, None):
             docker_client.health_results["web"] = result
             await engine._evaluate_container_health(container, info)
 
