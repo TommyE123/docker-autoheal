@@ -35,8 +35,6 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.badge-only != 'true' }}
     runs-on: ubuntu-latest
-    env:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
 
     steps:
       - name: Checkout code
@@ -55,10 +53,10 @@ jobs:
               mirrors = ["mirror.gcr.io"]
 
       # Authenticated pulls avoid Docker Hub's anonymous rate limit (429). Best effort: if the
-      # login itself fails (a Docker Hub outage), carry on with anonymous pulls. Repo secrets are
-      # not available to fork or Dependabot runs, which skip this and use the mirror instead.
+      # login itself fails (a Docker Hub outage), carry on with anonymous pulls. Fork pull
+      # requests get no secrets, so they skip this and use the mirror instead.
       - name: Login to Docker Hub
-        if: env.DOCKERHUB_USERNAME != ''
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
         continue-on-error: true
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
@@ -95,7 +93,6 @@ jobs:
       contents: read
     uses: ./.github/workflows/production-smoke-test.yml
     secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
   # The arm64 image is built under QEMU emulation and only started, not put through the UI
@@ -106,8 +103,6 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.badge-only != 'true' }}
     runs-on: ubuntu-latest
-    env:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     timeout-minutes: 30
 
     steps:
@@ -148,10 +143,10 @@ jobs:
           } >> "${GITHUB_ENV}"
 
       # Authenticated pulls avoid Docker Hub's anonymous rate limit (429). Best effort: if the
-      # login itself fails (a Docker Hub outage), carry on with anonymous pulls. Repo secrets are
-      # not available to fork or Dependabot runs, which skip this and use the mirror instead.
+      # login itself fails (a Docker Hub outage), carry on with anonymous pulls. Fork pull
+      # requests get no secrets, so they skip this and use the mirror instead.
       - name: Login to Docker Hub
-        if: env.DOCKERHUB_USERNAME != ''
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
         continue-on-error: true
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
