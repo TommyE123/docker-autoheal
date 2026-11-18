@@ -95,6 +95,7 @@ jobs:
         with:
           run_command: empty-upload
           force: true
+          fail_ci_if_error: true
 
       - name: Upload Python coverage artifact
         if: ${{ !cancelled() && hashFiles('coverage.xml') != '' }}
