@@ -157,7 +157,9 @@ mutation job again for a badge-only change. The frontend tests, Docker build and
 MegaLinter also skip such a PR (a `changes` job calling `.github/workflows/badge-only-check.yml`,
 which reports it badge-only only when the badge file is the sole changed file). The required
 `unit-tests` check still runs but, instead of the test suite, only runs
-`.github/scripts/validate-badge.sh`, which fails on a missing or malformed badge file. Any PR that
+`.github/scripts/validate-badge.sh`, which fails on a missing or malformed badge file. It also
+sends Codecov an `empty-upload` (with `force`), so the required `codecov/patch` and
+`codecov/project` statuses are posted as passing even though no coverage is uploaded. Any PR that
 changes another file, or where detection fails, runs everything.
 
 On a pull request from this repository, a short comment shows this PR's score next to the
