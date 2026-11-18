@@ -51,9 +51,7 @@ curl -X POST http://localhost:3131/api/healthchecks \
     "check_type": "http",
     "http_endpoint": "http://localhost:8080/health",
     "http_expected_status": 200,
-    "interval_seconds": 30,
-    "timeout_seconds": 10,
-    "retries": 3
+    "timeout_seconds": 10
   }'
 ```
 
@@ -88,6 +86,15 @@ A check already saved in `config.json` that fails these rules (including an unkn
 configuration loads, so it no longer restarts the container and does not affect other checks. It
 is removed from `config.json` the next time the configuration is saved. Importing a configuration
 that contains one is rejected as a whole.
+
+A custom check runs once per monitoring cycle (`monitor.interval_seconds`), only when `restart.mode`
+is `health` or `both` (not in the default `on-failure` mode). It has no retry or interval setting
+of its own. One failed check marks the container unhealthy for that cycle, and
+the [restart behavior](#restart-behavior-once-a-check-fails) below, in particular the backoff
+wait, decides when it is actually restarted. Earlier versions accepted `interval_seconds` and
+`retries` on a custom check but ignored them. They are still accepted, in `POST /api/healthchecks`,
+in `config.json` and when importing a configuration, and are dropped when the configuration is
+next saved.
 
 If a custom health check is configured, it's evaluated in addition to Docker's native
 health status — either one reporting unhealthy is enough to trigger a restart.
