@@ -85,6 +85,17 @@ jobs:
         with:
           report_type: coverage
 
+      # A badge-only PR uploads no coverage, so Codecov would never post the required
+      # codecov/patch and codecov/project statuses. force is needed because the badge file is
+      # not on Codecov's ignore list; without it the statuses are posted only when every
+      # changed file is ignored.
+      - name: Report passing Codecov statuses for a badge-only change
+        if: ${{ needs.changes.outputs.badge-only == 'true' }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          run_command: empty-upload
+          force: true
+
       - name: Upload Python coverage artifact
         if: ${{ !cancelled() && hashFiles('coverage.xml') != '' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
