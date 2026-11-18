@@ -155,14 +155,14 @@ class HealthEvaluator:
             check_type: The custom check's type
             skipped: True when the check could not run
         """
-        key = (info.get("full_id") or info.get("name") or "", check_type)
+        key = (info["full_id"], check_type)
         if not skipped:
             self._skipped_checks.discard(key)
             return
         if key in self._skipped_checks:
             return
         self._skipped_checks.add(key)
-        name = info.get("name")
+        name = info["name"]
         message = (
             f"Custom {check_type} health check skipped: the container uses host networking, "
             "so Autoheal cannot reach it. Use an exec or Docker health check instead"
@@ -171,8 +171,8 @@ class HealthEvaluator:
         config_manager.add_event(
             AutoHealEvent(
                 timestamp=datetime.now(UTC),
-                container_name=str(name),
-                container_id=str(info.get("full_id", "")),
+                container_name=name,
+                container_id=info["full_id"],
                 event_type="health_check_skipped",
                 restart_count=0,
                 status="skipped",

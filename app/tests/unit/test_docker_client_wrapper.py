@@ -16,7 +16,12 @@ import docker
 import docker.errors
 import pytest
 
-from app.docker_client.docker_client_wrapper import DockerClientWrapper, _require_container_id
+from app.docker_client.docker_client_wrapper import (
+    DockerClientWrapper,
+    _container_ip,
+    _require_container_id,
+    _uses_host_networking,
+)
 
 
 @pytest.fixture
@@ -885,6 +890,37 @@ class TestHttpHealth:
             side_effect=ConnectionError("refused"),
         ):
             assert wrapper.check_http_health(container, "http://localhost:3131/health") is False
+
+
+class TestContainerNetworkHelpers:
+    """``_uses_host_networking`` and ``_container_ip`` on attrs the daemon may leave out."""
+
+    @pytest.mark.parametrize(
+        "attrs", [{}, {"NetworkSettings": {}}, {"NetworkSettings": {"Networks": {}}}]
+    )
+    def test_container_without_network_data_is_not_host_networked_and_has_no_ip(
+        self, attrs, caplog
+    ):
+        container = make_sdk_container()
+        container.name = "web"
+        container.attrs = attrs
+
+        assert _uses_host_networking(container) is False
+        with caplog.at_level(logging.WARNING):
+            assert _container_ip(container) is None
+        assert [r.getMessage() for r in caplog.records] == [
+            "Cannot get IP address for container web"
+        ]
+
+    def test_container_ip_is_the_first_network_address(self):
+        container = make_sdk_container()
+        container.attrs = {
+            "NetworkSettings": {
+                "Networks": {"a": {"IPAddress": ""}, "b": {"IPAddress": "10.0.0.5"}}
+            }
+        }
+
+        assert _container_ip(container) == "10.0.0.5"
 
 
 class TestEvents:

@@ -396,7 +396,7 @@ class TestSkippedCustomHealthChecks:
     async def test_skip_is_logged_and_recorded_once_per_container(
         self, engine, docker_client, caplog
     ):
-        container, info = make_container(name="web")
+        container, info = make_container(name="web", container_id="c" * 64)
         docker_client.add_container(container, info)
         docker_client.health_results["web"] = None
         self._add_check("http")
@@ -404,12 +404,50 @@ class TestSkippedCustomHealthChecks:
         for _ in range(3):
             await engine._evaluate_container_health(container, info)
 
+        message = (
+            "Custom http health check skipped: the container uses host networking, so Autoheal "
+            "cannot reach it. Use an exec or Docker health check instead"
+        )
         events = [e for e in config_manager.get_events() if e.event_type == "health_check_skipped"]
         assert len(events) == 1
-        assert events[0].status == "skipped"
-        assert events[0].container_name == "web"
-        assert "host networking" in events[0].message
-        assert caplog.text.count("health check skipped") == 1
+        event = events[0]
+        assert event.container_name == "web"
+        assert event.container_id == "c" * 64
+        assert event.restart_count == 0
+        assert event.status == "skipped"
+        assert event.message == message
+        skip_logs = [r for r in caplog.records if "health check skipped" in r.getMessage()]
+        assert [(r.levelname, r.getMessage()) for r in skip_logs] == [
+            ("WARNING", f"Container web: {message}")
+        ]
+
+    async def test_skip_is_reported_again_when_the_check_type_changes(self, engine, docker_client):
+        container, info = make_container(name="web")
+        docker_client.add_container(container, info)
+        docker_client.health_results["web"] = None
+
+        for check_type in ("http", "tcp"):
+            self._add_check(check_type)
+            await engine._evaluate_container_health(container, info)
+
+        events = [e for e in config_manager.get_events() if e.event_type == "health_check_skipped"]
+        assert [e.message.split()[1] for e in events] == ["http", "tcp"]
+
+    async def test_skips_of_different_containers_are_reported_separately(
+        self, engine, docker_client
+    ):
+        docker_client.health_results["web"] = None
+        docker_client.health_results["db"] = None
+        for name, container_id in (("web", "a" * 64), ("db", "b" * 64)):
+            container, info = make_container(name=name, container_id=container_id)
+            docker_client.add_container(container, info)
+            config_manager.add_custom_health_check(
+                HealthCheckConfig(container_id=name, check_type="tcp", tcp_port=8080)
+            )
+            await engine._evaluate_container_health(container, info)
+
+        events = [e for e in config_manager.get_events() if e.event_type == "health_check_skipped"]
+        assert sorted(e.container_name for e in events) == ["db", "web"]
 
     async def test_skip_is_reported_again_after_the_check_runs(self, engine, docker_client):
         container, info = make_container(name="web")
