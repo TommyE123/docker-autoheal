@@ -31,8 +31,8 @@ The container provides:
   (markdownlint, prettier, stylelint and the rest) in `.devcontainer/package.json` are
   unpinned and have no lockfile, so each rebuild installs the latest releases
 - Shared VS Code settings, a shared set of installed VS Code extensions, and forwarded
-  ports for the frontend (3000), the dev stack's UI/API (3132) and metrics (9091), the
-  browser demo (3133), and Playwright's UI (9323)
+  ports for the dev stack's UI/API (3132) and metrics (9091), the browser demo (3133), the
+  frontend dev server (3134), and Playwright's UI (3135)
 
 Application services are **not** started automatically — use the tasks below.
 
@@ -134,6 +134,23 @@ need `bash` on `PATH` (Git Bash or WSL on Windows).
 **Autoheal: Run Megalinter Cupcake** runs the same pinned MegaLinter image CI uses. It
 mounts the current directory. Because the Dev Container has its own Docker daemon, the
 container path is the path that daemon sees.
+
+### Ports
+
+Browser-facing ports are in the 313x block. Each dev stack port is its production port plus one.
+
+| Port | Used by                                             | Scope       |
+| ---- | --------------------------------------------------- | ----------- |
+| 3131 | Web UI and API                                      | Production  |
+| 9090 | Prometheus metrics                                  | Production  |
+| 3132 | Dev stack UI and API (`docker-compose.dev.yml`)     | Development |
+| 3133 | Browser demo (**Autoheal: Run Demo**)               | Development |
+| 3134 | Vite frontend dev server (**Run React Frontend**)   | Development |
+| 3135 | Playwright UI mode (**Autoheal: Run UI E2E**, `ui`) | Development |
+| 9091 | Dev stack metrics                                   | Development |
+
+The Dev Container forwards the development ports. After pulling a change to them into an existing
+Dev Container, run **Dev Containers: Rebuild Container** once.
 
 ### Docker isolation
 

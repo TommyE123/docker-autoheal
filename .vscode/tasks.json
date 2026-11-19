@@ -475,7 +475,7 @@
           "value": "headless"
         },
         {
-          "label": "Watch and debug in a browser panel (Playwright UI, port 9323)",
+          "label": "Watch and debug in a browser panel (Playwright UI, port 3135)",
           "value": "ui"
         }
       ],
