@@ -65,11 +65,11 @@
   ],
   "packageRules": [
     {
-      "description": "Update the Node major everywhere in one PR: the Dockerfile image, node-version in tests.yml and production-smoke-test.yml, and the node feature's version option in devcontainer.json (read by Renovate's built-in devcontainer manager). minimumGroupSize must equal the number of pins, so the PR is only created once all of them have an update. The contract test in app/tests/unit/test_dev_stack_files.py checks that they agree. Only major updates are grouped, so digest refreshes are not held back by the minimum. Node majors need a manual merge. The rule matches the dependency name rather than the package name, because the setup-node pins in the workflows have the package name actions/node-versions while the Dockerfile and Dev Container pins are named node.",
+      "description": "Update the Node major everywhere in one PR: the Dockerfile image, node-version in tests.yml, production-smoke-test.yml and demo-pages.yml, and the node feature's version option in devcontainer.json (read by Renovate's built-in devcontainer manager). minimumGroupSize must equal the number of pins, so the PR is only created once all of them have an update. The contract test in app/tests/unit/test_dev_stack_files.py checks that they agree. Only major updates are grouped, so digest refreshes are not held back by the minimum. Node majors need a manual merge. The rule matches the dependency name rather than the package name, because the setup-node pins in the workflows have the package name actions/node-versions while the Dockerfile and Dev Container pins are named node.",
       "matchDepNames": ["node"],
       "matchUpdateTypes": ["major"],
       "groupName": "Node runtime",
-      "minimumGroupSize": 4,
+      "minimumGroupSize": 5,
       "minimumReleaseAge": "7 days"
     },
     {
