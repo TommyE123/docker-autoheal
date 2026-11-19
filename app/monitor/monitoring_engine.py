@@ -15,6 +15,7 @@ from app.config.config_manager import (
     config_manager,
 )
 from app.docker_client.docker_client_wrapper import recovery_identifier
+from app.docker_client.identity import recovery_keys
 from app.monitor.auto_discovery import AutoDiscovery
 from app.monitor.health import HealthEvaluator
 from app.monitor.recovery import RecoveryPolicy
@@ -327,7 +328,7 @@ class MonitoringEngine:
             self._recovery.forget_container(container_id)
             return
 
-        # Check if container is quarantined (by recovery ID, name, or ID for backwards compatibility)
+        # Check if container is quarantined (by recovery ID, or a legacy name or ID entry)
         identifiers = self._container_identifiers(info)
         if identifiers is None:
             logger.warning(
@@ -336,17 +337,15 @@ class MonitoringEngine:
             )
             return
         container_id, container_name, recovery_id = identifiers
-        quarantine_id = None
-        if config_manager.is_quarantined(recovery_id):
-            quarantine_id = recovery_id
-        elif config_manager.is_quarantined(container_name):
-            quarantine_id = container_name
-        elif config_manager.is_quarantined(container_id):
-            quarantine_id = container_id
+        quarantine_keys = [
+            key
+            for key in recovery_keys(recovery_id, container_name, container_id)
+            if config_manager.is_quarantined(key)
+        ]
 
-        if quarantine_id:
+        if quarantine_keys:
             released = await self._check_quarantined_container(
-                container, info, quarantine_id, recovery_id
+                container, info, quarantine_keys, recovery_id
             )
             if not released:
                 logger.debug(
@@ -368,7 +367,7 @@ class MonitoringEngine:
         self._recovery.note_healthy(recovery_id, container_id, running, config.restart)
 
     async def _check_quarantined_container(
-        self, container: Container, info: dict, quarantine_id: str, recovery_id: str
+        self, container: Container, info: dict, quarantine_keys: list[str], recovery_id: str
     ) -> bool:
         """
         Release a quarantined container once it has stayed healthy; True if released.
@@ -379,7 +378,7 @@ class MonitoringEngine:
         Args:
             container: Container object
             info: Container information dict
-            quarantine_id: The ID used in the quarantine list
+            quarantine_keys: The keys the container is quarantined under
             recovery_id: Recovery identifier for the container
 
         Returns:
@@ -390,7 +389,7 @@ class MonitoringEngine:
             needs_restart, _ = await self._evaluate_container_health(container, info)
             if not needs_restart and self._quarantine_recovery_confirmed(container_id, info):
                 await self._auto_unquarantine_container(
-                    quarantine_id, recovery_id, info["name"], container_id
+                    quarantine_keys, recovery_id, info["name"], container_id
                 )
                 return True
         return False
@@ -443,7 +442,7 @@ class MonitoringEngine:
 
     async def _auto_unquarantine_container(
         self,
-        quarantine_id: str,
+        quarantine_keys: list[str],
         recovery_id: str,
         container_name: str,
         container_id: str,
@@ -451,14 +450,15 @@ class MonitoringEngine:
         """
         Automatically remove a container from quarantine because it has auto-healed
         Args:
-            quarantine_id: The ID used in the quarantine list
+            quarantine_keys: The keys the container is quarantined under; all are removed
             recovery_id: Recovery identifier for the container
             container_name: Container name
             container_id: Container ID
         """
         try:
-            # Remove from quarantine
-            config_manager.unquarantine_container(quarantine_id)
+            # Remove from quarantine under every key it is filed under
+            for key in quarantine_keys:
+                config_manager.unquarantine_container(key)
 
             # Also clear the restart count so it starts fresh
             config_manager.clear_restart_history(recovery_id)
