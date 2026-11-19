@@ -3,8 +3,9 @@ name: Demo (GitHub Pages)
 # Builds the public browser demo (frontend `--mode demo`: the real UI with sample
 # data and a mock API, see frontend/src/demo/) and deploys it to GitHub Pages.
 #   - release published: deploys that release's tag.
-#   - manual run: deploys the branch or tag picked in "Use workflow from" (main by
-#     default, to show merged work before the next release; or a release tag).
+#   - manual run: redeploys the release tag picked in "Use workflow from". Only
+#     release tags may deploy (the github-pages environment allows v* tags only), so
+#     a run from a branch builds and tests but its deployment is refused.
 # There is one demo: each deployment replaces the previous one. If the build
 # fails nothing is deployed, so the live demo stays as it was.
 on: # yamllint disable-line rule:truthy

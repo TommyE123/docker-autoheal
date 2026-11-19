@@ -77,22 +77,23 @@ deployment. See [Testing](testing.md#browser-demo-smoke-test-playwright).
 deployment is listed in the repository's Deployments panel under the `github-pages`
 environment.
 
-- **When a release is published**, it deploys that release's tag.
-- **Manually** (Actions → Demo (GitHub Pages) → Run workflow), it deploys the branch or
-  tag picked in "Use workflow from": `main` to show merged work before the next release,
-  or a release tag to go back to a release.
+- **When a release is published**, it deploys that release's tag. Only releases are
+  deployed, so the live demo always matches a published version.
+- **Manually** (Actions → Demo (GitHub Pages) → Run workflow), pick a release tag in
+  "Use workflow from" to redeploy that release, for example to go back to it or retry a
+  failed deployment. A run from a branch builds and tests, but its deployment is refused.
+  Only tags cut after this workflow was added can be run.
 
 There is one demo, so each deployment replaces the last one. If the build or its smoke
 test fails, nothing is deployed and the live demo stays as it was. The banner shows the
-release tag, or the branch and short commit for anything else.
+release tag (or, for a local or CI build, the branch and short commit).
 
 One-off repository setup:
 
 1. **Settings → Pages → Build and deployment → Source:** GitHub Actions.
 2. **Settings → Environments → `github-pages` → Deployment branches and tags:** choose
-   **Selected branches and tags**, then make sure there is a branch rule for `main`
-   (manual runs) and add a tag rule for `v*` (releases). With only one of the two,
-   the other kind of deployment is refused.
+   **Selected branches and tags** with a single tag rule for `v*`, and no branch rules,
+   so only release tags can deploy.
 3. **Optional analytics:** to count visitors, add a site in Cloudflare Web Analytics and
    save its site token as the repository **variable** `CF_ANALYTICS_TOKEN` (Settings →
    Secrets and variables → Actions → Variables). The token is public: it ends up in the
