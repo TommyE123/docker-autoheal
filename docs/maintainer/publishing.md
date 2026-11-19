@@ -36,10 +36,9 @@ only updates the Release PR. A human decides when to actually release by merging
 **Required repository variable:** `DOCKERHUB_USERNAME`, the Docker Hub account the images are
 published to. **Required repository secrets:** `DOCKERHUB_TOKEN` and
 `RELEASE_PLEASE_TOKEN`, a personal access token the `release-please` job uses to open and
-update the Release PR (see below). The CI workflows also keep `DOCKERHUB_USERNAME` as a
-secret, only to detect whether secrets are available: fork and Dependabot runs have none, so
-they skip the Docker Hub login. GHCR push uses the workflow's own `GITHUB_TOKEN` — no
-extra secret needed. Newly published GHCR packages default
+update the Release PR (see below). The CI workflows skip the Docker Hub login on pull
+requests from forks, which get no secrets. GHCR push uses the workflow's own `GITHUB_TOKEN` —
+no extra secret needed. Newly published GHCR packages default
 to **private**; someone with admin access needs to switch the package to public in its GitHub
 package settings before `docker pull ghcr.io/...` works for everyone (see the note in
 `docs/maintainer/docker-hub-readme.md`).
