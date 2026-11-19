@@ -884,3 +884,52 @@ def test_loaders_return_empty_state_when_their_files_are_missing():
     assert config_manager._load_quarantine() == set()
     assert config_manager._maintenance_mode is False
     assert config_manager._maintenance_start_time is None
+
+
+def test_failed_import_config_restores_config_and_custom_health_checks(isolated_config_manager):
+    manager = isolated_config_manager
+    old_check = HealthCheckConfig(container_id="web", check_type="http", http_endpoint="/old")
+    manager.add_custom_health_check(old_check)
+    old_config = manager.get_config()
+    exported = json.loads(manager.export_config())
+    exported["monitor"]["interval_seconds"] = 99
+    exported["custom_health_checks"] = {}
+    saved_before = manager.CONFIG_FILE.read_bytes()
+
+    with _failing_writes(), pytest.raises(PersistenceError):
+        manager.import_config(json.dumps(exported))
+
+    assert manager.get_config() == old_config
+    assert manager.get_all_custom_health_checks() == {"web": old_check}
+    assert manager.CONFIG_FILE.read_bytes() == saved_before
+
+
+def test_failed_add_custom_health_check_restores_the_previous_value(isolated_config_manager):
+    manager = isolated_config_manager
+    old_check = HealthCheckConfig(container_id="web", check_type="http", http_endpoint="/old")
+    manager.add_custom_health_check(old_check)
+
+    new_check = HealthCheckConfig(container_id="web", check_type="http", http_endpoint="/new")
+    added = HealthCheckConfig(container_id="db", check_type="http", http_endpoint="/db")
+    with _failing_writes():
+        with pytest.raises(PersistenceError):
+            manager.add_custom_health_check(new_check)
+        with pytest.raises(PersistenceError):
+            manager.add_custom_health_check(added)
+
+    assert manager.get_all_custom_health_checks() == {"web": old_check}
+
+
+def test_failed_remove_custom_health_check_restores_it(isolated_config_manager):
+    manager = isolated_config_manager
+    check = HealthCheckConfig(container_id="web", check_type="http", http_endpoint="/old")
+    manager.add_custom_health_check(check)
+
+    with _failing_writes():
+        with pytest.raises(PersistenceError):
+            manager.remove_custom_health_check("web")
+        # Removing something that was never there leaves nothing behind either.
+        with pytest.raises(PersistenceError):
+            manager.remove_custom_health_check("absent")
+
+    assert manager.get_all_custom_health_checks() == {"web": check}

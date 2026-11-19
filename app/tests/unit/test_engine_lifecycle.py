@@ -796,6 +796,26 @@ class TestProcessContainerStartEvent:
         assert config_manager.get_events() == []
         mock_notification_manager.send_event_notification.assert_not_awaited()
 
+    async def test_events_file_write_failure_still_sends_the_notification(
+        self, engine, docker_client, mock_notification_manager, monkeypatch, caplog
+    ):
+        """The selection is saved; only the event is memory-only, and the notification goes out."""
+        container, info = make_container(name="web", labels={"autoheal": "true"})
+        docker_client.add_container(container, info)
+        events_path = config_manager.EVENTS_FILE
+        monkeypatch.setattr(
+            config_manager,
+            "EVENTS_FILE",
+            events_path.parent / "missing-parent" / events_path.name,
+        )
+
+        await engine._auto_discovery.process_start_event(start_event(container.id, "web"))
+
+        assert len(config_manager.get_config().containers.selected) == 1
+        assert [e.event_type for e in config_manager.get_events()] == ["auto_monitor"]
+        mock_notification_manager.send_event_notification.assert_awaited_once()
+        assert "Could not save the auto_monitor event for container 'web'" in caplog.text
+
     async def test_event_without_container_id_is_ignored(self, engine):
         await engine._auto_discovery.process_start_event({"Actor": {"Attributes": {"name": "web"}}})
 

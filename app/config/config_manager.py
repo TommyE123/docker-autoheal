@@ -886,7 +886,11 @@ class ConfigManager:
             return json.dumps(config_dict, indent=2, default=str)
 
     def import_config(self, json_str: str) -> None:
-        """Import configuration from JSON string"""
+        """Import configuration from JSON string.
+
+        If the file cannot be written the previous configuration and custom health
+        checks are restored in memory and ``PersistenceError`` is raised.
+        """
         with self._lock:
             config_dict = json.loads(json_str)
             if not isinstance(config_dict, dict):
@@ -909,11 +913,16 @@ class ConfigManager:
                 cid: HealthCheckConfig(**hc) for cid, hc in custom_hc.items()
             }
 
+            previous = (self._config, self._custom_health_checks)
             self._config = new_config
             self._custom_health_checks = new_custom_health_checks
 
-            # Persist to disk
-            self._save_config()
+            # Persist to disk; if that fails, put the previous configuration back
+            try:
+                self._save_config()
+            except PersistenceError:
+                self._config, self._custom_health_checks = previous
+                raise
 
     def add_event(self, event: AutoHealEvent) -> None:
         """Add event to log (thread-safe, with size limit).
@@ -943,10 +952,20 @@ class ConfigManager:
             logger.info("All events cleared")
 
     def add_custom_health_check(self, health_check: HealthCheckConfig) -> None:
-        """Add custom health check for a container"""
+        """Add custom health check for a container.
+
+        If the file cannot be written the previous value is restored in memory and
+        ``PersistenceError`` is raised.
+        """
         with self._lock:
-            self._custom_health_checks[health_check.container_id] = health_check
-            self._save_config()
+            container_id = health_check.container_id
+            previous = self._custom_health_checks.get(container_id)
+            self._custom_health_checks[container_id] = health_check
+            try:
+                self._save_config()
+            except PersistenceError:
+                self._restore_custom_health_check(container_id, previous)
+                raise
 
     def get_custom_health_check(self, container_id: str) -> HealthCheckConfig | None:
         """Get custom health check for a container"""
@@ -954,10 +973,27 @@ class ConfigManager:
             return self._custom_health_checks.get(container_id)
 
     def remove_custom_health_check(self, container_id: str) -> None:
-        """Remove custom health check for a container"""
+        """Remove custom health check for a container.
+
+        If the file cannot be written the check is restored in memory and
+        ``PersistenceError`` is raised.
+        """
         with self._lock:
+            previous = self._custom_health_checks.pop(container_id, None)
+            try:
+                self._save_config()
+            except PersistenceError:
+                self._restore_custom_health_check(container_id, previous)
+                raise
+
+    def _restore_custom_health_check(
+        self, container_id: str, previous: HealthCheckConfig | None
+    ) -> None:
+        """Put back (or drop, if ``previous`` is None) a custom health check. Hold the lock."""
+        if previous is None:
             self._custom_health_checks.pop(container_id, None)
-            self._save_config()
+        else:
+            self._custom_health_checks[container_id] = previous
 
     def get_all_custom_health_checks(self) -> dict[str, HealthCheckConfig]:
         """Get all custom health checks"""
