@@ -410,10 +410,12 @@ deep link loads under the `/docker-autoheal/` sub-path, and there is no service 
 or manifest. It also clicks through two things a visitor could misread: a notification
 test says nothing was sent, and **Reset demo** brings back the sample data after the
 events are cleared. It needs no Docker and takes a few seconds. It serves an existing
-build, so build first:
+build, so build first. Outside the Dev Container, whose setup already installs Chromium,
+install it once with `test:demo-e2e:install`:
 
 ```bash
 cd frontend
+npm run test:demo-e2e:install   # once, outside the Dev Container
 npm run build:demo
 npm run test:demo-e2e
 ```
