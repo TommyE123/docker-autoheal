@@ -141,7 +141,7 @@ Things you open in a browser use the 313x block. The dev stack ports (3132, 9091
 production ports plus one, and metrics stay in the 909x range.
 
 | Port | Used by                                             | Scope       |
-| ---- | --------------------------------------------------- | ----------- |
+|------|-----------------------------------------------------|-------------|
 | 3131 | Web UI and API                                      | Production  |
 | 9090 | Prometheus metrics                                  | Production  |
 | 3132 | Dev stack UI and API (`docker-compose.dev.yml`)     | Development |
