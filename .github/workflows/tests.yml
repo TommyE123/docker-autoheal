@@ -154,6 +154,16 @@ jobs:
           path: frontend/coverage/lcov.info
           retention-days: 7
 
+      # The browser demo (src/demo/) must only be in the demo build. Its banner
+      # text appearing in the production build means the demo code shipped too.
+      - name: Check the production build has no demo code
+        run: |
+          npm run build
+          if grep -rl "Demo with sample data" ../static; then
+            echo "::error::Browser demo code found in the production build"
+            exit 1
+          fi
+
       # Smoke test of the browser demo build (docs/developer/demo.md): every page
       # against the mock API, under the Pages sub-path. Catches a UI call the mock
       # doesn't answer before it reaches the live demo.

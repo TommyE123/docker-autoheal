@@ -87,9 +87,10 @@ release tag, or the branch and short commit for anything else.
 One-off repository setup:
 
 1. **Settings → Pages → Build and deployment → Source:** GitHub Actions.
-2. **Settings → Environments → `github-pages` → Deployment branches and tags:** add a
-   tag rule for `v*`. Release deployments run from the release tag, and the
-   environment's default rule only allows the default branch.
+2. **Settings → Environments → `github-pages` → Deployment branches and tags:** choose
+   **Selected branches and tags**, then make sure there is a branch rule for `main`
+   (manual runs) and add a tag rule for `v*` (releases). With only one of the two,
+   the other kind of deployment is refused.
 3. **Optional analytics:** to count visitors, add a site in Cloudflare Web Analytics and
    save its site token as the repository **variable** `CF_ANALYTICS_TOKEN` (Settings →
    Secrets and variables → Actions → Variables). The token is public: it ends up in the
