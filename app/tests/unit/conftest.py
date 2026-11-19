@@ -377,6 +377,12 @@ class FakeUptimeKumaClient:
 
 
 @pytest.fixture(autouse=True)
+def _no_data_dir_override(monkeypatch):
+    """Ignore a developer's exported AUTOHEAL_DATA_DIR, which would beat the patched paths."""
+    monkeypatch.delenv("AUTOHEAL_DATA_DIR", raising=False)
+
+
+@pytest.fixture(autouse=True)
 def isolated_config_manager():
     """
     Isolate the global ``config_manager`` singleton for each test.

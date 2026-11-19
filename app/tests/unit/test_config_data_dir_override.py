@@ -1,5 +1,7 @@
 """AUTOHEAL_DATA_DIR overrides where ConfigManager stores its state."""
 
+import logging
+import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -52,12 +54,14 @@ def test_without_override_the_default_directory_is_used(data_dir_default, monkey
     assert (data_dir_default / "config.json").exists()
 
 
-def test_override_moves_every_state_file(data_dir_default, tmp_path, monkeypatch):
+def test_override_moves_every_state_file(data_dir_default, tmp_path, monkeypatch, caplog):
     override = tmp_path / "custom"
     monkeypatch.setenv(DATA_DIR_ENV, str(override))
 
-    manager = ConfigManager()
+    with caplog.at_level(logging.INFO, logger=config_manager_module.logger.name):
+        manager = ConfigManager()
 
+    assert f"persistent storage at {override}" in caplog.text
     assert override == manager.DATA_DIR
     for attribute in _FILES:
         assert getattr(manager, attribute).parent == override
@@ -112,3 +116,8 @@ def test_unusable_override_still_falls_back_to_the_local_directory(
     assert Path("./data") == manager.DATA_DIR
     assert Path("./data") / "config.json" == manager.CONFIG_FILE
     assert (tmp_path / "data" / "config.json").exists()
+
+
+def test_an_exported_override_does_not_leak_into_the_unit_tests():
+    """The autouse fixture in conftest.py clears it, so isolated tests stay isolated."""
+    assert DATA_DIR_ENV not in os.environ

@@ -24,6 +24,8 @@ Compose files bind-mount. To run outside the container, or to keep state elsewhe
 when unset) cannot be created, Autoheal logs an error and falls back to `./data` relative to the
 working directory. Log files still go to `/data/logs`, falling back to `./data/logs`.
 
+The variable is read when the service starts, so set it in the environment before launching.
+
 ## Changing configuration
 
 **Via the web UI (recommended):** open `http://<host>:3131`, go to **Configuration**, and

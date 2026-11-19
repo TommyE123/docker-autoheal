@@ -61,7 +61,8 @@ docker run -d \
 - Prometheus metrics on a dedicated port
 - Notifications to Discord, Slack, Telegram, ntfy, Gotify, Pushover, or a generic webhook
 - All configuration and state stored in `/data`, editable through the web UI, the REST
-  API, or `config.json` directly — **there are no environment-variable settings**
+  API, or `config.json` directly — **there are no environment-variable settings for
+  monitoring behaviour**
 
 ## Enabling auto-healing
 
