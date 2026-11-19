@@ -137,7 +137,8 @@ container path is the path that daemon sees.
 
 ### Ports
 
-Browser-facing ports are in the 313x block. Each dev stack port is its production port plus one.
+Things you open in a browser use the 313x block. The dev stack ports (3132, 9091) are the
+production ports plus one, and metrics stay in the 909x range.
 
 | Port | Used by                                             | Scope       |
 | ---- | --------------------------------------------------- | ----------- |
