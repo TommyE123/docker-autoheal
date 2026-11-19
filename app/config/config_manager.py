@@ -945,10 +945,19 @@ class ConfigManager:
             return self._event_log.copy()
 
     def clear_events(self) -> None:
-        """Clear all events from log (thread-safe)"""
+        """Clear all events from log (thread-safe).
+
+        If events.json cannot be written the events are restored in memory and
+        ``PersistenceError`` is raised.
+        """
         with self._lock:
-            self._event_log.clear()
-            self._save_events()
+            previous = self._event_log
+            self._event_log = []
+            try:
+                self._save_events()
+            except PersistenceError:
+                self._event_log = previous
+                raise
             logger.info("All events cleared")
 
     def add_custom_health_check(self, health_check: HealthCheckConfig) -> None:

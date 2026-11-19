@@ -933,3 +933,16 @@ def test_failed_remove_custom_health_check_restores_it(isolated_config_manager):
             manager.remove_custom_health_check("absent")
 
     assert manager.get_all_custom_health_checks() == {"web": check}
+
+
+def test_failed_clear_events_restores_the_events(isolated_config_manager):
+    manager = isolated_config_manager
+    manager.add_event(_make_event("web"))
+    manager.add_event(_make_event("db"))
+    saved_before = manager.EVENTS_FILE.read_bytes()
+
+    with _failing_writes(), pytest.raises(PersistenceError):
+        manager.clear_events()
+
+    assert [e.container_id for e in manager.get_events()] == ["web", "db"]
+    assert manager.EVENTS_FILE.read_bytes() == saved_before

@@ -97,10 +97,10 @@ database — all state is JSON files under `/data`.
 
    A write that fails (full disk, read-only or wrongly permissioned `/data`) is logged and
    raised as `PersistenceError`, and the file keeps its previous contents. Maintenance
-   mode, quarantine, `update_config()`, `mutate()`, `import_config()` and the custom health
-   check setters then restore the previous in-memory state, so memory and disk agree, and
-   an API request gets a 500. `record_restart()`, `add_event()`, `clear_restart_history()`
-   and `clear_events()` keep the new value in memory and raise, because the restart or
+   mode, quarantine, `update_config()`, `mutate()`, `import_config()`, `clear_events()` and
+   the custom health check setters then restore the previous in-memory state, so memory and
+   disk agree, and an API request gets a 500. `record_restart()`, `add_event()` and
+   `clear_restart_history()` keep the new value in memory and raise, because the restart or
    release already happened; the next successful save writes it out. The monitoring engine
    and auto-discovery log the failure and still apply the cooldown, record the event and
    send the notification. The manual unquarantine route is not best-effort: if clearing the
