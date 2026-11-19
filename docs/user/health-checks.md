@@ -71,10 +71,10 @@ the configured endpoint itself (for example `302`). Only a host of exactly `loca
 a container that uses host networking (`network_mode: host`). For such a container the check is
 skipped, not failed: it never causes a restart, backoff or quarantine, and the container is judged
 by its Docker health status and exit code as if it had no custom check. Autoheal logs a warning
-and records a `health_check_skipped` event once for the container. It records the event again
-if the container's check type changes, or if the check runs or is removed and the container is
-then skipped once more. That event appears in the event log only and is never sent as a
-notification. Use an `exec` check or a Docker `HEALTHCHECK` instead.
+and records a `health_check_skipped` event once for the container. It records another event if
+a different check type is skipped. If the check runs or is removed, it records another event
+the next time the check is skipped. That event appears in the event log only and is never sent
+as a notification. Use an `exec` check or a Docker `HEALTHCHECK` instead.
 An `exec` check that has not finished after `timeout_seconds` is reported as failed, although
 Docker cannot stop the command, so it may keep running inside the container. Until it
 finishes, later checks of the same container and command fail without starting another one.
