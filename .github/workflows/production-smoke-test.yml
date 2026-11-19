@@ -15,8 +15,6 @@ name: Production Smoke Test
 on:
   workflow_call:
     secrets:
-      DOCKERHUB_USERNAME:
-        required: false
       DOCKERHUB_TOKEN:
         required: false
 
@@ -28,8 +26,6 @@ jobs:
     name: Production container smoke test
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    env:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
 
     steps:
       # Docker Hub credentials go in a throwaway config directory, so the step that removes
@@ -44,15 +40,15 @@ jobs:
           echo "DEFAULT_DOCKER_CONFIG_SHA=$(cat "${HOME}/.docker/config.json" 2>/dev/null | sha256sum)" >> "${GITHUB_ENV}"
 
       # Authenticated pulls avoid Docker Hub's anonymous rate limit (429). Best effort: if the
-      # login itself fails (a Docker Hub outage), carry on with anonymous pulls. Repo secrets are
-      # not available to fork or Dependabot runs, which skip this step.
+      # login itself fails (a Docker Hub outage), carry on with anonymous pulls. Fork pull
+      # requests get no secrets, so they skip this step.
       - name: Login to Docker Hub
-        if: env.DOCKERHUB_USERNAME != ''
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
         continue-on-error: true
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: docker.io
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Download the built image

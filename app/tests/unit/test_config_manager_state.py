@@ -225,6 +225,45 @@ def test_custom_health_checks_persist_and_can_be_removed(isolated_config_manager
     assert reloaded.get_all_custom_health_checks() == {}
 
 
+_LEGACY_CHECK = {
+    "container_id": "web",
+    "check_type": "http",
+    "http_endpoint": "/healthz",
+    "interval_seconds": 30,
+    "timeout_seconds": 7,
+    "retries": 3,
+}
+
+
+def test_saved_config_with_removed_health_check_fields_still_loads(
+    isolated_config_manager, monkeypatch
+):
+    data_dir = isolated_config_manager.DATA_DIR
+    (data_dir / "config.json").write_text(
+        json.dumps({"custom_health_checks": {"web": _LEGACY_CHECK}})
+    )
+
+    _redirect_manager_paths(monkeypatch, data_dir)
+    reloaded = ConfigManager()
+
+    check = reloaded.get_custom_health_check("web")
+    assert check == HealthCheckConfig(**_LEGACY_CHECK)
+    assert check is not None
+    assert "retries" not in check.model_dump()
+
+
+def test_import_with_removed_health_check_fields_still_loads(isolated_config_manager):
+    exported = json.loads(isolated_config_manager.export_config())
+    exported["custom_health_checks"] = {"web": _LEGACY_CHECK}
+
+    isolated_config_manager.import_config(json.dumps(exported))
+
+    check = isolated_config_manager.get_custom_health_check("web")
+    assert check is not None
+    assert check.timeout_seconds == 7
+    assert "interval_seconds" not in check.model_dump()
+
+
 def test_event_log_respects_configured_maximum(isolated_config_manager, update_config):
     def set_max_entries(config):
         config.ui.max_log_entries = 2
