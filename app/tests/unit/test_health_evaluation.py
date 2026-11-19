@@ -463,6 +463,94 @@ class TestSkippedCustomHealthChecks:
         events = [e for e in config_manager.get_events() if e.event_type == "health_check_skipped"]
         assert len(events) == 2
 
+    @staticmethod
+    def _skip_events():
+        return [e for e in config_manager.get_events() if e.event_type == "health_check_skipped"]
+
+    async def test_skip_is_reported_again_after_the_check_type_goes_away_and_returns(
+        self, engine, docker_client
+    ):
+        """A skip of http, then a run of exec, then a skip of http again is a new skip."""
+        container, info = make_container(name="web")
+        docker_client.add_container(container, info)
+        docker_client.health_results["web"] = None
+        self._add_check("http")
+        await engine._evaluate_container_health(container, info)
+
+        docker_client.health_results["web"] = True
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="web", check_type="exec", exec_command=["true"])
+        )
+        await engine._evaluate_container_health(container, info)
+
+        docker_client.health_results["web"] = None
+        self._add_check("http")
+        await engine._evaluate_container_health(container, info)
+
+        assert [e.message.split()[1] for e in self._skip_events()] == ["http", "http"]
+
+    async def test_skip_is_reported_again_after_the_check_is_deleted(self, engine, docker_client):
+        container, info = make_container(name="web")
+        docker_client.add_container(container, info)
+        docker_client.health_results["web"] = None
+        self._add_check("http")
+        await engine._evaluate_container_health(container, info)
+
+        config_manager.remove_custom_health_check("web")
+        await engine._evaluate_container_health(container, info)
+        self._add_check("http")
+        await engine._evaluate_container_health(container, info)
+
+        assert len(self._skip_events()) == 2
+
+    async def test_forget_absent_drops_only_containers_docker_no_longer_lists(
+        self, engine, docker_client
+    ):
+        evaluator = engine._health_evaluator
+        docker_client.health_results["web"] = None
+        docker_client.health_results["db"] = None
+        pairs = []
+        for name, container_id in (("web", "a" * 64), ("db", "b" * 64)):
+            container, info = make_container(name=name, container_id=container_id)
+            docker_client.add_container(container, info)
+            config_manager.add_custom_health_check(
+                HealthCheckConfig(container_id=name, check_type="tcp", tcp_port=8080)
+            )
+            pairs.append((container, info))
+            await engine._evaluate_container_health(container, info)
+        assert set(evaluator._skipped_checks) == {"a" * 64, "b" * 64}
+
+        evaluator.forget_absent({"a" * 64, None})
+
+        assert evaluator._skipped_checks == {"a" * 64: "tcp"}
+        # The kept container stays quiet; the forgotten one is reported when it returns.
+        for container, info in pairs:
+            await engine._evaluate_container_health(container, info)
+        assert sorted(e.container_name for e in self._skip_events()) == ["db", "db", "web"]
+
+    async def test_cycle_forgets_removed_containers_but_not_after_a_failed_listing(
+        self, engine, docker_client
+    ):
+        web, web_info = make_container(name="web", container_id="a" * 64)
+        other, other_info = make_container(name="api", container_id="c" * 64)
+        docker_client.add_container(web, web_info)
+        docker_client.add_container(other, other_info)
+        docker_client.health_results["web"] = None
+        self._add_check("tcp")
+        await engine._check_containers()
+        assert list(engine._health_evaluator._skipped_checks) == ["a" * 64]
+
+        # An empty listing may be a failed Docker call, so it forgets nothing.
+        docker_client.remove_container(web)
+        docker_client.remove_container(other)
+        await engine._check_containers()
+        assert list(engine._health_evaluator._skipped_checks) == ["a" * 64]
+
+        # A listing without the container says it is gone.
+        docker_client.add_container(other, other_info)
+        await engine._check_containers()
+        assert engine._health_evaluator._skipped_checks == {}
+
     async def test_failing_check_is_still_a_failure(self, engine, docker_client):
         container, info = make_container(name="web")
         docker_client.add_container(container, info)

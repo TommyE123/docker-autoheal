@@ -35,9 +35,9 @@ class HealthEvaluator:
         """
         self.docker_client = docker_client
         self.uptime_kuma_monitor = uptime_kuma_monitor
-        # (container ID, check type) pairs already reported as skipped, so the log and event
-        # log get one entry per container instead of one per cycle
-        self._skipped_checks: set[tuple[str, str]] = set()
+        # Container ID to the check type last reported as skipped, so the log and event log
+        # get one entry per container instead of one per cycle
+        self._skipped_checks: dict[str, str] = {}
 
     async def evaluate(
         self, container: Container, info: dict, stable_id: str | None
@@ -140,12 +140,24 @@ class HealthEvaluator:
             self._note_custom_check_result(info, custom_hc.check_type, skipped=result is None)
             if result is False:
                 return f"Custom health check failed ({custom_hc.check_type})"
+        else:
+            self._skipped_checks.pop(info["full_id"], None)
 
         # Then check Docker native health
         health = info.get("health")
         if health and health.get("status") == "unhealthy":
             return "Docker health check reports unhealthy"
         return None
+
+    def forget_absent(self, listed_ids: set[str | None]) -> None:
+        """
+        Forget the skipped checks of containers Docker no longer lists
+        Args:
+            listed_ids: Docker IDs of every container Docker listed this cycle. Only
+                call this with a non-empty listing: an empty one may be a failed call.
+        """
+        for container_id in [cid for cid in self._skipped_checks if cid not in listed_ids]:
+            del self._skipped_checks[container_id]
 
     def _note_custom_check_result(self, info: dict, check_type: str, *, skipped: bool) -> None:
         """
@@ -155,13 +167,13 @@ class HealthEvaluator:
             check_type: The custom check's type
             skipped: True when the check could not run
         """
-        key = (info["full_id"], check_type)
+        container_id = info["full_id"]
         if not skipped:
-            self._skipped_checks.discard(key)
+            self._skipped_checks.pop(container_id, None)
             return
-        if key in self._skipped_checks:
+        if self._skipped_checks.get(container_id) == check_type:
             return
-        self._skipped_checks.add(key)
+        self._skipped_checks[container_id] = check_type
         name = info["name"]
         message = (
             f"Custom {check_type} health check skipped: the container uses host networking, "
@@ -172,7 +184,7 @@ class HealthEvaluator:
             AutoHealEvent(
                 timestamp=datetime.now(UTC),
                 container_name=name,
-                container_id=info["full_id"],
+                container_id=container_id,
                 event_type="health_check_skipped",
                 restart_count=0,
                 status="skipped",
