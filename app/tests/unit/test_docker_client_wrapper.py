@@ -16,7 +16,12 @@ import docker
 import docker.errors
 import pytest
 
-from app.docker_client.docker_client_wrapper import DockerClientWrapper, _require_container_id
+from app.docker_client.docker_client_wrapper import (
+    DockerClientWrapper,
+    _container_ip,
+    _require_container_id,
+    _uses_host_networking,
+)
 
 
 @pytest.fixture
@@ -771,20 +776,16 @@ class TestTcpHealth:
             ({}, {"host": {"IPAddress": ""}}),
         ],
     )
-    def test_http_health_check_reports_host_networking(
-        self, wrapper, caplog, host_config, networks
-    ):
+    def test_http_health_check_cannot_run_on_host_networking(self, wrapper, host_config, networks):
         container = make_sdk_container()
         container.name = "web"
         container.attrs["HostConfig"] = host_config
         container.attrs["NetworkSettings"] = {"Networks": networks}
 
         with patch("app.docker_client.docker_client_wrapper.requests.get") as mock_get:
-            assert wrapper.check_http_health(container, "http://localhost:8080/health") is False
+            assert wrapper.check_http_health(container, "http://localhost:8080/health") is None
 
         mock_get.assert_not_called()
-        assert "Container web uses host networking" in caplog.text
-        assert "Cannot get IP address" not in caplog.text
 
     @pytest.mark.parametrize(
         ("host_config", "networks"),
@@ -794,18 +795,16 @@ class TestTcpHealth:
             ({}, {"host": {"IPAddress": ""}}),
         ],
     )
-    def test_tcp_health_check_reports_host_networking(self, wrapper, caplog, host_config, networks):
+    def test_tcp_health_check_cannot_run_on_host_networking(self, wrapper, host_config, networks):
         container = make_sdk_container()
         container.name = "web"
         container.attrs["HostConfig"] = host_config
         container.attrs["NetworkSettings"] = {"Networks": networks}
 
         with patch("app.docker_client.docker_client_wrapper.socket.socket") as mock_socket_cls:
-            assert wrapper.check_tcp_health(container, port=8080) is False
+            assert wrapper.check_tcp_health(container, port=8080) is None
 
         mock_socket_cls.assert_not_called()
-        assert "Container web uses host networking" in caplog.text
-        assert "Cannot get IP address" not in caplog.text
 
     def test_tcp_health_check_fails_when_container_disappears_during_inspection(self, wrapper):
         container = make_sdk_container()
@@ -891,6 +890,37 @@ class TestHttpHealth:
             side_effect=ConnectionError("refused"),
         ):
             assert wrapper.check_http_health(container, "http://localhost:3131/health") is False
+
+
+class TestContainerNetworkHelpers:
+    """``_uses_host_networking`` and ``_container_ip`` on attrs the daemon may leave out."""
+
+    @pytest.mark.parametrize(
+        "attrs", [{}, {"NetworkSettings": {}}, {"NetworkSettings": {"Networks": {}}}]
+    )
+    def test_container_without_network_data_is_not_host_networked_and_has_no_ip(
+        self, attrs, caplog
+    ):
+        container = make_sdk_container()
+        container.name = "web"
+        container.attrs = attrs
+
+        assert _uses_host_networking(container) is False
+        with caplog.at_level(logging.WARNING):
+            assert _container_ip(container) is None
+        assert [r.getMessage() for r in caplog.records] == [
+            "Cannot get IP address for container web"
+        ]
+
+    def test_container_ip_is_the_first_network_address(self):
+        container = make_sdk_container()
+        container.attrs = {
+            "NetworkSettings": {
+                "Networks": {"a": {"IPAddress": ""}, "b": {"IPAddress": "10.0.0.5"}}
+            }
+        }
+
+        assert _container_ip(container) == "10.0.0.5"
 
 
 class TestEvents:

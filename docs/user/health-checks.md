@@ -51,9 +51,7 @@ curl -X POST http://localhost:3131/api/healthchecks \
     "check_type": "http",
     "http_endpoint": "http://localhost:8080/health",
     "http_expected_status": 200,
-    "interval_seconds": 30,
-    "timeout_seconds": 10,
-    "retries": 3
+    "timeout_seconds": 10
   }'
 ```
 
@@ -70,8 +68,13 @@ HTTP checks do not follow redirects, so `http_expected_status` is compared with 
 the configured endpoint itself (for example `302`). Only a host of exactly `localhost` or
 `127.0.0.1` is replaced with the container's IP address; the rest of the URL is sent as written.
 `http` and `tcp` checks need the container's IP address on a Docker network, so they cannot check
-a container that uses host networking (`network_mode: host`). Such a check always fails and logs
-that the container uses host networking; use an `exec` check or a Docker `HEALTHCHECK` instead.
+a container that uses host networking (`network_mode: host`). For such a container the check is
+skipped, not failed: it never causes a restart, backoff or quarantine, and the container is judged
+by its Docker health status and exit code as if it had no custom check. Autoheal logs a warning
+and records a `health_check_skipped` event once for the container. It records another event if
+a different check type is skipped. If the check runs or is removed, it records another event
+the next time the check is skipped. That event appears in the event log only and is never sent
+as a notification. Use an `exec` check or a Docker `HEALTHCHECK` instead.
 An `exec` check that has not finished after `timeout_seconds` is reported as failed, although
 Docker cannot stop the command, so it may keep running inside the container. Until it
 finishes, later checks of the same container and command fail without starting another one.
@@ -88,6 +91,15 @@ A check already saved in `config.json` that fails these rules (including an unkn
 configuration loads, so it no longer restarts the container and does not affect other checks. It
 is removed from `config.json` the next time the configuration is saved. Importing a configuration
 that contains one is rejected as a whole.
+
+A custom check runs once per monitoring cycle (`monitor.interval_seconds`), only when `restart.mode`
+is `health` or `both` (not in the default `on-failure` mode). It has no retry or interval setting
+of its own. One failed check marks the container unhealthy for that cycle, and
+the [restart behavior](#restart-behavior-once-a-check-fails) below, in particular the backoff
+wait, decides when it is actually restarted. Earlier versions accepted `interval_seconds` and
+`retries` on a custom check but ignored them. They are still accepted, in `POST /api/healthchecks`,
+in `config.json` and when importing a configuration, and are dropped when the configuration is
+next saved.
 
 If a custom health check is configured, it's evaluated in addition to Docker's native
 health status — either one reporting unhealthy is enough to trigger a restart.

@@ -81,7 +81,7 @@ jobs:
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: docker.io
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # Authenticate to GitHub Container Registry (GHCR) for pushing images
@@ -100,7 +100,7 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: |
-            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal
+            docker.io/${{ vars.DOCKERHUB_USERNAME }}/docker-autoheal
             ghcr.io/${{ github.repository_owner }}/docker-autoheal
           tags: |
             type=raw,value=${{ needs.release-please.outputs.tag_name }}
@@ -123,9 +123,9 @@ jobs:
       - name: Update Docker Hub description
         uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          repository: ${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal
+          repository: ${{ vars.DOCKERHUB_USERNAME }}/docker-autoheal
           readme-filepath: ./docs/maintainer/docker-hub-readme.md
 
   # Publishes a continuously-updated "beta" image reflecting the current
@@ -156,7 +156,7 @@ jobs:
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: docker.io
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Login to GHCR
@@ -174,7 +174,7 @@ jobs:
         id: meta-dockerhub
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
-          images: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/docker-autoheal
+          images: docker.io/${{ vars.DOCKERHUB_USERNAME }}/docker-autoheal
           tags: |
             type=raw,value=beta
 
