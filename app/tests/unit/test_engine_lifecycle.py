@@ -777,9 +777,10 @@ class TestProcessContainerStartEvent:
         assert config_manager.get_events() == []
         mock_notification_manager.send_event_notification.assert_not_awaited()
 
-    async def test_config_file_write_failure_keeps_selection_event_and_notification(
+    async def test_config_file_write_failure_skips_selection_event_and_notification(
         self, engine, docker_client, mock_notification_manager, monkeypatch
     ):
+        """A selection that could not be saved is rolled back, as if mutate() had raised."""
         container, info = make_container(name="web", labels={"autoheal": "true"})
         docker_client.add_container(container, info)
         config_path = config_manager.CONFIG_FILE
@@ -791,9 +792,9 @@ class TestProcessContainerStartEvent:
 
         await engine._auto_discovery.process_start_event(start_event(container.id, "web"))
 
-        assert config_manager.get_config().containers.selected == ["web"]
-        assert len(config_manager.get_events()) == 1
-        mock_notification_manager.send_event_notification.assert_awaited_once()
+        assert config_manager.get_config().containers.selected == []
+        assert config_manager.get_events() == []
+        mock_notification_manager.send_event_notification.assert_not_awaited()
 
     async def test_event_without_container_id_is_ignored(self, engine):
         await engine._auto_discovery.process_start_event({"Actor": {"Attributes": {"name": "web"}}})

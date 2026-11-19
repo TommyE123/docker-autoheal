@@ -22,7 +22,7 @@ from pathlib import Path
 import pytest
 
 from app.config import config_manager as config_manager_module
-from app.config.config_manager import AutoHealEvent
+from app.config.config_manager import AutoHealEvent, PersistenceError
 
 
 def _event(message: str) -> AutoHealEvent:
@@ -87,7 +87,8 @@ def test_interrupted_write_keeps_previous_file(isolated_config_manager, monkeypa
     assert json.loads(good_bytes) is not None
 
     monkeypatch.setattr(config_manager_module.json, "dump", _interrupted_dump)
-    second_save(manager)  # the save error is logged, not raised (existing behaviour)
+    with pytest.raises(PersistenceError):
+        second_save(manager)
 
     assert path.read_bytes() == good_bytes
     assert list(path.parent.glob(f".{path.name}.*")) == [], "temporary file was left behind"
@@ -103,7 +104,8 @@ def test_interrupted_config_write_does_not_reset_settings_on_next_load(
     # fixtures' patches (asyncio.sleep, notification manager) mid-test.
     with monkeypatch.context() as patch_context:
         patch_context.setattr(config_manager_module.json, "dump", _interrupted_dump)
-        _save_config(manager, 99)
+        with pytest.raises(PersistenceError):
+            _save_config(manager, 99)
 
     assert manager._load_config().monitor.interval_seconds == 45
 
@@ -179,7 +181,8 @@ def test_failure_after_serialisation_keeps_previous_file_and_cleans_up(
         raise OSError(5, "Input/output error")
 
     monkeypatch.setattr(os, failing_step, failing)
-    second_save(manager)
+    with pytest.raises(PersistenceError):
+        second_save(manager)
 
     assert path.read_bytes() == good_bytes
     assert list(path.parent.glob(f".{path.name}.*")) == [], "temporary file was left behind"

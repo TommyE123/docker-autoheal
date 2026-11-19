@@ -8,6 +8,7 @@ and the ``get_docker_client`` dependency, not by the route functions themselves.
 
 import json
 import logging
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 import pytest
@@ -15,7 +16,8 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 
 from app.api.errors import INTERNAL_ERROR_DETAIL, escape_for_log, get_docker_client
-from app.config.config_manager import config_manager
+from app.config.config_manager import AutoHealEvent, config_manager
+from app.tests.unit.conftest import make_container
 from app.tests.unit.test_api_routing import _request
 
 SECRET = "tk_internal_secret_value"
@@ -97,6 +99,76 @@ class TestUnexpectedErrors:
         message = next(r for r in caplog.records if r.name == "app.api.errors").getMessage()
         assert "\x1b" not in message
         assert "x\\x1b[31mforged" in message
+
+
+def _break_file(monkeypatch, attribute: str) -> None:
+    """Point one of the config manager's files into a missing directory, so saving it fails."""
+    path = getattr(config_manager, attribute)
+    monkeypatch.setattr(config_manager, attribute, path.parent / "missing-parent" / path.name)
+
+
+@pytest.mark.asyncio
+class TestPersistenceFailures:
+    """A state file that cannot be written gives a 500, not a success, and changes nothing."""
+
+    @pytest.mark.parametrize("start_enabled", [True, False], ids=["disable", "enable"])
+    async def test_failed_maintenance_save_returns_500_and_keeps_the_mode(
+        self, monkeypatch, start_enabled
+    ):
+        if start_enabled:
+            config_manager.enable_maintenance_mode()
+        started = config_manager.get_maintenance_start_time()
+        _break_file(monkeypatch, "MAINTENANCE_FILE")
+        action = "disable" if start_enabled else "enable"
+
+        status, text = await _call("POST", f"/api/maintenance/{action}")
+
+        assert status == 500
+        assert json.loads(text) == {"detail": INTERNAL_ERROR_DETAIL}
+        assert config_manager.is_maintenance_mode() is start_enabled
+        assert config_manager.get_maintenance_start_time() == started
+        status, text = await _call("GET", "/api/maintenance/status")
+        assert json.loads(text)["maintenance_mode"] is start_enabled
+
+    async def test_failed_unquarantine_save_returns_500_and_keeps_the_quarantine(
+        self, monkeypatch, docker_client, mock_notification_manager
+    ):
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+        monkeypatch.setattr("app.api.state.docker_client", docker_client)
+        config_manager.quarantine_container("web")
+        config_manager.record_restart("web")
+        _break_file(monkeypatch, "QUARANTINE_FILE")
+
+        status, _text = await _call("POST", f"/api/containers/{'a' * 64}/unquarantine")
+
+        assert status == 500
+        assert config_manager.is_quarantined("web") is True
+        assert config_manager.get_total_restart_count("web") == 1
+        assert config_manager.get_events() == []
+        mock_notification_manager.send_event_notification.assert_not_awaited()
+
+    async def test_failed_events_clear_returns_500_and_keeps_the_file(self, monkeypatch):
+        config_manager.add_event(
+            AutoHealEvent(
+                timestamp=datetime.now(UTC),
+                container_id="web",
+                container_name="web",
+                event_type="restart",
+                restart_count=1,
+                status="success",
+                message="container restarted",
+            )
+        )
+        events_file = config_manager.EVENTS_FILE
+        saved_before = events_file.read_bytes()
+        _break_file(monkeypatch, "EVENTS_FILE")
+
+        status, text = await _call("DELETE", "/api/events")
+
+        assert status == 500
+        assert json.loads(text) == {"detail": INTERNAL_ERROR_DETAIL}
+        assert events_file.read_bytes() == saved_before
 
 
 class TestEscapeForLog:

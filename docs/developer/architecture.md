@@ -95,6 +95,14 @@ database — all state is JSON files under `/data`.
    out other coroutines on the event loop thread); awaited work comes first. `update_config()`
    always keeps the live `containers.restart_counts` and `containers.restart_history`.
 
+   A write that fails (full disk, read-only or wrongly permissioned `/data`) is logged and
+   raised as `PersistenceError`, and the file keeps its previous contents. Maintenance
+   mode, quarantine, `update_config()` and `mutate()` then restore the previous in-memory
+   state, so memory and disk agree, and an API request gets a 500. `record_restart()` and
+   `add_event()` keep the new value in memory, because the restart already happened; the
+   monitoring engine logs the failure and still applies the cooldown, records the event and
+   sends the notification.
+
 ## Stable container identity
 
 Because container IDs (and often names) change when a container is recreated, the

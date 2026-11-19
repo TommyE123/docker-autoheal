@@ -1,5 +1,6 @@
 """Tests for ConfigManager state transitions and persisted round trips."""
 
+import contextlib
 import json
 from datetime import UTC, datetime
 from unittest.mock import patch
@@ -13,6 +14,7 @@ from app.config.config_manager import (
     HealthCheckConfig,
     MonitorConfig,
     NotificationService,
+    PersistenceError,
     UptimeKumaMapping,
     config_manager,
 )
@@ -402,34 +404,170 @@ def test_import_config_with_invalid_custom_health_check_leaves_state_unchanged(
     assert saved["monitor"]["interval_seconds"] == original_interval
 
 
-def test_config_write_failure_is_logged_and_does_not_escape(isolated_config_manager, caplog):
-    with patch("os.open", side_effect=OSError("disk full")):
-        isolated_config_manager.update_config(isolated_config_manager.get_config())
-
-    assert "Failed to save config to disk: disk full" in caplog.text
+def _failing_writes():
+    """Make every atomic write fail before anything reaches the data directory."""
+    return patch("os.open", side_effect=OSError("disk full"))
 
 
-def test_events_write_failure_is_logged_and_does_not_escape(isolated_config_manager, caplog):
-    with patch("os.open", side_effect=OSError("disk full")):
-        isolated_config_manager.add_event(_make_event("web"))
-
-    assert "Failed to save events to disk: disk full" in caplog.text
-
-
-def test_quarantine_write_failure_is_logged_and_does_not_escape(isolated_config_manager, caplog):
-    with patch("os.open", side_effect=OSError("disk full")):
-        isolated_config_manager.quarantine_container("web")
-
-    assert "Failed to save quarantine list to disk: disk full" in caplog.text
+def _set_interval(manager, interval):
+    config = manager.get_config()
+    config.monitor.interval_seconds = interval
+    manager.update_config(config)
 
 
-def test_maintenance_mode_write_failure_is_logged_and_does_not_escape(
-    isolated_config_manager, caplog
+def _mutate_interval(manager, interval):
+    with manager.mutate() as config:
+        config.monitor.interval_seconds = interval
+
+
+@pytest.mark.parametrize(
+    ("save", "log_text", "message"),
+    [
+        (lambda m: _set_interval(m, 99), "Failed to save config to disk", "configuration"),
+        (lambda m: m.add_event(_make_event("db")), "Failed to save events to disk", "events"),
+        (
+            lambda m: m.quarantine_container("db"),
+            "Failed to save quarantine list to disk",
+            "quarantine list",
+        ),
+        (
+            lambda m: m.enable_maintenance_mode(),
+            "Failed to save maintenance mode to disk",
+            "maintenance mode",
+        ),
+    ],
+    ids=["config", "events", "quarantine", "maintenance"],
+)
+def test_write_failure_is_logged_and_raised(
+    isolated_config_manager, caplog, save, log_text, message
 ):
-    with patch("os.open", side_effect=OSError("disk full")):
+    with _failing_writes(), pytest.raises(PersistenceError) as raised:
+        save(isolated_config_manager)
+
+    assert f"{log_text}: disk full" in caplog.text
+    assert str(raised.value) == f"Failed to save {message}"
+    assert isinstance(raised.value, OSError)
+    assert isinstance(raised.value.__cause__, OSError)
+    assert str(raised.value.__cause__) == "disk full"
+
+
+def test_config_write_failure_message_leaves_out_the_file_contents(isolated_config_manager):
+    """config.json holds credentials, so the raised error must not echo the document."""
+    config = isolated_config_manager.get_config()
+    config.notifications.services.append(
+        NotificationService(name="ntfy", type="ntfy", topic="t", password="hunter2-secret")
+    )
+
+    with _failing_writes(), pytest.raises(PersistenceError) as raised:
+        isolated_config_manager.update_config(config)
+
+    assert "hunter2-secret" not in str(raised.value)
+    assert "hunter2-secret" not in repr(raised.value.args)
+
+
+@pytest.mark.parametrize("write", [_set_interval, _mutate_interval], ids=["update", "mutate"])
+def test_failed_config_save_restores_the_previous_config(isolated_config_manager, write):
+    _set_interval(isolated_config_manager, 45)
+    isolated_config_manager.record_restart("web")
+    saved_before = isolated_config_manager.CONFIG_FILE.read_bytes()
+    live = isolated_config_manager._config
+
+    with _failing_writes(), pytest.raises(PersistenceError):
+        write(isolated_config_manager, 99)
+
+    assert isolated_config_manager._config is live
+    assert isolated_config_manager.get_config().monitor.interval_seconds == 45
+    assert isolated_config_manager.get_total_restart_count("web") == 1
+    assert isolated_config_manager.CONFIG_FILE.read_bytes() == saved_before
+
+
+def test_restart_recorded_while_a_failed_mutate_was_open_is_kept(isolated_config_manager):
+    """Rolling back a failed mutate() must not undo a restart recorded inside the block."""
+
+    def mutate_while_a_restart_is_recorded():
+        with isolated_config_manager.mutate() as config:
+            config.monitor.interval_seconds = 12
+            with contextlib.suppress(PersistenceError):
+                isolated_config_manager.record_restart("web")
+
+    with _failing_writes(), pytest.raises(PersistenceError):
+        mutate_while_a_restart_is_recorded()
+
+    assert isolated_config_manager.get_total_restart_count("web") == 1
+    assert isolated_config_manager.get_config().monitor.interval_seconds != 12
+
+
+def test_failed_record_restart_keeps_the_restart_in_memory(isolated_config_manager):
+    """The restart already happened, so the quarantine threshold must still count it."""
+    isolated_config_manager.record_restart("web")
+    saved_before = isolated_config_manager.CONFIG_FILE.read_bytes()
+
+    with _failing_writes(), pytest.raises(PersistenceError):
+        isolated_config_manager.record_restart("web", window_seconds=600)
+
+    assert isolated_config_manager.get_total_restart_count("web") == 2
+    assert isolated_config_manager.get_restart_count("web", window_seconds=600) == 2
+    assert isolated_config_manager.CONFIG_FILE.read_bytes() == saved_before
+
+
+def test_failed_add_event_keeps_the_event_in_memory(isolated_config_manager):
+    isolated_config_manager.add_event(_make_event("web"))
+    saved_before = isolated_config_manager.EVENTS_FILE.read_bytes()
+
+    with _failing_writes(), pytest.raises(PersistenceError):
+        isolated_config_manager.add_event(_make_event("db"))
+
+    assert [e.container_id for e in isolated_config_manager.get_events()] == ["web", "db"]
+    assert isolated_config_manager.EVENTS_FILE.read_bytes() == saved_before
+
+
+@pytest.mark.parametrize(
+    ("change", "target", "expected"),
+    [
+        ("quarantine_container", "db", {"web"}),
+        ("quarantine_container", "web", {"web"}),
+        ("unquarantine_container", "web", {"web"}),
+        ("unquarantine_container", "db", {"web"}),
+    ],
+    ids=["add-new", "add-existing", "remove-existing", "remove-absent"],
+)
+def test_failed_quarantine_save_leaves_the_quarantine_unchanged(
+    isolated_config_manager, change, target, expected
+):
+    isolated_config_manager.quarantine_container("web")
+    saved_before = isolated_config_manager.QUARANTINE_FILE.read_bytes()
+
+    with _failing_writes(), pytest.raises(PersistenceError):
+        getattr(isolated_config_manager, change)(target)
+
+    assert isolated_config_manager.get_quarantined_containers() == expected
+    assert isolated_config_manager.QUARANTINE_FILE.read_bytes() == saved_before
+
+
+def test_failed_maintenance_enable_leaves_maintenance_off(isolated_config_manager):
+    isolated_config_manager.disable_maintenance_mode()
+    saved_before = isolated_config_manager.MAINTENANCE_FILE.read_bytes()
+
+    with _failing_writes(), pytest.raises(PersistenceError):
         isolated_config_manager.enable_maintenance_mode()
 
-    assert "Failed to save maintenance mode to disk: disk full" in caplog.text
+    assert isolated_config_manager.is_maintenance_mode() is False
+    assert isolated_config_manager.get_maintenance_start_time() is None
+    assert isolated_config_manager.MAINTENANCE_FILE.read_bytes() == saved_before
+
+
+def test_failed_maintenance_disable_keeps_maintenance_on(isolated_config_manager):
+    """Healing must not resume while maintenance.json still says it is paused (#189)."""
+    isolated_config_manager.enable_maintenance_mode()
+    started = isolated_config_manager.get_maintenance_start_time()
+    saved_before = isolated_config_manager.MAINTENANCE_FILE.read_bytes()
+
+    with _failing_writes(), pytest.raises(PersistenceError):
+        isolated_config_manager.disable_maintenance_mode()
+
+    assert isolated_config_manager.is_maintenance_mode() is True
+    assert isolated_config_manager.get_maintenance_start_time() == started
+    assert isolated_config_manager.MAINTENANCE_FILE.read_bytes() == saved_before
 
 
 def test_legacy_empty_monitoring_id_quarantine_key_is_dropped_on_load(
