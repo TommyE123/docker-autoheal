@@ -148,6 +148,33 @@ class TestPersistenceFailures:
         assert config_manager.get_events() == []
         mock_notification_manager.send_event_notification.assert_not_awaited()
 
+    async def test_failed_restart_history_clear_after_release_returns_500_with_stale_counts(
+        self, monkeypatch, docker_client, mock_notification_manager
+    ):
+        """The release is saved before the history clear fails, so the two files disagree.
+
+        This pins down a known trade-off (see architecture.md): the container stays
+        released, but config.json keeps its old restart counts until the next save.
+        """
+        container, info = make_container(name="web", container_id="a" * 64)
+        docker_client.add_container(container, info)
+        monkeypatch.setattr("app.api.state.docker_client", docker_client)
+        config_manager.quarantine_container("web")
+        config_manager.record_restart("web")
+        quarantine_file = config_manager.QUARANTINE_FILE
+        config_file = config_manager.CONFIG_FILE
+        _break_file(monkeypatch, "CONFIG_FILE")
+
+        status, _text = await _call("POST", f"/api/containers/{'a' * 64}/unquarantine")
+
+        assert status == 500
+        assert config_manager.is_quarantined("web") is False
+        assert "web" not in json.loads(quarantine_file.read_text())
+        saved_counts = json.loads(config_file.read_text())["containers"]["restart_counts"]
+        assert saved_counts == {"web": 1}
+        assert config_manager.get_events() == []
+        mock_notification_manager.send_event_notification.assert_not_awaited()
+
     async def test_failed_events_clear_returns_500_and_keeps_the_file(self, monkeypatch):
         config_manager.add_event(
             AutoHealEvent(
