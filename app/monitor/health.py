@@ -5,9 +5,10 @@ Decides from a container's state and health checks whether it needs a restart
 
 import asyncio
 import logging
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from app.config.config_manager import config_manager
+from app.config.config_manager import AutoHealEvent, config_manager
 
 if TYPE_CHECKING:
     from docker.models.containers import Container
@@ -34,6 +35,9 @@ class HealthEvaluator:
         """
         self.docker_client = docker_client
         self.uptime_kuma_monitor = uptime_kuma_monitor
+        # Container ID to the check type last reported as skipped, so the log and event log
+        # get one entry per container instead of one per cycle
+        self._skipped_checks: dict[str, str] = {}
 
     async def evaluate(
         self, container: Container, info: dict, stable_id: str | None
@@ -131,8 +135,13 @@ class HealthEvaluator:
                 custom_hc = config_manager.get_custom_health_check(key)
                 if custom_hc:
                     break
-        if custom_hc and not await self.perform_custom_health_check(container, custom_hc):
-            return f"Custom health check failed ({custom_hc.check_type})"
+        if custom_hc:
+            result = await self.perform_custom_health_check(container, custom_hc)
+            self._note_custom_check_result(info, custom_hc.check_type, skipped=result is None)
+            if result is False:
+                return f"Custom health check failed ({custom_hc.check_type})"
+        else:
+            self._skipped_checks.pop(info["full_id"], None)
 
         # Then check Docker native health
         health = info.get("health")
@@ -140,16 +149,60 @@ class HealthEvaluator:
             return "Docker health check reports unhealthy"
         return None
 
+    def forget_absent(self, listed_ids: set[str | None]) -> None:
+        """
+        Forget the skipped checks of containers Docker no longer lists
+        Args:
+            listed_ids: Docker IDs of every container Docker listed this cycle. Only
+                call this with a non-empty listing: an empty one may be a failed call.
+        """
+        for container_id in [cid for cid in self._skipped_checks if cid not in listed_ids]:
+            del self._skipped_checks[container_id]
+
+    def _note_custom_check_result(self, info: dict, check_type: str, *, skipped: bool) -> None:
+        """
+        Report a custom check that could not run once per container, and forget it once it can
+        Args:
+            info: Container information dict
+            check_type: The custom check's type
+            skipped: True when the check could not run
+        """
+        container_id = info["full_id"]
+        if not skipped:
+            self._skipped_checks.pop(container_id, None)
+            return
+        if self._skipped_checks.get(container_id) == check_type:
+            return
+        self._skipped_checks[container_id] = check_type
+        name = info["name"]
+        message = (
+            f"Custom {check_type} health check skipped: the container uses host networking, "
+            "so Autoheal cannot reach it. Use an exec or Docker health check instead"
+        )
+        logger.warning("Container %s: %s", name, message)
+        config_manager.add_event(
+            AutoHealEvent(
+                timestamp=datetime.now(UTC),
+                container_name=name,
+                container_id=container_id,
+                event_type="health_check_skipped",
+                restart_count=0,
+                status="skipped",
+                message=message,
+            )
+        )
+
     async def perform_custom_health_check(
         self, container: Container, health_check: HealthCheckConfig
-    ) -> bool:
+    ) -> bool | None:
         """
         Perform custom health check on container
         Args:
             container: Container object
             health_check: Health check configuration
         Returns:
-            True if healthy, False otherwise
+            True if healthy, False if not, None if the check could not run (an HTTP or TCP
+            check on a host-network container) and so says nothing about its health
         """
         check_type = health_check.check_type
 

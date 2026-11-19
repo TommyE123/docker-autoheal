@@ -57,9 +57,11 @@ class DockerClient(Protocol):
         endpoint: str,
         expected_status: int = ...,
         timeout: int = ...,
-    ) -> bool: ...
+    ) -> bool | None: ...
 
-    def check_tcp_health(self, container: Container, port: int, timeout: int = ...) -> bool: ...
+    def check_tcp_health(
+        self, container: Container, port: int, timeout: int = ...
+    ) -> bool | None: ...
 
     def check_exec_health(
         self, container: Container, command: list[str], timeout: int = ...
@@ -292,7 +294,9 @@ class MonitoringEngine:
             # list_containers returns [] when the Docker call fails, which says nothing
             # about whether the containers still exist.
             if containers:
-                self._recovery.forget_absent({container.id for container in containers})
+                listed_ids = {container.id for container in containers}
+                self._recovery.forget_absent(listed_ids)
+                self._health_evaluator.forget_absent(listed_ids)
 
             for container in containers:
                 try:
