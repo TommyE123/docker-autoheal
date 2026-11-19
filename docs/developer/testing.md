@@ -407,7 +407,10 @@ form and by title (`dialogTitled`).
 `frontend/e2e-demo/demo.spec.js` checks the built [browser demo](demo.md): every page
 works against the in-browser mock API with no console errors or off-site requests, a
 deep link loads under the `/docker-autoheal/` sub-path, and there is no service worker
-or manifest. It needs no Docker and takes a few seconds. It serves an existing build, so build first:
+or manifest. It also clicks through two things a visitor could misread: a notification
+test says nothing was sent, and **Reset demo** brings back the sample data after the
+events are cleared. It needs no Docker and takes a few seconds. It serves an existing
+build, so build first:
 
 ```bash
 cd frontend

@@ -37,6 +37,14 @@ test.afterEach(() => {
   expect(problems).toEqual([]);
 });
 
+// The notifications page logs a failed test send; in the demo that failure is
+// how the "nothing was sent" message reaches the page, so it is expected there.
+const allowTestSendLog = () => {
+  problems = problems.filter(
+    (problem) => !problem.startsWith("console: Failed to test service:"),
+  );
+};
+
 test("every page works against the mock, with the banner and no service worker", async ({
   page,
 }) => {
@@ -77,4 +85,40 @@ test("a deep link loads the app", async ({ page }) => {
   await expect(
     page.getByText("Demo with sample data: no real containers."),
   ).toBeVisible();
+});
+
+test("a notification test says nothing was sent", async ({ page }) => {
+  const nothingSent = page.getByText(/^Demo: nothing was sent/);
+  await page.goto("./notifications");
+
+  await page.getByRole("button", { name: "Test Team chat" }).click();
+  await expect(nothingSent).toBeVisible();
+
+  await page.getByRole("button", { name: /Add Service$/ }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel(/Service Name/).fill("ops");
+  await dialog.getByLabel(/Webhook URL/).fill("https://example.com/hook");
+  await dialog.getByRole("button", { name: "Test", exact: true }).click();
+  await expect(dialog.getByText(/^Demo: nothing was sent/)).toBeVisible();
+
+  await expect(page.getByText(/Test notification sent/)).toHaveCount(0);
+  allowTestSendLog();
+});
+
+test("Reset demo brings back the sample data", async ({ page }) => {
+  const sampleEvent = page.getByText(
+    "Container quarantined: exceeded 3 restarts in 600s window",
+  );
+  await page.goto("./events");
+  await expect(sampleEvent).toBeVisible();
+
+  await page.getByRole("button", { name: /Clear All$/ }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /Clear All Events$/ })
+    .click();
+  await expect(sampleEvent).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Reset demo" }).click();
+  await expect(sampleEvent).toBeVisible();
 });

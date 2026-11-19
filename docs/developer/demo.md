@@ -57,7 +57,8 @@ npx vite preview --mode demo
 
 Unit tests sit next to each file in `src/demo/`. `e2e-demo/demo.spec.js` is a
 Playwright smoke test of the built demo, which fails on any console error, so a UI call
-the mock doesn't answer is caught:
+the mock doesn't answer is caught. It also checks that a notification test says nothing
+was sent and that **Reset demo** restores the sample data:
 
 ```bash
 cd frontend
