@@ -5,15 +5,24 @@ Docker Autoheal has **no environment-variable configuration** for its behaviour.
 the file directly (the service reloads it on restart). Sensible defaults are written to
 `/data/config.json` the first time the service starts.
 
-> The only environment variables Docker Autoheal's own code reads are `AUTOHEAL_PUBLIC_PORT` and
-> `AUTOHEAL_PUBLIC_HOST`. They change only the UI URL printed in the startup logs (the host
-> and published port), not any setting. (Libraries it uses may read their own variables; those
-> aren't Autoheal settings.)
+> The only environment variables Docker Autoheal's own code reads are `AUTOHEAL_PUBLIC_PORT`,
+> `AUTOHEAL_PUBLIC_HOST` and `AUTOHEAL_DATA_DIR`. The first two change only the UI URL printed in
+> the startup logs (the host and published port), not any setting. `AUTOHEAL_DATA_DIR` changes where
+> state files are stored (default `/data`; see below). (Libraries it uses may read their own
+> variables; those aren't Autoheal settings.)
 >
 > If you've seen older documentation or blog posts referencing environment variables like
 > `AUTOHEAL_INTERVAL` or `AUTOHEAL_LOG_LEVEL` — those do not exist in the current
 > application. Use the web UI's **Configuration** tab or the `/api/config` endpoints
 > instead.
+
+## Data directory
+
+State (`config.json`, events, quarantine and maintenance files) is stored in `/data`, which the
+Compose files bind-mount. To run outside the container, or to keep state elsewhere, set
+`AUTOHEAL_DATA_DIR` to a directory before starting the service. If that directory (or `/data`,
+when unset) cannot be created, Autoheal logs an error and falls back to `./data` relative to the
+working directory. Log files still go to `/data/logs`, falling back to `./data/logs`.
 
 ## Changing configuration
 

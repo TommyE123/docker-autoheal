@@ -438,6 +438,10 @@ def _atomic_write_json(path: Path, data: Any, **dump_kwargs: Any) -> None:
         raise
 
 
+# Optional override for where state is stored. Read when a ConfigManager is created, so it
+# must be set before the process starts to affect the module-level singleton.
+DATA_DIR_ENV = "AUTOHEAL_DATA_DIR"
+
 _CONFIG_FILENAME = "config.json"
 _EVENTS_FILENAME = "events.json"
 _QUARANTINE_FILENAME = "quarantine.json"
@@ -507,6 +511,11 @@ class ConfigManager:
     def __init__(self) -> None:
         self._lock = threading.RLock()
 
+        # An explicit override replaces the default directory before anything touches disk
+        if override := os.environ.get(DATA_DIR_ENV, "").strip():
+            self.DATA_DIR = Path(override)
+            self._update_file_paths()
+
         # Create data directory if it doesn't exist
         self._ensure_data_directory()
 
@@ -529,7 +538,7 @@ class ConfigManager:
         self._maintenance_start_time: datetime | None = None
         self._load_maintenance_mode()
 
-        logger.info("ConfigManager initialized with persistent storage at /data")
+        logger.info("ConfigManager initialized with persistent storage at %s", self.DATA_DIR)
 
     def _ensure_data_directory(self) -> None:
         """Create data directory and subdirectories if they don't exist"""
