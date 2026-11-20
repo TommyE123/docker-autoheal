@@ -838,3 +838,15 @@ class TestFindCustomHealthCheck:
         assert find_custom_health_check(docker_client, {"name": "web"}, "web") == (
             CustomCheckLookup()
         )
+
+    def test_listing_asks_the_wrapper_to_raise_instead_of_returning_empty(self):
+        """The real wrapper returns [] on failure unless asked to raise, which would read
+        as "no other container"; the lookup must ask for the error."""
+        client = MagicMock()
+        client.list_containers.return_value = []
+        _container, info = _compose_web()
+        config_manager.add_custom_health_check(_tcp_check("stack-web-1"))
+
+        find_custom_health_check(client, info, "stack_web")
+
+        client.list_containers.assert_called_once_with(all_containers=True, raise_errors=True)

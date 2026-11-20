@@ -778,6 +778,19 @@ class TestSelectionLegacyEntries:
         assert config.containers.selected == ["stack_web"]
         assert engine.should_monitor_container(container, info) is True
 
+    async def test_enabling_clears_every_copy_of_a_duplicated_exclusion(self, wired_api):
+        docker_client, engine = wired_api
+        container, info = _compose_web()
+        docker_client.add_container(container, info)
+        self._exclude(_FULL_ID, "other", _FULL_ID)
+
+        await update_container_selection(
+            get_docker_client(), ContainerSelectionRequest(container_ids=[_FULL_ID], enabled=True)
+        )
+
+        assert config_manager.get_config().containers.excluded == ["other"]
+        assert engine.should_monitor_container(container, info) is True
+
     async def test_bare_service_exclusion_rejects_the_whole_batch(self, wired_api, monkeypatch):
         docker_client, _engine = wired_api
         blocked, blocked_info = _compose_web()

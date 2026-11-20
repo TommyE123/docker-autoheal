@@ -245,7 +245,8 @@ def _apply_selection(
     identifiers = (stable_id, container_name, cid, info.get("full_id"), info.get("id"))
     for identifier in dict.fromkeys(i for i in identifiers if i is not None):
         if identifier in remove_from:
-            remove_from.remove(identifier)
+            # Every copy, as a hand-edited list can hold one more than once
+            remove_from[:] = [entry for entry in remove_from if entry != identifier]
             logger.debug("Removed '%s' from %s list", identifier, remove_label)
 
     # Exclusion wins over selection, so only enabling can leave the container short of the
