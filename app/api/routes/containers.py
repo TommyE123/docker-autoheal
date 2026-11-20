@@ -207,7 +207,12 @@ def _apply_selection(
     Every entry that names only this container (stable_id, name, full or short
     Docker ID) is removed from the opposite list. A bare Compose service name is
     not, because it also matches every other container of a service with that
-    name, so an excluded one still keeps an enabled container excluded.
+    name, so an excluded one still keeps an enabled container excluded. That
+    includes a name or requested identifier equal to the service name (for
+    example ``container_name: web`` on service ``web``). The stable_id is always
+    removed, as it is the key the application itself stores, even when another
+    project's service of that name also matches it (a plain container named
+    ``web``, or ``monitoring.id: web``).
 
     Returns:
         The excluded entries that keep an enabled container excluded; empty when
@@ -243,7 +248,11 @@ def _apply_selection(
 
     # Remove from the opposite list if present (check stable_id, name, and both IDs)
     identifiers = (stable_id, container_name, cid, info.get("full_id"), info.get("id"))
+    compose_service = info.get("labels", {}).get("com.docker.compose.service")
     for identifier in dict.fromkeys(i for i in identifiers if i is not None):
+        if identifier == compose_service and identifier != stable_id:
+            # Also matches every other container of that service, so never removed here
+            continue
         if identifier in remove_from:
             # Every copy, as a hand-edited list can hold one more than once
             remove_from[:] = [entry for entry in remove_from if entry != identifier]

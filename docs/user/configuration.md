@@ -178,10 +178,15 @@ replica of a scaled Compose service has its own restart count, keyed
 Enabling or disabling a container (`POST /api/containers/select`) removes it from the opposite
 list under its stable identifier, name, and full or short Docker ID. An entry in
 `containers.excluded` can also be a bare Compose service name, such as `web`, which excludes
-every container of a service with that name in any project. Enabling a container does not remove
-such an entry: the request returns `409`, names the entry, and changes nothing for any of the
-requested containers. Remove the entry with `PUT /api/config` if no other container should stay
-excluded by it.
+every container of a service with that name in any project. Enabling a Compose container does
+not remove an entry equal to its own service name, even when it is also the container's name
+(`container_name: web` on service `web`): the request returns `409`, names the entry, and changes
+nothing for any of the requested containers. Remove the entry with `PUT /api/config` if no other
+container should stay excluded by it. Disabling such a container likewise leaves a matching
+`containers.selected` entry in place, where it keeps applying to the service's other containers.
+An entry equal to the container's own stable identifier is always removed, so enabling a plain
+container named `web`, or one labelled `monitoring.id: web`, also clears a `web` entry that other
+projects' `web` services match.
 
 `containers.restart_counts` and `containers.restart_history` are runtime state. `GET /api/config`
 returns them, but `PUT /api/config` ignores whatever the request body holds for them and keeps
