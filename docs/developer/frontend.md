@@ -13,7 +13,7 @@ npm install
 npm run dev
 ```
 
-This starts the Vite dev server on **`http://localhost:3000`**, with hot module
+This starts the Vite dev server on **`http://localhost:3134`**, with hot module
 replacement.
 
 The Vite dev server proxies `/api` and `/health` requests to `http://localhost:3131`
@@ -33,7 +33,7 @@ npm run dev
 ```
 
 Edit files under `frontend/src/`; changes hot-reload in the browser at
-`http://localhost:3000`.
+`http://localhost:3134`.
 
 ## Building for production
 

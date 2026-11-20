@@ -240,7 +240,7 @@ the short names. The mode is one of two:
 * `headless` ("In the background, no window"; the default): what CI runs. Fast, and nothing to
   watch.
 * `ui` ("Watch and debug in a browser panel"): Playwright's UI mode, served on forwarded port
-  9323 and opened in your own browser. You can watch each test run with a live view of the page,
+  3135 and opened in your own browser. You can watch each test run with a live view of the page,
   a timeline and screenshots, pause, step through and re-run single tests. This is the way to
   watch or debug a run.
   UI mode ticks only the first project and cannot preselect more, so the task starts it with a
