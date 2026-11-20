@@ -5,6 +5,7 @@ Decides from a container's state and health checks whether it needs a restart
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -18,6 +19,108 @@ if TYPE_CHECKING:
     from app.monitor.uptime_kuma_monitor import UptimeKumaMonitor
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class CustomCheckLookup:
+    """
+    The custom health check that applies to one container, and why a name-keyed one was skipped
+
+    Attributes:
+        check: The check that applies, or None
+        key: The key ``check`` is stored under, or None
+        skipped_name: The container name, when a check stored under it was not used because it
+            could not be attributed to this container alone
+        conflicting: Names of the other containers whose stable identifier is ``skipped_name``
+        unverifiable: True when Docker could not be listed to rule such containers out
+    """
+
+    check: HealthCheckConfig | None = None
+    key: str | None = None
+    skipped_name: str | None = None
+    conflicting: tuple[str, ...] = ()
+    unverifiable: bool = False
+
+
+def _stable_id_owners(
+    docker_client: DockerClient, key: str, full_id: str | None
+) -> tuple[str, ...] | None:
+    """
+    Names of the containers other than ``full_id`` whose stable identifier is ``key``
+
+    Lists every container, stopped ones included, because any of them can own a check stored
+    under its stable identifier.
+
+    Returns:
+        The names (empty when there are none), or None when the list could not be retrieved
+        or a listed container could not be inspected
+    """
+    try:
+        containers = docker_client.list_containers(all_containers=True, raise_errors=True)
+    except Exception:
+        # The wrapper has logged the Docker error
+        return None
+    owners: list[str] = []
+    for container in containers:
+        if container.id == full_id:
+            continue
+        other = docker_client.get_container_info(container, refresh=False)
+        other_stable_id = other.get("stable_id")
+        if not other_stable_id:
+            return None
+        if other_stable_id == key:
+            owners.append(other.get("name") or other_stable_id)
+    return tuple(owners)
+
+
+def find_custom_health_check(
+    docker_client: DockerClient, info: dict, stable_id: str | None
+) -> CustomCheckLookup:
+    """
+    Find the custom health check for a container: by stable_id, then name, then full Docker ID
+
+    A check stored under the container's name is used only when no other container has that
+    name as its stable identifier, since such a check may be that container's. Docker is
+    listed only in that case: when nothing is stored under the stable_id but something is
+    stored under a name that differs from it. Blocking; call it from a worker thread.
+
+    Args:
+        docker_client: Docker client wrapper, used to list containers
+        info: Container information dict
+        stable_id: The container's stable identifier
+
+    Returns:
+        The lookup result
+    """
+    if stable_id is not None:
+        check = config_manager.get_custom_health_check(stable_id)
+        if check:
+            return CustomCheckLookup(check=check, key=stable_id)
+
+    name = info.get("name")
+    full_id = info.get("full_id")
+    skipped = CustomCheckLookup()
+    if name is not None and name != stable_id:
+        check = config_manager.get_custom_health_check(name)
+        if check:
+            owners = _stable_id_owners(docker_client, name, full_id)
+            if owners == ():
+                return CustomCheckLookup(check=check, key=name)
+            skipped = CustomCheckLookup(
+                skipped_name=name, conflicting=owners or (), unverifiable=owners is None
+            )
+
+    if full_id is not None:
+        check = config_manager.get_custom_health_check(full_id)
+        if check:
+            return CustomCheckLookup(
+                check=check,
+                key=full_id,
+                skipped_name=skipped.skipped_name,
+                conflicting=skipped.conflicting,
+                unverifiable=skipped.unverifiable,
+            )
+    return skipped
 
 
 class HealthEvaluator:
@@ -115,6 +218,28 @@ class HealthEvaluator:
         # exit_code = 0 but respect_manual_stop = False
         return True, "Container stopped (exit 0)"
 
+    @staticmethod
+    def _warn_skipped_name_check(info: dict, lookup: CustomCheckLookup) -> None:
+        """Log why a custom health check stored under the container's name was not applied"""
+        if lookup.unverifiable:
+            logger.warning(
+                "Custom health check stored under '%s' was not applied to container %s: "
+                "Docker containers could not be listed to rule out another container with "
+                "that stable identifier",
+                lookup.skipped_name,
+                info.get("name"),
+            )
+            return
+        logger.warning(
+            "Custom health check stored under '%s' was not applied to container %s: "
+            "'%s' is also the stable identifier of %s. Set a unique monitoring.id label on "
+            "that container so the key identifies one container",
+            lookup.skipped_name,
+            info.get("name"),
+            lookup.skipped_name,
+            ", ".join(lookup.conflicting),
+        )
+
     async def _health_check_failure(
         self, container: Container, info: dict, stable_id: str | None
     ) -> str | None:
@@ -129,12 +254,12 @@ class HealthEvaluator:
         """
         # Custom health checks are looked up by stable_id, name, then ID for backwards
         # compatibility
-        custom_hc = None
-        for key in (stable_id, info.get("name"), info.get("full_id")):
-            if key is not None:
-                custom_hc = config_manager.get_custom_health_check(key)
-                if custom_hc:
-                    break
+        lookup = await asyncio.to_thread(
+            find_custom_health_check, self.docker_client, info, stable_id
+        )
+        if lookup.skipped_name is not None:
+            self._warn_skipped_name_check(info, lookup)
+        custom_hc = lookup.check
         if custom_hc:
             result = await self.perform_custom_health_check(container, custom_hc)
             self._note_custom_check_result(info, custom_hc.check_type, skipped=result is None)

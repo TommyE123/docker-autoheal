@@ -169,11 +169,15 @@ class DockerClientWrapper:
             logger.warning("Connection check failed: %s", e)
         return False
 
-    def list_containers(self, all_containers: bool = False) -> list[Container]:
+    def list_containers(
+        self, all_containers: bool = False, *, raise_errors: bool = False
+    ) -> list[Container]:
         """
         List containers
         Args:
             all_containers: If True, list all containers including stopped ones
+            raise_errors: If True, re-raise a failed Docker call instead of returning an
+                empty list, for callers that must tell "no containers" from "unknown"
         Returns:
             List of Container objects
         """
@@ -183,6 +187,8 @@ class DockerClientWrapper:
             logger.error("Failed to list containers: %s", e)
             if not self.is_connected():
                 self.reconnect()
+            if raise_errors:
+                raise
             return []
 
     def get_container(self, container_id: str) -> Container | None:

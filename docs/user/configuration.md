@@ -175,6 +175,14 @@ recreation because they are keyed by an identifier derived from the *stable iden
 replica of a scaled Compose service has its own restart count, keyed
 `compose:{project}:{service}#{N}` for replica *N* (see [Labels](labels.md#scaled-compose-services)).
 
+Enabling or disabling a container (`POST /api/containers/select`) removes it from the opposite
+list under its stable identifier, name, and full or short Docker ID. An entry in
+`containers.excluded` can also be a bare Compose service name, such as `web`, which excludes
+every container of a service with that name in any project. Enabling a container does not remove
+such an entry: the request returns `409`, names the entry, and changes nothing for any of the
+requested containers. Remove the entry with `PUT /api/config` if no other container should stay
+excluded by it.
+
 `containers.restart_counts` and `containers.restart_history` are runtime state. `GET /api/config`
 returns them, but `PUT /api/config` ignores whatever the request body holds for them and keeps
 the current values, so saving a configuration you read earlier cannot undo restarts recorded
