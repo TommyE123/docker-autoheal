@@ -53,9 +53,9 @@ class BlockingDockerClient(FakeDockerClient):
         self._maybe_block("is_connected")
         return super().is_connected()
 
-    def list_containers(self, all_containers=False):
+    def list_containers(self, all_containers=False, *, raise_errors=False):
         self._maybe_block("list_containers")
-        return super().list_containers(all_containers)
+        return super().list_containers(all_containers, raise_errors=raise_errors)
 
     def get_container(self, container_id):
         self._maybe_block("get_container")
