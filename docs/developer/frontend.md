@@ -13,7 +13,7 @@ npm install
 npm run dev
 ```
 
-This starts the Vite dev server on **`http://localhost:3000`**, with hot module
+This starts the Vite dev server on **`http://localhost:3134`**, with hot module
 replacement.
 
 The Vite dev server proxies `/api` and `/health` requests to `http://localhost:3131`
@@ -33,7 +33,7 @@ npm run dev
 ```
 
 Edit files under `frontend/src/`; changes hot-reload in the browser at
-`http://localhost:3000`.
+`http://localhost:3134`.
 
 ## Building for production
 
@@ -46,6 +46,9 @@ This runs `vite build`, which outputs to `../static` (i.e. `<repo root>/static/`
 `build.outDir` in `vite.config.js`) — the directory the FastAPI backend serves as the web
 UI. `static/` is gitignored; it's generated at build time (or inside the Docker multi-stage
 build) rather than committed.
+
+`npm run build:demo` builds the public browser demo instead, into `frontend/dist/`: see
+[Browser demo](demo.md).
 
 To see the production build served by the actual backend:
 
@@ -85,6 +88,7 @@ frontend/
 │   ├── components/          # Page components (Dashboard, ContainersPage, EventsPage,
 │   │                         #  ConfigPage, NotificationsPage, ...) and config/ subforms
 │   ├── constants/            # Shared constants (EVENT_TYPES)
+│   ├── demo/                 # Browser demo only (see demo.md): mock API and sample data
 │   ├── hooks/                # Shared React hooks (useAlert, useConfigValidation)
 │   ├── services/api.js       # Axios client — one function per backend endpoint
 │   ├── styles/App.css

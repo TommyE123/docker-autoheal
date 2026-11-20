@@ -240,7 +240,7 @@ the short names. The mode is one of two:
 * `headless` ("In the background, no window"; the default): what CI runs. Fast, and nothing to
   watch.
 * `ui` ("Watch and debug in a browser panel"): Playwright's UI mode, served on forwarded port
-  9323 and opened in your own browser. You can watch each test run with a live view of the page,
+  3135 and opened in your own browser. You can watch each test run with a live view of the page,
   a timeline and screenshots, pause, step through and re-run single tests. This is the way to
   watch or debug a run.
   UI mode ticks only the first project and cannot preselect more, so the task starts it with a
@@ -401,6 +401,27 @@ Use role, text and label locators and wait for visible UI state, never fixed sle
 or stall; the app itself is never faked. The settings forms and the modals do not yet link
 labels to inputs or give dialogs accessible names, so those are found by role within their
 form and by title (`dialogTitled`).
+
+## Browser demo smoke test (Playwright)
+
+`frontend/e2e-demo/demo.spec.js` checks the built [browser demo](demo.md): every page
+works against the in-browser mock API with no console errors or off-site requests, a
+deep link loads under the `/docker-autoheal/` sub-path, and there is no service worker
+or manifest. It also clicks through two things a visitor could misread: a notification
+test says nothing was sent, and **Reset demo** brings back the sample data after the
+events are cleared. It needs no Docker and takes a few seconds. It serves an existing
+build, so build first. Outside the Dev Container, whose setup already installs Chromium,
+install it once with `test:demo-e2e:install`:
+
+```bash
+cd frontend
+npm run test:demo-e2e:install   # once, outside the Dev Container
+npm run build:demo
+npm run test:demo-e2e
+```
+
+CI runs it in the `frontend-tests` job of `tests.yml`, and `demo-pages.yml` runs it on
+the files it is about to deploy.
 
 ## CI
 
