@@ -39,6 +39,8 @@ export default defineConfig(({ mode }) => ({
   ],
   server: {
     port: 3134,
+    // Fail instead of drifting to the next port, which is Playwright UI (3135).
+    strictPort: true,
     proxy: {
       "/api": {
         target: "http://localhost:3131",
