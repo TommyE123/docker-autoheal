@@ -13,7 +13,7 @@ set -euo pipefail
 #
 # scope: smoke (default) | full | containers | monitoring | events | configuration |
 #        notifications | errors | regression
-# mode:  headless (default) | ui (Playwright UI on port 9323)
+# mode:  headless (default) | ui (Playwright UI on port 3135)
 #
 # Exit codes: 0 passed, 1 a test failed, 2 bad arguments, 3 the environment could not
 # be set up (the stack did not start, or Docker is not an isolated local daemon), so setup
@@ -44,7 +44,7 @@ ui)
   # One project holding every spec (see playwright.ui.config.js): UI mode otherwise ticks
   # only `parallel`, which has no tests for the scopes that live in `exclusive`.
   export UI_E2E_UI_MODE=1
-  args+=(--ui-host=0.0.0.0 --ui-port=9323)
+  args+=(--ui-host=0.0.0.0 --ui-port=3135)
   ;;
 *)
   echo "Unknown mode '${mode}'" >&2

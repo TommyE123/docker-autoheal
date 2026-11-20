@@ -29,6 +29,7 @@ How to set up a development environment and understand the codebase.
 - [Testing](developer/testing.md)
 - [Mutation testing](developer/mutation-testing.md)
 - [Type annotations](developer/type-annotations.md)
+- [Browser demo](developer/demo.md) — the sample-data demo on GitHub Pages
 
 See also [CONTRIBUTING.md](../CONTRIBUTING.md) for the contribution workflow.
 
