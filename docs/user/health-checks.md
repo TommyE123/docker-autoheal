@@ -40,8 +40,8 @@ with `nginx:alpine`'s BusyBox base; the common `nginx:latest`/Debian image has n
 
 ## Custom health checks
 
-For containers without a Docker-native `HEALTHCHECK`, you can define a custom check from
-the **Containers** tab in the UI (click the health/heart icon) or via the API:
+For containers without a Docker-native `HEALTHCHECK`, you can define a custom check through
+the API. The web UI does not manage custom checks. For example:
 
 ```bash
 curl -X POST http://localhost:3131/api/healthchecks \
