@@ -84,7 +84,7 @@ class ContainersConfig(BaseModel):
         default_factory=list, description="Explicitly excluded container IDs/names"
     )
     restart_counts: dict[str, int] = Field(
-        default_factory=dict, description="Restart counts by stable_id"
+        default_factory=dict, description="Restart counts by recovery id"
     )
     restart_history: dict[str, list[float]] = Field(
         default_factory=dict,
