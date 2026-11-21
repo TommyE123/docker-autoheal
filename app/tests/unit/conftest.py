@@ -227,7 +227,11 @@ class FakeDockerClient:
             self.connected = True
         return self.reconnect_succeeds
 
-    def list_containers(self, all_containers: bool = False) -> list[Any]:
+    def list_containers(
+        self, all_containers: bool = False, *, raise_errors: bool = False
+    ) -> list[Any]:
+        # Raises whatever ``raise_errors`` says, so a test can fail the listing on any path
+        del raise_errors
         if self.list_containers_error is not None:
             raise self.list_containers_error
         if all_containers:
