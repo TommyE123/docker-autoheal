@@ -83,7 +83,7 @@ function Navigation({ systemStatus }) {
             )}
             <button
               type="button"
-              className="btn btn-outline-light btn-sm ms-lg-3"
+              className="btn btn-outline-light btn-sm ms-lg-3 mt-2 mt-lg-0 align-self-start align-self-lg-auto"
               onClick={toggleTheme}
               aria-pressed={isDark}
               aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
