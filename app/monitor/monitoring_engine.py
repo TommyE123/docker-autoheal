@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from app.config.config_manager import (
     AutoHealEvent,
+    PersistenceError,
     config_manager,
 )
 from app.docker_client.docker_client_wrapper import recovery_identifier
@@ -22,6 +23,8 @@ from app.monitor.selection import should_monitor
 from app.notifications.notification_manager import notification_manager
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from docker.models.containers import Container
 
     from app.monitor.uptime_kuma_monitor import UptimeKumaMonitor
@@ -464,8 +467,14 @@ class MonitoringEngine:
             # Remove from quarantine
             config_manager.unquarantine_container(quarantine_id)
 
-            # Also clear the restart count so it starts fresh
-            config_manager.clear_restart_history(recovery_id)
+            # Also clear the restart count so it starts fresh. The release is already
+            # saved, so a failed save here must not skip the rest of it.
+            self._persist_best_effort(
+                "restart history clear",
+                container_name,
+                config_manager.clear_restart_history,
+                recovery_id,
+            )
 
             # Forget the streak and reset backoff delays; a wait started by another
             # replica sharing this recovery ID is still valid
@@ -485,7 +494,7 @@ class MonitoringEngine:
                 status="success",
                 message="Container automatically removed from quarantine - auto-healed and now healthy",
             )
-            config_manager.add_event(event)
+            self._persist_best_effort("event", container_name, config_manager.add_event, event)
 
             # Send notification
             await notification_manager.send_event_notification(event)
@@ -562,7 +571,7 @@ class MonitoringEngine:
                 message=f"Container quarantined: exceeded {config.restart.max_restarts} restarts "
                 f"in {config.restart.max_restarts_window_seconds}s window",
             )
-            config_manager.add_event(event)
+            self._persist_best_effort("event", container_name, config_manager.add_event, event)
 
             # Send notification for quarantine event
             await notification_manager.send_event_notification(event)
@@ -599,8 +608,16 @@ class MonitoringEngine:
         )
         success = await asyncio.to_thread(self.docker_client.restart_container, container)
 
-        # Record restart (using recovery_id - persists across ID changes and handles all edge cases)
-        config_manager.record_restart(recovery_id, config.restart.max_restarts_window_seconds)
+        # Record restart (using recovery_id - persists across ID changes and handles all edge
+        # cases). The restart has happened, so a failed save must not skip the cooldown,
+        # event or notification below; the count is still kept in memory.
+        self._persist_best_effort(
+            "restart count",
+            container_name,
+            config_manager.record_restart,
+            recovery_id,
+            config.restart.max_restarts_window_seconds,
+        )
         self._recovery.record_restart(recovery_id)
 
         # Log event
@@ -613,7 +630,7 @@ class MonitoringEngine:
             status="success" if success else "failure",
             message=f"Restart {'successful' if success else 'failed'}: {reason}",
         )
-        config_manager.add_event(event)
+        self._persist_best_effort("event", container_name, config_manager.add_event, event)
 
         # Send notification for restart event
         await notification_manager.send_event_notification(event)
@@ -629,6 +646,31 @@ class MonitoringEngine:
                 "Failed to restart container %s (recovery_id: %s)",
                 container_name,
                 recovery_id,
+            )
+
+    @staticmethod
+    def _persist_best_effort(
+        what: str, container_name: str, save: Callable[..., None], *args: Any
+    ) -> None:
+        """
+        Call a ``config_manager`` method whose change must not be lost to a failed save.
+
+        Used after a container action has already happened: ``record_restart``,
+        ``add_event`` and ``clear_restart_history`` keep the change in memory when the
+        file cannot be written, so the failure is logged and the caller carries on.
+        Args:
+            what: What was being saved, for the log message
+            container_name: Container the change belongs to, for the log message
+            save: The ``config_manager`` method to call
+            *args: Arguments for ``save``
+        """
+        try:
+            save(*args)
+        except PersistenceError:
+            logger.error(
+                "Could not save %s for container %s; it is kept in memory only",
+                what,
+                container_name,
             )
 
     async def _send_alert(self, event: AutoHealEvent) -> None:

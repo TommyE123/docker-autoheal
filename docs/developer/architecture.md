@@ -95,6 +95,26 @@ database — all state is JSON files under `/data`.
    out other coroutines on the event loop thread); awaited work comes first. `update_config()`
    always keeps the live `containers.restart_counts` and `containers.restart_history`.
 
+   A write that fails (full disk, read-only or wrongly permissioned `/data`) is logged and
+   raised as `PersistenceError`, and the file keeps its previous contents. Maintenance
+   mode, quarantine, `update_config()`, `mutate()`, `import_config()`, `clear_events()` and
+   the custom health check setters then restore the previous in-memory state, so the failed
+   change is not applied, and an API request gets a 500. That restored state can still differ
+   from disk if an earlier save failed and kept its change in memory only.
+   `record_restart()`, `add_event()` and `clear_restart_history()` keep the new value in
+   memory and raise, because the restart or release already happened; the next successful
+   save writes it out.
+
+   The monitoring engine logs those failures and still applies the cooldown, records the
+   event and sends the notification. Auto-discovery distinguishes two cases. If saving a new
+   selection to `config.json` fails, the selection is rolled back and it returns before
+   recording the event or sending the notification; a later start event or startup scan
+   retries it. If the selection is saved but the event cannot be written, the event stays in
+   memory and the notification is still sent. The manual unquarantine route is not
+   best-effort: if clearing the restart history fails after the release was saved, it
+   returns a 500, the container stays released, and `config.json` keeps its old restart
+   counts until the next save.
+
 ## Stable container identity
 
 Because container IDs (and often names) change when a container is recreated, the

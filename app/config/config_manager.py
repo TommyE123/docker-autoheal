@@ -490,6 +490,15 @@ class ConfigImportError(ValueError):
     """
 
 
+class PersistenceError(OSError):
+    """A state file under the data directory could not be written.
+
+    Raised by the ``_save_*`` methods after the failure is logged. The message names
+    only the file that failed, never its contents (config.json holds credentials); the
+    underlying error is chained as ``__cause__``. The file on disk is left as it was.
+    """
+
+
 class ConfigManager:
     """
     Thread-safe configuration manager with file-based persistence
@@ -655,7 +664,7 @@ class ConfigManager:
         return AutoHealConfig(**sections)
 
     def _save_config(self) -> None:
-        """Save configuration to file"""
+        """Save configuration to file; raise ``PersistenceError`` if it cannot be written."""
         try:
             config_dict = self._config.model_dump()
             config_dict["custom_health_checks"] = {
@@ -665,6 +674,7 @@ class ConfigManager:
             logger.debug("Configuration saved to disk")
         except Exception as e:
             logger.error("Failed to save config to disk: %s", e)
+            raise PersistenceError("Failed to save configuration") from e
 
     def _load_events(self) -> list[StoredAutoHealEvent]:
         """Load current and legacy events without losing valid history."""
@@ -698,13 +708,14 @@ class ConfigManager:
         return []
 
     def _save_events(self) -> None:
-        """Save events to file"""
+        """Save events to file; raise ``PersistenceError`` if it cannot be written."""
         try:
             events_data = [event.model_dump(mode="json") for event in self._event_log]
             _atomic_write_json(self.EVENTS_FILE, events_data, indent=2, default=str)
             logger.debug("Saved %s events to disk", len(self._event_log))
         except Exception as e:
             logger.error("Failed to save events to disk: %s", e)
+            raise PersistenceError("Failed to save events") from e
 
     # Restart counts are now stored in config.json, no separate file needed
 
@@ -725,7 +736,7 @@ class ConfigManager:
         return set()
 
     def _save_quarantine(self) -> None:
-        """Save quarantine list to file"""
+        """Save quarantine list to file; raise ``PersistenceError`` if it cannot be written."""
         try:
             _atomic_write_json(self.QUARANTINE_FILE, list(self._quarantined_containers), indent=2)
             logger.debug(
@@ -734,6 +745,7 @@ class ConfigManager:
             )
         except Exception as e:
             logger.error("Failed to save quarantine list to disk: %s", e)
+            raise PersistenceError("Failed to save quarantine list") from e
 
     def _load_maintenance_mode(self) -> None:
         """Load maintenance mode state from file"""
@@ -752,7 +764,7 @@ class ConfigManager:
             logger.warning("Failed to load maintenance mode from disk: %s", e)
 
     def _save_maintenance_mode(self) -> None:
-        """Save maintenance mode state to file"""
+        """Save maintenance mode to file; raise ``PersistenceError`` if it cannot be written."""
         try:
             data = {
                 "enabled": self._maintenance_mode,
@@ -764,6 +776,7 @@ class ConfigManager:
             logger.debug("Saved maintenance mode state: %s", self._maintenance_mode)
         except Exception as e:
             logger.error("Failed to save maintenance mode to disk: %s", e)
+            raise PersistenceError("Failed to save maintenance mode") from e
 
     def get_config(self) -> AutoHealConfig:
         """Get current configuration (thread-safe)"""
@@ -793,12 +806,29 @@ class ConfigManager:
         Everything else in ``config`` replaces the live values, so a caller that reads,
         awaits and then writes can still overwrite another writer's change. Use
         ``mutate()`` for a read-modify-write.
+
+        If the file cannot be written, the previous configuration is restored in memory
+        and ``PersistenceError`` is raised.
         """
         with self._lock:
             new_config = config.model_copy(deep=True)
             self._keep_live_restart_state(new_config)
-            self._config = new_config
+            self._replace_config_and_save(new_config)
+
+    def _replace_config_and_save(self, new_config: AutoHealConfig) -> None:
+        """Make ``new_config`` live and save it, restoring the previous one if the save fails.
+
+        Callers must hold ``self._lock``. The restart state in ``new_config`` is the live
+        one (see ``_keep_live_restart_state``), so restoring the previous configuration
+        keeps any restart recorded meanwhile.
+        """
+        previous = self._config
+        self._config = new_config
+        try:
             self._save_config()
+        except PersistenceError:
+            self._config = previous
+            raise
 
     @contextlib.contextmanager
     def mutate(self) -> Iterator[AutoHealConfig]:
@@ -809,7 +839,8 @@ class ConfigManager:
         configuration and is saved; if it is unchanged nothing is written. Like
         ``update_config`` it does not validate the copy, so one earlier invalid value
         cannot block every later write. If the block raises, the copy is discarded and
-        the live configuration and file are left as they were. As with
+        the live configuration and file are left as they were. If the save fails, the
+        live configuration is restored and ``PersistenceError`` is raised. As with
         ``update_config``, the live ``containers.restart_counts`` and
         ``containers.restart_history`` are kept.
 
@@ -825,8 +856,7 @@ class ConfigManager:
                 return
             new_config = working.model_copy(deep=True)
             self._keep_live_restart_state(new_config)
-            self._config = new_config
-            self._save_config()
+            self._replace_config_and_save(new_config)
 
     def update_partial_config(self, **kwargs: Any) -> None:
         """Update specific top-level configuration fields.
@@ -856,7 +886,11 @@ class ConfigManager:
             return json.dumps(config_dict, indent=2, default=str)
 
     def import_config(self, json_str: str) -> None:
-        """Import configuration from JSON string"""
+        """Import configuration from JSON string.
+
+        If the file cannot be written the previous configuration and custom health
+        checks are restored in memory and ``PersistenceError`` is raised.
+        """
         with self._lock:
             config_dict = json.loads(json_str)
             if not isinstance(config_dict, dict):
@@ -879,14 +913,23 @@ class ConfigManager:
                 cid: HealthCheckConfig(**hc) for cid, hc in custom_hc.items()
             }
 
+            previous = (self._config, self._custom_health_checks)
             self._config = new_config
             self._custom_health_checks = new_custom_health_checks
 
-            # Persist to disk
-            self._save_config()
+            # Persist to disk; if that fails, put the previous configuration back
+            try:
+                self._save_config()
+            except PersistenceError:
+                self._config, self._custom_health_checks = previous
+                raise
 
     def add_event(self, event: AutoHealEvent) -> None:
-        """Add event to log (thread-safe, with size limit)"""
+        """Add event to log (thread-safe, with size limit).
+
+        If events.json cannot be written the event is still kept in memory, so the
+        audit trail shown in the UI is not lost, and ``PersistenceError`` is raised.
+        """
         with self._lock:
             self._event_log.append(event)
             max_entries = self._config.ui.max_log_entries
@@ -902,17 +945,36 @@ class ConfigManager:
             return self._event_log.copy()
 
     def clear_events(self) -> None:
-        """Clear all events from log (thread-safe)"""
+        """Clear all events from log (thread-safe).
+
+        If events.json cannot be written the events are restored in memory and
+        ``PersistenceError`` is raised.
+        """
         with self._lock:
-            self._event_log.clear()
-            self._save_events()
+            previous = self._event_log
+            self._event_log = []
+            try:
+                self._save_events()
+            except PersistenceError:
+                self._event_log = previous
+                raise
             logger.info("All events cleared")
 
     def add_custom_health_check(self, health_check: HealthCheckConfig) -> None:
-        """Add custom health check for a container"""
+        """Add custom health check for a container.
+
+        If the file cannot be written the previous value is restored in memory and
+        ``PersistenceError`` is raised.
+        """
         with self._lock:
-            self._custom_health_checks[health_check.container_id] = health_check
-            self._save_config()
+            container_id = health_check.container_id
+            previous = self._custom_health_checks.get(container_id)
+            self._custom_health_checks[container_id] = health_check
+            try:
+                self._save_config()
+            except PersistenceError:
+                self._restore_custom_health_check(container_id, previous)
+                raise
 
     def get_custom_health_check(self, container_id: str) -> HealthCheckConfig | None:
         """Get custom health check for a container"""
@@ -920,10 +982,27 @@ class ConfigManager:
             return self._custom_health_checks.get(container_id)
 
     def remove_custom_health_check(self, container_id: str) -> None:
-        """Remove custom health check for a container"""
+        """Remove custom health check for a container.
+
+        If the file cannot be written the check is restored in memory and
+        ``PersistenceError`` is raised.
+        """
         with self._lock:
+            previous = self._custom_health_checks.pop(container_id, None)
+            try:
+                self._save_config()
+            except PersistenceError:
+                self._restore_custom_health_check(container_id, previous)
+                raise
+
+    def _restore_custom_health_check(
+        self, container_id: str, previous: HealthCheckConfig | None
+    ) -> None:
+        """Put back (or drop, if ``previous`` is None) a custom health check. Hold the lock."""
+        if previous is None:
             self._custom_health_checks.pop(container_id, None)
-            self._save_config()
+        else:
+            self._custom_health_checks[container_id] = previous
 
     def get_all_custom_health_checks(self) -> dict[str, HealthCheckConfig]:
         """Get all custom health checks"""
@@ -935,6 +1014,11 @@ class ConfigManager:
 
         When ``window_seconds`` is given, timestamps that can no longer fall inside that
         window are pruned so the history stays bounded.
+
+        The restart has already happened, so if config.json cannot be written the new
+        count and timestamp are still kept in memory, where the quarantine threshold
+        reads them, and ``PersistenceError`` is raised. Rolling them back would let a
+        crash-looping container escape quarantine.
         """
         with self._lock:
             counts = self._config.containers.restart_counts
@@ -963,16 +1047,36 @@ class ConfigManager:
             return self._config.containers.restart_counts.get(container_id, 0)
 
     def quarantine_container(self, container_id: str) -> None:
-        """Mark container as quarantined"""
+        """Mark container as quarantined.
+
+        If quarantine.json cannot be written the change is undone in memory and
+        ``PersistenceError`` is raised.
+        """
         with self._lock:
+            added = container_id not in self._quarantined_containers
             self._quarantined_containers.add(container_id)
-            self._save_quarantine()
+            try:
+                self._save_quarantine()
+            except PersistenceError:
+                if added:
+                    self._quarantined_containers.discard(container_id)
+                raise
 
     def unquarantine_container(self, container_id: str) -> None:
-        """Remove container from quarantine"""
+        """Remove container from quarantine.
+
+        If quarantine.json cannot be written the change is undone in memory and
+        ``PersistenceError`` is raised.
+        """
         with self._lock:
+            removed = container_id in self._quarantined_containers
             self._quarantined_containers.discard(container_id)
-            self._save_quarantine()
+            try:
+                self._save_quarantine()
+            except PersistenceError:
+                if removed:
+                    self._quarantined_containers.add(container_id)
+                raise
 
     def is_quarantined(self, container_id: str) -> bool:
         """Check if container is quarantined"""
@@ -993,18 +1097,33 @@ class ConfigManager:
                 self._save_config()
 
     def enable_maintenance_mode(self) -> None:
-        """Enable maintenance mode"""
-        with self._lock:
-            self._maintenance_mode = True
-            self._maintenance_start_time = datetime.now(UTC)
-            self._save_maintenance_mode()
+        """Enable maintenance mode.
+
+        If maintenance.json cannot be written the previous state is restored in memory
+        and ``PersistenceError`` is raised.
+        """
+        self._set_maintenance_mode(enabled=True, start_time=datetime.now(UTC))
 
     def disable_maintenance_mode(self) -> None:
-        """Disable maintenance mode"""
+        """Disable maintenance mode.
+
+        If maintenance.json cannot be written the previous state is restored in memory
+        and ``PersistenceError`` is raised. Healing therefore never resumes while the
+        file still says maintenance is on, which a restart would reload.
+        """
+        self._set_maintenance_mode(enabled=False, start_time=None)
+
+    def _set_maintenance_mode(self, *, enabled: bool, start_time: datetime | None) -> None:
+        """Set and save the maintenance state, restoring the previous one if the save fails."""
         with self._lock:
-            self._maintenance_mode = False
-            self._maintenance_start_time = None
-            self._save_maintenance_mode()
+            previous = (self._maintenance_mode, self._maintenance_start_time)
+            self._maintenance_mode = enabled
+            self._maintenance_start_time = start_time
+            try:
+                self._save_maintenance_mode()
+            except PersistenceError:
+                self._maintenance_mode, self._maintenance_start_time = previous
+                raise
 
     def is_maintenance_mode(self) -> bool:
         """Check if maintenance mode is enabled"""
