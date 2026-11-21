@@ -687,17 +687,19 @@ class TestNameKeyedCustomChecks:
         assert needs_restart is True
         assert reason == "Custom health check failed (tcp)"
 
-    async def test_stable_id_match_does_not_list_docker(self, engine, docker_client):
+    async def test_stable_id_match_does_not_list_docker(self, engine, docker_client, monkeypatch):
         container, info = _compose_web()
         docker_client.add_container(container, info)
         docker_client.health_results["stack-web-1"] = False
-        docker_client.list_containers_error = RuntimeError("must not be listed")
+        listing = MagicMock(wraps=docker_client.list_containers)
+        monkeypatch.setattr(docker_client, "list_containers", listing)
         config_manager.add_custom_health_check(_tcp_check("stack_web"))
         config_manager.add_custom_health_check(_tcp_check("stack-web-1"))
 
         needs_restart, _reason = await engine._evaluate_container_health(container, info)
 
         assert needs_restart is True
+        listing.assert_not_called()
 
     @pytest.mark.parametrize("owner_status", ["running", "exited"])
     async def test_ambiguous_name_keyed_check_is_skipped_with_a_warning(
@@ -798,7 +800,7 @@ class TestNameKeyedCustomChecks:
         assert "could not be listed" in caplog.text
 
     async def test_replicas_share_the_check_under_their_stable_id(
-        self, engine, docker_client, caplog
+        self, engine, docker_client, caplog, monkeypatch
     ):
         """Two replicas of one service both use the check stored under the shared stable ID."""
         first, first_info = _compose_web(1, "a" * 64)
@@ -807,13 +809,15 @@ class TestNameKeyedCustomChecks:
         docker_client.add_container(second, second_info)
         docker_client.health_results["stack-web-1"] = False
         docker_client.health_results["stack-web-2"] = False
-        # A listing would fail, so any name fallback would be skipped
-        docker_client.list_containers_error = RuntimeError("must not be listed")
+        listing = MagicMock(wraps=docker_client.list_containers)
+        monkeypatch.setattr(docker_client, "list_containers", listing)
         config_manager.add_custom_health_check(_tcp_check("stack_web"))
 
         with caplog.at_level(logging.WARNING, logger="app.monitor.health"):
             first_result = await engine._evaluate_container_health(first, first_info)
             second_result = await engine._evaluate_container_health(second, second_info)
+
+        listing.assert_not_called()
 
         assert first_result == (True, "Custom health check failed (tcp)")
         assert second_result == (True, "Custom health check failed (tcp)")
@@ -847,6 +851,7 @@ class TestFindCustomHealthCheck:
         _container, info = _compose_web()
         config_manager.add_custom_health_check(_tcp_check("stack-web-1"))
 
-        find_custom_health_check(client, info, "stack_web")
+        lookup = find_custom_health_check(client, info, "stack_web")
 
         client.list_containers.assert_called_once_with(all_containers=True, raise_errors=True)
+        assert lookup == CustomCheckLookup(check=_tcp_check("stack-web-1"), key="stack-web-1")

@@ -9,6 +9,7 @@ real Docker daemon is ever touched.
 """
 
 import json
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import HTTPException
@@ -558,17 +559,19 @@ class TestNameKeyedHealthChecks:
         await delete_health_check(get_docker_client(), "web")
         assert config_manager.get_all_custom_health_checks() == {}
 
-    async def test_stable_id_match_does_not_list_docker(self, wired_api):
+    async def test_stable_id_match_does_not_list_docker(self, wired_api, monkeypatch):
         docker_client, _engine = wired_api
         container, info = _compose_web()
         docker_client.add_container(container, info)
-        docker_client.list_containers_error = RuntimeError("must not be listed")
+        listing = MagicMock(wraps=docker_client.list_containers)
+        monkeypatch.setattr(docker_client, "list_containers", listing)
         config_manager.add_custom_health_check(_tcp_check("stack_web"))
         config_manager.add_custom_health_check(_tcp_check("stack-web-1", port=9090))
 
         assert (await get_health_check(get_docker_client(), _FULL_ID)).tcp_port == 8080
         await delete_health_check(get_docker_client(), _FULL_ID)
         assert set(config_manager.get_all_custom_health_checks()) == {"stack-web-1"}
+        listing.assert_not_called()
 
     @pytest.mark.parametrize("owner_status", ["running", "exited"])
     async def test_ambiguous_name_keyed_check_returns_409(self, wired_api, owner_status):
@@ -654,16 +657,18 @@ class TestNameKeyedHealthChecks:
 
         assert (await get_health_check(get_docker_client(), _FULL_ID)).tcp_port == 9090
 
-    async def test_replicas_share_the_check_under_their_stable_id(self, wired_api):
+    async def test_replicas_share_the_check_under_their_stable_id(self, wired_api, monkeypatch):
         docker_client, _engine = wired_api
         first, first_info = _compose_web(1, "a" * 64)
         second, second_info = _compose_web(2, "b" * 64)
         docker_client.add_container(first, first_info)
         docker_client.add_container(second, second_info)
-        docker_client.list_containers_error = RuntimeError("must not be listed")
+        listing = MagicMock(wraps=docker_client.list_containers)
+        monkeypatch.setattr(docker_client, "list_containers", listing)
         config_manager.add_custom_health_check(_tcp_check("stack_web"))
 
         for replica in ("stack-web-1", "stack-web-2"):
             assert (await get_health_check(get_docker_client(), replica)).container_id == (
                 "stack_web"
             )
+        listing.assert_not_called()

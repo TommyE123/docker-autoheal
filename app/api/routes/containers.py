@@ -196,7 +196,7 @@ def _apply_selection(
     cid: str,
     info: dict | None,
     enabled: bool,
-) -> list[str]:
+) -> None:
     """
     Move one container into the selected (``enabled``) or excluded list and
     out of the opposite one.
@@ -212,11 +212,8 @@ def _apply_selection(
     example ``container_name: web`` on service ``web``). The stable_id is always
     removed, as it is the key the application itself stores, even when another
     project's service of that name also matches it (a plain container named
-    ``web``, or ``monitoring.id: web``).
-
-    Returns:
-        The excluded entries that keep an enabled container excluded; empty when
-        the requested state is reached
+    ``web``, or ``monitoring.id: web``). ``_still_excluded`` reports an entry
+    that keeps an enabled container excluded.
     """
     if enabled:
         add_to, remove_from = containers.selected, containers.excluded
@@ -233,7 +230,7 @@ def _apply_selection(
             logger.debug("Added container %s to %s list (container not resolved)", cid, add_label)
         if cid in remove_from:
             remove_from.remove(cid)
-        return []
+        return
 
     container_name = info.get("name")
     if stable_id not in add_to:
@@ -258,10 +255,12 @@ def _apply_selection(
             remove_from[:] = [entry for entry in remove_from if entry != identifier]
             logger.debug("Removed '%s' from %s list", identifier, remove_label)
 
-    # Exclusion wins over selection, so only enabling can leave the container short of the
-    # requested state
-    if not enabled:
+
+def _still_excluded(containers: ContainersConfig, info: dict | None) -> list[str]:
+    """The ``containers.excluded`` entries that match a resolved container; empty if none"""
+    if info is None:
         return []
+    stable_id = _stable_id_from_info(info)
     return [entry for entry in containers.excluded if _listed([entry], info, stable_id)]
 
 
@@ -277,7 +276,9 @@ def _selection_conflict_detail(conflicts: dict[str, list[str]]) -> str:
         + " in containers.excluded. Such an entry matches a container by its Compose service"
         " name, so it also matches every other container of a service with that name, and is"
         " not removed automatically. If no other container should stay excluded by it, remove"
-        " it from containers.excluded (PUT /api/config or a configuration import) and retry."
+        " it from containers.excluded and retry: read GET /api/config, remove the entry and PUT"
+        " the whole configuration back (PUT replaces the configuration), or import a"
+        " configuration."
     )
 
 
@@ -310,12 +311,20 @@ async def update_container_selection(
     config = config_manager.get_config()
 
     # Applied to a copy and saved only when every container reaches the requested state, so a
-    # conflict anywhere in the batch changes nothing
-    conflicts = {
-        (resolved[cid] or {}).get("name") or cid: entries
-        for cid in request.container_ids
-        if (entries := _apply_selection(config.containers, cid, resolved[cid], request.enabled))
-    }
+    # conflict anywhere in the batch changes nothing. Checked after the whole batch is applied,
+    # so the outcome does not depend on the order of the request. Exclusion wins over
+    # selection, so only enabling can leave a container short of the requested state.
+    for cid in request.container_ids:
+        _apply_selection(config.containers, cid, resolved[cid], request.enabled)
+    conflicts = (
+        {
+            (resolved[cid] or {}).get("name") or cid: entries
+            for cid in request.container_ids
+            if (entries := _still_excluded(config.containers, resolved[cid]))
+        }
+        if request.enabled
+        else {}
+    )
     if conflicts:
         raise HTTPException(status_code=409, detail=_selection_conflict_detail(conflicts))
 

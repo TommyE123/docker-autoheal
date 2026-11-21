@@ -902,6 +902,26 @@ class TestSelectionLegacyEntries:
         assert config_manager.get_config().containers.excluded == []
         assert engine.should_monitor_container(container, info) is True
 
+    @pytest.mark.parametrize("order", ["compose-first", "plain-first"])
+    async def test_conflicts_are_checked_against_the_final_batch(self, wired_api, order):
+        """A later container in the batch that clears the shared entry (its own stable ID)
+        resolves an earlier container's conflict, whatever the request order."""
+        docker_client, engine = wired_api
+        compose, compose_info = _compose_web()
+        plain, plain_info = make_container(name="web", container_id="e" * 64)
+        docker_client.add_container(compose, compose_info)
+        docker_client.add_container(plain, plain_info)
+        self._exclude("web")
+        ids = [_FULL_ID, "e" * 64] if order == "compose-first" else ["e" * 64, _FULL_ID]
+
+        await update_container_selection(
+            get_docker_client(), ContainerSelectionRequest(container_ids=ids, enabled=True)
+        )
+
+        assert config_manager.get_config().containers.excluded == []
+        assert engine.should_monitor_container(compose, compose_info) is True
+        assert engine.should_monitor_container(plain, plain_info) is True
+
     async def test_disabling_is_not_blocked_by_a_bare_service_selection(self, wired_api):
         """Exclusion wins over selection, so disabling always reaches its state."""
         docker_client, engine = wired_api
