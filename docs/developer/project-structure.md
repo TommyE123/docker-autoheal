@@ -10,7 +10,8 @@ docker-autoheal/
 │   │   ├── models.py             # Shared Pydantic request/response models
 │   │   └── routes/               # Per-domain API routers
 │   ├── config/
-│   │   ├── config_manager.py     # Pydantic config models + thread-safe JSON persistence
+│   │   ├── config_manager.py     # Thread-safe JSON persistence + the global ConfigManager
+│   │   ├── config_models.py      # Pydantic config models (side-effect free; defaults source)
 │   │   └── init_defaults.py      # Writes default config.json/events.json/etc. on first run
 │   ├── docker_client/
 │   │   └── docker_client_wrapper.py  # Thin wrapper around the `docker` SDK

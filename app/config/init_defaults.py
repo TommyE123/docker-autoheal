@@ -8,6 +8,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from app.config.config_models import AutoHealConfig
+
 logger = logging.getLogger(__name__)
 
 
@@ -18,11 +20,7 @@ def get_default_config() -> dict[str, Any]:
     defaults are declared once. ``custom_health_checks`` is stored outside the
     model and is therefore added here explicitly.
 
-    The import is deferred because ``config_manager`` imports this module at
-    load time, so a top-level import would be circular.
     """
-    from app.config.config_manager import AutoHealConfig
-
     config: dict[str, Any] = AutoHealConfig().model_dump(mode="json")
     config["custom_health_checks"] = {}
     return config
