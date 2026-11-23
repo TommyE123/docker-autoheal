@@ -266,18 +266,13 @@ function ContainersPage() {
       )}
 
       <Card>
-        <Card.Header className="d-flex justify-content-between align-items-center">
+        <Card.Header className="d-flex flex-wrap justify-content-between align-items-center gap-2">
           <h5 className="mb-0">
             <i className="bi bi-box me-2"></i>
             Containers
           </h5>
-          <div>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={fetchContainers}
-              className="me-2"
-            >
+          <div className="d-flex flex-wrap gap-2">
+            <Button variant="primary" size="sm" onClick={fetchContainers}>
               <i className="bi bi-arrow-clockwise me-1"></i>
               Refresh
             </Button>
@@ -286,7 +281,6 @@ function ContainersPage() {
               size="sm"
               onClick={handleEnableAutoheal}
               disabled={selectedContainers.size === 0}
-              className="me-2"
             >
               <i className="bi bi-check-circle me-1"></i>
               Enable Auto-Heal

@@ -11,6 +11,7 @@ from app.api import state
 from app.api.errors import DockerClientDep  # noqa: TC001  (FastAPI resolves it at runtime)
 from app.api.models import ContainerInfo, ContainerSelectionRequest
 from app.config.config_manager import AutoHealEvent, ContainersConfig, config_manager
+from app.docker_client.identity import recovery_keys
 from app.monitor.health import find_custom_health_check
 from app.monitor.selection import _listed
 
@@ -63,8 +64,11 @@ async def list_containers(docker_client: DockerClientDep, include_stopped: bool 
         # Restart counts and quarantine are stored per replica (recovery_id)
         recovery_id = info.get("recovery_id")
 
-        # Check if quarantined (use recovery_id, matching how quarantine is stored)
-        quarantined = config_manager.is_quarantined(recovery_id)
+        # Quarantined under recovery_id, or a legacy name or full Docker ID entry
+        quarantined = any(
+            config_manager.is_quarantined(key)
+            for key in recovery_keys(recovery_id, info.get("name"), info.get("full_id"))
+        )
 
         # Get locally tracked restart count (persists across container recreations)
         locally_tracked_restarts = config_manager.get_total_restart_count(recovery_id)
@@ -150,8 +154,11 @@ async def get_container_details(docker_client: DockerClientDep, container_id: st
     if monitoring_engine:
         monitored = monitoring_engine.should_monitor_container(container, info)
 
-    # Check if quarantined (use recovery_id, matching how quarantine is stored)
-    quarantined = config_manager.is_quarantined(recovery_id)
+    # Quarantined under recovery_id, or a legacy name or full Docker ID entry
+    quarantined = any(
+        config_manager.is_quarantined(key)
+        for key in recovery_keys(recovery_id, container_name, full_container_id)
+    )
 
     # Get custom health check (by stable_id first for correctness, then fallback to name/ID for
     # legacy compat). A name-keyed check that may belong to another container is not shown.
@@ -379,8 +386,10 @@ async def unquarantine_container(docker_client: DockerClientDep, container_id: s
     if container_name is None or recovery_id is None or full_container_id is None:
         raise HTTPException(status_code=500, detail="Unable to resolve container identifiers")
 
-    # Remove from quarantine using recovery_id (matches how quarantine is stored)
-    config_manager.unquarantine_container(recovery_id)
+    # Remove from quarantine under recovery_id and any legacy name or full Docker ID entry
+    for key in recovery_keys(recovery_id, container_name, full_container_id):
+        if config_manager.is_quarantined(key):
+            config_manager.unquarantine_container(key)
 
     # Clear restart history using recovery_id
     config_manager.clear_restart_history(recovery_id)
