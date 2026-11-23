@@ -312,7 +312,7 @@ class AutoHealService:
         # `start()` cleans up after itself on cancellation.
         async with self._stop_lock:
             if not self._stop_event.is_set():
-                self._start_task = asyncio.create_task(self.start())
+                self._start_task = asyncio.create_task(self.start(), name="autoheal-startup")
                 try:
                     await self._start_task
                 except asyncio.CancelledError:
@@ -364,7 +364,7 @@ def signal_handler(signum: int, _frame: FrameType | None) -> None:
     """Handle shutdown signals"""
     logger.info("Received signal %s, initiating shutdown...", signum)
     if service:
-        task = asyncio.create_task(service.stop())
+        task = asyncio.create_task(service.stop(), name="autoheal-shutdown")
         _shutdown_tasks.add(task)
         task.add_done_callback(_shutdown_tasks.discard)
 
@@ -416,8 +416,8 @@ async def main() -> int:
     # Start service and API server concurrently
     try:
         async with asyncio.TaskGroup() as group:
-            group.create_task(service.run())
-            group.create_task(run_api_server())
+            group.create_task(service.run(), name="autoheal-service")
+            group.create_task(run_api_server(), name="api-server")
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt")
     except asyncio.CancelledError:
