@@ -231,14 +231,11 @@ def test_image_sets_unbuffered_python_and_oci_labels():
     assert "maintainer=" not in dockerfile
 
 
-def test_image_build_uses_cache_mounts_and_linked_copy():
-    """Download caches stay out of the layers, and the static copy can be reused."""
+def test_frontend_build_uses_npm_cache_mount_and_linked_copy():
+    """The npm cache stays out of the layers, lifecycle scripts stay off, and the copy is linked."""
     dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
 
-    assert "RUN --mount=type=cache,target=/root/.npm npm ci" in dockerfile
-    assert (
-        "--mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt" in dockerfile
-    )
+    assert "RUN --mount=type=cache,target=/root/.npm npm ci --ignore-scripts" in dockerfile
     assert "COPY --link --from=frontend-builder /static ./static/" in dockerfile
 
 

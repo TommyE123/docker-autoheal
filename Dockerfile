@@ -13,7 +13,8 @@ COPY frontend/package*.json ./
 
 # Install exactly what's in package-lock.json (including dev dependencies needed for build).
 # The cache mount keeps npm's download cache out of the layer and reuses it across local builds.
-RUN --mount=type=cache,target=/root/.npm npm ci
+# --ignore-scripts skips lifecycle scripts; the only one in the lockfile is fsevents' (macOS-only).
+RUN --mount=type=cache,target=/root/.npm npm ci --ignore-scripts
 
 # Copy frontend source
 COPY frontend/ ./
@@ -40,8 +41,8 @@ WORKDIR /app
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies. The cache mount keeps pip's download cache out of the layer.
-RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code (new structure)
 COPY app/ ./app/
