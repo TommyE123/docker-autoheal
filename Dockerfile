@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Multi-stage Dockerfile for Docker Autoheal with React UI
 
 # ============================================
@@ -10,8 +11,9 @@ WORKDIR /frontend
 # Copy package files (including the lockfile, so `npm ci` gets exact, reproducible versions)
 COPY frontend/package*.json ./
 
-# Install exactly what's in package-lock.json (including dev dependencies needed for build)
-RUN npm ci
+# Install exactly what's in package-lock.json (including dev dependencies needed for build).
+# The cache mount keeps npm's download cache out of the layer and reuses it across local builds.
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 # Copy frontend source
 COPY frontend/ ./
@@ -24,33 +26,28 @@ RUN npm run build
 # ============================================
 FROM python:3.15-slim@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928
 
-LABEL maintainer="Docker Autoheal"
-LABEL description="Automated container monitoring and healing service with React UI"
+# OCI image annotations, so local and PR builds carry the same metadata as release builds
+LABEL org.opencontainers.image.description="Automated container monitoring and healing service with React UI" \
+      org.opencontainers.image.authors="Docker Autoheal" \
+      org.opencontainers.image.source="https://github.com/TommyE123/docker-autoheal"
+
+# Unbuffered stdout/stderr, so logs reach `docker logs` without Compose or other orchestrators
+ENV PYTHONUNBUFFERED=1
 
 # Set working directory
 WORKDIR /app
 
-# renovate: datasource=deb depName=curl versioning=deb registryUrl=https://deb.debian.org/debian?suite=trixie&components=main&binaryArch=amd64
-ARG CURL_VERSION=8.14.1-2+deb13u7
-
-# Install system dependencies
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        curl="${CURL_VERSION}" \
-        libcurl4t64="${CURL_VERSION}" \
-    && rm -rf /var/lib/apt/lists/*
-
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies. The cache mount keeps pip's download cache out of the layer.
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
 
 # Copy application code (new structure)
 COPY app/ ./app/
 
 # Copy React build from stage 1 (vite outputs to frontend/../static which is /frontend/../static)
-COPY --from=frontend-builder /static ./static/
+COPY --link --from=frontend-builder /static ./static/
 
 # Create data and log directories
 RUN mkdir -p /data/logs
@@ -60,9 +57,12 @@ RUN mkdir -p /data/logs
 # 9090 - Prometheus metrics
 EXPOSE 3131 9090
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD ["curl", "-f", "http://localhost:3131/health"]
+# Health check, probed with the Python already in the image, so no extra package is installed.
+# urlopen raises on connection errors and on HTTP 4xx/5xx, so the probe exits non-zero on failure.
+# --start-interval (Docker Engine 25.0+) probes every 5s during the start period, so the
+# container reports healthy soon after it is ready instead of after the first 30s interval.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --start-interval=5s --retries=3 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3131/health', timeout=5)"]
 
 # Run the application
 CMD ["python", "-m", "app.main"]

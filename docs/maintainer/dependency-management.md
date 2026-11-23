@@ -31,11 +31,6 @@ The Dev Container's features, base image and runtime versions are managed too. O
 linters and `mise` tools float. See
 [Pinned and floating dependencies](#pinned-and-floating-dependencies).
 
-Currently, `curl` is pinned in the `Dockerfile` so that its version can be tracked and updated
-by Renovate. This allows the Dockerfile dependency to receive a normal Renovate PR rather than
-floating to whatever version happens to be available from the Debian package repository at
-build time.
-
 ## Pinned and floating dependencies
 
 Pin what ships in the production image and what gates a merge. Let the Dev Container's linters
@@ -45,7 +40,7 @@ them needs a manual bump.
 
 | Pinned (Renovate raises PRs)                                            | Floating (Renovate never updates it)                                    |
 |-------------------------------------------------------------------------|-------------------------------------------------------------------------|
-| `requirements.txt`, the `Dockerfile` base images and apt pins           | `mise.toml` tools, set to `latest`, with no `mise.lock`                 |
+| `requirements.txt` and the `Dockerfile` base images                     | `mise.toml` tools, set to `latest`, with no `mise.lock`                 |
 | `frontend/package-lock.json`, including the build chain devDependencies | `.devcontainer/package.json` linters, set to `latest`, with no lockfile |
 | `docker-compose` images                                                 | The `mise` image (`latest`)                                             |
 | `requirements-dev.txt`, which feeds the required `unit-tests` check     |                                                                         |

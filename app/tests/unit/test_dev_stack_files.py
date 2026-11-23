@@ -205,6 +205,28 @@ def test_python_runtime_versions_are_aligned():
     )
 
 
+def test_image_health_check_probes_without_curl():
+    """The image's HEALTHCHECK uses the image's Python, so curl is not installed for it."""
+    lines = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8").splitlines()
+
+    assert lines[0] == "# syntax=docker/dockerfile:1"
+    dockerfile = "\n".join(lines)
+    assert "curl" not in dockerfile
+    assert re.search(r"^HEALTHCHECK .*--start-interval=5s", dockerfile, re.MULTILINE)
+    assert re.search(
+        r'^\s+CMD \["python", "-c", "import urllib\.request; '
+        r"urllib\.request\.urlopen\('http://localhost:3131/health', timeout=5\)\"\]$",
+        dockerfile,
+        re.MULTILINE,
+    )
+
+
+def test_compose_file_does_not_duplicate_the_image_health_check():
+    """One health check definition, in the Dockerfile, so the two cannot drift apart."""
+    compose = COMPOSE_DEV.parent / "docker-compose.yml"
+    assert "healthcheck:" not in compose.read_text(encoding="utf-8")
+
+
 def test_node_runtime_versions_are_aligned():
     """The Node major must be the same in the build image, CI and the Dev Container."""
     dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
