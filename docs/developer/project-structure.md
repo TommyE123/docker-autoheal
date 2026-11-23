@@ -26,7 +26,7 @@ docker-autoheal/
 │   │   └── notification_manager.py   # Async notification dispatch (Discord/Slack/Telegram/ntfy/Gotify/Pushover/webhook)
 │   ├── uptime_kuma/
 │   │   └── uptime_kuma_client.py     # HTTP/websocket client for the Uptime Kuma API
-│   ├── models/, services/, utils/    # Currently near-empty; reserved for future growth
+│   ├── models/, utils/           # Currently near-empty; reserved for future growth
 │   └── tests/
 │       ├── unit/                 # Automated unit test suite (see docs/developer/testing.md)
 │       └── integration/          # Marked integration suite; needs a real Docker daemon,

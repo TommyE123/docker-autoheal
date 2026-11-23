@@ -19,6 +19,7 @@ from app.docker_client.docker_client_wrapper import DockerClientWrapper
 from app.monitor.monitoring_engine import MonitoringEngine
 from app.monitor.uptime_kuma_monitor import UptimeKumaMonitor
 from app.notifications.notification_manager import notification_manager
+from app.utils.log_level import apply_log_level
 
 if TYPE_CHECKING:
     from types import FrameType
@@ -60,22 +61,7 @@ class CancelledErrorFilter(logging.Filter):
 
 def update_log_level(level_name: str) -> None:
     """Update logging level for all loggers"""
-    level_map = {
-        "DEBUG": logging.DEBUG,
-        "INFO": logging.INFO,
-        "WARNING": logging.WARNING,
-        "ERROR": logging.ERROR,
-        "CRITICAL": logging.CRITICAL,
-    }
-    level = level_map.get(level_name.upper(), logging.INFO)
-
-    # Set root logger level
-    logging.getLogger().setLevel(level)
-
-    # Disable uvicorn access logs completely (set to WARNING to suppress INFO logs)
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-    logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
-    logging.getLogger("uvicorn").setLevel(logging.WARNING)
+    apply_log_level(level_name)
 
     # Add filter to suppress CancelledError tracebacks
     logging.getLogger("uvicorn.error").addFilter(CancelledErrorFilter())
@@ -312,7 +298,7 @@ class AutoHealService:
         # `start()` cleans up after itself on cancellation.
         async with self._stop_lock:
             if not self._stop_event.is_set():
-                self._start_task = asyncio.create_task(self.start())
+                self._start_task = asyncio.create_task(self.start(), name="autoheal-startup")
                 try:
                     await self._start_task
                 except asyncio.CancelledError:
@@ -364,7 +350,7 @@ def signal_handler(signum: int, _frame: FrameType | None) -> None:
     """Handle shutdown signals"""
     logger.info("Received signal %s, initiating shutdown...", signum)
     if service:
-        task = asyncio.create_task(service.stop())
+        task = asyncio.create_task(service.stop(), name="autoheal-shutdown")
         _shutdown_tasks.add(task)
         task.add_done_callback(_shutdown_tasks.discard)
 
@@ -416,8 +402,8 @@ async def main() -> int:
     # Start service and API server concurrently
     try:
         async with asyncio.TaskGroup() as group:
-            group.create_task(service.run())
-            group.create_task(run_api_server())
+            group.create_task(service.run(), name="autoheal-service")
+            group.create_task(run_api_server(), name="api-server")
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt")
     except asyncio.CancelledError:

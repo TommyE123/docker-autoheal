@@ -164,7 +164,9 @@ class NotificationManager:
         self._running = True
         self._stopping = False
         self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30))
-        self._worker_task = asyncio.create_task(self._notification_worker())
+        self._worker_task = asyncio.create_task(
+            self._notification_worker(), name="notification-worker"
+        )
         logger.info("Notification manager started")
 
     async def stop(self) -> None:
