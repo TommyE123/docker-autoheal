@@ -26,13 +26,16 @@ def test_resolve_log_level_falls_back_to_info(name):
     assert resolve_log_level(name) == logging.INFO
 
 
+LOGGER_NAMES = ("", "uvicorn", "uvicorn.access", "uvicorn.error")
+
+
 def test_apply_log_level_sets_root_and_uvicorn_loggers():
-    root = logging.getLogger()
-    previous = root.level
+    previous = {name: logging.getLogger(name).level for name in LOGGER_NAMES}
     try:
         assert apply_log_level("debug") == logging.DEBUG
-        assert root.level == logging.DEBUG
+        assert logging.getLogger().level == logging.DEBUG
         for name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
             assert logging.getLogger(name).level == logging.WARNING
     finally:
-        root.setLevel(previous)
+        for name, level in previous.items():
+            logging.getLogger(name).setLevel(level)
