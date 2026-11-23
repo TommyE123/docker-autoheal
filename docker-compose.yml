@@ -20,7 +20,6 @@ services:
       - "9090:9090" # Prometheus metrics
 
     # Labels for auto-heal (exclude itself from monitoring)
+    # No healthcheck here: the image's HEALTHCHECK (Dockerfile) applies, so the probe is defined once.
     labels:
       - "autoheal=false"
-
-    # No healthcheck here: the image's HEALTHCHECK (Dockerfile) applies, so the probe is defined once.
