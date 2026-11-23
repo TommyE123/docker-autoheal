@@ -128,7 +128,8 @@ docker logs -f docker-autoheal
 
 ## Requirements
 
-- Docker Engine 20.10+ (25.0+ for the image's 5-second start probe)
+- Docker Engine 20.10+ to run the published image (25.0+ for the 5-second start probe; building
+  from source needs 25.0+ or BuildKit)
 - Docker socket access (`/var/run/docker.sock`)
 
 ## Troubleshooting

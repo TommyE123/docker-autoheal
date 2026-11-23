@@ -2,8 +2,10 @@
 
 ## Requirements
 
-- Docker Engine 20.10+ (25.0+ for the image's 5-second start probe; older engines use the
-  30-second interval)
+- Docker Engine 20.10+ to run the published image. Engine 25.0+ runs the image's 5-second start
+  probe; older engines use the 30-second interval. Building from source needs Engine 25.0+
+  or BuildKit with the `docker/dockerfile:1` frontend, because the legacy builder does not
+  accept `HEALTHCHECK --start-interval`.
 - Access to `/var/run/docker.sock` (or your platform's equivalent)
 - Ports `3131` (web UI + API) and `9090` (Prometheus metrics) available on the host, or
   remapped to ports of your choosing

@@ -221,10 +221,33 @@ def test_image_health_check_probes_without_curl():
     )
 
 
+def test_image_sets_unbuffered_python_and_oci_labels():
+    """Unbuffered logs and OCI labels come from the image, not from Compose or the build."""
+    dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
+
+    assert re.search(r"^ENV PYTHONUNBUFFERED=1$", dockerfile, re.MULTILINE)
+    assert "org.opencontainers.image.source=" in dockerfile
+    assert "org.opencontainers.image.description=" in dockerfile
+    assert "maintainer=" not in dockerfile
+
+
+def test_image_build_uses_cache_mounts_and_linked_copy():
+    """Download caches stay out of the layers, and the static copy can be reused."""
+    dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
+
+    assert "RUN --mount=type=cache,target=/root/.npm npm ci" in dockerfile
+    assert (
+        "--mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt" in dockerfile
+    )
+    assert "COPY --link --from=frontend-builder /static ./static/" in dockerfile
+
+
 def test_compose_file_does_not_duplicate_the_image_health_check():
     """One health check definition, in the Dockerfile, so the two cannot drift apart."""
-    compose = COMPOSE_DEV.parent / "docker-compose.yml"
-    assert "healthcheck:" not in compose.read_text(encoding="utf-8")
+    compose = (REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+
+    assert "healthcheck:" not in compose
+    assert "PYTHONUNBUFFERED" not in compose
 
 
 def test_node_runtime_versions_are_aligned():

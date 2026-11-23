@@ -8,6 +8,20 @@ because they live in the mounted `/data` volume, not in the container itself.
 If a specific release ever requires a manual migration step (for example, a breaking
 configuration-format change), it will be called out in that release's notes.
 
+## Health check moved into the image
+
+The image now defines its own `HEALTHCHECK` and no longer ships `curl`. Earlier versions of
+this guide's Compose example added a `healthcheck:` block that calls `curl`. If you copied it,
+delete that block and let the image's health check apply. A Compose `healthcheck:` overrides the
+image's, so a copied `curl` probe would fail with `exec: "curl": executable file not found` and
+the container would show `unhealthy`. If you want your own probe, use one the image can run,
+for example:
+
+```yaml
+healthcheck:
+  test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3131/health', timeout=5)"]
+```
+
 The only "migration" documented anywhere in this repository is an internal, already-completed
 restructuring of the codebase (flat files → the current `app/` package layout) — see
 [Project restructuring](../historical/project-restructuring.md) if you're curious, but it has
