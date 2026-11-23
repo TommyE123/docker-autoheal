@@ -6,11 +6,13 @@ Tests cover healthy containers, unhealthy containers, exit-code handling,
 custom health checks and health-check failure paths.
 """
 
+import logging
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from app.config.config_manager import HealthCheckConfig, config_manager
+from app.monitor.health import CustomCheckLookup, find_custom_health_check
 from app.tests.unit.conftest import make_container
 
 
@@ -642,3 +644,217 @@ async def test_custom_health_check_is_found_by_id_when_info_has_no_name(engine, 
     needs_restart, _reason = await engine._evaluate_container_health(container, info)
 
     assert needs_restart is True
+
+
+_COMPOSE_WEB = {
+    "autoheal": "true",
+    "com.docker.compose.project": "stack",
+    "com.docker.compose.service": "web",
+}
+
+
+def _compose_web(number: int = 1, container_id: str = "a" * 64):
+    """A Compose container whose stable ID, name and Docker ID all differ."""
+    return make_container(
+        name=f"stack-web-{number}",
+        container_id=container_id,
+        labels={**_COMPOSE_WEB, "com.docker.compose.container-number": str(number)},
+    )
+
+
+def _tcp_check(key: str) -> HealthCheckConfig:
+    return HealthCheckConfig(container_id=key, check_type="tcp", tcp_port=8080)
+
+
+@pytest.mark.asyncio
+class TestNameKeyedCustomChecks:
+    """A check stored under the container name is used only when no other container owns it."""
+
+    @pytest.fixture(autouse=True)
+    def _health_mode(self, update_config):
+        update_config(lambda c: setattr(c.restart, "mode", "health"))
+
+    async def test_name_keyed_check_applies_when_no_other_container_owns_the_name(
+        self, engine, docker_client
+    ):
+        container, info = _compose_web()
+        docker_client.add_container(container, info)
+        docker_client.health_results["stack-web-1"] = False
+        config_manager.add_custom_health_check(_tcp_check("stack-web-1"))
+
+        needs_restart, reason = await engine._evaluate_container_health(container, info)
+
+        assert needs_restart is True
+        assert reason == "Custom health check failed (tcp)"
+
+    async def test_stable_id_match_does_not_list_docker(self, engine, docker_client, monkeypatch):
+        container, info = _compose_web()
+        docker_client.add_container(container, info)
+        docker_client.health_results["stack-web-1"] = False
+        listing = MagicMock(wraps=docker_client.list_containers)
+        monkeypatch.setattr(docker_client, "list_containers", listing)
+        config_manager.add_custom_health_check(_tcp_check("stack_web"))
+        config_manager.add_custom_health_check(_tcp_check("stack-web-1"))
+
+        needs_restart, _reason = await engine._evaluate_container_health(container, info)
+
+        assert needs_restart is True
+        listing.assert_not_called()
+
+    @pytest.mark.parametrize("owner_status", ["running", "exited"])
+    async def test_ambiguous_name_keyed_check_is_skipped_with_a_warning(
+        self, engine, docker_client, caplog, owner_status
+    ):
+        """Another container (running or stopped) has the name as its stable ID."""
+        container, info = _compose_web()
+        owner, owner_info = make_container(
+            name="other", container_id="b" * 64, stable_id="stack-web-1", status=owner_status
+        )
+        docker_client.add_container(container, info)
+        docker_client.add_container(owner, owner_info)
+        docker_client.health_results["stack-web-1"] = False
+        config_manager.add_custom_health_check(_tcp_check("stack-web-1"))
+
+        with caplog.at_level(logging.WARNING, logger="app.monitor.health"):
+            needs_restart, _reason = await engine._evaluate_container_health(container, info)
+
+        assert needs_restart is False
+        warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+        assert warnings == [
+            "Custom health check stored under 'stack-web-1' was not applied to container "
+            "stack-web-1: 'stack-web-1' is also the stable identifier of other, so it may be "
+            "that container's check. If it belongs to this container, add it again for this "
+            "container and delete it through the other container. A unique monitoring.id label "
+            "on the other container also resolves this, but the check under 'stack-web-1' then "
+            "applies to this container"
+        ]
+
+    async def test_ambiguous_name_falls_through_to_an_exact_full_id_check(
+        self, engine, docker_client, caplog
+    ):
+        container, info = _compose_web()
+        owner, owner_info = make_container(
+            name="other", container_id="b" * 64, stable_id="stack-web-1"
+        )
+        docker_client.add_container(container, info)
+        docker_client.add_container(owner, owner_info)
+        docker_client.health_results["stack-web-1"] = False
+        config_manager.add_custom_health_check(_tcp_check("stack-web-1"))
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="a" * 64, check_type="exec", exec_command=["true"])
+        )
+
+        with caplog.at_level(logging.WARNING, logger="app.monitor.health"):
+            needs_restart, reason = await engine._evaluate_container_health(container, info)
+
+        assert needs_restart is True
+        assert reason == "Custom health check failed (exec)"
+        assert "was not applied to container stack-web-1" in caplog.text
+
+    async def test_owner_keeps_its_own_check(self, engine, docker_client):
+        """The container whose stable ID is the key still gets the check."""
+        container, info = _compose_web()
+        owner, owner_info = make_container(
+            name="other", container_id="b" * 64, stable_id="stack-web-1"
+        )
+        docker_client.add_container(container, info)
+        docker_client.add_container(owner, owner_info)
+        docker_client.health_results["other"] = False
+        config_manager.add_custom_health_check(_tcp_check("stack-web-1"))
+
+        needs_restart, _reason = await engine._evaluate_container_health(owner, owner_info)
+
+        assert needs_restart is True
+
+    async def test_failed_listing_skips_the_name_keyed_check_with_a_warning(
+        self, engine, docker_client, caplog
+    ):
+        container, info = _compose_web()
+        docker_client.add_container(container, info)
+        docker_client.health_results["stack-web-1"] = False
+        docker_client.list_containers_error = RuntimeError("daemon unreachable")
+        config_manager.add_custom_health_check(_tcp_check("stack-web-1"))
+
+        with caplog.at_level(logging.WARNING, logger="app.monitor.health"):
+            needs_restart, _reason = await engine._evaluate_container_health(container, info)
+
+        assert needs_restart is False
+        assert (
+            "Custom health check stored under 'stack-web-1' was not applied to container "
+            "stack-web-1: Docker containers could not be listed to rule out another container "
+            "with that stable identifier"
+        ) in caplog.text
+
+    async def test_uninspectable_container_in_the_listing_skips_the_name_keyed_check(
+        self, engine, docker_client, caplog
+    ):
+        """An incomplete inventory cannot rule out a conflict either."""
+        container, info = _compose_web()
+        other, _other_info = make_container(name="other", container_id="b" * 64)
+        docker_client.add_container(container, info)
+        docker_client.add_container(other, {})  # the wrapper returns {} when inspection fails
+        docker_client.health_results["stack-web-1"] = False
+        config_manager.add_custom_health_check(_tcp_check("stack-web-1"))
+
+        with caplog.at_level(logging.WARNING, logger="app.monitor.health"):
+            needs_restart, _reason = await engine._evaluate_container_health(container, info)
+
+        assert needs_restart is False
+        assert "could not be listed" in caplog.text
+
+    async def test_replicas_share_the_check_under_their_stable_id(
+        self, engine, docker_client, caplog, monkeypatch
+    ):
+        """Two replicas of one service both use the check stored under the shared stable ID."""
+        first, first_info = _compose_web(1, "a" * 64)
+        second, second_info = _compose_web(2, "b" * 64)
+        docker_client.add_container(first, first_info)
+        docker_client.add_container(second, second_info)
+        docker_client.health_results["stack-web-1"] = False
+        docker_client.health_results["stack-web-2"] = False
+        listing = MagicMock(wraps=docker_client.list_containers)
+        monkeypatch.setattr(docker_client, "list_containers", listing)
+        config_manager.add_custom_health_check(_tcp_check("stack_web"))
+
+        with caplog.at_level(logging.WARNING, logger="app.monitor.health"):
+            first_result = await engine._evaluate_container_health(first, first_info)
+            second_result = await engine._evaluate_container_health(second, second_info)
+
+        listing.assert_not_called()
+
+        assert first_result == (True, "Custom health check failed (tcp)")
+        assert second_result == (True, "Custom health check failed (tcp)")
+        assert not [r for r in caplog.records if r.levelno == logging.WARNING]
+
+
+class TestFindCustomHealthCheck:
+    """``find_custom_health_check`` called directly."""
+
+    def test_unrelated_containers_do_not_block_a_name_keyed_check(self, docker_client):
+        container, info = _compose_web()
+        unrelated, unrelated_info = make_container(name="db", container_id="b" * 64)
+        docker_client.add_container(container, info)
+        docker_client.add_container(unrelated, unrelated_info)
+        config_manager.add_custom_health_check(_tcp_check("stack-web-1"))
+
+        lookup = find_custom_health_check(docker_client, info, "stack_web")
+
+        assert lookup == CustomCheckLookup(check=_tcp_check("stack-web-1"), key="stack-web-1")
+
+    def test_info_without_a_docker_id_and_no_check_finds_nothing(self, docker_client):
+        assert find_custom_health_check(docker_client, {"name": "web"}, "web") == (
+            CustomCheckLookup()
+        )
+
+    def test_listing_asks_the_wrapper_to_raise_instead_of_returning_empty(self):
+        """The real wrapper returns [] on failure unless asked to raise, which would read
+        as "no other container"; the lookup must ask for the error."""
+        client = MagicMock()
+        client.list_containers.return_value = []
+        _container, info = _compose_web()
+        config_manager.add_custom_health_check(_tcp_check("stack-web-1"))
+
+        lookup = find_custom_health_check(client, info, "stack_web")
+
+        client.list_containers.assert_called_once_with(all_containers=True, raise_errors=True)
+        assert lookup == CustomCheckLookup(check=_tcp_check("stack-web-1"), key="stack-web-1")

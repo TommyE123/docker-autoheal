@@ -107,6 +107,24 @@ health status — either one reporting unhealthy is enough to trigger a restart.
 Manage custom health checks with `GET /api/healthchecks`, `GET /api/healthchecks/{id}`,
 and `DELETE /api/healthchecks/{id}`.
 
+A check is stored under the container's [stable identifier](labels.md#stable-container-identity).
+A check stored under the container's name or full Docker ID, for example one added before the
+container got a `monitoring.id` label or moved into Compose, still applies, and
+`GET /api/healthchecks/{id}`, `DELETE /api/healthchecks/{id}` and the container details find it.
+A check stored under the name is used only when no other container, running or stopped, has
+that name as its stable identifier, because the check may be that container's. To rule this
+out, Docker Autoheal lists all containers, but only when nothing is stored under the stable
+identifier and a check is stored under a name that differs from it. If another container has
+that stable identifier, the check is not applied to this container: the monitoring engine logs
+a warning each cycle, the details don't show it, and `GET` and `DELETE` return `409` naming
+the other container, unless a check stored under the full Docker ID applies instead. If the
+check belongs to this container, add it again for this container, which stores it under this
+container's stable identifier, then delete it through the other container. Setting a unique
+`monitoring.id` label on the other container also resolves the ambiguity, but the check then
+applies to this container and the other container no longer has it. If Docker cannot be listed,
+the check is skipped in the same way, and `GET` and `DELETE` return `503` without changing
+anything.
+
 ## Restart behavior once a check fails
 
 1. **Cooldown** — if the container was restarted more recently than

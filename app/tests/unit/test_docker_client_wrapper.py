@@ -266,6 +266,28 @@ class TestListingAndLookup:
         ):
             assert wrapper.list_containers() == []
 
+    def test_list_containers_raises_on_failure_when_asked(self, wrapper, sdk_client):
+        """A caller that must tell "no containers" from "unknown" gets the error."""
+        sdk_client.containers.list.side_effect = docker.errors.APIError("daemon gone")
+        sdk_client.ping.side_effect = docker.errors.APIError("daemon gone")
+
+        with (
+            patch(
+                "app.docker_client.docker_client_wrapper.docker.DockerClient",
+                return_value=sdk_client,
+            ),
+            pytest.raises(docker.errors.APIError, match="daemon gone"),
+        ):
+            wrapper.list_containers(all_containers=True, raise_errors=True)
+
+    def test_list_containers_returns_an_empty_inventory_when_asked_to_raise(
+        self, wrapper, sdk_client
+    ):
+        sdk_client.containers.list.return_value = []
+
+        assert wrapper.list_containers(all_containers=True, raise_errors=True) == []
+        sdk_client.containers.list.assert_called_once_with(all=True)
+
     def test_require_client_returns_the_sdk_client(self, wrapper, sdk_client):
         assert wrapper._require_client() is sdk_client
 
