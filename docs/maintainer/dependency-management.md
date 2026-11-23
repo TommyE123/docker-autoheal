@@ -8,19 +8,19 @@ updates are reviewed and merged.
 
 ## What Renovate manages
 
-| Ecosystem                       | Files                                                 | Renovate manager                    |
-|---------------------------------|-------------------------------------------------------|-------------------------------------|
-| Python runtime dependencies     | `requirements.txt`                                    | `pip_requirements`                  |
-| Python test dependencies        | `requirements-dev.txt`                                | `pip_requirements`                  |
-| npm dependencies + lockfile     | `frontend/package.json`, `frontend/package-lock.json` | `npm`                               |
-| Docker base images              | `Dockerfile`                                          | `dockerfile`                        |
-| Docker Compose images           | `docker-compose.yml`                                  | `docker-compose`                    |
-| GitHub Actions                  | `.github/workflows/*.yml`                             | `github-actions`                    |
-| SonarCloud Python version       | `.sonarcloud.properties`                              | custom `regex` manager              |
-| Pyright Python version          | `pyrightconfig.json`                                  | custom `regex` manager              |
-| Ruff Python version             | `.linter-rules/.ruff.toml`                            | custom `regex` manager              |
-| Dev Container features          | `.devcontainer/devcontainer.json`                     | `devcontainer`                      |
-| Dev Container base image        | `.devcontainer/Dockerfile`                            | `dockerfile`                        |
+| Ecosystem                   | Files                                                 | Renovate manager       |
+|-----------------------------|-------------------------------------------------------|------------------------|
+| Python runtime dependencies | `requirements.txt`                                    | `pip_requirements`     |
+| Python test dependencies    | `requirements-dev.txt`                                | `pip_requirements`     |
+| npm dependencies + lockfile | `frontend/package.json`, `frontend/package-lock.json` | `npm`                  |
+| Docker base images          | `Dockerfile`                                          | `dockerfile`           |
+| Docker Compose images       | `docker-compose.yml`                                  | `docker-compose`       |
+| GitHub Actions              | `.github/workflows/*.yml`                             | `github-actions`       |
+| SonarCloud Python version   | `.sonarcloud.properties`                              | custom `regex` manager |
+| Pyright Python version      | `pyrightconfig.json`                                  | custom `regex` manager |
+| Ruff Python version         | `.linter-rules/.ruff.toml`                            | custom `regex` manager |
+| Dev Container features      | `.devcontainer/devcontainer.json`                     | `devcontainer`         |
+| Dev Container base image    | `.devcontainer/Dockerfile`                            | `dockerfile`           |
 
 The standard `config:recommended` preset provides the managers for the main dependency
 ecosystems above.
