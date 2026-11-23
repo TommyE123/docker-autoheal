@@ -20,7 +20,7 @@ from app.monitor.auto_discovery import AutoDiscovery
 from app.monitor.health import HealthEvaluator
 from app.monitor.recovery import RecoveryPolicy
 from app.monitor.selection import should_monitor
-from app.notifications.notification_manager import notification_manager
+from app.notifications.notification_manager import mask_url_secrets, notification_manager
 
 if TYPE_CHECKING:
     from docker.models.containers import Container
@@ -668,7 +668,9 @@ class MonitoringEngine:
                 logger.warning("Alert webhook returned status %s", response.status_code)
 
         except Exception as e:
-            logger.error("Failed to send alert: %s", e)
+            # requests puts the URL, and any token in it, into its error messages.
+            detail = mask_url_secrets(f"{type(e).__name__}: {e}", webhook_url)
+            logger.error("Failed to send alert: %s", detail)
 
     def get_status(self) -> dict:
         """Get monitoring engine status"""

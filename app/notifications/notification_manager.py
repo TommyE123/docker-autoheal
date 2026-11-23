@@ -12,6 +12,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
+from types import SimpleNamespace
 from typing import Any, Protocol
 from urllib.parse import urlsplit
 
@@ -69,6 +70,17 @@ def _mask_secrets(text: str, service: Any) -> str:
         text = re.sub(re.escape(secret), "***", text, flags=re.IGNORECASE)
     # Any other URL in an error can carry a token in its path or query.
     return _URL_IN_TEXT.sub("***", text)
+
+
+def mask_url_secrets(text: str, url: str | None) -> str:
+    """Mask ``url`` (and any other URL) in ``text``, for logging a webhook failure."""
+    # requests prints only the path and query of the URL ("Max retries exceeded with url: /...").
+    with suppress(ValueError):  # a malformed URL must not hide the failure reason
+        parts = urlsplit(url or "")
+        target = parts.path + (f"?{parts.query}" if parts.query else "")
+        if len(target) > 1:
+            text = text.replace(target, "***")
+    return _mask_secrets(text, SimpleNamespace(url=url))
 
 
 def _origin(url: str | None) -> str:
