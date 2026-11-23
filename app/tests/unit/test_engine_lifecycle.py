@@ -78,6 +78,15 @@ class TestStartStop:
         finally:
             await engine.stop()
 
+    async def test_long_lived_tasks_carry_names_for_introspection(self, engine, quiet_loops):
+        # Named tasks are what `python -m asyncio ps/pstree` and the sampling profiler show (#283)
+        await engine.start()
+        try:
+            assert engine._task.get_name() == "monitor-loop"
+            assert engine._event_task.get_name() == "docker-event-listener"
+        finally:
+            await engine.stop()
+
     async def test_start_is_idempotent(self, engine, quiet_loops, monkeypatch):
         scan = AsyncMock()
         monkeypatch.setattr(engine._auto_discovery, "scan_existing_containers", scan)
