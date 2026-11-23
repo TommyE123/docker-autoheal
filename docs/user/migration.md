@@ -1,12 +1,13 @@
 # Migration
 
-There is currently no special migration procedure for users — upgrading to a new image
-version is the normal Docker Compose/`docker run` upgrade flow (pull the new image, recreate
-the container). Configuration, restart history, and quarantine state persist across upgrades
-because they live in the mounted `/data` volume, not in the container itself.
+Most upgrades need no manual step: upgrading to a new image version is the normal Docker
+Compose/`docker run` upgrade flow (pull the new image, recreate the container). Configuration,
+restart history, and quarantine state persist across upgrades because they live in the mounted
+`/data` volume, not in the container itself.
 
-If a specific release ever requires a manual migration step (for example, a breaking
-configuration-format change), it will be called out in that release's notes.
+The one exception in the current release is the health check, described below. If a specific
+release ever requires a manual migration step (for example, a breaking configuration-format
+change), it will be called out in that release's notes.
 
 ## Health check moved into the image
 
@@ -22,10 +23,9 @@ healthcheck:
   test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3131/health', timeout=5)"]
 ```
 
-The only "migration" documented anywhere in this repository is an internal, already-completed
-restructuring of the codebase (flat files → the current `app/` package layout) — see
-[Project restructuring](../historical/project-restructuring.md) if you're curious, but it has
-no bearing on how you run or upgrade Docker Autoheal today.
+An older internal restructuring of the codebase (flat files → the current `app/` package layout)
+is recorded in [Project restructuring](../historical/project-restructuring.md). It has no bearing on
+how you run or upgrade Docker Autoheal today.
 
 ## API documentation URLs
 

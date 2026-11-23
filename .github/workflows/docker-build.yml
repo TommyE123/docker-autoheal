@@ -191,7 +191,8 @@ jobs:
       - name: Wait for the arm64 service to become healthy and reach Docker
         run: |
           for _ in $(seq 1 60); do
-            if curl -sf http://localhost:3133/health >/dev/null \
+            if [ "$(docker inspect --format '{{.State.Health.Status}}' autoheal-arm64)" = "healthy" ] \
+              && curl -sf http://localhost:3133/health >/dev/null \
               && curl -sf http://localhost:3133/api/status | jq -e '.docker_connected == true' >/dev/null 2>&1; then
               echo "arm64 image is healthy and connected to Docker"
               exit 0
@@ -199,6 +200,7 @@ jobs:
             sleep 5
           done
           echo "::error::The arm64 image never became healthy and connected to Docker"
+          docker inspect --format '{{json .State.Health}}' autoheal-arm64 || true
           exit 1
 
       - name: Diagnostics on failure

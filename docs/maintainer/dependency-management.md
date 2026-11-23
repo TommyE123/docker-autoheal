@@ -16,7 +16,6 @@ updates are reviewed and merged.
 | Docker base images              | `Dockerfile`                                          | `dockerfile`                        |
 | Docker Compose images           | `docker-compose.yml`                                  | `docker-compose`                    |
 | GitHub Actions                  | `.github/workflows/*.yml`                             | `github-actions`                    |
-| Dockerfile apt package versions | `Dockerfile`                                          | `customManagers:dockerfileVersions` |
 | SonarCloud Python version       | `.sonarcloud.properties`                              | custom `regex` manager              |
 | Pyright Python version          | `pyrightconfig.json`                                  | custom `regex` manager              |
 | Ruff Python version             | `.linter-rules/.ruff.toml`                            | custom `regex` manager              |
@@ -24,8 +23,7 @@ updates are reviewed and merged.
 | Dev Container base image        | `.devcontainer/Dockerfile`                            | `dockerfile`                        |
 
 The standard `config:recommended` preset provides the managers for the main dependency
-ecosystems above. A custom Renovate manager is also enabled for
-pinned versions of apt packages in the `Dockerfile`.
+ecosystems above.
 
 The Dev Container's features, base image and runtime versions are managed too. Only its npm
 linters and `mise` tools float. See
@@ -123,10 +121,6 @@ excludes `.devcontainer/package.json` from analysis (`sonar.exclusions`).
     the newest published release when copied by users.
 
     Renovate is explicitly configured not to manage this image.
-
-* **Dockerfile apt packages**: versions are explicitly pinned where required by the `Dockerfile`
-  linting policy. Renovate's `customManagers:dockerfileVersions` manager tracks these pins and
-  can create update PRs when newer package versions are available.
 
 ## Dependency update policy
 
