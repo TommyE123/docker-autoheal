@@ -1261,7 +1261,7 @@ class TestPersistenceFailures:
         engine._recovery.backoff_delays["web"] = 999
         break_file(monkeypatch, broken_file)
 
-        await engine._auto_unquarantine_container("web", "web", "web", "a" * 64)
+        await engine._auto_unquarantine_container(["web"], "web", "web", "a" * 64)
 
         assert config_manager.is_quarantined("web") is False
         assert config_manager.get_total_restart_count("web") == 0
@@ -1276,7 +1276,7 @@ class TestPersistenceFailures:
         config_manager.record_restart("web")
         break_file(monkeypatch, "QUARANTINE_FILE")
 
-        await engine._auto_unquarantine_container("web", "web", "web", "a" * 64)
+        await engine._auto_unquarantine_container(["web"], "web", "web", "a" * 64)
 
         assert config_manager.is_quarantined("web") is True
         assert config_manager.get_total_restart_count("web") == 1
