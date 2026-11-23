@@ -25,6 +25,13 @@ from app.main import (
 from app.notifications.notification_manager import NotificationManager
 
 
+def current_task_name() -> str:
+    """Return the name of the task running the calling coroutine (#283)."""
+    task = asyncio.current_task()
+    assert task is not None
+    return task.get_name()
+
+
 class TestCancelledErrorFilter:
     """Uvicorn logs a noisy CancelledError traceback during shutdown; it should be dropped."""
 
@@ -965,7 +972,7 @@ class TestAutoHealServiceRun:
 
         async def quick_start():
             # The startup coroutine runs as its own task, so it can read its name (#283)
-            outcome.append(asyncio.current_task().get_name())
+            outcome.append(current_task_name())
             await asyncio.sleep(0.01)
             outcome.append("finished")
 
@@ -1084,10 +1091,10 @@ class TestMain:
         task_names = {}
 
         async def record_run():
-            task_names["service"] = asyncio.current_task().get_name()
+            task_names["service"] = current_task_name()
 
         async def record_api():
-            task_names["api"] = asyncio.current_task().get_name()
+            task_names["api"] = current_task_name()
 
         fake_service.run = AsyncMock(side_effect=record_run)
 
