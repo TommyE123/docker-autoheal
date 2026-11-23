@@ -232,12 +232,15 @@ class HealthEvaluator:
             return
         logger.warning(
             "Custom health check stored under '%s' was not applied to container %s: "
-            "'%s' is also the stable identifier of %s. Set a unique monitoring.id label on "
-            "that container so the key identifies one container",
+            "'%s' is also the stable identifier of %s, so it may be that container's check. "
+            "If it belongs to this container, add it again for this container and delete it "
+            "through the other container. A unique monitoring.id label on the other container "
+            "also resolves this, but the check under '%s' then applies to this container",
             lookup.skipped_name,
             info.get("name"),
             lookup.skipped_name,
             ", ".join(lookup.conflicting),
+            lookup.skipped_name,
         )
 
     async def _health_check_failure(

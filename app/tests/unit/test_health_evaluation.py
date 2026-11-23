@@ -722,8 +722,11 @@ class TestNameKeyedCustomChecks:
         warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
         assert warnings == [
             "Custom health check stored under 'stack-web-1' was not applied to container "
-            "stack-web-1: 'stack-web-1' is also the stable identifier of other. Set a unique "
-            "monitoring.id label on that container so the key identifies one container"
+            "stack-web-1: 'stack-web-1' is also the stable identifier of other, so it may be "
+            "that container's check. If it belongs to this container, add it again for this "
+            "container and delete it through the other container. A unique monitoring.id label "
+            "on the other container also resolves this, but the check under 'stack-web-1' then "
+            "applies to this container"
         ]
 
     async def test_ambiguous_name_falls_through_to_an_exact_full_id_check(

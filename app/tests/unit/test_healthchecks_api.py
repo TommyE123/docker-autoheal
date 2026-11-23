@@ -588,10 +588,31 @@ class TestNameKeyedHealthChecks:
             assert exc_info.value.detail == (
                 "The custom health check stored under 'stack-web-1' is ambiguous: "
                 "'stack-web-1' is this container's name and also the stable identifier of "
-                "'other'. Set a unique monitoring.id label on that container so the key "
-                "identifies one container."
+                "'other', so it may be that container's check. If it belongs to this "
+                "container, add it again here (it is then stored under this container's stable "
+                "identifier) and delete it through the other container. Setting a unique "
+                "monitoring.id label on the other container also resolves the ambiguity, but "
+                "the check under 'stack-web-1' then applies to this container and the other "
+                "container no longer has it."
             )
         assert set(config_manager.get_all_custom_health_checks()) == {"stack-web-1"}
+
+    async def test_documented_resolution_moves_the_check_to_this_container(self, wired_api):
+        """Following the 409 advice: add the check here, then delete it through the owner."""
+        docker_client, _engine = wired_api
+        container, info = _compose_web()
+        docker_client.add_container(container, info)
+        self._add_owner(docker_client)
+        config_manager.add_custom_health_check(_tcp_check("stack-web-1"))
+
+        await add_health_check(get_docker_client(), _tcp_check(_FULL_ID, port=9090))
+        await delete_health_check(get_docker_client(), "other")
+
+        assert set(config_manager.get_all_custom_health_checks()) == {"stack_web"}
+        assert (await get_health_check(get_docker_client(), _FULL_ID)).tcp_port == 9090
+        with pytest.raises(HTTPException) as exc_info:
+            await get_health_check(get_docker_client(), "other")
+        assert exc_info.value.status_code == 404
 
     async def test_ambiguous_name_falls_through_to_an_exact_full_id_check(self, wired_api):
         docker_client, _engine = wired_api

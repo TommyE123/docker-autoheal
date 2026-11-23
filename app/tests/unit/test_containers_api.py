@@ -791,6 +791,18 @@ class TestSelectionLegacyEntries:
         assert config_manager.get_config().containers.excluded == ["other"]
         assert engine.should_monitor_container(container, info) is True
 
+    async def test_unresolved_container_clears_every_copy_of_its_exclusion(self, wired_api):
+        """A container Docker cannot resolve is stored as requested, with no copy left behind."""
+        self._exclude("ghost", "other", "ghost")
+
+        await update_container_selection(
+            get_docker_client(), ContainerSelectionRequest(container_ids=["ghost"], enabled=True)
+        )
+
+        config = config_manager.get_config()
+        assert config.containers.excluded == ["other"]
+        assert config.containers.selected == ["ghost"]
+
     async def test_bare_service_exclusion_rejects_the_whole_batch(self, wired_api, monkeypatch):
         docker_client, _engine = wired_api
         blocked, blocked_info = _compose_web()

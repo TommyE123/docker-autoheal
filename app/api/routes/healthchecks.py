@@ -88,8 +88,12 @@ async def _lookup_health_check(
             detail=(
                 f"The custom health check stored under '{name}' is ambiguous: '{name}' is this "
                 f"container's name and also the stable identifier of "
-                f"{', '.join(repr(owner) for owner in lookup.conflicting)}. Set a unique "
-                "monitoring.id label on that container so the key identifies one container."
+                f"{', '.join(repr(owner) for owner in lookup.conflicting)}, so it may be that "
+                "container's check. If it belongs to this container, add it again here (it is "
+                "then stored under this container's stable identifier) and delete it through "
+                "the other container. Setting a unique monitoring.id label on the other "
+                f"container also resolves the ambiguity, but the check under '{name}' then "
+                "applies to this container and the other container no longer has it."
             ),
         )
     return lookup

@@ -235,8 +235,8 @@ def _apply_selection(
         if cid not in add_to:
             add_to.append(cid)
             logger.debug("Added container %s to %s list (container not resolved)", cid, add_label)
-        if cid in remove_from:
-            remove_from.remove(cid)
+        # Every copy, as a hand-edited list can hold one more than once
+        remove_from[:] = [entry for entry in remove_from if entry != cid]
         return
 
     container_name = info.get("name")

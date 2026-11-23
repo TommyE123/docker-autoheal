@@ -180,7 +180,8 @@ list under its stable identifier, name, and full or short Docker ID. An entry in
 `containers.excluded` can also be a bare Compose service name, such as `web`, which excludes
 every container of a service with that name in any project. Enabling a Compose container does
 not remove an entry equal to its own service name, even when it is also the container's name
-(`container_name: web` on service `web`): the request returns `409`, names the entry, and changes
+(`container_name: web` on service `web`), unless the entry is also its stable identifier (see
+below): the request returns `409`, names the entry, and changes
 nothing for any of the requested containers. The conflict is checked after the whole request is
 applied, so another container in the same request that removes the entry resolves it. If no
 other container should stay excluded by the entry, read the configuration with `GET /api/config`,
