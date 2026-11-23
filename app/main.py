@@ -19,6 +19,7 @@ from app.docker_client.docker_client_wrapper import DockerClientWrapper
 from app.monitor.monitoring_engine import MonitoringEngine
 from app.monitor.uptime_kuma_monitor import UptimeKumaMonitor
 from app.notifications.notification_manager import notification_manager
+from app.utils.log_level import apply_log_level
 
 if TYPE_CHECKING:
     from types import FrameType
@@ -60,22 +61,7 @@ class CancelledErrorFilter(logging.Filter):
 
 def update_log_level(level_name: str) -> None:
     """Update logging level for all loggers"""
-    level_map = {
-        "DEBUG": logging.DEBUG,
-        "INFO": logging.INFO,
-        "WARNING": logging.WARNING,
-        "ERROR": logging.ERROR,
-        "CRITICAL": logging.CRITICAL,
-    }
-    level = level_map.get(level_name.upper(), logging.INFO)
-
-    # Set root logger level
-    logging.getLogger().setLevel(level)
-
-    # Disable uvicorn access logs completely (set to WARNING to suppress INFO logs)
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-    logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
-    logging.getLogger("uvicorn").setLevel(logging.WARNING)
+    apply_log_level(level_name)
 
     # Add filter to suppress CancelledError tracebacks
     logging.getLogger("uvicorn.error").addFilter(CancelledErrorFilter())

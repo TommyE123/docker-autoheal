@@ -340,7 +340,7 @@ class LegacyAutoHealEvent(BaseModel):
     def timestamp_must_be_non_utc_legacy_value(cls, value: str) -> str:
         """Only retain values that cannot satisfy the current UTC contract."""
         try:
-            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(value)
         except ValueError as error:
             raise ValueError("legacy timestamp must be ISO 8601") from error
 

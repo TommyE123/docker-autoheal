@@ -32,7 +32,7 @@ def utc_now() -> datetime:
 def uptime_seconds(started_at: str, now: datetime) -> float | None:
     """Seconds from a Docker ``StartedAt`` timestamp to ``now``, or None if it is unusable"""
     try:
-        started = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+        started = datetime.fromisoformat(started_at)
     except ValueError:
         return None
     if started.year <= 1:  # Docker's zero time: never started
