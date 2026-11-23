@@ -728,6 +728,8 @@ class TestSignalHandler:
 
         signal_handler(signal.SIGTERM, None)
         assert len(main_module._shutdown_tasks) == 1
+        (shutdown_task,) = main_module._shutdown_tasks
+        assert shutdown_task.get_name() == "autoheal-shutdown"  # #283
 
         release.set()
         await asyncio.sleep(0)
@@ -962,6 +964,8 @@ class TestAutoHealServiceRun:
         outcome = []
 
         async def quick_start():
+            # The startup coroutine runs as its own task, so it can read its name (#283)
+            outcome.append(asyncio.current_task().get_name())
             await asyncio.sleep(0.01)
             outcome.append("finished")
 
@@ -972,7 +976,7 @@ class TestAutoHealServiceRun:
         stop_task = asyncio.create_task(service.stop())
         await asyncio.wait_for(asyncio.gather(run_task, stop_task), timeout=2)
 
-        assert outcome == ["finished"]
+        assert outcome == ["autoheal-startup", "finished"]
         assert service._startup_cancelled is False
 
     @pytest.mark.asyncio
@@ -1076,13 +1080,21 @@ class TestMain:
     @pytest.mark.asyncio
     async def test_main_registers_signal_handlers_and_wires_components(self):
         fake_service = MagicMock()
-        fake_service.run = AsyncMock()
         fake_service.running = False
+        task_names = {}
+
+        async def record_run():
+            task_names["service"] = asyncio.current_task().get_name()
+
+        async def record_api():
+            task_names["api"] = asyncio.current_task().get_name()
+
+        fake_service.run = AsyncMock(side_effect=record_run)
 
         with (
             patch("app.main.signal.signal") as mock_signal,
             patch("app.main.AutoHealService", return_value=fake_service),
-            patch("app.main.run_api_server", new=AsyncMock()),
+            patch("app.main.run_api_server", new=AsyncMock(side_effect=record_api)),
         ):
             await main_module.main()
 
@@ -1091,6 +1103,8 @@ class TestMain:
             assert main_module.service is fake_service
             fake_service.run.assert_awaited_once()
             fake_service.stop.assert_not_called()
+            # Both TaskGroup tasks are named so introspection can tell them apart (#283)
+            assert task_names == {"service": "autoheal-service", "api": "api-server"}
 
     @pytest.mark.asyncio
     async def test_main_stops_service_in_finally_if_still_running(self):
