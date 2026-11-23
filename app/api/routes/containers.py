@@ -12,6 +12,8 @@ from app.api.errors import DockerClientDep  # noqa: TC001  (FastAPI resolves it 
 from app.api.models import ContainerInfo, ContainerSelectionRequest
 from app.config.config_manager import AutoHealEvent, ContainersConfig, config_manager
 from app.docker_client.identity import recovery_keys
+from app.monitor.health import find_custom_health_check
+from app.monitor.selection import _listed
 
 if TYPE_CHECKING:
     from app.docker_client.docker_client_wrapper import DockerClientWrapper
@@ -158,12 +160,10 @@ async def get_container_details(docker_client: DockerClientDep, container_id: st
         for key in recovery_keys(recovery_id, container_name, full_container_id)
     )
 
-    # Get custom health check (by stable_id first for correctness, then fallback to name/ID for legacy compat)
-    custom_hc = config_manager.get_custom_health_check(stable_id)
-    if not custom_hc:
-        custom_hc = config_manager.get_custom_health_check(container_name)
-    if not custom_hc:
-        custom_hc = config_manager.get_custom_health_check(full_container_id)
+    # Get custom health check (by stable_id first for correctness, then fallback to name/ID for
+    # legacy compat). A name-keyed check that may belong to another container is not shown.
+    lookup = await asyncio.to_thread(find_custom_health_check, docker_client, info, stable_id)
+    custom_hc = lookup.check
 
     # Override restart_count in info with locally tracked count
     info["restart_count"] = total_restart_count
@@ -210,6 +210,17 @@ def _apply_selection(
 
     The container is stored by its stable identifier so the choice survives
     recreation. If it could not be resolved, the identifier is stored as-is.
+
+    Every entry that names only this container (stable_id, name, full or short
+    Docker ID) is removed from the opposite list. A bare Compose service name is
+    not, because it also matches every other container of a service with that
+    name, so an excluded one still keeps an enabled container excluded. That
+    includes a name or requested identifier equal to the service name (for
+    example ``container_name: web`` on service ``web``). The stable_id is always
+    removed, as it is the key the application itself stores, even when another
+    project's service of that name also matches it (a plain container named
+    ``web``, or ``monitoring.id: web``). ``_still_excluded`` reports an entry
+    that keeps an enabled container excluded.
     """
     if enabled:
         add_to, remove_from = containers.selected, containers.excluded
@@ -224,8 +235,8 @@ def _apply_selection(
         if cid not in add_to:
             add_to.append(cid)
             logger.debug("Added container %s to %s list (container not resolved)", cid, add_label)
-        if cid in remove_from:
-            remove_from.remove(cid)
+        # Every copy, as a hand-edited list can hold one more than once
+        remove_from[:] = [entry for entry in remove_from if entry != cid]
         return
 
     container_name = info.get("name")
@@ -239,14 +250,49 @@ def _apply_selection(
             cid,
         )
 
-    # Remove from the opposite list if present (check stable_id, name, and ID)
-    for identifier in (i for i in (stable_id, container_name, cid) if i is not None):
+    # Remove from the opposite list if present (check stable_id, name, and both IDs)
+    identifiers = (stable_id, container_name, cid, info.get("full_id"), info.get("id"))
+    compose_service = info.get("labels", {}).get("com.docker.compose.service")
+    for identifier in dict.fromkeys(i for i in identifiers if i is not None):
+        if identifier == compose_service and identifier != stable_id:
+            # Also matches every other container of that service, so never removed here
+            continue
         if identifier in remove_from:
-            remove_from.remove(identifier)
+            # Every copy, as a hand-edited list can hold one more than once
+            remove_from[:] = [entry for entry in remove_from if entry != identifier]
             logger.debug("Removed '%s' from %s list", identifier, remove_label)
 
 
-@router.post("/api/containers/select")
+def _still_excluded(containers: ContainersConfig, info: dict | None) -> list[str]:
+    """The ``containers.excluded`` entries that match a resolved container; empty if none"""
+    if info is None:
+        return []
+    stable_id = _stable_id_from_info(info)
+    return [entry for entry in containers.excluded if _listed([entry], info, stable_id)]
+
+
+def _selection_conflict_detail(conflicts: dict[str, list[str]]) -> str:
+    """Error text for a selection request rejected because containers would stay excluded"""
+    parts = [
+        f"'{name}' would stay excluded by {', '.join(repr(e) for e in entries)}"
+        for name, entries in conflicts.items()
+    ]
+    return (
+        "Nothing was changed: "
+        + "; ".join(parts)
+        + " in containers.excluded. Such an entry matches a container by its Compose service"
+        " name, so it also matches every other container of a service with that name, and is"
+        " not removed automatically. If no other container should stay excluded by it, remove"
+        " it from containers.excluded and retry: read GET /api/config, remove the entry and PUT"
+        " the whole configuration back (PUT replaces the configuration), or import a"
+        " configuration."
+    )
+
+
+@router.post(
+    "/api/containers/select",
+    responses={409: {"description": "A container would stay excluded; nothing was changed"}},
+)
 async def update_container_selection(
     docker_client: DockerClientDep, request: ContainerSelectionRequest
 ):
@@ -271,8 +317,23 @@ async def update_container_selection(
 
     config = config_manager.get_config()
 
+    # Applied to a copy and saved only when every container reaches the requested state, so a
+    # conflict anywhere in the batch changes nothing. Checked after the whole batch is applied,
+    # so the outcome does not depend on the order of the request. Exclusion wins over
+    # selection, so only enabling can leave a container short of the requested state.
     for cid in request.container_ids:
         _apply_selection(config.containers, cid, resolved[cid], request.enabled)
+    conflicts = (
+        {
+            (resolved[cid] or {}).get("name") or cid: entries
+            for cid in request.container_ids
+            if (entries := _still_excluded(config.containers, resolved[cid]))
+        }
+        if request.enabled
+        else {}
+    )
+    if conflicts:
+        raise HTTPException(status_code=409, detail=_selection_conflict_detail(conflicts))
 
     config_manager.update_config(config)
 

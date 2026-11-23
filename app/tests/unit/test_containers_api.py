@@ -689,3 +689,264 @@ class TestUnquarantineContainer:
 
         with pytest.raises(RuntimeError, match="notification failed"):
             await unquarantine_container(get_docker_client(), "a" * 64)
+
+
+_COMPOSE_WEB = {
+    "autoheal": "true",
+    "com.docker.compose.project": "stack",
+    "com.docker.compose.service": "web",
+}
+_FULL_ID = "c" * 64
+_SHORT_ID = _FULL_ID[:12]
+
+
+def _compose_web(name: str = "stack-web-1", container_id: str = _FULL_ID, project="stack"):
+    """A Compose container whose stable ID, name and Docker IDs all differ."""
+    return make_container(
+        name=name,
+        container_id=container_id,
+        labels={**_COMPOSE_WEB, "com.docker.compose.project": project},
+    )
+
+
+@pytest.mark.asyncio
+class TestDetailsHideAnUncertainNameKeyedCheck:
+    async def test_ambiguous_name_keyed_check_is_not_shown(self, wired_api):
+        docker_client, _engine = wired_api
+        container, info = _compose_web()
+        owner, owner_info = make_container(
+            name="other", container_id="d" * 64, stable_id="stack-web-1"
+        )
+        docker_client.add_container(container, info)
+        docker_client.add_container(owner, owner_info)
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="stack-web-1", check_type="tcp", tcp_port=80)
+        )
+
+        details = await get_container_details(get_docker_client(), _FULL_ID)
+
+        assert details["custom_health_check"] is None
+
+    async def test_name_keyed_check_is_not_shown_when_docker_cannot_be_listed(self, wired_api):
+        docker_client, _engine = wired_api
+        container, info = _compose_web()
+        docker_client.add_container(container, info)
+        docker_client.list_containers_error = RuntimeError("daemon unreachable")
+        config_manager.add_custom_health_check(
+            HealthCheckConfig(container_id="stack-web-1", check_type="tcp", tcp_port=80)
+        )
+
+        details = await get_container_details(get_docker_client(), _FULL_ID)
+
+        assert details["custom_health_check"] is None
+
+
+@pytest.mark.asyncio
+class TestSelectionLegacyEntries:
+    """Enabling clears every entry naming only this container, or rejects the whole batch."""
+
+    @staticmethod
+    def _exclude(*entries):
+        config = config_manager.get_config()
+        config.containers.excluded = list(entries)
+        config_manager.update_config(config)
+
+    @pytest.mark.parametrize(
+        ("stored", "requested"), [(_FULL_ID, _SHORT_ID), (_SHORT_ID, _FULL_ID)]
+    )
+    async def test_enabling_clears_an_exclusion_under_the_other_docker_id(
+        self, wired_api, monkeypatch, stored, requested
+    ):
+        docker_client, engine = wired_api
+        container, info = _compose_web()
+        docker_client.add_container(container, info)
+        # The fake resolves only exact IDs and names; Docker also resolves a short ID
+        real_get = docker_client.get_container
+        monkeypatch.setattr(
+            docker_client,
+            "get_container",
+            lambda cid: container if cid == _SHORT_ID else real_get(cid),
+        )
+        self._exclude(stored)
+
+        await update_container_selection(
+            get_docker_client(), ContainerSelectionRequest(container_ids=[requested], enabled=True)
+        )
+
+        config = config_manager.get_config()
+        assert config.containers.excluded == []
+        assert config.containers.selected == ["stack_web"]
+        assert engine.should_monitor_container(container, info) is True
+
+    async def test_enabling_clears_every_copy_of_a_duplicated_exclusion(self, wired_api):
+        docker_client, engine = wired_api
+        container, info = _compose_web()
+        docker_client.add_container(container, info)
+        self._exclude(_FULL_ID, "other", _FULL_ID)
+
+        await update_container_selection(
+            get_docker_client(), ContainerSelectionRequest(container_ids=[_FULL_ID], enabled=True)
+        )
+
+        assert config_manager.get_config().containers.excluded == ["other"]
+        assert engine.should_monitor_container(container, info) is True
+
+    async def test_unresolved_container_clears_every_copy_of_its_exclusion(self, wired_api):
+        """A container Docker cannot resolve is stored as requested, with no copy left behind."""
+        self._exclude("ghost", "other", "ghost")
+
+        await update_container_selection(
+            get_docker_client(), ContainerSelectionRequest(container_ids=["ghost"], enabled=True)
+        )
+
+        config = config_manager.get_config()
+        assert config.containers.excluded == ["other"]
+        assert config.containers.selected == ["ghost"]
+
+    async def test_bare_service_exclusion_rejects_the_whole_batch(self, wired_api, monkeypatch):
+        docker_client, _engine = wired_api
+        blocked, blocked_info = _compose_web()
+        free, free_info = make_container(name="free", container_id="e" * 64)
+        docker_client.add_container(blocked, blocked_info)
+        docker_client.add_container(free, free_info)
+        self._exclude("free", "web")
+        before = config_manager.get_config().model_dump()
+        save = MagicMock(wraps=config_manager.update_config)
+        monkeypatch.setitem(vars(config_manager), "update_config", save)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await update_container_selection(
+                get_docker_client(),
+                ContainerSelectionRequest(container_ids=["e" * 64, _FULL_ID], enabled=True),
+            )
+
+        assert exc_info.value.status_code == 409
+        assert exc_info.value.detail.startswith(
+            "Nothing was changed: 'stack-web-1' would stay excluded by 'web' in "
+            "containers.excluded."
+        )
+        assert "remove it from containers.excluded" in exc_info.value.detail
+        save.assert_not_called()
+        assert config_manager.get_config().model_dump() == before
+
+    async def test_bare_service_exclusion_is_not_removed_for_other_projects(self, wired_api):
+        """'web' also excludes another project's web service, so it is kept."""
+        docker_client, engine = wired_api
+        container, info = _compose_web()
+        other, other_info = _compose_web("other-web-1", "f" * 64, project="other")
+        docker_client.add_container(container, info)
+        docker_client.add_container(other, other_info)
+        self._exclude("web")
+
+        with pytest.raises(HTTPException):
+            await update_container_selection(
+                get_docker_client(),
+                ContainerSelectionRequest(container_ids=[_FULL_ID], enabled=True),
+            )
+
+        assert config_manager.get_config().containers.excluded == ["web"]
+        assert engine.should_monitor_container(other, other_info) is False
+
+    @staticmethod
+    def _named_like_its_service(docker_client):
+        """A Compose container with ``container_name: web`` on service ``web``, plus another
+        project's ``web`` service that a bare ``web`` entry also matches."""
+        mine, mine_info = make_container(
+            name="web",
+            container_id=_FULL_ID,
+            labels={"com.docker.compose.project": "project", "com.docker.compose.service": "web"},
+        )
+        other, other_info = _compose_web("other-web-1", "f" * 64, project="other")
+        docker_client.add_container(mine, mine_info)
+        docker_client.add_container(other, other_info)
+        return (mine, mine_info), (other, other_info)
+
+    async def test_name_equal_to_the_service_does_not_clear_a_shared_exclusion(self, wired_api):
+        docker_client, engine = wired_api
+        (_mine, _), (other, other_info) = self._named_like_its_service(docker_client)
+        self._exclude("web")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await update_container_selection(
+                get_docker_client(),
+                ContainerSelectionRequest(container_ids=[_FULL_ID], enabled=True),
+            )
+
+        assert exc_info.value.status_code == 409
+        assert "'web' would stay excluded by 'web'" in exc_info.value.detail
+        assert config_manager.get_config().containers.excluded == ["web"]
+        assert engine.should_monitor_container(other, other_info) is False
+
+    async def test_name_equal_to_the_service_does_not_clear_a_shared_selection(self, wired_api):
+        docker_client, engine = wired_api
+        (mine, mine_info), (other, other_info) = self._named_like_its_service(docker_client)
+        config = config_manager.get_config()
+        config.containers.selected = ["web"]
+        config_manager.update_config(config)
+
+        await update_container_selection(
+            get_docker_client(), ContainerSelectionRequest(container_ids=[_FULL_ID], enabled=False)
+        )
+
+        config = config_manager.get_config()
+        assert config.containers.selected == ["web"]
+        assert config.containers.excluded == ["project_web"]
+        assert engine.should_monitor_container(mine, mine_info) is False
+        assert engine.should_monitor_container(other, other_info) is True
+
+    async def test_stable_id_equal_to_the_service_is_still_cleared(self, wired_api):
+        """The stable_id is the application's own key, so it is removed even when a
+        monitoring.id equals the service name."""
+        docker_client, engine = wired_api
+        container, info = make_container(
+            name="project-web-1",
+            container_id=_FULL_ID,
+            labels={**_COMPOSE_WEB, "com.docker.compose.project": "project"},
+            stable_id="web",
+        )
+        docker_client.add_container(container, info)
+        self._exclude("web")
+
+        await update_container_selection(
+            get_docker_client(), ContainerSelectionRequest(container_ids=[_FULL_ID], enabled=True)
+        )
+
+        assert config_manager.get_config().containers.excluded == []
+        assert engine.should_monitor_container(container, info) is True
+
+    @pytest.mark.parametrize("order", ["compose-first", "plain-first"])
+    async def test_conflicts_are_checked_against_the_final_batch(self, wired_api, order):
+        """A later container in the batch that clears the shared entry (its own stable ID)
+        resolves an earlier container's conflict, whatever the request order."""
+        docker_client, engine = wired_api
+        compose, compose_info = _compose_web()
+        plain, plain_info = make_container(name="web", container_id="e" * 64)
+        docker_client.add_container(compose, compose_info)
+        docker_client.add_container(plain, plain_info)
+        self._exclude("web")
+        ids = [_FULL_ID, "e" * 64] if order == "compose-first" else ["e" * 64, _FULL_ID]
+
+        await update_container_selection(
+            get_docker_client(), ContainerSelectionRequest(container_ids=ids, enabled=True)
+        )
+
+        assert config_manager.get_config().containers.excluded == []
+        assert engine.should_monitor_container(compose, compose_info) is True
+        assert engine.should_monitor_container(plain, plain_info) is True
+
+    async def test_disabling_is_not_blocked_by_a_bare_service_selection(self, wired_api):
+        """Exclusion wins over selection, so disabling always reaches its state."""
+        docker_client, engine = wired_api
+        container, info = _compose_web()
+        docker_client.add_container(container, info)
+        config = config_manager.get_config()
+        config.containers.selected = ["web"]
+        config_manager.update_config(config)
+
+        await update_container_selection(
+            get_docker_client(), ContainerSelectionRequest(container_ids=[_FULL_ID], enabled=False)
+        )
+
+        config = config_manager.get_config()
+        assert config.containers.excluded == ["stack_web"]
+        assert engine.should_monitor_container(container, info) is False
