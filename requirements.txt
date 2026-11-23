@@ -4,6 +4,6 @@ fastapi==0.163.0
 prometheus-client==0.26.0
 pydantic==2.14.3
 pydantic-settings==2.16.3
-python-multipart==0.0.33
+python-multipart==0.0.34
 requests==2.34.2
 uvicorn[standard]==0.54.0
