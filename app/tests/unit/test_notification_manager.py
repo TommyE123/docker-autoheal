@@ -24,6 +24,7 @@ from app.config.config_manager import AutoHealEvent, NotificationService
 from app.notifications.notification_manager import (
     NotificationManager,
     NotificationPriority,
+    mask_url_secrets,
 )
 
 _ACCEPTED_BODY = {"ok": True, "status": 1}
@@ -2058,3 +2059,25 @@ async def test_send_test_reports_the_reason_when_the_url_is_malformed(
 
     assert result["message"] == "Test notification to 'svc' failed: could not connect to the server"
     assert "ClientConnectionError: cannot connect" in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("url", "text", "hidden"),
+    [
+        (
+            "http://hooks.invalid/a/SECRET?k=QUERYSECRET",
+            "bad url: /a/SECRET?k=QUERYSECRET",
+            "SECRET",
+        ),
+        ("http://hooks.invalid", "failed: hooks.invalid", "hooks.invalid"),
+        ("http://hooks.invalid/", "failed: hooks.invalid", "hooks.invalid"),
+        ("http://[bad/SECRET", "failed: http://[bad/SECRET", "SECRET"),
+        (None, "failed: http://other.invalid/SECRET", "SECRET"),
+    ],
+)
+def test_mask_url_secrets_hides_url_parts(url, text, hidden):
+    """A webhook failure message never keeps the URL path, query, host or any other URL."""
+    masked = mask_url_secrets(text, url)
+
+    assert hidden not in masked
+    assert masked.startswith(text.split(":")[0])
