@@ -9,7 +9,6 @@
 import { AxiosError } from "axios";
 import defaultConfig from "./default-config.json";
 
-const clone = (value) => JSON.parse(JSON.stringify(value));
 const minutesAgo = (minutes) =>
   new Date(Date.now() - minutes * 60000).toISOString();
 
@@ -71,7 +70,7 @@ function sampleEvent(
 
 /** The sample data the demo starts with. */
 export function createDemoState() {
-  const config = clone(defaultConfig);
+  const config = structuredClone(defaultConfig);
   config.notifications.enabled = true;
   config.notifications.services = [
     {
@@ -209,7 +208,7 @@ const routes = [
         .length,
       maintenance_mode: state.maintenance.mode,
       maintenance_start_time: state.maintenance.start,
-      config: clone(state.config),
+      config: structuredClone(state.config),
     }),
   ],
   [
@@ -239,7 +238,7 @@ const routes = [
   [
     "get",
     "/api/containers/:id",
-    (state, { id }) => clone(findContainer(state, id)),
+    (state, { id }) => structuredClone(findContainer(state, id)),
   ],
   [
     "post",
@@ -294,8 +293,8 @@ const routes = [
       return { status: "success", maintenance_mode: false };
     },
   ],
-  ["get", "/api/config", (state) => clone(state.config)],
-  ["get", "/api/config/export", (state) => clone(state.config)],
+  ["get", "/api/config", (state) => structuredClone(state.config)],
+  ["get", "/api/config/export", (state) => structuredClone(state.config)],
   [
     "put",
     "/api/config/:section",
@@ -342,14 +341,17 @@ const routes = [
   [
     "get",
     "/api/notifications/config",
-    (state) => clone(state.config.notifications),
+    (state) => structuredClone(state.config.notifications),
   ],
   [
     "put",
     "/api/notifications/config",
     (state, { body }) => {
       Object.assign(state.config.notifications, body);
-      return { status: "success", config: clone(state.config.notifications) };
+      return {
+        status: "success",
+        config: structuredClone(state.config.notifications),
+      };
     },
   ],
   [
