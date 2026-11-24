@@ -670,7 +670,9 @@ class ConfigManager:
         section recursively, so omitted fields keep their current values at every
         level; any other value replaces the section. The merged result is validated before it
         replaces the current config, so an invalid value raises
-        ``ValidationError`` and leaves the config and file untouched.
+        ``ValidationError`` and leaves the config and file untouched. If the file cannot
+        be written, the previous configuration is restored in memory and
+        ``PersistenceError`` is raised.
         """
         with self._lock:
             config_dict = self._config.model_dump()
@@ -678,8 +680,7 @@ class ConfigManager:
                 if key not in config_dict:
                     continue
                 config_dict[key] = _merge_dicts(config_dict[key], value)
-            self._config = AutoHealConfig.model_validate(config_dict)
-            self._save_config()
+            self._replace_config_and_save(AutoHealConfig.model_validate(config_dict))
 
     def export_config(self) -> str:
         """Export configuration as JSON string"""

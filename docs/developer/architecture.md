@@ -105,15 +105,22 @@ database — all state is JSON files under `/data`.
    memory and raise, because the restart or release already happened; the next successful
    save writes it out.
 
-   The monitoring engine logs those failures and still applies the cooldown, records the
-   event and sends the notification. Auto-discovery distinguishes two cases. If saving a new
-   selection to `config.json` fails, the selection is rolled back and it returns before
-   recording the event or sending the notification; a later start event or startup scan
-   retries it. If the selection is saved but the event cannot be written, the event stays in
-   memory and the notification is still sent. The manual unquarantine route is not
-   best-effort: if clearing the restart history fails after the release was saved, it
-   returns a 500, the container stays released, and `config.json` keeps its old restart
-   counts until the next save.
+   The monitoring engine logs failures from `record_restart()`, `add_event()` and
+   `clear_restart_history()`, and still applies the cooldown, records the event and sends the
+   notification. If saving the quarantine list fails, the engine stops that container's cycle:
+   it does not quarantine or restart it, and records no event and sends no notification. The
+   next cycle tries again.
+
+   Auto-discovery distinguishes two cases. If saving a new selection to `config.json` fails,
+   the selection is rolled back and it returns before recording the event or sending the
+   notification. Nothing retries it on a schedule: the container stays unmonitored until its
+   next start event or the next Autoheal start, whose startup scan selects it again. If the
+   selection is saved but the event cannot be written, the event stays in memory and the
+   notification is still sent.
+
+   The manual unquarantine route is not best-effort: if clearing the restart history fails
+   after the release was saved, it returns a 500, the container stays released, and
+   `config.json` keeps its old restart counts until the next save.
 
 ## Stable container identity
 

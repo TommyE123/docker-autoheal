@@ -946,3 +946,17 @@ def test_failed_clear_events_restores_the_events(isolated_config_manager):
 
     assert [e.container_id for e in manager.get_events()] == ["web", "db"]
     assert manager.EVENTS_FILE.read_bytes() == saved_before
+
+
+def test_failed_update_partial_config_restores_the_previous_config(isolated_config_manager):
+    manager = isolated_config_manager
+    manager.update_partial_config(monitor={"interval_seconds": 45})
+    before = manager.get_config()
+    saved_before = manager.CONFIG_FILE.read_bytes()
+
+    with _failing_writes(), pytest.raises(PersistenceError):
+        manager.update_partial_config(monitor={"interval_seconds": 99})
+
+    assert manager.get_config().monitor.interval_seconds == 45
+    assert manager.get_config() == before
+    assert manager.CONFIG_FILE.read_bytes() == saved_before
