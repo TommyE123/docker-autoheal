@@ -20,11 +20,9 @@ export default [
   {
     files: ["**/*.{js,jsx}"],
     languageOptions: {
-      ecmaVersion: 2020,
       globals: globals.browser,
       parserOptions: {
         ecmaFeatures: { jsx: true },
-        sourceType: "module",
       },
     },
     plugins: {
@@ -70,6 +68,7 @@ export default [
       "**/e2e-ui/**/*.js",
       "**/playwright.demo.config.js",
       "**/e2e-demo/**/*.js",
+      "**/src/test/globalSetup.js",
     ],
     languageOptions: { globals: globals.node },
   },

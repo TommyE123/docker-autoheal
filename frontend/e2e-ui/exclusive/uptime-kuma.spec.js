@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from "node:timers/promises";
 import { exclusiveTest as test, expect } from "../fixtures.js";
 import {
   docker,
@@ -392,7 +393,7 @@ test(
       do {
         expect((await dockerState(mapped)).startedAt).toBe(upState.startedAt);
         expect(await restartsAfter(mapped, upMark)).toEqual([]);
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await sleep(500);
       } while (Date.now() < deadline);
 
       // 3. The unmapped sibling was never touched.

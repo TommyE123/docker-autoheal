@@ -215,8 +215,10 @@ class MonitoringEngine:
         # Proactively scan for existing containers with the configured monitoring label
         await self._auto_discovery.scan_existing_containers()
 
-        self._task = asyncio.create_task(self._monitor_loop())
-        self._event_task = asyncio.create_task(self._event_listener_loop(events_since))
+        self._task = asyncio.create_task(self._monitor_loop(), name="monitor-loop")
+        self._event_task = asyncio.create_task(
+            self._event_listener_loop(events_since), name="docker-event-listener"
+        )
         logger.info("Monitoring engine started")
         monitor_config = config_manager.get_config().monitor
         logger.info(

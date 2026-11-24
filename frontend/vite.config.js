@@ -1,4 +1,4 @@
-import { fileURLToPath } from "node:url";
+import path from "node:path";
 import {
   defineConfig,
   configDefaults,
@@ -13,7 +13,7 @@ import { workbox } from "./workbox.config.js";
 // to dist/ instead of the backend's static/, and without a service worker.
 const DEMO_BASE = "/docker-autoheal/";
 
-// https://vitejs.dev/config/
+// https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
   base: mode === "demo" ? DEMO_BASE : "/",
   plugins: [
@@ -60,8 +60,9 @@ export default defineConfig(({ mode }) => ({
     environment: "jsdom",
     // `virtual:pwa-register` only exists inside a Vite build; tests get a mock.
     alias: {
-      "virtual:pwa-register": fileURLToPath(
-        new URL("./src/test/pwa-register-stub.js", import.meta.url),
+      "virtual:pwa-register": path.join(
+        import.meta.dirname,
+        "src/test/pwa-register-stub.js",
       ),
     },
     // Playwright specs run via `npm run test:ui-e2e` and `npm run test:demo-e2e`, not Vitest.
