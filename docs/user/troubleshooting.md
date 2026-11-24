@@ -98,7 +98,8 @@ docker logs -f docker-autoheal
 When Autoheal hangs, stops healing, or uses a lot of CPU, the logs may not show where it is
 stuck. The image includes Python's built-in tools for inspecting a live process, so you don't
 need to change code, restart Autoheal, or install anything. Autoheal is PID 1 in its container,
-so the commands below use `1`. They assume the default container name `docker-autoheal`.
+so the commands below use `1`. They assume the default container name `docker-autoheal`. The
+dev stack names it `docker-autoheal-dev`.
 
 These tools read a running process's memory and don't pause it by default. Avoid the `--blocking`
 option, which stops every thread while it samples.
@@ -131,14 +132,16 @@ workers, which run outside the event loop):
 docker exec docker-autoheal python -m profiling.sampling dump -a 1
 ```
 
-To see the stacks of the asyncio tasks instead, use `--async-aware`. Don't combine it with `-a`,
-which the tool rejects.
+To see the stacks of the asyncio tasks that are running right now, use `--async-aware`. It
+prints nothing for tasks that are blocked, so it is no use for a deadlock; use `pstree` for that.
+Don't combine it with `-a`, which the tool rejects.
 
 ```bash
 docker exec docker-autoheal python -m profiling.sampling dump --async-aware 1
 ```
 
-Autoheal doesn't name its tasks yet, so they show as `Task-1`, `Task-2`, and so on.
+Autoheal's long-lived tasks have names such as `monitor-loop` and `api-server`. Other tasks show
+as `Task-1`, `Task-2`, and so on.
 
 ### High CPU: see what the process is doing
 
