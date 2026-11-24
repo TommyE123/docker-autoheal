@@ -93,6 +93,129 @@ Set `observability.log_level` to `DEBUG` from the Configuration tab (or `PUT
 docker logs -f docker-autoheal
 ```
 
+## Inspecting a running container
+
+When Autoheal hangs, stops healing, or uses a lot of CPU, the logs may not show where it is
+stuck. The image includes Python's built-in tools for inspecting a live process, so you don't
+need to change code, restart Autoheal, or install anything. Autoheal is PID 1 in its container,
+so the commands below use `1`. They assume the default container name `docker-autoheal`. The
+dev stack names it `docker-autoheal-dev`.
+
+These tools read a running process's memory and don't pause it by default. Avoid the `--blocking`
+option, which stops every thread while it samples.
+
+### It's stuck: see what each task is waiting for
+
+```bash
+docker exec docker-autoheal python -m asyncio pstree 1
+```
+
+This prints the tree of asyncio tasks and what each one is awaiting. If two tasks await each
+other, `pstree` prints the cycle instead of a tree, which is the usual sign of a deadlock:
+
+```text
+ERROR: await-graph contains cycles - cannot print a tree!
+
+cycle: Task-2 → Task-3 → Task-2
+```
+
+For a flat table that lists each task's coroutine stack and awaiter:
+
+```bash
+docker exec docker-autoheal python -m asyncio ps 1
+```
+
+To see the stack of every thread (for example the Docker event reader or the health-check
+workers, which run outside the event loop):
+
+```bash
+docker exec docker-autoheal python -m profiling.sampling dump -a 1
+```
+
+To see the stacks of the asyncio tasks, use `--async-aware`. By default it includes tasks that
+are waiting. Add `--async-mode running` to show only the task that is running right now. Don't
+combine it with `-a`, which the tool rejects. For the await chain of a deadlock, use `pstree`.
+
+```bash
+docker exec docker-autoheal python -m profiling.sampling dump --async-aware 1
+```
+
+Autoheal's long-lived tasks have names such as `monitor-loop` and `api-server`. Other tasks show
+as `Task-1`, `Task-2`, and so on.
+
+### High CPU: see what the process is doing
+
+Run a live, top-style view in your terminal and press `q` to quit. It samples all threads and
+counts only threads that are running on a CPU, so idle threads don't dominate the view:
+
+```bash
+docker exec -it docker-autoheal python -m profiling.sampling attach --live --mode cpu -a 1
+```
+
+For a sample you can save, use `--pstats` for a binary profile file or `--flamegraph` for an HTML
+flame graph, and write it to a file inside the container. Copy it to the host with `docker cp`.
+Read a `.pstats` file with `python -m pstats`, and open the flame graph in a browser:
+
+```bash
+docker exec docker-autoheal python -m profiling.sampling attach --mode cpu --pstats \
+  -a -d 10 -o /tmp/autoheal-cpu.pstats 1
+docker cp docker-autoheal:/tmp/autoheal-cpu.pstats .
+```
+
+### Files for a bug report
+
+When reporting a hang or high CPU, include the output of `pstree 1` (or its cycle line) and of
+`dump -a 1`. You can also attach a flame graph:
+
+```bash
+docker exec docker-autoheal python -m profiling.sampling attach --flamegraph -a -d 10 \
+  -o /tmp/autoheal-flame.html 1
+docker cp docker-autoheal:/tmp/autoheal-flame.html .
+```
+
+The output shows module and function names and file paths, not configuration values. Check it
+before you post it anyway.
+
+### Permissions
+
+The tools attach to the process the way a debugger does. The image runs as root (it has no
+`USER` instruction), and Docker's default capabilities don't include `SYS_PTRACE`. If a command
+fails with `Operation not permitted` or a ptrace error, retry that command with `--privileged` on
+`docker exec`. This gives only that command extended privileges, including `SYS_PTRACE`, without
+recreating the container, so the hung process is preserved. It is broad, so use it only while
+diagnosing:
+
+```bash
+docker exec --privileged docker-autoheal python -m asyncio pstree 1
+```
+
+Don't recreate the container while the hang is still there, because a new PID 1 discards the
+hung process. To prepare for the next occurrence, add the capability in your Compose file and
+recreate the container during a maintenance window:
+
+```yaml
+services:
+  autoheal:
+    cap_add:
+      - SYS_PTRACE
+```
+
+This widens what the container is allowed to do, so remove it once you've finished diagnosing.
+
+### Last resort: remote debugger
+
+Maintainers can attach the standard debugger to the running process:
+
+```bash
+docker exec -it docker-autoheal python -m pdb -p 1
+```
+
+Unlike the commands above, this runs code inside Autoheal and can pause it, so use it only when
+the other tools haven't found the cause.
+
+If PID 1 is blocked in a system call or waiting for I/O, the attach can wait until Autoheal runs
+Python code again. Press Ctrl-C to cancel the wait.
+
 ## See also
 
 - [Configuration](configuration.md)
