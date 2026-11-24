@@ -189,9 +189,10 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      # The lockfile-pinned Playwright from node_modules, not an npx download.
       - name: Install Chromium and its system dependencies
         working-directory: frontend
-        run: npx playwright install --with-deps chromium
+        run: npm run test:demo-e2e:install
 
       # UI_E2E_BASE_URL makes run.sh use this running instance instead of starting the
       # dev stack. It always runs the full suite. run.sh exits 3

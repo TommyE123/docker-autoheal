@@ -191,10 +191,7 @@ test(
   "shows a loading state until the containers arrive",
   { tag: ["@errors", "@containers"] },
   async ({ page }) => {
-    let release;
-    const gate = new Promise((resolve) => {
-      release = resolve;
-    });
+    const { promise: gate, resolve: release } = Promise.withResolvers();
     await page.route(/\/api\/containers(\?|$)/, async (route) => {
       await gate;
       await route.continue();

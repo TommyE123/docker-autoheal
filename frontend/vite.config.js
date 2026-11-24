@@ -1,4 +1,4 @@
-import { fileURLToPath } from "node:url";
+import path from "node:path";
 import {
   defineConfig,
   configDefaults,
@@ -60,8 +60,9 @@ export default defineConfig(({ mode }) => ({
     environment: "jsdom",
     // `virtual:pwa-register` only exists inside a Vite build; tests get a mock.
     alias: {
-      "virtual:pwa-register": fileURLToPath(
-        new URL("./src/test/pwa-register-stub.js", import.meta.url),
+      "virtual:pwa-register": path.join(
+        import.meta.dirname,
+        "src/test/pwa-register-stub.js",
       ),
     },
     // Playwright specs run via `npm run test:ui-e2e` and `npm run test:demo-e2e`, not Vitest.
