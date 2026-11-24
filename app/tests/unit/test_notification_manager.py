@@ -2070,6 +2070,8 @@ async def test_send_test_reports_the_reason_when_the_url_is_malformed(
             "SECRET",
         ),
         ("http://hooks.invalid", "failed: hooks.invalid", "hooks.invalid"),
+        ("http://hooks.invalid/%7E/SECRET", "bad url: /~/SECRET", "SECRET"),
+        ("http://hooks.invalid/%7E/SECRET", "bad url: /%7E/SECRET", "SECRET"),
         ("http://hooks.invalid/", "failed: hooks.invalid", "hooks.invalid"),
         ("http://[bad/SECRET", "failed: http://[bad/SECRET", "SECRET"),
         (None, "failed: http://other.invalid/SECRET", "SECRET"),

@@ -17,6 +17,7 @@ from typing import Any, Protocol
 from urllib.parse import urlsplit
 
 import aiohttp
+from requests.utils import requote_uri
 
 from app.config.config_manager import AutoHealEvent, NotificationService, config_manager
 
@@ -79,7 +80,9 @@ def mask_url_secrets(text: str, url: str | None) -> str:
         parts = urlsplit(url or "")
         target = parts.path + (f"?{parts.query}" if parts.query else "")
         if len(target) > 1:
-            text = text.replace(target, "***")
+            # requests normalises unreserved escapes (%7E -> ~), and its errors print that form.
+            for variant in sorted({target, requote_uri(target)}, key=len, reverse=True):
+                text = text.replace(variant, "***")
     return _mask_secrets(text, SimpleNamespace(url=url))
 
 
