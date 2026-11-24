@@ -32,4 +32,22 @@ describe("ConfigImportExport", () => {
     expect(onImport).toHaveBeenCalledTimes(1);
     expect(input.files[0]).toBe(file);
   });
+
+  it("disables export and import when the flags are off", () => {
+    render(
+      <ConfigImportExport
+        onExport={vi.fn()}
+        onImport={vi.fn()}
+        allowExport={false}
+        allowImport={false}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: /export configuration/i }),
+    ).toBeDisabled();
+    expect(screen.getByLabelText("Import configuration file")).toBeDisabled();
+    expect(screen.getByText(/export is disabled/i)).toBeInTheDocument();
+    expect(screen.getByText(/import is disabled/i)).toBeInTheDocument();
+  });
 });

@@ -108,7 +108,7 @@ precedence.
 | `listen_address`                          | `0.0.0.0` | Address the web UI/API binds to                                                                          |
 | `listen_port`                             | `3131`    | Port the web UI/API binds to                                                                             |
 | `max_log_entries`                         | `50`      | Maximum number of events kept in the in-memory/persisted event log; applied when the next event is added |
-| `allow_export_json` / `allow_import_json` | `true`    | Stored but currently have no effect: export and import are always available                              |
+| `allow_export_json` / `allow_import_json` | `true`    | When `false`, export / import returns `403` and the UI disables the matching control                     |
 
 ### `alerts`
 
