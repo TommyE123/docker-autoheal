@@ -66,7 +66,7 @@ EXPOSE 3131 9090
 # --start-interval (Docker Engine 25.0+) probes every 5s during the start period, so the
 # container reports healthy soon after it is ready instead of after the first 30s interval.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --start-interval=5s --retries=3 \
-    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3131/health', timeout=5)"]
+    CMD ["python", "-c", "import urllib.request; urllib.request.build_opener(urllib.request.ProxyHandler({})).open('http://localhost:3131/health', timeout=5)"]
 
 # Run the application
 CMD ["python", "-m", "app.main"]

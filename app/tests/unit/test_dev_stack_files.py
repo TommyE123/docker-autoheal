@@ -216,10 +216,47 @@ def test_image_health_check_probes_without_curl():
     assert re.search(r"^HEALTHCHECK .*--start-interval=5s", dockerfile, re.MULTILINE)
     assert re.search(
         r'^\s+CMD \["python", "-c", "import urllib\.request; '
-        r"urllib\.request\.urlopen\('http://localhost:3131/health', timeout=5\)\"\]$",
+        r"urllib\.request\.build_opener\(urllib\.request\.ProxyHandler\(\{\}\)\)\.open"
+        r"\('http://localhost:3131/health', timeout=5\)\"\]$",
         dockerfile,
         re.MULTILINE,
     )
+
+
+def test_image_health_probe_ignores_http_proxy_variables():
+    """A proxy in the environment must not route the localhost probe, so it still reports healthy."""
+    import http.server
+    import threading
+
+    dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
+    probe = re.search(r'^\s+CMD \["python", "-c", "(.+)"\]$', dockerfile, re.MULTILINE).group(1)
+
+    class Health(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), Health)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        port = server.server_address[1]
+        script = probe.replace("localhost:3131", f"localhost:{port}")
+        env = {"PATH": "/usr/bin:/bin", "HTTP_PROXY": "http://127.0.0.1:9", "http_proxy": ""}
+        result = subprocess.run(  # noqa: S603
+            [sys.executable, "-c", script],
+            capture_output=True,
+            env=env,
+            timeout=30,
+            check=False,
+        )
+    finally:
+        server.shutdown()
+
+    assert result.returncode == 0, result.stderr.decode(errors="replace")
 
 
 def test_image_sets_unbuffered_python_and_oci_labels():
