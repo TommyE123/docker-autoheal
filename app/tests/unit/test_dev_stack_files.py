@@ -229,14 +229,16 @@ def test_image_health_probe_ignores_http_proxy_variables():
     import threading
 
     dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
-    probe = re.search(r'^\s+CMD \["python", "-c", "(.+)"\]$', dockerfile, re.MULTILINE).group(1)
+    match = re.search(r'^\s+CMD \["python", "-c", "(.+)"\]$', dockerfile, re.MULTILINE)
+    assert match, "health probe command not found in Dockerfile"
+    probe = match.group(1)
 
     class Health(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
             self.send_response(200)
             self.end_headers()
 
-        def log_message(self, *args):
+        def log_message(self, format, *args):
             pass
 
     server = http.server.HTTPServer(("127.0.0.1", 0), Health)
