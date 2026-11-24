@@ -142,15 +142,15 @@ Autoheal doesn't name its tasks yet, so they show as `Task-1`, `Task-2`, and so 
 
 ### High CPU: see what the process is doing
 
-Run a live, top-style view in your terminal and press `q` to quit:
+Run a live, top-style view in your terminal and press `q` to quit. It samples all threads and
+counts only threads that are running on a CPU, so idle threads don't dominate the view:
 
 ```bash
-docker exec -it docker-autoheal python -m profiling.sampling attach --live 1
+docker exec -it docker-autoheal python -m profiling.sampling attach --live --mode cpu -a 1
 ```
 
-For a sample you can save, add `--mode cpu` to count only threads that are running on a CPU.
-Use `--pstats` for a table or `--flamegraph` for an HTML flame graph, and write it to a file
-inside the container. Copy it to the host with `docker cp`:
+For a sample you can save, use `--pstats` for a table or `--flamegraph` for an HTML flame graph,
+and write it to a file inside the container. Copy it to the host with `docker cp`:
 
 ```bash
 docker exec docker-autoheal python -m profiling.sampling attach --mode cpu --pstats \
@@ -176,8 +176,10 @@ before you post it anyway.
 
 The tools attach to the process the way a debugger does. The image runs as root (it has no
 `USER` instruction), and Docker's default capabilities don't include `SYS_PTRACE`. If a command
-fails with `Operation not permitted` or a ptrace error, add the capability to the service in your
-Compose file, then recreate the container:
+fails with `Operation not permitted` or a ptrace error, you can't fix it on the hung container:
+adding a capability means recreating the container, which starts a new PID 1 and discards the
+hang you are investigating. Add the capability in your Compose file so the next occurrence can be
+inspected, then recreate the container during a maintenance window:
 
 ```yaml
 services:
@@ -198,6 +200,9 @@ docker exec -it docker-autoheal python -m pdb -p 1
 
 Unlike the commands above, this runs code inside Autoheal and can pause it, so use it only when
 the other tools haven't found the cause.
+
+If PID 1 is blocked in a system call or waiting for I/O, the attach can wait until Autoheal runs
+Python code again. Press Ctrl-C to cancel the wait.
 
 ## See also
 
