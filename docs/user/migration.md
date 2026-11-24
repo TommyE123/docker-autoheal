@@ -14,9 +14,9 @@ change), it will be called out in that release's notes.
 The image now defines its own `HEALTHCHECK` and no longer ships `curl`. Earlier versions of
 this guide's Compose example added a `healthcheck:` block that calls `curl`. If you copied it,
 delete that block, then run `docker compose up -d` to recreate the container so the image's
-health check applies. A Compose `healthcheck:` overrides the
-image's, so a copied `curl` probe would fail with `exec: "curl": executable file not found` and
-the container would show `unhealthy`. If you want your own probe, use one the image can run,
+health check applies. A `healthcheck:` block in Compose overrides the image's, so a copied
+`curl` probe would fail with `exec: "curl": executable file not found`, and the container would show
+`unhealthy`. If you want your own probe, use one the image can run,
 for example:
 
 ```yaml
