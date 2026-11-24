@@ -80,7 +80,7 @@ class UptimeKumaMonitor:
 
             # Start monitoring loop
             self._running = True
-            self._task = asyncio.create_task(self._monitoring_loop())
+            self._task = asyncio.create_task(self._monitoring_loop(), name="uptime-kuma-loop")
         except Exception as e:
             logger.warning("Failed to start Uptime-Kuma monitor: %s", e)
             logger.info(

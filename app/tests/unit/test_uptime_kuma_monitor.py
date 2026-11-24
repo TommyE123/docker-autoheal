@@ -93,6 +93,7 @@ class TestStart:
         assert monitor._monitor_cache == {"web": {"friendly_name": "web", "status": 1}}
         assert monitor._running is True
         assert monitor._task is not None
+        assert monitor._task.get_name() == "uptime-kuma-loop"
 
         await monitor.stop()
 

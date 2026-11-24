@@ -5,7 +5,6 @@ import logging
 from datetime import UTC, datetime
 
 from fastapi import APIRouter
-from fastapi.responses import FileResponse
 
 from app.api import state
 from app.api.models import SystemStatus
@@ -31,13 +30,6 @@ async def health_check():
         if state.monitoring_engine
         else False,
     }
-
-
-# PWA manifest route - testing
-@router.get("/manifest.webmanifest", include_in_schema=False)
-async def get_manifest():
-    """Serve PWA manifest"""
-    return FileResponse("static/manifest.webmanifest", media_type="application/manifest+json")
 
 
 @router.get("/api/status", response_model=SystemStatus)
