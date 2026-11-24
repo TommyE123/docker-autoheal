@@ -6,6 +6,7 @@ Tests the automatic creation of default configuration files
 import json
 import runpy
 import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -311,3 +312,21 @@ class TestInitializeDefaultsIdempotent:
 
         assert {p.name: p.read_text() for p in tmp_path.glob("*.json")} == before
         assert "no initialization needed" in caplog.text
+
+
+def test_importing_init_defaults_does_not_create_global_config_manager():
+    """The initialisation command must only write to the requested data dir.
+
+    config_manager builds a module-level ConfigManager() on import, which writes
+    to /data. init_defaults must therefore not load config_manager at import time,
+    so a fresh interpreter importing it must leave that module unloaded.
+    """
+    code = "import sys; import app.config.init_defaults; sys.exit(1 if 'app.config.config_manager' in sys.modules else 0)"
+    result = subprocess.run(  # noqa: S603 - fixed argv, sys.executable
+        [sys.executable, "-c", code],
+        cwd=Path(__file__).resolve().parents[3],
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr.decode()
