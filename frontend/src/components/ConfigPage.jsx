@@ -439,6 +439,8 @@ function ConfigPage() {
           <ConfigImportExport
             onExport={handleExportConfig}
             onImport={handleImportConfig}
+            allowExport={config.ui?.allow_export_json !== false}
+            allowImport={config.ui?.allow_import_json !== false}
           />
         </Col>
 
