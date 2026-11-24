@@ -121,16 +121,20 @@ jobs:
             autoheal-test:amd64
           echo "UI E2E instance image: $(docker inspect --format '{{.Config.Image}} ({{.Image}})' autoheal-ui-e2e)"
 
-      - name: Wait for the service to become ready
+      # Checks the image's own HEALTHCHECK (the Python probe in the Dockerfile), not only the
+      # published port, so a probe that exits non-zero fails the job.
+      - name: Wait for the service to become ready and its health check to pass
         run: |
           for _ in $(seq 1 30); do
-            if curl -sf http://localhost:3132/health >/dev/null; then
-              echo "Service is ready"
+            if [ "$(docker inspect --format '{{.State.Health.Status}}' autoheal-ui-e2e)" = "healthy" ] \
+              && curl -sf http://localhost:3132/health >/dev/null; then
+              echo "Service is ready and the container health check reports healthy"
               exit 0
             fi
             sleep 2
           done
-          echo "::error::Docker Autoheal instance did not become ready within the timeout"
+          echo "::error::Docker Autoheal instance did not become ready and healthy within the timeout"
+          docker inspect --format '{{json .State.Health}}' autoheal-ui-e2e || true
           exit 1
 
       - name: Verify the application can communicate with Docker

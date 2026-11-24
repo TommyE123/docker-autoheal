@@ -19,18 +19,7 @@ services:
       - "3131:3131" # Web UI (React)
       - "9090:9090" # Prometheus metrics
 
-    # Environment variables (optional, can be configured via UI)
-    environment:
-      - PYTHONUNBUFFERED=1
-
     # Labels for auto-heal (exclude itself from monitoring)
+    # No healthcheck here: the image's HEALTHCHECK (Dockerfile) applies, so the probe is defined once.
     labels:
       - "autoheal=false"
-
-    # Health check
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3131/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
