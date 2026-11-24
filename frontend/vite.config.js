@@ -13,7 +13,7 @@ import { workbox } from "./workbox.config.js";
 // to dist/ instead of the backend's static/, and without a service worker.
 const DEMO_BASE = "/docker-autoheal/";
 
-// https://vitejs.dev/config/
+// https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
   base: mode === "demo" ? DEMO_BASE : "/",
   plugins: [

@@ -24,6 +24,7 @@ from app.config.config_manager import (
     RestartConfig,
     config_manager,
 )
+from app.utils.log_level import apply_log_level
 
 logger = logging.getLogger(__name__)
 
@@ -132,24 +133,7 @@ async def update_observability_config(observability_config: dict):
 
     if "log_level" in updates:
         level_name = config.observability.log_level
-
-        # Update log level directly without importing main
-        level_map = {
-            "DEBUG": logging.DEBUG,
-            "INFO": logging.INFO,
-            "WARNING": logging.WARNING,
-            "ERROR": logging.ERROR,
-            "CRITICAL": logging.CRITICAL,
-        }
-        level = level_map.get(level_name.upper(), logging.INFO)
-
-        # Set root logger level
-        logging.getLogger().setLevel(level)
-
-        # Disable uvicorn access logs completely
-        logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-        logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
-        logging.getLogger("uvicorn").setLevel(logging.WARNING)
+        apply_log_level(level_name)
 
         logger.info("Log level changed to: %s", escape_for_log(level_name))
 
