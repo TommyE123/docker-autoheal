@@ -9,7 +9,7 @@ and the ``get_docker_client`` dependency, not by the route functions themselves.
 import json
 import logging
 from datetime import UTC, datetime
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
@@ -318,6 +318,38 @@ class TestModelValidationErrors:
             for r in caplog.records
             if r.name == "app.api.errors"
         )
+
+    @pytest.mark.asyncio
+    async def test_export_is_403_when_disabled(self):
+        config = config_manager.get_config().model_copy(deep=True)
+        config.ui.allow_export_json = False
+        with patch.object(config_manager, "get_config", return_value=config):
+            status, body, _headers = await _request("GET", "/api/config/export")
+
+        assert status == 403
+        assert json.loads(body)["detail"] == "Configuration export is disabled"
+
+    @pytest.mark.asyncio
+    async def test_import_is_403_when_disabled_and_config_is_untouched(self):
+        config = config_manager.get_config().model_copy(deep=True)
+        config.ui.allow_import_json = False
+        with (
+            patch.object(config_manager, "get_config", return_value=config),
+            patch.object(config_manager, "import_config") as import_config,
+        ):
+            status, body, _headers = await _request(
+                "POST",
+                "/api/config/import",
+                request_headers={"content-type": "multipart/form-data; boundary=b"},
+                body=(
+                    b'--b\r\nContent-Disposition: form-data; name="file"; filename="c.json"\r\n'
+                    b"Content-Type: application/json\r\n\r\n{}\r\n--b--\r\n"
+                ),
+            )
+
+        assert status == 403
+        assert json.loads(body)["detail"] == "Configuration import is disabled"
+        import_config.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_invalid_config_import_is_422(self):

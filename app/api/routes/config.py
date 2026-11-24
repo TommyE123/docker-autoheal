@@ -78,9 +78,14 @@ async def update_restart_config(restart_config: dict):
     return {"status": "success", "message": "Restart configuration updated"}
 
 
-@router.get("/api/config/export")
+@router.get(
+    "/api/config/export",
+    responses={403: {"description": "Export is disabled (ui.allow_export_json is false)"}},
+)
 async def export_config():
     """Export configuration as JSON"""
+    if not config_manager.get_config().ui.allow_export_json:
+        raise HTTPException(status_code=403, detail="Configuration export is disabled")
     config_json = config_manager.export_config()
 
     # Return as downloadable file
@@ -94,10 +99,15 @@ async def export_config():
 
 @router.post(
     "/api/config/import",
-    responses={422: {"description": "File is not UTF-8 JSON or is not a valid configuration"}},
+    responses={
+        403: {"description": "Import is disabled (ui.allow_import_json is false)"},
+        422: {"description": "File is not UTF-8 JSON or is not a valid configuration"},
+    },
 )
 async def import_config(file: Annotated[UploadFile, File()]):
     """Import configuration from JSON file"""
+    if not config_manager.get_config().ui.allow_import_json:
+        raise HTTPException(status_code=403, detail="Configuration import is disabled")
     content = await file.read()
     try:
         config_json = content.decode("utf-8")

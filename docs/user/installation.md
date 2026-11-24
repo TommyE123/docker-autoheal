@@ -2,7 +2,10 @@
 
 ## Requirements
 
-- Docker Engine 20.10+
+- Docker Engine 20.10+ to run the published image. Engine 25.0+ runs the image's 5-second start
+  probe; older engines use the 30-second interval.
+- Building from source needs BuildKit, the default in current Docker releases. The legacy builder
+  (`DOCKER_BUILDKIT=0`) does not accept the Dockerfile's `RUN --mount`.
 - Access to `/var/run/docker.sock` (or your platform's equivalent)
 - Ports `3131` (web UI + API) and `9090` (Prometheus metrics) available on the host, or
   remapped to ports of your choosing
@@ -24,13 +27,9 @@ services:
     labels:
       - "autoheal=false"           # keeps the monitor unselected under the default label-based
                                     # selection; see docs/user/labels.md if you enable include_all
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3131/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 ```
+
+The image defines its own health check, so the Compose file does not need one.
 
 ```bash
 docker compose up -d

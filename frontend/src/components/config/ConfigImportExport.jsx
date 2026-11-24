@@ -7,8 +7,15 @@ import { Card, Form, Button } from "react-bootstrap";
  * @param {Object} props - Component props
  * @param {Function} props.onExport - Callback when export is triggered
  * @param {Function} props.onImport - Callback when import file is selected
+ * @param {boolean} [props.allowExport=true] - Whether export is enabled (ui.allow_export_json)
+ * @param {boolean} [props.allowImport=true] - Whether import is enabled (ui.allow_import_json)
  */
-function ConfigImportExport({ onExport, onImport }) {
+function ConfigImportExport({
+  onExport,
+  onImport,
+  allowExport = true,
+  allowImport = true,
+}) {
   return (
     <Card>
       <Card.Header>
@@ -19,13 +26,19 @@ function ConfigImportExport({ onExport, onImport }) {
       </Card.Header>
       <Card.Body>
         <div className="mb-3">
-          <Button variant="success" className="w-100 mb-2" onClick={onExport}>
+          <Button
+            variant="success"
+            className="w-100 mb-2"
+            onClick={onExport}
+            disabled={!allowExport}
+          >
             <i className="bi bi-download me-1"></i>
             Export Configuration
           </Button>
           <Form.Text className="d-block">
-            Download current configuration as JSON file (includes Uptime Kuma
-            settings)
+            {allowExport
+              ? "Download current configuration as JSON file (includes Uptime Kuma settings)"
+              : "Export is disabled (ui.allow_export_json)"}
           </Form.Text>
         </div>
 
@@ -35,10 +48,13 @@ function ConfigImportExport({ onExport, onImport }) {
             accept=".json"
             onChange={onImport}
             id="importFile"
+            disabled={!allowImport}
             aria-label="Import configuration file"
           />
           <Form.Text className="d-block mt-2">
-            Upload configuration JSON file to restore all settings
+            {allowImport
+              ? "Upload configuration JSON file to restore all settings"
+              : "Import is disabled (ui.allow_import_json)"}
           </Form.Text>
         </div>
       </Card.Body>
