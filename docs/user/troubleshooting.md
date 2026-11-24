@@ -149,8 +149,9 @@ counts only threads that are running on a CPU, so idle threads don't dominate th
 docker exec -it docker-autoheal python -m profiling.sampling attach --live --mode cpu -a 1
 ```
 
-For a sample you can save, use `--pstats` for a table or `--flamegraph` for an HTML flame graph,
-and write it to a file inside the container. Copy it to the host with `docker cp`:
+For a sample you can save, use `--pstats` for a binary profile file or `--flamegraph` for an HTML
+flame graph, and write it to a file inside the container. Copy it to the host with `docker cp`.
+Read a `.pstats` file with `python -m pstats`, and open the flame graph in a browser:
 
 ```bash
 docker exec docker-autoheal python -m profiling.sampling attach --mode cpu --pstats \
@@ -176,10 +177,18 @@ before you post it anyway.
 
 The tools attach to the process the way a debugger does. The image runs as root (it has no
 `USER` instruction), and Docker's default capabilities don't include `SYS_PTRACE`. If a command
-fails with `Operation not permitted` or a ptrace error, you can't fix it on the hung container:
-adding a capability means recreating the container, which starts a new PID 1 and discards the
-hang you are investigating. Add the capability in your Compose file so the next occurrence can be
-inspected, then recreate the container during a maintenance window:
+fails with `Operation not permitted` or a ptrace error, retry that command with `--privileged` on
+`docker exec`. This gives only that command extended privileges, including `SYS_PTRACE`, without
+recreating the container, so the hung process is preserved. It is broad, so use it only while
+diagnosing:
+
+```bash
+docker exec --privileged docker-autoheal python -m asyncio pstree 1
+```
+
+Don't recreate the container while the hang is still there, because a new PID 1 discards the
+hung process. To prepare for the next occurrence, add the capability in your Compose file and
+recreate the container during a maintenance window:
 
 ```yaml
 services:
