@@ -36,6 +36,13 @@ Autoheal logs around the time of the issue. Please redact any secrets or sensiti
 paste logs here
 ```
 
+## Hangs or high CPU (optional)
+
+If Autoheal stops healing or uses high CPU, paste the output of
+`docker exec docker-autoheal python -m asyncio pstree 1` and
+`docker exec docker-autoheal python -m profiling.sampling dump -a 1`.
+The Troubleshooting guide has more detail on these commands.
+
 ## Additional context (optional)
 
 Anything else that might help, e.g. relevant configuration, labels, or container health status.
