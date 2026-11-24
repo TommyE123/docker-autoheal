@@ -1,10 +1,10 @@
 """Integration test for ConfigManager's real first-boot flow (issue #101).
 
-A fresh deployment's config is defined twice, independently: once as a
-hand-maintained dict in init_defaults.get_default_config(), and once as the
-actual schema in AutoHealConfig's own Pydantic field defaults.
-ConfigManager._load_config() reads the former back through the latter, but
-nothing has ever exercised that round trip end-to-end - every other test
+A fresh deployment's config is produced by init_defaults.get_default_config(),
+which derives it from AutoHealConfig's own Pydantic field defaults (plus the
+separately stored custom_health_checks). ConfigManager._load_config() reads
+that file back through the same models, but nothing has ever exercised that
+round trip end-to-end - every other test
 uses the isolated_config_manager fixture, which bypasses
 __init__/_ensure_data_directory/initialize_defaults/_load_config entirely by
 directly assigning `_config = AutoHealConfig()`.
@@ -106,12 +106,10 @@ def _redirect_manager_paths(monkeypatch, data_dir: Path) -> None:
 
 def test_first_boot_on_empty_data_dir_matches_autohealconfig_defaults(monkeypatch, tmp_path):
     """A real ConfigManager() constructed against a brand-new, empty data
-    directory must produce exactly what a bare AutoHealConfig() would -
-    proving get_default_config()'s hand-maintained dict and AutoHealConfig's
-    own Pydantic defaults haven't drifted apart. If a future required field
-    (or a renamed key) is added to one but not the other, this fails loudly
-    instead of a real user's first boot silently absorbing the mismatch or
-    crashing without warning."""
+    directory must produce exactly what a bare AutoHealConfig() would.
+    get_default_config() is derived from the models, so this also guards the
+    load path: if the written file and the loaded config ever diverge, a real
+    user's first boot would silently absorb the mismatch."""
     _redirect_manager_paths(monkeypatch, tmp_path)
 
     manager = ConfigManager()
@@ -123,20 +121,19 @@ def test_first_boot_on_empty_data_dir_matches_autohealconfig_defaults(monkeypatc
     assert (tmp_path / "config.json").exists()
 
 
-def test_get_default_config_keys_match_autohealconfig_schema():
-    """Direct schema-parity check, catching drift in the direction the
-    empty-dir equality test above cannot: a future typo, renamed key, stray
-    extra key, or silently-omitted key in get_default_config() - at the top
-    level or nested inside a section - would be silently papered over by
-    AutoHealConfig(**sections) (Pydantic ignores unknown fields and defaults
-    missing ones, neither raises), so that test would still pass even
-    though the defaults dict no longer matches the real schema.
-    custom_health_checks is deliberately excluded - it's popped and parsed
-    separately before AutoHealConfig is ever constructed, not a field of
-    AutoHealConfig itself."""
-    _assert_keys_match_model_fields(
-        _valid_top_level_config(), AutoHealConfig, "get_default_config()"
-    )
+def test_get_default_config_is_derived_from_autohealconfig():
+    """The first-boot defaults are the model's own dump, so drift between the
+    two is impossible by construction. The only extra key is
+    custom_health_checks, which is stored outside the model on purpose. The
+    result must also validate as AutoHealConfig, so a file written from it
+    can always be loaded back."""
+    config = get_default_config()
+
+    assert config == {
+        **AutoHealConfig().model_dump(mode="json"),
+        "custom_health_checks": {},
+    }
+    assert AutoHealConfig.model_validate(_valid_top_level_config()) == AutoHealConfig()
 
 
 def test_config_loader_registry_matches_autohealconfig_sections():

@@ -8,78 +8,22 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from app.config.config_models import AutoHealConfig
+
 logger = logging.getLogger(__name__)
 
 
 def get_default_config() -> dict[str, Any]:
-    """Get default configuration dictionary"""
-    return {
-        "monitor": {
-            "interval_seconds": 30,
-            "label_key": "autoheal",
-            "label_value": "true",
-            "include_all": False,
-        },
-        "containers": {
-            "selected": [],
-            "excluded": [],
-            "restart_counts": {},
-            "restart_history": {},
-        },
-        "restart": {
-            "mode": "on-failure",
-            "cooldown_seconds": 60,
-            "max_restarts": 3,
-            "max_restarts_window_seconds": 600,
-            "backoff": {
-                "enabled": True,
-                "initial_seconds": 10,
-                "multiplier": 2.0,
-                "max_seconds": 300,
-            },
-            "respect_manual_stop": True,
-        },
-        "filters": {
-            "whitelist_names": [],
-            "blacklist_names": [],
-            "whitelist_labels": [],
-            "blacklist_labels": [],
-        },
-        "ui": {
-            "enable": True,
-            "listen_address": "0.0.0.0",  # noqa: S104 - the container must listen on all interfaces
-            "listen_port": 3131,
-            "allow_export_json": True,
-            "allow_import_json": True,
-            "max_log_entries": 50,
-        },
-        "alerts": {"enabled": True, "webhook": None, "notify_on_quarantine": True},
-        "observability": {
-            "prometheus_enabled": True,
-            "metrics_port": 9090,
-            "log_format": "json",
-            "log_level": "INFO",
-        },
-        "uptime_kuma": {
-            "enabled": False,
-            "server_url": "",
-            "username": "",
-            "api_token": "",
-            "auto_restart_on_down": True,
-        },
-        "uptime_kuma_mappings": [],
-        "notifications": {
-            "enabled": False,
-            "services": [],
-            "event_filters": [
-                "restart",
-                "quarantine",
-                "auto_unquarantine",
-                "auto_monitor",
-            ],
-        },
-        "custom_health_checks": {},
-    }
+    """Get the first-boot default configuration.
+
+    Derived from the Pydantic models in ``app.config.config_manager`` so the
+    defaults are declared once. ``custom_health_checks`` is stored outside the
+    model and is therefore added here explicitly.
+
+    """
+    config: dict[str, Any] = AutoHealConfig().model_dump(mode="json")
+    config["custom_health_checks"] = {}
+    return config
 
 
 def get_default_events() -> list:
