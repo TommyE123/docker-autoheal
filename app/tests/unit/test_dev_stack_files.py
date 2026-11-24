@@ -210,6 +210,7 @@ def test_image_health_check_probes_without_curl():
     lines = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8").splitlines()
 
     assert lines[0] == "# syntax=docker/dockerfile:1"
+    assert lines[1] == "# check=error=true"
     dockerfile = "\n".join(lines)
     assert "curl" not in dockerfile
     assert re.search(r"^HEALTHCHECK .*--start-interval=5s", dockerfile, re.MULTILINE)
@@ -225,7 +226,8 @@ def test_image_sets_unbuffered_python_and_oci_labels():
     """Unbuffered logs and OCI labels come from the image, not from Compose or the build."""
     dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
 
-    assert re.search(r"^ENV PYTHONUNBUFFERED=1$", dockerfile, re.MULTILINE)
+    assert re.search(r"^ENV PYTHONUNBUFFERED=1\b", dockerfile, re.MULTILINE)
+    assert re.search(r"^\s+PYTHONDONTWRITEBYTECODE=1$", dockerfile, re.MULTILINE)
     assert "org.opencontainers.image.source=" in dockerfile
     assert "org.opencontainers.image.description=" in dockerfile
     assert "maintainer=" not in dockerfile

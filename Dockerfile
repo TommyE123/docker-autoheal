@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1
+# check=error=true
 # Multi-stage Dockerfile for Docker Autoheal with React UI
 
 # ============================================
@@ -32,8 +33,10 @@ LABEL org.opencontainers.image.description="Automated container monitoring and h
       org.opencontainers.image.authors="Docker Autoheal" \
       org.opencontainers.image.source="https://github.com/TommyE123/docker-autoheal"
 
-# Unbuffered stdout/stderr, so logs reach `docker logs` without Compose or other orchestrators
-ENV PYTHONUNBUFFERED=1
+# Unbuffered stdout/stderr, so logs reach `docker logs` without Compose or other orchestrators.
+# No .pyc files, so the image doesn't carry compiled copies of the app that nothing reuses.
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
 
 # Set working directory
 WORKDIR /app
