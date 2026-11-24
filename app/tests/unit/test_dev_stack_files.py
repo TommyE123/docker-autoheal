@@ -245,7 +245,8 @@ def test_image_health_probe_ignores_http_proxy_variables():
     try:
         port = server.server_address[1]
         script = probe.replace("localhost:3131", f"localhost:{port}")
-        env = {"PATH": "/usr/bin:/bin", "HTTP_PROXY": "http://127.0.0.1:9", "http_proxy": ""}
+        # Only the uppercase variable: an empty lowercase http_proxy takes precedence and hides the bug.
+        env = {"PATH": "/usr/bin:/bin", "HTTP_PROXY": "http://127.0.0.1:9"}
         result = subprocess.run(  # noqa: S603
             [sys.executable, "-c", script],
             capture_output=True,
