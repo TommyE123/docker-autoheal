@@ -881,6 +881,7 @@ async def test_start_stop_lifecycle_delivers_queued_notification(
     await instance.start()
     assert instance._running is True
     assert instance._worker_task is not None
+    assert instance._worker_task.get_name() == "notification-worker"
     started_session = fake_session(instance)
 
     await instance.send_event_notification(_make_event("restart"))
