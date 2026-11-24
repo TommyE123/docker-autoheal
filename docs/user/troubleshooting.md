@@ -132,9 +132,9 @@ workers, which run outside the event loop):
 docker exec docker-autoheal python -m profiling.sampling dump -a 1
 ```
 
-To see the stacks of the asyncio tasks that are running right now, use `--async-aware`. It
-prints nothing for tasks that are blocked, so it is no use for a deadlock; use `pstree` for that.
-Don't combine it with `-a`, which the tool rejects.
+To see the stacks of the asyncio tasks, use `--async-aware`. By default it includes tasks that
+are waiting. Add `--async-mode running` to show only the task that is running right now. Don't
+combine it with `-a`, which the tool rejects. For the await chain of a deadlock, use `pstree`.
 
 ```bash
 docker exec docker-autoheal python -m profiling.sampling dump --async-aware 1
