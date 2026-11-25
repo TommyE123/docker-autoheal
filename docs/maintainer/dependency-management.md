@@ -62,7 +62,8 @@ Trade-offs:
   and base image updates skip the seven-day minimum release age
   (`minimumReleaseAgeBehaviour: timestamp-optional`). The rule is scoped to
   `.devcontainer/devcontainer.json` and `.devcontainer/Dockerfile`, so it does not change the wait
-  for production images. The Python runtime group has a separate exception, described below. Those
+  for production image version updates. Docker digest refreshes and the Python runtime group have
+  separate exceptions, described in "Dependency update policy" and below. Those
   Dev Container updates are major or minor, so they need a manual merge, and the
   `Build and test Dev Container` check runs on each one.
 
@@ -140,6 +141,18 @@ cleared this window instead of selecting a newer, still-pending release. Securit
 bypass the minimum release age so that vulnerability fixes are not delayed.
 The Python runtime group is the exception and has no minimum release age (see
 "Python runtime version updates").
+
+Docker digest refreshes of a tag already in use, such as a new digest for `node:26-alpine`, are
+the other exception. Renovate's job log for the `node:26-alpine` digest bump reported no release
+timestamp for it, and with the default `minimumReleaseAgeBehaviour: "timestamp-required"`
+Renovate holds an update without a timestamp for ever: the `renovate/stability-days` status stays
+pending and never clears. A package rule matching the `docker` datasource and the `digest` and
+`pinDigest` update types sets `minimumReleaseAgeBehaviour: "timestamp-optional"`, so a refresh
+with no timestamp is raised without an age check. Where Renovate does supply a timestamp, the
+seven-day wait still applies. Version updates keep the seven-day wait. Digest updates are never
+automerged, so each one still needs a manual merge.
+`test_renovate_digest_updates_skip_release_age_check` in `app/tests/unit/test_dev_stack_files.py`
+fails if the rule is removed or placed before the general `minimumReleaseAge` rule.
 
 Two things run only on Saturdays: regular FastAPI updates (a `packageRules` entry with
 `schedule: ["* * * * 6"]`) and lockfile maintenance (`lockFileMaintenance`, Saturdays from
