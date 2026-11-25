@@ -8,7 +8,7 @@ import os
 import signal
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import uvicorn
 from prometheus_client import Counter, Gauge, start_http_server
@@ -22,6 +22,7 @@ from app.notifications.notification_manager import notification_manager
 from app.utils.log_level import apply_log_level
 
 if TYPE_CHECKING:
+    from collections.abc import Coroutine
     from types import FrameType
     from wsgiref.simple_server import WSGIServer
 
@@ -49,6 +50,13 @@ logger.info("Logging to: %s", LOG_FILE)
 # How long a stop waits for a startup in progress before cancelling it. Kept under Docker's
 # default 10 second stop timeout so a hung startup can't hold the shutdown until SIGKILL.
 STARTUP_STOP_GRACE_SECONDS = 5.0
+
+# How long uvicorn waits for in-flight API requests on shutdown before cancelling them. On
+# SIGTERM uvicorn closes its listeners, sleeps 0.1s, waits up to this long for in-flight
+# requests, then re-raises SIGTERM, so `AutoHealService.stop()` runs strictly afterwards and
+# the durations add up: 0.1s + this + the service stop (its engine and notification steps
+# overlap, each bounded at 5s) has to fit inside Docker's default 10 second stop timeout.
+UVICORN_GRACEFUL_SHUTDOWN_SECONDS = 3  # uvicorn types this setting as an int
 
 
 class CancelledErrorFilter(logging.Filter):
@@ -269,16 +277,33 @@ class AutoHealService:
                 except Exception as e:
                     logger.warning("Error stopping Uptime-Kuma monitor: %s", e, exc_info=True)
 
+            # The engine and the notification manager stop concurrently, so the engine's
+            # event-reader join (up to 5s) and the notification drain (up to 5s) overlap rather
+            # than add up. No notification is lost by this: the producers are the engine's
+            # monitor-loop and event-listener tasks (on SIGTERM, uvicorn has already finished or
+            # cancelled the API requests that also send one), and `MonitoringEngine.stop()`
+            # cancels both tasks before its first await. With the engine first, gather() runs
+            # that step before the notification manager's first step sets `_stopping`, so
+            # neither task can resume to send a notification after the drain starts: each gets
+            # CancelledError at its next await. Keep the engine first. The event-reader thread
+            # joined after the cancellation only hands events to the cancelled listener; it
+            # sends nothing.
+            steps: list[tuple[str, Coroutine[Any, Any, None]]] = []
             if self.monitoring_engine:
-                try:
-                    await self.monitoring_engine.stop()
-                except Exception as e:
-                    logger.warning("Error stopping monitoring engine: %s", e, exc_info=True)
+                steps.append(("monitoring engine", self.monitoring_engine.stop()))
+            steps.append(("notification manager", self.notification_manager.stop()))
+            results = await asyncio.gather(*(stop for _, stop in steps), return_exceptions=True)
 
-            try:
-                await self.notification_manager.stop()
-            except Exception as e:
-                logger.warning("Error stopping notification manager: %s", e, exc_info=True)
+            # Log every failed step, then re-raise a cancellation (a BaseException) so it still
+            # propagates, after the cleanup in `finally`
+            interrupted: BaseException | None = None
+            for (name, _), result in zip(steps, results, strict=True):
+                if isinstance(result, Exception):
+                    logger.warning("Error stopping %s: %s", name, result, exc_info=result)
+                elif isinstance(result, BaseException) and interrupted is None:
+                    interrupted = result
+            if interrupted is not None:
+                raise interrupted
         finally:
             self._stopped = True
             self._close_metrics_server()
@@ -367,6 +392,7 @@ async def run_api_server() -> None:
         log_level="warning",  # Set to warning to suppress info logs
         access_log=False,  # Completely disable access logs
         log_config=None,  # Use default logging config
+        timeout_graceful_shutdown=UVICORN_GRACEFUL_SHUTDOWN_SECONDS,
     )
 
     server = uvicorn.Server(uvicorn_config)

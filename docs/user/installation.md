@@ -78,6 +78,29 @@ If `/data` isn't writable, the service falls back to `./data` relative to its wo
 directory inside the container — but without a volume mount, that state is lost when the
 container is removed.
 
+## Shutdown
+
+`docker stop` sends `SIGTERM`, then `SIGKILL` once the stop timeout runs out (10 seconds by
+default). Docker Autoheal shuts down in two steps, one after the other:
+
+1. The web server stops accepting connections and gives requests already in progress up to
+   3 seconds to finish, then cancels the rest.
+2. The service stops the Uptime Kuma monitor, then stops the monitoring and delivers queued
+   notifications side by side. Each of those two waits is capped at 5 seconds.
+
+That adds up to about 8 seconds, which normally fits in Docker's default. The log line
+`Docker Autoheal stopped` shows a clean shutdown; notifications still queued when the 5 seconds
+run out are dropped, with a warning in the log.
+
+The deadline is not guaranteed. Some work runs in background worker threads, for example a
+manual container restart from the web UI or a Docker call made by a monitoring check. Cancelling
+the request or the monitoring does not stop that thread, and the Python runtime waits for those
+threads before the process exits, so the process can still outlive the stop timeout and be
+killed by Docker. This is a known limitation of the current shutdown.
+
+To give it more time, raise the stop timeout with `stop_grace_period` in Compose (see the
+commented example in `docker-compose.yml`) or `docker stop --time <seconds>`.
+
 ## Try it with a sample container
 
 ```bash

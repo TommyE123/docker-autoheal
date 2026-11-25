@@ -95,6 +95,16 @@ database — all state is JSON files under `/data`.
    out other coroutines on the event loop thread); awaited work comes first. `update_config()`
    always keeps the live `containers.restart_counts` and `containers.restart_history`.
 
+5. **Shutdown** (`app/main.py`): on `SIGTERM`, uvicorn's signal handler runs first. It waits up
+   to `UVICORN_GRACEFUL_SHUTDOWN_SECONDS` for in-flight requests, cancels the rest, and only then
+   re-raises the signal, which starts `AutoHealService.stop()`. That stops the Uptime Kuma monitor,
+   then the monitoring engine and the `NotificationManager` concurrently. The engine is passed to
+   `asyncio.gather()` first and cancels its monitor-loop and event-listener tasks before it first
+   awaits, so neither can send a notification once the manager has begun draining its queue. The
+   budget and its limits are described in
+   [Installation: Shutdown](../user/installation.md#shutdown): worker threads started with
+   `asyncio.to_thread` are not stopped by cancellation, and `asyncio.run()` waits for them at exit.
+
 ## Stable container identity
 
 Because container IDs (and often names) change when a container is recreated, the

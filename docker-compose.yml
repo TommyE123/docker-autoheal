@@ -8,6 +8,10 @@ services:
     build: .
     container_name: docker-autoheal
     restart: unless-stopped
+    # Shutdown budget: up to ~3s for in-flight API requests, then up to ~5s to stop the
+    # monitoring and deliver queued notifications, inside Docker's default 10s stop timeout.
+    # Raise it if the container is killed before "Docker Autoheal stopped" is logged.
+    # stop_grace_period: 10s
 
     # Mount Docker socket to access Docker API
     volumes:

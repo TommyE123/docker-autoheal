@@ -10,11 +10,13 @@ duplicating startup-success coverage already provided there.
 
 import asyncio
 import signal
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 import app.main as main_module
+from app.config.config_manager import AutoHealEvent
 from app.main import (
     AutoHealService,
     CancelledErrorFilter,
@@ -23,6 +25,7 @@ from app.main import (
     signal_handler,
 )
 from app.notifications.notification_manager import NotificationManager
+from app.tests.unit.conftest import wait_until
 
 
 def current_task_name() -> str:
@@ -220,6 +223,239 @@ class TestAutoHealServiceStop:
         [record] = [r for r in caplog.records if r.levelname == "WARNING"]
         assert record.exc_info is not None
         assert isinstance(record.exc_info[1], RuntimeError)
+
+
+class TestConcurrentShutdown:
+    """The engine and notification manager stop together, so their bounded waits overlap (#296)."""
+
+    @staticmethod
+    def _gated_service():
+        """
+        A service whose engine and notification stops block until their gate is set.
+
+        Returns the service, its Docker client mock, the gates, an event per stop set once it
+        has started, and the names of the stops that were cancelled.
+        """
+        service = AutoHealService()
+        gates = {name: asyncio.Event() for name in ("engine", "notifications")}
+        started = {name: asyncio.Event() for name in gates}
+        cancelled: set[str] = set()
+
+        def gated(name):
+            async def stop():
+                started[name].set()
+                try:
+                    await gates[name].wait()
+                except asyncio.CancelledError:
+                    cancelled.add(name)
+                    raise
+
+            return AsyncMock(side_effect=stop)
+
+        service.monitoring_engine = MagicMock()
+        service.monitoring_engine.stop = gated("engine")
+        service.notification_manager = MagicMock()
+        service.notification_manager.stop = gated("notifications")
+        docker = MagicMock()
+        service.docker_client = docker
+        return service, docker, gates, started, cancelled
+
+    @pytest.mark.asyncio
+    async def test_engine_and_notification_stops_overlap(self):
+        service, docker, gates, started, _cancelled = self._gated_service()
+
+        stop_task = asyncio.create_task(service.stop())
+        # Both stops begin while the other is still blocked: they overlap instead of adding up
+        await asyncio.wait_for(started["engine"].wait(), timeout=5)
+        await asyncio.wait_for(started["notifications"].wait(), timeout=5)
+        assert not stop_task.done()
+        docker.close.assert_not_called()
+
+        gates["notifications"].set()
+        await asyncio.sleep(0)
+        assert not stop_task.done()  # still waiting for the engine
+
+        gates["engine"].set()
+        await asyncio.wait_for(stop_task, timeout=5)
+        docker.close.assert_called_once()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("failing", ["engine", "notifications"])
+    async def test_a_failing_stop_does_not_cut_the_other_short(self, failing, caplog):
+        service, docker, gates, started, _cancelled = self._gated_service()
+        other = "notifications" if failing == "engine" else "engine"
+        component = {
+            "engine": service.monitoring_engine,
+            "notifications": service.notification_manager,
+        }
+        component[failing].stop.side_effect = RuntimeError(f"{failing} boom")
+
+        with caplog.at_level("WARNING", logger="app.main"):
+            stop_task = asyncio.create_task(service.stop())
+            await asyncio.wait_for(started[other].wait(), timeout=5)
+            await asyncio.sleep(0)
+            # The failure is not reported, nor the client closed, until the other stop ends
+            assert not stop_task.done()
+            docker.close.assert_not_called()
+
+            gates[other].set()
+            await asyncio.wait_for(stop_task, timeout=5)
+
+        component[other].stop.assert_awaited_once()
+        docker.close.assert_called_once()
+        label = {"engine": "monitoring engine", "notifications": "notification manager"}[failing]
+        [record] = [r for r in caplog.records if r.levelname == "WARNING"]
+        assert record.getMessage() == f"Error stopping {label}: {failing} boom"
+        assert record.exc_info is not None
+        assert isinstance(record.exc_info[1], RuntimeError)
+
+    @pytest.mark.asyncio
+    async def test_both_stops_failing_are_both_logged(self, caplog):
+        service = AutoHealService()
+        service.monitoring_engine = MagicMock()
+        service.monitoring_engine.stop = AsyncMock(side_effect=RuntimeError("engine boom"))
+        service.notification_manager = MagicMock()
+        service.notification_manager.stop = AsyncMock(side_effect=ValueError("notif boom"))
+        service.docker_client = MagicMock()
+
+        with caplog.at_level("WARNING", logger="app.main"):
+            await service.stop()
+
+        service.docker_client.close.assert_called_once()
+        assert [r.getMessage() for r in caplog.records if r.levelname == "WARNING"] == [
+            "Error stopping monitoring engine: engine boom",
+            "Error stopping notification manager: notif boom",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_cancelled_step_propagates_after_the_other_failure_is_logged(self, caplog):
+        service = AutoHealService()
+        service.monitoring_engine = MagicMock()
+        service.monitoring_engine.stop = AsyncMock(side_effect=asyncio.CancelledError)
+        service.notification_manager = MagicMock()
+        service.notification_manager.stop = AsyncMock(side_effect=RuntimeError("notif boom"))
+        service.docker_client = MagicMock()
+
+        with caplog.at_level("WARNING", logger="app.main"), pytest.raises(asyncio.CancelledError):
+            await service.stop()
+
+        service.docker_client.close.assert_called_once()
+        assert service._stopped is True
+        assert [r.getMessage() for r in caplog.records if r.levelname == "WARNING"] == [
+            "Error stopping notification manager: notif boom"
+        ]
+
+    @pytest.mark.asyncio
+    async def test_both_steps_cancelled_still_propagates_and_closes_docker(self):
+        service = AutoHealService()
+        service.monitoring_engine = MagicMock()
+        service.monitoring_engine.stop = AsyncMock(side_effect=asyncio.CancelledError)
+        service.notification_manager = MagicMock()
+        service.notification_manager.stop = AsyncMock(side_effect=asyncio.CancelledError)
+        service.docker_client = MagicMock()
+
+        with pytest.raises(asyncio.CancelledError):
+            await service.stop()
+
+        service.docker_client.close.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_cancelling_shutdown_cancels_both_stops_and_closes_docker(self):
+        service, docker, _gates, started, cancelled = self._gated_service()
+
+        stop_task = asyncio.create_task(service.stop())
+        await asyncio.wait_for(started["engine"].wait(), timeout=5)
+        await asyncio.wait_for(started["notifications"].wait(), timeout=5)
+
+        stop_task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await stop_task
+
+        assert cancelled == {"engine", "notifications"}
+        docker.close.assert_called_once()
+        assert service._stopped is True
+
+
+class TestShutdownNotificationSafety:
+    """Stopping the engine and the notification manager together loses no notification (#296)."""
+
+    @pytest.mark.asyncio
+    async def test_cancelled_producer_never_sends_while_queued_notification_is_drained(
+        self, engine, monkeypatch, update_config, caplog
+    ):
+        update_config(lambda config: setattr(config.notifications, "enabled", True))
+        update_config(lambda config: setattr(config.notifications, "event_filters", []))
+        monkeypatch.setattr(
+            "app.notifications.notification_manager.aiohttp.ClientSession",
+            MagicMock(return_value=MagicMock(close=AsyncMock())),
+        )
+
+        # A real manager whose only fake part is the sender, held until `send_gate` opens
+        manager = NotificationManager()
+        send_gate = asyncio.Event()
+        delivered: list[str] = []
+
+        async def fake_send(event):
+            await send_gate.wait()
+            delivered.append(event.container_name)
+
+        monkeypatch.setattr(manager, "_process_notification", fake_send)
+        await manager.start()
+
+        def event(name):
+            return AutoHealEvent(
+                timestamp=datetime.now(UTC),
+                container_name=name,
+                container_id=name,
+                event_type="restart",
+                restart_count=1,
+                status="success",
+                message=name,
+            )
+
+        unwind_gate = asyncio.Event()
+        producer_gate = asyncio.Event()
+
+        async def monitor_loop():
+            # Unwinds slowly once cancelled, so `stop()` is still awaiting it when the
+            # notification manager starts draining
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                await unwind_gate.wait()
+                raise
+
+        async def event_listener():
+            # Would send a notification as soon as its gate opens, unless cancelled first
+            await producer_gate.wait()
+            await manager.send_event_notification(event("late"))
+
+        engine._running = True
+        engine._task = asyncio.create_task(monitor_loop())
+        engine._event_task = asyncio.create_task(event_listener())
+        await asyncio.sleep(0)
+
+        await manager.send_event_notification(event("early"))
+
+        service = AutoHealService()
+        service.monitoring_engine = engine
+        service.notification_manager = manager
+
+        with caplog.at_level("WARNING"):
+            stop_task = asyncio.create_task(service.stop())
+            await wait_until(lambda: manager._stopping)
+            # The producer would now run if it had not been cancelled
+            producer_gate.set()
+            for _ in range(5):
+                await asyncio.sleep(0)
+            unwind_gate.set()
+            send_gate.set()
+            await asyncio.wait_for(stop_task, timeout=5)
+
+        assert engine._event_task.cancelled()
+        assert delivered == ["early"]  # queued before the stop, delivered by the drain
+        assert not [r for r in caplog.records if "dropping notification" in r.getMessage()]
+        assert not [r for r in caplog.records if "undelivered" in r.getMessage()]
 
 
 class TestAutoHealServiceStartFailure:
@@ -775,6 +1011,7 @@ class TestRunApiServer:
                 log_level="warning",
                 access_log=False,
                 log_config=None,
+                timeout_graceful_shutdown=main_module.UVICORN_GRACEFUL_SHUTDOWN_SECONDS,
             )
             mock_uvicorn.Server.assert_called_once_with(mock_uvicorn.Config.return_value)
             mock_server_instance.serve.assert_awaited_once()
