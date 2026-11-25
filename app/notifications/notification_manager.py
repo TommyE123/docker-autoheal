@@ -18,7 +18,6 @@ from urllib.parse import urlsplit
 
 import aiohttp
 import requests
-from requests.utils import requote_uri
 
 from app.config.config_manager import AutoHealEvent, NotificationService, config_manager
 
@@ -74,24 +73,26 @@ def _mask_secrets(text: str, service: Any) -> str:
     return _URL_IN_TEXT.sub("***", text)
 
 
-def _prepared_target(url: str) -> str:
-    """Path and query of ``url`` as ``requests`` prepares (and later prints) it."""
-    prepared = requests.models.PreparedRequest()
-    prepared.prepare_url(url, None)
-    return prepared.path_url
+def _target_variants(url: str) -> set[str]:
+    """Path-and-query spellings of ``url`` that an error message can print."""
+    variants: set[str] = set()
+    with suppress(ValueError):  # a malformed URL must not hide the failure reason
+        parts = urlsplit(url)
+        variants.add(parts.path + (f"?{parts.query}" if parts.query else ""))
+    # requests prints the form it prepares (%7E -> ~, %2f -> %2F), which can differ from the config.
+    with suppress(ValueError):  # requests' URL errors are ValueErrors
+        prepared = requests.models.PreparedRequest()
+        prepared.prepare_url(url, None)
+        variants.add(prepared.path_url)
+    return variants
 
 
 def mask_url_secrets(text: str, url: str | None) -> str:
     """Mask ``url`` (and any other URL) in ``text``, for logging a webhook failure."""
-    # requests prints only the path and query of the URL ("Max retries exceeded with url: /..."),
-    # in the form it normalises to (%7E -> ~, %2f -> %2F), so mask the prepared form as well.
-    with suppress(ValueError, requests.RequestException):  # a bad URL must not hide the failure
-        parts = urlsplit(url or "")
-        target = parts.path + (f"?{parts.query}" if parts.query else "")
-        variants = {target, requote_uri(target), _prepared_target(url or "")}
-        for variant in sorted(variants, key=len, reverse=True):
-            if len(variant) > 1:
-                text = text.replace(variant, "***")
+    # requests prints only the path and query of the URL ("Max retries exceeded with url: /...").
+    for variant in _target_variants(url) if url else ():
+        if len(variant) > 1:
+            text = text.replace(variant, "***")
     return _mask_secrets(text, SimpleNamespace(url=url))
 
 

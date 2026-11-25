@@ -2095,6 +2095,8 @@ def test_mask_url_secrets_hides_url_parts(url, text, hidden):
         ("http://hooks.invalid/a", "bad url: /a", "bad url: ***"),
         # With no URL configured the text is left alone, not matched against a placeholder.
         (None, "XXXX stays", "XXXX stays"),
+        # A URL requests rejects (bad port) still has its raw path and query masked.
+        ("http://hooks.invalid:bad/p?q=SECRET", "oops: /p?q=SECRET", "oops: ***"),
         # A URL that urlsplit accepts but requests rejects still masks the full URL.
         ("http:///SECRET", "failed: http:///SECRET", "failed: ***"),
     ],
