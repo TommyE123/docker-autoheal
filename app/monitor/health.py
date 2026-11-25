@@ -277,24 +277,39 @@ class HealthEvaluator:
         if custom_hc:
             result = await self.perform_custom_health_check(container, custom_hc)
             self._note_custom_check_result(info, custom_hc.check_type, skipped=result is None)
-            # A check that could not run says nothing about health, so it is not counted
-            if result is not None:
+            # A check that could not run says nothing about health, so it is not counted. A
+            # "docker" check reads the Docker status that is counted below instead.
+            is_docker_check = custom_hc.check_type == "docker"
+            if result is not None and not is_docker_check:
                 record_health_check(_metric_label(info), failed=not result)
             if result is False:
+                if is_docker_check:
+                    self._record_native_health(info)
                 return f"Custom health check failed ({custom_hc.check_type})"
         else:
             self._skipped_checks.pop(info["full_id"], None)
 
-        # Then check Docker native health. Only a healthy or unhealthy status is a check
-        # result: "starting" means Docker has none yet.
-        health = info.get("health")
-        native_status = health.get("status") if health else None
-        if native_status in _NATIVE_HEALTH_RESULTS:
-            unhealthy = native_status == "unhealthy"
-            record_health_check(_metric_label(info), failed=unhealthy)
-            if unhealthy:
-                return "Docker health check reports unhealthy"
+        # Then check Docker native health
+        if self._record_native_health(info):
+            return "Docker health check reports unhealthy"
         return None
+
+    @staticmethod
+    def _record_native_health(info: dict) -> bool:
+        """
+        Count the Docker native health status as one check, when it is a check result
+        Args:
+            info: Container information dict
+        Returns:
+            True when the status is unhealthy. "starting" means Docker has no result yet.
+        """
+        health = info.get("health")
+        status = health.get("status") if health else None
+        if status not in _NATIVE_HEALTH_RESULTS:
+            return False
+        unhealthy = status == "unhealthy"
+        record_health_check(_metric_label(info), failed=unhealthy)
+        return unhealthy
 
     def forget_absent(self, listed_ids: set[str | None]) -> None:
         """

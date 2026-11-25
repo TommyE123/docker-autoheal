@@ -259,6 +259,69 @@ class TestHealthCheckCounters:
         assert delta.checked() == 2
         assert delta.check_failures() == 1
 
+    async def test_docker_type_custom_check_counts_the_native_status_once(
+        self, engine, docker_client, update_config
+    ):
+        use_mode(update_config, "health")
+        add_check("metrics-hc-docker-ok", "docker")
+        docker_client.native_health["metrics-hc-docker-ok"] = "healthy"
+        container, info = make_container(name="metrics-hc-docker-ok", health={"status": "healthy"})
+        delta = Delta("metrics-hc-docker-ok")
+
+        needs_restart, _ = await engine._evaluate_container_health(container, info)
+
+        assert needs_restart is False
+        assert delta.checked() == 1
+        assert delta.check_failures() == 0
+
+    async def test_docker_type_custom_check_without_a_healthcheck_is_not_counted(
+        self, engine, update_config
+    ):
+        use_mode(update_config, "health")
+        add_check("metrics-hc-docker-none", "docker")
+        container, info = make_container(name="metrics-hc-docker-none", health=None)
+        delta = Delta("metrics-hc-docker-none")
+
+        needs_restart, _ = await engine._evaluate_container_health(container, info)
+
+        assert needs_restart is False
+        assert delta.checked() == 0
+        assert delta.check_failures() == 0
+
+    async def test_docker_type_custom_check_counts_an_unhealthy_status_once(
+        self, engine, docker_client, update_config
+    ):
+        use_mode(update_config, "health")
+        add_check("metrics-hc-docker-bad", "docker")
+        docker_client.native_health["metrics-hc-docker-bad"] = "unhealthy"
+        container, info = make_container(
+            name="metrics-hc-docker-bad", health={"status": "unhealthy"}
+        )
+        delta = Delta("metrics-hc-docker-bad")
+
+        needs_restart, reason = await engine._evaluate_container_health(container, info)
+
+        assert needs_restart is True
+        assert reason == "Custom health check failed (docker)"
+        assert delta.checked() == 1
+        assert delta.check_failures() == 1
+
+    async def test_docker_type_custom_check_on_a_starting_container_is_not_counted(
+        self, engine, docker_client, update_config
+    ):
+        use_mode(update_config, "health")
+        add_check("metrics-hc-docker-starting", "docker")
+        docker_client.native_health["metrics-hc-docker-starting"] = "starting"
+        container, info = make_container(
+            name="metrics-hc-docker-starting", health={"status": "starting"}
+        )
+        delta = Delta("metrics-hc-docker-starting")
+
+        await engine._evaluate_container_health(container, info)
+
+        assert delta.checked() == 0
+        assert delta.check_failures() == 0
+
     async def test_custom_check_that_could_not_run_is_not_counted(
         self, engine, docker_client, update_config
     ):

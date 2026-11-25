@@ -33,7 +33,8 @@ When each metric changes:
   `both` restart modes. Nothing is counted for a container that is still starting, a
   stopped container whose exit code alone decides the outcome (a clean manual stop, or an
   exit-code restart in `both` mode), a Docker status of `starting`, a custom HTTP or TCP
-  check skipped for host networking, or an Uptime Kuma DOWN status.
+  check skipped for host networking, or an Uptime Kuma DOWN status. A custom check of type
+  `docker` reads the same Docker status, so it is counted once, not twice.
 - **`autoheal_health_checks_failed_total`** goes up by one, with the container's name in
   `container_name`, for each of those checks that fails: a custom check that reports the
   container unhealthy or errors, or a Docker status of `unhealthy`. A failed custom check
