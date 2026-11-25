@@ -30,10 +30,8 @@ DISABLE_LINTERS:
   - REPOSITORY_OSV_SCANNER
   - REPOSITORY_SYFT
 
-# Report-only linters (run and report, but never fail the build).
-# ACTION_ZIZMOR runs the auditor persona, which still has findings to fix (issue #244).
-DISABLE_ERRORS_LINTERS:
-  - ACTION_ZIZMOR
+# Report-only linters (run and report, but never fail the build). Currently none.
+DISABLE_ERRORS_LINTERS: []
 
 # ---------------------------------------------------------------------------
 # Global MegaLinter configuration
