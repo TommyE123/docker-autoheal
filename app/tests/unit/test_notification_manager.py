@@ -2084,3 +2084,21 @@ def test_mask_url_secrets_hides_url_parts(url, text, hidden):
 
     assert hidden not in masked
     assert masked.startswith(text.split(":")[0])
+
+
+@pytest.mark.parametrize(
+    ("url", "text", "expected"),
+    [
+        # A one-character target ("/") is not a secret, so it must not be masked.
+        ("http://hooks.invalid/", "keep/this", "keep/this"),
+        # The shortest real target ("/a") is masked, and replaced by exactly "***".
+        ("http://hooks.invalid/a", "bad url: /a", "bad url: ***"),
+        # With no URL configured the text is left alone, not matched against a placeholder.
+        (None, "XXXX stays", "XXXX stays"),
+        # A URL that urlsplit accepts but requests rejects still masks the full URL.
+        ("http:///SECRET", "failed: http:///SECRET", "failed: ***"),
+    ],
+)
+def test_mask_url_secrets_masks_exactly(url, text, expected):
+    """The masked text is exactly the original with each target replaced by ``***``."""
+    assert mask_url_secrets(text, url) == expected
