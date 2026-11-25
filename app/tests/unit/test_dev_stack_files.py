@@ -146,7 +146,7 @@ def test_python_runtime_group_has_no_release_age_after_catch_all_rule():
 
 
 def test_renovate_digest_updates_skip_release_age_check():
-    """Docker digest refreshes have no release timestamp, so the age check must be optional."""
+    """A Docker digest refresh can have no release timestamp, so the age check must be optional."""
     rules = json.loads((REPO_ROOT / "renovate.json").read_text(encoding="utf-8"))["packageRules"]
     catch_all = next(i for i, r in enumerate(rules) if r.get("matchPackageNames") == ["*"])
     digest_rules = [

@@ -158,7 +158,7 @@
       "minimumReleaseAgeBehaviour": "timestamp-optional"
     },
     {
-      "description": "Docker digest refreshes of a tag already in use (for example node:26-alpine) have no release timestamp, so with the default timestamp-required behaviour the seven-day minimum holds them forever and renovate/stability-days never leaves pending. timestamp-optional raises them without an age check. Version updates keep the full minimumReleaseAge because they do have timestamps, and digest PRs still need a manual merge because automerge is patch-only. Keep this after the general minimumReleaseAge rule.",
+      "description": "Docker digest refreshes of a tag already in use (for example node:26-alpine, whose Renovate job log reported no releaseTimestamp) are held forever by the seven-day minimum under the default timestamp-required behaviour, and renovate/stability-days never leaves pending. timestamp-optional raises an update with no timestamp without an age check; where Renovate does supply a timestamp, the seven-day wait still applies. Version updates keep the full minimumReleaseAge because they do have timestamps, and digest PRs still need a manual merge because automerge is patch-only. Keep this after the general minimumReleaseAge rule.",
       "matchDatasources": ["docker"],
       "matchUpdateTypes": ["digest", "pinDigest"],
       "minimumReleaseAgeBehaviour": "timestamp-optional"
