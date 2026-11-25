@@ -145,6 +145,24 @@ def test_python_runtime_group_has_no_release_age_after_catch_all_rule():
         assert scoped_away, f"Rule after the Python group could set its release age: {later}"
 
 
+def test_renovate_digest_updates_skip_release_age_check():
+    """Docker digest refreshes have no release timestamp, so the age check must be optional."""
+    rules = json.loads((REPO_ROOT / "renovate.json").read_text(encoding="utf-8"))["packageRules"]
+    catch_all = next(i for i, r in enumerate(rules) if r.get("matchPackageNames") == ["*"])
+    digest_rules = [
+        i
+        for i, r in enumerate(rules)
+        if r.get("matchDatasources") == ["docker"]
+        and set(r.get("matchUpdateTypes", [])) == {"digest", "pinDigest"}
+        and r.get("minimumReleaseAgeBehaviour") == "timestamp-optional"
+    ]
+
+    assert digest_rules, "No Renovate rule makes the release age optional for Docker digests"
+    assert digest_rules[0] > catch_all
+    # The rule must not also change the release age, or version updates would lose their wait.
+    assert "minimumReleaseAge" not in rules[digest_rules[0]]
+
+
 def test_python_runtime_versions_are_aligned():
     """All Python runtime and tooling targets must use the same version."""
     dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")

@@ -158,6 +158,12 @@
       "minimumReleaseAgeBehaviour": "timestamp-optional"
     },
     {
+      "description": "Docker digest refreshes of a tag already in use (for example node:26-alpine) have no release timestamp, so with the default timestamp-required behaviour the seven-day minimum holds them forever and renovate/stability-days never leaves pending. timestamp-optional raises them without an age check. Version updates keep the full minimumReleaseAge because they do have timestamps, and digest PRs still need a manual merge because automerge is patch-only. Keep this after the general minimumReleaseAge rule.",
+      "matchDatasources": ["docker"],
+      "matchUpdateTypes": ["digest", "pinDigest"],
+      "minimumReleaseAgeBehaviour": "timestamp-optional"
+    },
+    {
       "description": "tommye123/docker-autoheal is this project's own published image, not a third-party dependency. Renovate should not manage it.",
       "matchDatasources": ["docker"],
       "matchPackageNames": ["tommye123/docker-autoheal"],
