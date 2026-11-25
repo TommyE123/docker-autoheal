@@ -1,6 +1,6 @@
-*.pyc
-__pycache__/
-*.py[cod]
+**/*.pyc
+**/__pycache__/
+**/*.py[cod]
 *$py.class
 
 # Virtual environment

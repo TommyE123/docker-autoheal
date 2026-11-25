@@ -8,33 +8,26 @@ updates are reviewed and merged.
 
 ## What Renovate manages
 
-| Ecosystem                       | Files                                                 | Renovate manager                    |
-|---------------------------------|-------------------------------------------------------|-------------------------------------|
-| Python runtime dependencies     | `requirements.txt`                                    | `pip_requirements`                  |
-| Python test dependencies        | `requirements-dev.txt`                                | `pip_requirements`                  |
-| npm dependencies + lockfile     | `frontend/package.json`, `frontend/package-lock.json` | `npm`                               |
-| Docker base images              | `Dockerfile`                                          | `dockerfile`                        |
-| Docker Compose images           | `docker-compose.yml`                                  | `docker-compose`                    |
-| GitHub Actions                  | `.github/workflows/*.yml`                             | `github-actions`                    |
-| Dockerfile apt package versions | `Dockerfile`                                          | `customManagers:dockerfileVersions` |
-| SonarCloud Python version       | `.sonarcloud.properties`                              | custom `regex` manager              |
-| Pyright Python version          | `pyrightconfig.json`                                  | custom `regex` manager              |
-| Ruff Python version             | `.linter-rules/.ruff.toml`                            | custom `regex` manager              |
-| Dev Container features          | `.devcontainer/devcontainer.json`                     | `devcontainer`                      |
-| Dev Container base image        | `.devcontainer/Dockerfile`                            | `dockerfile`                        |
+| Ecosystem                   | Files                                                 | Renovate manager       |
+|-----------------------------|-------------------------------------------------------|------------------------|
+| Python runtime dependencies | `requirements.txt`                                    | `pip_requirements`     |
+| Python test dependencies    | `requirements-dev.txt`                                | `pip_requirements`     |
+| npm dependencies + lockfile | `frontend/package.json`, `frontend/package-lock.json` | `npm`                  |
+| Docker base images          | `Dockerfile`                                          | `dockerfile`           |
+| Docker Compose images       | `docker-compose.yml`                                  | `docker-compose`       |
+| GitHub Actions              | `.github/workflows/*.yml`                             | `github-actions`       |
+| SonarCloud Python version   | `.sonarcloud.properties`                              | custom `regex` manager |
+| Pyright Python version      | `pyrightconfig.json`                                  | custom `regex` manager |
+| Ruff Python version         | `.linter-rules/.ruff.toml`                            | custom `regex` manager |
+| Dev Container features      | `.devcontainer/devcontainer.json`                     | `devcontainer`         |
+| Dev Container base image    | `.devcontainer/Dockerfile`                            | `dockerfile`           |
 
 The standard `config:recommended` preset provides the managers for the main dependency
-ecosystems above. A custom Renovate manager is also enabled for
-pinned versions of apt packages in the `Dockerfile`.
+ecosystems above.
 
 The Dev Container's features, base image and runtime versions are managed too. Only its npm
 linters and `mise` tools float. See
 [Pinned and floating dependencies](#pinned-and-floating-dependencies).
-
-Currently, `curl` is pinned in the `Dockerfile` so that its version can be tracked and updated
-by Renovate. This allows the Dockerfile dependency to receive a normal Renovate PR rather than
-floating to whatever version happens to be available from the Debian package repository at
-build time.
 
 ## Pinned and floating dependencies
 
@@ -45,7 +38,7 @@ them needs a manual bump.
 
 | Pinned (Renovate raises PRs)                                            | Floating (Renovate never updates it)                                    |
 |-------------------------------------------------------------------------|-------------------------------------------------------------------------|
-| `requirements.txt`, the `Dockerfile` base images and apt pins           | `mise.toml` tools, set to `latest`, with no `mise.lock`                 |
+| `requirements.txt` and the `Dockerfile` base images                     | `mise.toml` tools, set to `latest`, with no `mise.lock`                 |
 | `frontend/package-lock.json`, including the build chain devDependencies | `.devcontainer/package.json` linters, set to `latest`, with no lockfile |
 | `docker-compose` images                                                 | The `mise` image (`latest`)                                             |
 | `requirements-dev.txt`, which feeds the required `unit-tests` check     |                                                                         |
@@ -69,7 +62,8 @@ Trade-offs:
   and base image updates skip the seven-day minimum release age
   (`minimumReleaseAgeBehaviour: timestamp-optional`). The rule is scoped to
   `.devcontainer/devcontainer.json` and `.devcontainer/Dockerfile`, so it does not change the wait
-  for production images. The Python runtime group has a separate exception, described below. Those
+  for production image version updates. Docker digest refreshes and the Python runtime group have
+  separate exceptions, described in "Dependency update policy" and below. Those
   Dev Container updates are major or minor, so they need a manual merge, and the
   `Build and test Dev Container` check runs on each one.
 
@@ -129,10 +123,6 @@ excludes `.devcontainer/package.json` from analysis (`sonar.exclusions`).
 
     Renovate is explicitly configured not to manage this image.
 
-* **Dockerfile apt packages**: versions are explicitly pinned where required by the `Dockerfile`
-  linting policy. Renovate's `customManagers:dockerfileVersions` manager tracks these pins and
-  can create update PRs when newer package versions are available.
-
 ## Dependency update policy
 
 Renovate is responsible for **detecting and proposing** dependency updates. It may:
@@ -151,6 +141,18 @@ cleared this window instead of selecting a newer, still-pending release. Securit
 bypass the minimum release age so that vulnerability fixes are not delayed.
 The Python runtime group is the exception and has no minimum release age (see
 "Python runtime version updates").
+
+Docker digest refreshes of a tag already in use, such as a new digest for `node:26-alpine`, are
+the other exception. Renovate's job log for the `node:26-alpine` digest bump reported no release
+timestamp for it, and with the default `minimumReleaseAgeBehaviour: "timestamp-required"`
+Renovate holds an update without a timestamp for ever: the `renovate/stability-days` status stays
+pending and never clears. A package rule matching the `docker` datasource and the `digest` and
+`pinDigest` update types sets `minimumReleaseAgeBehaviour: "timestamp-optional"`, so a refresh
+with no timestamp is raised without an age check. Where Renovate does supply a timestamp, the
+seven-day wait still applies. Version updates keep the seven-day wait. Digest updates are never
+automerged, so each one still needs a manual merge.
+`test_renovate_digest_updates_skip_release_age_check` in `app/tests/unit/test_dev_stack_files.py`
+fails if the rule is removed or placed before the general `minimumReleaseAge` rule.
 
 Two things run only on Saturdays: regular FastAPI updates (a `packageRules` entry with
 `schedule: ["* * * * 6"]`) and lockfile maintenance (`lockFileMaintenance`, Saturdays from

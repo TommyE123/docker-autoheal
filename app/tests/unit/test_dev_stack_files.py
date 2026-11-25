@@ -145,6 +145,24 @@ def test_python_runtime_group_has_no_release_age_after_catch_all_rule():
         assert scoped_away, f"Rule after the Python group could set its release age: {later}"
 
 
+def test_renovate_digest_updates_skip_release_age_check():
+    """A Docker digest refresh can have no release timestamp, so the age check must be optional."""
+    rules = json.loads((REPO_ROOT / "renovate.json").read_text(encoding="utf-8"))["packageRules"]
+    catch_all = next(i for i, r in enumerate(rules) if r.get("matchPackageNames") == ["*"])
+    digest_rules = [
+        i
+        for i, r in enumerate(rules)
+        if r.get("matchDatasources") == ["docker"]
+        and set(r.get("matchUpdateTypes", [])) == {"digest", "pinDigest"}
+        and r.get("minimumReleaseAgeBehaviour") == "timestamp-optional"
+    ]
+
+    assert digest_rules, "No Renovate rule makes the release age optional for Docker digests"
+    assert digest_rules[0] > catch_all
+    # The rule must not also change the release age, or version updates would lose their wait.
+    assert "minimumReleaseAge" not in rules[digest_rules[0]]
+
+
 def test_python_runtime_versions_are_aligned():
     """All Python runtime and tooling targets must use the same version."""
     dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
@@ -203,6 +221,90 @@ def test_python_runtime_versions_are_aligned():
     assert ruff_version.group(1) == expected_ruff_version, (
         f"Ruff target-version is {ruff_version.group(1)}, expected {expected_ruff_version}"
     )
+
+
+def test_image_health_check_probes_without_curl():
+    """The image's HEALTHCHECK uses the image's Python, so curl is not installed for it."""
+    lines = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8").splitlines()
+
+    assert lines[0] == "# syntax=docker/dockerfile:1"
+    assert lines[1] == "# check=error=true"
+    dockerfile = "\n".join(lines)
+    assert "curl" not in dockerfile
+    assert re.search(r"^HEALTHCHECK .*--start-interval=5s", dockerfile, re.MULTILINE)
+    assert re.search(
+        r'^\s+CMD \["python", "-c", "import urllib\.request; '
+        r"urllib\.request\.build_opener\(urllib\.request\.ProxyHandler\(\{\}\)\)\.open"
+        r"\('http://localhost:3131/health', timeout=5\)\"\]$",
+        dockerfile,
+        re.MULTILINE,
+    )
+
+
+def test_image_health_probe_ignores_http_proxy_variables():
+    """A proxy in the environment must not route the localhost probe, so it still reports healthy."""
+    import http.server
+    import threading
+
+    dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
+    match = re.search(r'^\s+CMD \["python", "-c", "(.+)"\]$', dockerfile, re.MULTILINE)
+    assert match, "health probe command not found in Dockerfile"
+    probe = match.group(1)
+
+    class Health(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, format, *args):
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), Health)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        port = server.server_address[1]
+        script = probe.replace("localhost:3131", f"localhost:{port}")
+        # Only the uppercase variable: an empty lowercase http_proxy takes precedence and hides the bug.
+        env = {"PATH": "/usr/bin:/bin", "HTTP_PROXY": "http://127.0.0.1:9"}
+        result = subprocess.run(  # noqa: S603
+            [sys.executable, "-c", script],
+            capture_output=True,
+            env=env,
+            timeout=30,
+            check=False,
+        )
+    finally:
+        server.shutdown()
+
+    assert result.returncode == 0, result.stderr.decode(errors="replace")
+
+
+def test_image_sets_unbuffered_python_and_oci_labels():
+    """Unbuffered logs and OCI labels come from the image, not from Compose or the build."""
+    dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
+
+    assert re.search(r"^ENV PYTHONUNBUFFERED=1\b", dockerfile, re.MULTILINE)
+    assert re.search(r"^\s+PYTHONDONTWRITEBYTECODE=1$", dockerfile, re.MULTILINE)
+    assert "org.opencontainers.image.source=" in dockerfile
+    assert "org.opencontainers.image.description=" in dockerfile
+    assert "maintainer=" not in dockerfile
+
+
+def test_frontend_build_uses_npm_cache_mount_and_linked_copy():
+    """The npm cache stays out of the layers, lifecycle scripts stay off, and the copy is linked."""
+    dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
+
+    assert "RUN --mount=type=cache,target=/root/.npm npm ci --ignore-scripts" in dockerfile
+    assert "COPY --link --from=frontend-builder /static ./static/" in dockerfile
+
+
+def test_compose_file_does_not_duplicate_the_image_health_check():
+    """One health check definition, in the Dockerfile, so the two cannot drift apart."""
+    compose = (REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+
+    assert "healthcheck:" not in compose
+    assert "PYTHONUNBUFFERED" not in compose
 
 
 def test_node_runtime_versions_are_aligned():
