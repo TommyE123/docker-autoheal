@@ -614,6 +614,9 @@ class MonitoringEngine:
             reason,
         )
         success = await asyncio.to_thread(self.docker_client.restart_container, container)
+        # Counted before the bookkeeping below, so a failure there cannot hide a real restart
+        if success:
+            container_restarts.labels(container_name=container_name).inc()
 
         # Record restart (using recovery_id - persists across ID changes and handles all edge cases)
         config_manager.record_restart(recovery_id, config.restart.max_restarts_window_seconds)
@@ -635,7 +638,6 @@ class MonitoringEngine:
         await notification_manager.send_event_notification(event)
 
         if success:
-            container_restarts.labels(container_name=container_name).inc()
             logger.info(
                 "Successfully restarted container %s (recovery_id: %s)",
                 container_name,

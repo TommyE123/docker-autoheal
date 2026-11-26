@@ -134,6 +134,25 @@ class TestRestartCounter:
         assert docker_client.restart_calls == ["metrics-restart-fail"]
         assert delta.restarted() == 0
 
+    async def test_restart_is_counted_when_the_notification_fails(
+        self, monkeypatch, engine, docker_client
+    ):
+        container, info = make_container(name="metrics-restart-notify-error")
+        docker_client.add_container(container, info)
+        monkeypatch.setattr(
+            "app.monitor.monitoring_engine.notification_manager.send_event_notification",
+            AsyncMock(side_effect=RuntimeError("notification failed")),
+        )
+        delta = Delta("metrics-restart-notify-error")
+
+        with pytest.raises(RuntimeError, match="notification failed"):
+            await after_backoff(
+                engine, engine._handle_container_restart, container, info, "unhealthy"
+            )
+
+        assert docker_client.restart_calls == ["metrics-restart-notify-error"]
+        assert delta.restarted() == 1
+
     async def test_restart_in_cooldown_is_not_counted(self, engine, docker_client):
         container, info = make_container(name="metrics-restart-cooldown")
         docker_client.add_container(container, info)
