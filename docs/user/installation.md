@@ -86,9 +86,11 @@ default). Docker Autoheal shuts down in two steps, one after the other:
 1. The web server stops accepting connections and gives requests already in progress up to
    3 seconds to finish, then cancels the rest.
 2. The service stops the Uptime Kuma monitor, then stops the monitoring and delivers queued
-   notifications side by side. Each of those two has a 5 second timeout. The 5 second delivery
+   notifications side by side. Two operations have a 5 second timeout of their own: waiting for
+   the Docker event-reader thread to exit, and delivering the queued notifications. The delivery
    window starts as soon as the stop begins, so a notification already being sent can be cut off
-   earlier than if the two ran one after the other.
+   earlier than if the two ran one after the other. The thread wait is queued on the same worker
+   pool as other Docker calls, so when that pool is busy it can take longer than its timeout.
 
 That adds up to about 8 seconds, as an estimate, which normally fits in Docker's default once
 startup has finished. If the stop arrives while the service is still starting, for example while

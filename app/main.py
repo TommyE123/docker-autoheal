@@ -53,9 +53,10 @@ STARTUP_STOP_GRACE_SECONDS = 5.0
 # How long uvicorn waits for in-flight API requests on shutdown before cancelling them. On
 # SIGTERM uvicorn closes its listeners, sleeps 0.1s, waits up to this long for in-flight
 # requests, then re-raises SIGTERM, so `AutoHealService.stop()` runs strictly afterwards and
-# the durations add up: 0.1s + this + the service stop (its engine and notification steps
-# overlap, each limited by a 5s timeout) has to fit inside Docker's default 10 second stop
-# timeout. That is an estimate, not a guarantee. A stop that arrives during startup adds up to
+# the durations add up: 0.1s + this + the service stop (the event-reader thread wait and the
+# notification drain overlap, each with its own 5s timeout, and a busy worker pool can delay the
+# thread wait) has to fit inside Docker's default 10 second stop timeout. That is an estimate,
+# not a guarantee. A stop that arrives during startup adds up to
 # STARTUP_STOP_GRACE_SECONDS more, which this does not cover.
 UVICORN_GRACEFUL_SHUTDOWN_SECONDS = 3  # uvicorn types this setting as an int
 
