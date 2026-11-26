@@ -93,7 +93,8 @@ default). Docker Autoheal shuts down in two steps, one after the other:
 That adds up to about 8 seconds, as an estimate, which normally fits in Docker's default once
 startup has finished. If the stop arrives while the service is still starting, for example while
 it waits on an unreachable Uptime Kuma server, the service first gives startup up to 5 more
-seconds, so the total can reach about 13 seconds and exceed the default. The log line
+seconds, so the total can reach about 13 seconds and exceed the default (tracked in
+[#342](https://github.com/TommyE123/docker-autoheal/issues/342)). The log line
 `Docker Autoheal stopped` marks the end of the service's cleanup, not proof that it was clean:
 check the warnings logged before it for any step that failed. Notifications still queued when
 the 5 seconds run out are dropped, with a warning in the log.
@@ -102,7 +103,8 @@ The deadline is not guaranteed. Some work runs in background worker threads, for
 manual container restart from the web UI or a Docker call made by a monitoring check. Cancelling
 the request or the monitoring does not stop that thread, and the Python runtime waits for those
 threads before the process exits, so the process can still outlive the stop timeout and be
-killed by Docker. This is a known limitation of the current shutdown.
+killed by Docker. This is a known limitation of the current shutdown, tracked in
+[#343](https://github.com/TommyE123/docker-autoheal/issues/343).
 
 To give it more time, raise the stop timeout with `stop_grace_period` in Compose (see the
 commented example in `docker-compose.yml`) or `docker stop --time <seconds>`.
