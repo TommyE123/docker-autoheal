@@ -132,10 +132,10 @@ refreshes it:
 - Before enabling auto-merge it checks that the PR changes only the badge file, and the
   merge request is bound to the exact commit the action pushed, so it fails if the head
   changes in between.
-- Its `GITHUB_TOKEN` is read-only. Writes use the `BADGE_PUSH_TOKEN` repository secret, a
-  fine-grained personal access token with **Contents** and **Pull requests**: read and
-  write, which only the pull request and auto-merge steps are given. A push or PR made
-  with `GITHUB_TOKEN` would not start the PR's other checks.
+- Its `GITHUB_TOKEN` is read-only. Writes use the `BADGE_PUSH_TOKEN` secret of the `badge-push`
+  environment (`main` branch only), a fine-grained personal access token with **Contents** and
+  **Pull requests**: read and write, which only the pull request and auto-merge steps are given.
+  A push or PR made with `GITHUB_TOKEN` would not start the PR's other checks.
 
 ### Why the updater PR auto-merges
 

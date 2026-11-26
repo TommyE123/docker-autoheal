@@ -26,6 +26,7 @@ jobs:
   auto-merge-release-pr:
     name: Auto-merge the Release PR
     runs-on: ubuntu-latest
+    environment: release # Holds RELEASE_PLEASE_TOKEN; limited to the main branch.
 
     # No GITHUB_TOKEN permissions: gh authenticates with GH_TOKEN below (the
     # RELEASE_PLEASE_TOKEN PAT), so the default token is never used.

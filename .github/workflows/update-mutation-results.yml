@@ -30,6 +30,7 @@ jobs:
     name: Update mutation results
     if: "${{ github.event_name == 'workflow_dispatch' || !startsWith(github.event.head_commit.message, 'chore(main): release') }}"
     runs-on: ubuntu-latest
+    environment: badge-push # Holds BADGE_PUSH_TOKEN; limited to the main branch.
     timeout-minutes: 60
     # On the job, so a run skipped by the `if` above never takes the group and
     # cannot replace a queued real run.
