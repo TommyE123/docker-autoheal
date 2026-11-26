@@ -337,6 +337,9 @@ class MonitoringEngine:
 
         # Get container info
         info = await asyncio.to_thread(self.docker_client.get_container_info, container)
+        if not info:
+            # Inspection failed, so this cycle cannot say how many containers are monitored
+            self._cycle_monitored = None
         container_id = info.get("full_id")
         container_name = info.get("name")
 

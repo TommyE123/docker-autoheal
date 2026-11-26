@@ -611,6 +611,25 @@ class TestMonitoredGauge:
 
         assert sample(MONITORED) == 7
 
+    async def test_failed_inspection_keeps_the_last_count(self, engine, docker_client):
+        self.add(docker_client, "metrics-mon-inspect-a", "1" * 64)
+        self.add(docker_client, "metrics-mon-inspect-b", "2" * 64)
+        del docker_client._info["1" * 64]  # listed, but inspecting it returns {}
+
+        await engine._check_containers()
+
+        assert sample(MONITORED) == 7
+
+    async def test_failed_inspection_of_every_container_does_not_publish_zero(
+        self, engine, docker_client
+    ):
+        self.add(docker_client, "metrics-mon-inspect-all", "1" * 64)
+        del docker_client._info["1" * 64]
+
+        await engine._check_containers()
+
+        assert sample(MONITORED) == 7
+
     async def test_unreachable_docker_keeps_the_last_count(self, engine, docker_client):
         self.add(docker_client, "metrics-mon-unreachable", "1" * 64)
         docker_client.connected = False
