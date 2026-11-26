@@ -19,6 +19,7 @@ jobs:
   upgrade:
     name: Upgrade gh-aw
     runs-on: ubuntu-latest
+    environment: gh-aw-upgrade # Holds GH_AW_UPGRADE_TOKEN; limited to the main branch.
     permissions:
       contents: read
     steps:

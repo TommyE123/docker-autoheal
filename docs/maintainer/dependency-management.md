@@ -347,6 +347,8 @@ updates in one PR, so two PRs never race to rewrite the same lock file:
   file (three days at the moment), read from that file because the install would refuse anything
   newer. Nightly and preview versions are never used.
 * It opens one PR, never automerged. While an upgrade PR is open, no new one is created.
+* It runs in the `gh-aw-upgrade` environment (`main` branch only), which holds the
+  `GH_AW_UPGRADE_TOKEN` personal access token it uses to push the branch and open the PR.
 
 CI cannot show that a new Gemini CLI still authenticates under the current AWF, so run
 issue-triage once from the PR branch before merging a Gemini CLI bump.

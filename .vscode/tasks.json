@@ -198,7 +198,7 @@
     {
       "label": "Autoheal: Check Workflow Security",
       "type": "shell",
-      "command": "zizmor $(git ls-files '.github/workflows/*.yml' | grep -v '\\.lock\\.yml$')",
+      "command": "zizmor --persona auditor --min-severity informational --min-confidence low $(git ls-files '.github/workflows/*.yml' | grep -v '\\.lock\\.yml$')",
       "options": {
         "shell": {
           "executable": "bash",
