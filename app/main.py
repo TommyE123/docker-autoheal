@@ -8,7 +8,7 @@ import os
 import signal
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import uvicorn
 from prometheus_client import Counter, Gauge, start_http_server
@@ -22,7 +22,6 @@ from app.notifications.notification_manager import notification_manager
 from app.utils.log_level import apply_log_level
 
 if TYPE_CHECKING:
-    from collections.abc import Coroutine
     from types import FrameType
     from wsgiref.simple_server import WSGIServer
 
@@ -55,8 +54,9 @@ STARTUP_STOP_GRACE_SECONDS = 5.0
 # SIGTERM uvicorn closes its listeners, sleeps 0.1s, waits up to this long for in-flight
 # requests, then re-raises SIGTERM, so `AutoHealService.stop()` runs strictly afterwards and
 # the durations add up: 0.1s + this + the service stop (its engine and notification steps
-# overlap, each bounded at 5s) has to fit inside Docker's default 10 second stop timeout. A stop
-# that arrives during startup adds up to STARTUP_STOP_GRACE_SECONDS more, which this does not cover.
+# overlap, each limited by a 5s timeout) has to fit inside Docker's default 10 second stop
+# timeout. That is an estimate, not a guarantee. A stop that arrives during startup adds up to
+# STARTUP_STOP_GRACE_SECONDS more, which this does not cover.
 UVICORN_GRACEFUL_SHUTDOWN_SECONDS = 3  # uvicorn types this setting as an int
 
 
@@ -280,20 +280,25 @@ class AutoHealService:
 
             # The engine and the notification manager stop concurrently, so the engine's
             # event-reader join (up to 5s) and the notification drain (up to 5s) overlap rather
-            # than add up. No notification is lost by this: the producers are the engine's
-            # monitor-loop and event-listener tasks (on SIGTERM, uvicorn has already finished or
-            # cancelled the API requests that also send one), and `MonitoringEngine.stop()`
-            # cancels both tasks before its first await. With the engine first, gather() runs
-            # that step before the notification manager's first step sets `_stopping`, so
-            # neither task can resume to send a notification after the drain starts: each gets
-            # CancelledError at its next await. Keep the engine first. The event-reader thread
-            # joined after the cancellation only hands events to the cancelled listener; it
-            # sends nothing.
-            steps: list[tuple[str, Coroutine[Any, Any, None]]] = []
+            # than add up. The drain therefore starts with the engine's stop instead of after it,
+            # so a send already in flight can be cut off earlier than if the stops ran in
+            # sequence. What stopping the producers guarantees is that no new notification is
+            # queued once the drain starts: they are the engine's monitor-loop and event-listener
+            # tasks (on SIGTERM, uvicorn has already finished or cancelled the API requests that
+            # also send one). Each stop starts eagerly, so it runs up to its first await before
+            # anything else can run: `MonitoringEngine.stop()` cancels both producer tasks there,
+            # before the notification manager's stop sets `_stopping`, and a cancellation of this
+            # coroutine cannot skip either stop before it begins. Keep the engine first. The
+            # event-reader thread joined afterwards only hands events to the cancelled listener.
+            steps: list[tuple[str, asyncio.Task[None]]] = []
             if self.monitoring_engine:
-                steps.append(("monitoring engine", self.monitoring_engine.stop()))
-            steps.append(("notification manager", self.notification_manager.stop()))
-            results = await asyncio.gather(*(stop for _, stop in steps), return_exceptions=True)
+                engine_stop = asyncio.create_task(self.monitoring_engine.stop(), eager_start=True)
+                steps.append(("monitoring engine", engine_stop))
+            notification_stop = asyncio.create_task(
+                self.notification_manager.stop(), eager_start=True
+            )
+            steps.append(("notification manager", notification_stop))
+            results = await asyncio.gather(*(task for _, task in steps), return_exceptions=True)
 
             # Log every failed step, then re-raise a cancellation (a BaseException) so it still
             # propagates, after the cleanup in `finally`

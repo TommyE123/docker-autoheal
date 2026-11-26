@@ -375,6 +375,24 @@ class TestConcurrentShutdown:
         docker.close.assert_called_once()
         assert service._stopped is True
 
+    @pytest.mark.asyncio
+    async def test_cancellation_right_after_stop_begins_cannot_skip_either_stop(self):
+        service, docker, _gates, started, cancelled = self._gated_service()
+
+        stop_task = asyncio.create_task(service.stop())
+        # One loop step: stop() has reached its wait on the two stops and nothing else has run
+        await asyncio.sleep(0)
+        stop_task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await stop_task
+
+        # Both stops were entered and then cancelled; a stop that was cancelled before it began
+        # would leave its component running while `_stopped` made a later stop() a no-op
+        assert started["engine"].is_set()
+        assert started["notifications"].is_set()
+        assert cancelled == {"engine", "notifications"}
+        docker.close.assert_called_once()
+
 
 class TestShutdownNotificationSafety:
     """Stopping the engine and the notification manager together loses no notification (#296)."""
@@ -1011,7 +1029,7 @@ class TestRunApiServer:
                 log_level="warning",
                 access_log=False,
                 log_config=None,
-                timeout_graceful_shutdown=main_module.UVICORN_GRACEFUL_SHUTDOWN_SECONDS,
+                timeout_graceful_shutdown=3,
             )
             mock_uvicorn.Server.assert_called_once_with(mock_uvicorn.Config.return_value)
             mock_server_instance.serve.assert_awaited_once()

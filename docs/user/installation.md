@@ -86,14 +86,17 @@ default). Docker Autoheal shuts down in two steps, one after the other:
 1. The web server stops accepting connections and gives requests already in progress up to
    3 seconds to finish, then cancels the rest.
 2. The service stops the Uptime Kuma monitor, then stops the monitoring and delivers queued
-   notifications side by side. Each of those two waits is capped at 5 seconds.
+   notifications side by side. Each of those two has a 5 second timeout. The 5 second delivery
+   window starts as soon as the stop begins, so a notification already being sent can be cut off
+   earlier than if the two ran one after the other.
 
-That adds up to about 8 seconds, which normally fits in Docker's default once startup has
-finished. If the stop arrives while the service is still starting, for example while it waits on
-an unreachable Uptime Kuma server, the service first gives startup up to 5 more seconds, so the
-total can reach about 13 seconds and exceed the default. The log line
-`Docker Autoheal stopped` shows a clean shutdown; notifications still queued when the 5 seconds
-run out are dropped, with a warning in the log.
+That adds up to about 8 seconds, as an estimate, which normally fits in Docker's default once
+startup has finished. If the stop arrives while the service is still starting, for example while
+it waits on an unreachable Uptime Kuma server, the service first gives startup up to 5 more
+seconds, so the total can reach about 13 seconds and exceed the default. The log line
+`Docker Autoheal stopped` marks the end of the service's cleanup, not proof that it was clean:
+check the warnings logged before it for any step that failed. Notifications still queued when
+the 5 seconds run out are dropped, with a warning in the log.
 
 The deadline is not guaranteed. Some work runs in background worker threads, for example a
 manual container restart from the web UI or a Docker call made by a monitoring check. Cancelling
