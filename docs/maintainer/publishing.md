@@ -34,14 +34,17 @@ In other words: **merging an ordinary Conventional Commit PR never publishes a r
 only updates the Release PR. A human decides when to actually release by merging that PR.
 
 **Required repository variable:** `DOCKERHUB_USERNAME`, the Docker Hub account the images are
-published to. **Required repository secrets:** `DOCKERHUB_TOKEN` and
-`RELEASE_PLEASE_TOKEN`, a personal access token the `release-please` job uses to open and
-update the Release PR (see below). The CI workflows skip the Docker Hub login on pull
-requests from forks, which get no secrets. GHCR push uses the workflow's own `GITHUB_TOKEN` —
-no extra secret needed. Newly published GHCR packages default
-to **private**; someone with admin access needs to switch the package to public in its GitHub
-package settings before `docker pull ghcr.io/...` works for everyone (see the note in
-`docs/maintainer/docker-hub-readme.md`).
+published to. **Required secrets:** `DOCKERHUB_TOKEN` and `RELEASE_PLEASE_TOKEN`, a personal
+access token the `release-please` job uses to open and update the Release PR (see below).
+`RELEASE_PLEASE_TOKEN` lives in the `release` environment, and the `DOCKERHUB_TOKEN` used to
+publish lives in the `docker-publish` environment. Both environments allow the `main` branch
+only, so a workflow on another branch cannot read them. The CI workflows that build pull
+requests use a repository-level `DOCKERHUB_TOKEN` instead, because a pull request cannot use a
+`main`-only environment, and they skip the Docker Hub login on pull requests from forks, which
+get no secrets. GHCR push uses the workflow's own `GITHUB_TOKEN` — no extra secret needed.
+Newly published GHCR packages default to **private**; someone with admin access needs to switch the
+package to public in its GitHub package settings before `docker pull ghcr.io/...` works for
+everyone (see the note in `docs/maintainer/docker-hub-readme.md`).
 
 ## PR-time build verification
 
