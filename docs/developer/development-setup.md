@@ -398,11 +398,11 @@ formatter is CLI-only.
 | Every file      | editorconfig-checker      | —                        | Yes              |
 
 Workflow files are additionally scanned by zizmor with its auditor persona, which reports
-every finding and is report-only. A deliberate exception can be accepted with an inline
-`# zizmor: ignore[rule] - reason` comment. Repository-wide scanners (checkov, semgrep, trivy,
-trufflehog, betterleaks, secretlint, ls-lint, git_diff) run against the project rather than a
-file type. The report-only linters are the ones listed in `.linter-rules/.mega-linter.yml`'s
-`DISABLE_ERRORS_LINTERS`.
+every finding and fails the MegaLinter check on any of them. Fix a finding, or accept it as a
+deliberate exception with an inline `# zizmor: ignore[rule] - reason` comment. Repository-wide
+scanners (checkov, semgrep, trivy, trufflehog, betterleaks, secretlint, ls-lint, git_diff) run
+against the project rather than a file type. The report-only linters are the ones listed in
+`.linter-rules/.mega-linter.yml`'s `DISABLE_ERRORS_LINTERS`, which is currently empty.
 
 The Dev Container installs an equivalent of each of these, so every row above has a
 matching `Autoheal:` task. The binaries and Python tools are installed by mise from
