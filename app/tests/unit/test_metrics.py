@@ -325,8 +325,8 @@ class TestHealthCheckCounters:
         assert delta.checked() == 1
         assert delta.check_failures() == 1
 
-    async def test_docker_type_custom_check_on_a_starting_container_is_not_counted(
-        self, engine, docker_client, update_config
+    async def test_docker_type_custom_check_on_a_starting_container_is_skipped(
+        self, engine, docker_client, update_config, caplog
     ):
         use_mode(update_config, "health")
         add_check("metrics-hc-docker-starting", "docker")
@@ -336,10 +336,13 @@ class TestHealthCheckCounters:
         )
         delta = Delta("metrics-hc-docker-starting")
 
-        await engine._evaluate_container_health(container, info)
+        needs_restart, reason = await engine._evaluate_container_health(container, info)
 
+        assert needs_restart is False
+        assert reason == ""
         assert delta.checked() == 0
         assert delta.check_failures() == 0
+        assert "host networking" not in caplog.text
 
     async def test_custom_check_that_could_not_run_is_not_counted(
         self, engine, docker_client, update_config

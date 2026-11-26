@@ -278,13 +278,10 @@ class HealthEvaluator:
             result = await self.perform_custom_health_check(container, custom_hc)
             self._note_custom_check_result(info, custom_hc.check_type, skipped=result is None)
             # A check that could not run says nothing about health, so it is not counted. A
-            # "docker" check reads the Docker status that is counted below instead.
-            is_docker_check = custom_hc.check_type == "docker"
-            if result is not None and not is_docker_check:
+            # passing "docker" check reads the Docker status that is counted below instead.
+            if result is not None and (custom_hc.check_type != "docker" or result is False):
                 record_health_check(_metric_label(info), failed=not result)
             if result is False:
-                if is_docker_check:
-                    self._record_native_health(info)
                 return f"Custom health check failed ({custom_hc.check_type})"
         else:
             self._skipped_checks.pop(info["full_id"], None)
@@ -407,7 +404,9 @@ class HealthEvaluator:
                 status = await asyncio.to_thread(
                     self.docker_client.get_docker_native_health, container
                 )
-                return status == "healthy" if status else True  # Assume healthy if no check
+                # Only an explicit "unhealthy" fails. "starting" has no result yet, and a container
+                # without a health check is assumed healthy, as without a custom check
+                return status != "unhealthy"
             logger.warning("Unknown health check type: %s", check_type)
         except Exception as e:
             logger.error("Error performing health check: %s", e)
