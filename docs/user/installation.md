@@ -108,8 +108,9 @@ threads before the process exits, so the process can still outlive the stop time
 killed by Docker. This is a known limitation of the current shutdown, tracked in
 [#343](https://github.com/TommyE123/docker-autoheal/issues/343).
 
-To give it more time, raise the stop timeout with `stop_grace_period` in Compose (see the
-commented example in `docker-compose.yml`) or `docker stop --time <seconds>`.
+To give it more time, set `stop_grace_period` in Compose to a value above the 10 second default
+(the commented example in `docker-compose.yml` shows the setting; `10s` is the default, so use a
+larger value) or pass `docker stop --time <seconds>`.
 
 ## Try it with a sample container
 
