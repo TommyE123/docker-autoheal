@@ -22,6 +22,7 @@ jobs:
   release-please:
     name: Release Please
     runs-on: ubuntu-latest
+    environment: release # Holds RELEASE_PLEASE_TOKEN; limited to the main branch.
 
     # No GITHUB_TOKEN permissions: the action authenticates with the
     # RELEASE_PLEASE_TOKEN PAT (explicit `token:` input below), so the
@@ -55,6 +56,7 @@ jobs:
     needs: release-please
     if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
+    environment: docker-publish # Holds DOCKERHUB_TOKEN for publishing; limited to the main branch.
 
     permissions:
       contents: read
@@ -135,6 +137,7 @@ jobs:
     name: Build and publish beta Docker image
     needs: release-please
     runs-on: ubuntu-latest
+    environment: docker-publish # Holds DOCKERHUB_TOKEN for publishing; limited to the main branch.
 
     permissions:
       contents: read
