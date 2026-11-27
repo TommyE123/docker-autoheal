@@ -41,11 +41,14 @@ WORD_START = frozenset(" \t;&|()")
 MAX_NESTING = 3
 
 
-def _scan_line(line: str, quote: str | None) -> tuple[str, str | None, list[tuple[bool, str]]]:
+def _scan_line(
+    line: str, quote: str | None
+) -> tuple[str, str | None, list[tuple[bool, str]], bool]:
     """Strip an unquoted `#` comment and find unquoted heredoc markers in one line.
 
     `quote` is the quote character open at the start of the line, if any; the one open at its end
-    is returned, so quoted text spanning lines is tracked.
+    is returned, so quoted text spanning lines is tracked. The last value says whether a comment
+    was removed.
     """
     kept: list[str] = []
     markers: list[tuple[bool, str]] = []
@@ -63,7 +66,7 @@ def _scan_line(line: str, quote: str | None) -> tuple[str, str | None, list[tupl
         elif char in "'\"":
             quote = char
         elif char == "#" and (i == 0 or line[i - 1] in WORD_START):
-            break
+            return "".join(kept), quote, markers, True
         elif char == "<" and (i == 0 or line[i - 1] != "<"):
             match = HEREDOC.match(line, i)
             if match:
@@ -73,7 +76,7 @@ def _scan_line(line: str, quote: str | None) -> tuple[str, str | None, list[tupl
                 continue
         kept.append(char)
         i += 1
-    return "".join(kept), quote, markers
+    return "".join(kept), quote, markers, False
 
 
 def _heredoc_end(lines: list[str], start: int, markers: list[tuple[bool, str]]) -> int | None:
@@ -102,9 +105,17 @@ def _preprocess(command: str) -> str:
     quote = None
     index = 0
     while index < len(lines):
-        text, quote, markers = _scan_line(lines[index], quote)
-        kept.append(text)
+        line, start_quote = lines[index], quote
         index += 1
+        while True:
+            text, quote, markers, commented = _scan_line(line, start_quote)
+            trailing_backslashes = len(line) - len(line.rstrip("\\"))
+            if commented or quote == "'" or trailing_backslashes % 2 == 0 or index == len(lines):
+                break
+            # `\` at the end of a line continues the command on the next line.
+            line = line[:-1] + lines[index]
+            index += 1
+        kept.append(text)
         if markers and quote is None and not _runs_shell(text):
             # An unclosed marker is checked as ordinary lines rather than risk hiding a command.
             index = _heredoc_end(lines, index, markers) or index
