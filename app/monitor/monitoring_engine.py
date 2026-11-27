@@ -18,6 +18,7 @@ from app.docker_client.docker_client_wrapper import recovery_identifier
 from app.docker_client.identity import recovery_keys
 from app.monitor.auto_discovery import AutoDiscovery
 from app.monitor.health import HealthEvaluator
+from app.monitor.metrics import container_restarts, containers_monitored
 from app.monitor.recovery import RecoveryPolicy
 from app.monitor.selection import should_monitor
 from app.notifications.notification_manager import notification_manager
@@ -101,6 +102,15 @@ class MonitoringEngine:
             docker_client, uptime_kuma_monitor=uptime_kuma_monitor
         )
         self._auto_discovery = AutoDiscovery(docker_client, self._container_identifiers)
+        # Containers selected for monitoring so far this cycle, or None once maintenance
+        # mode has skipped a check, since the cycle then says nothing about the count
+        self._cycle_monitored: int | None = 0
+        # IDs counted this cycle and in the last published cycle, and how many containers
+        # Docker inspected this cycle. A container that cannot be inspected keeps its place
+        # in the count only if it was counted before.
+        self._cycle_monitored_ids: set[str | None] = set()
+        self._monitored_ids: set[str | None] = set()
+        self._cycle_inspected = 0
 
     @property
     def uptime_kuma_monitor(self) -> UptimeKumaMonitor | None:
@@ -309,11 +319,19 @@ class MonitoringEngine:
                 self._recovery.forget_absent(listed_ids)
                 self._health_evaluator.forget_absent(listed_ids)
 
+            self._cycle_monitored = 0
+            self._cycle_monitored_ids = set()
+            self._cycle_inspected = 0
             for container in containers:
                 try:
                     await self._check_single_container(container)
                 except Exception as e:
                     logger.error("Error checking container %s: %s", container.name, e)
+
+            # An empty listing may be a failed Docker call, so the last count is kept
+            if containers and self._cycle_monitored is not None and self._cycle_inspected:
+                containers_monitored.set(self._cycle_monitored)
+                self._monitored_ids = self._cycle_monitored_ids
 
         except Exception as e:
             logger.exception("Error checking containers: %s", e)
@@ -327,12 +345,21 @@ class MonitoringEngine:
         # Check if maintenance mode is enabled
         if config_manager.is_maintenance_mode():
             logger.debug("Maintenance mode is enabled, skipping container checks")
+            self._cycle_monitored = None
             return
 
         config = config_manager.get_config()
 
         # Get container info
         info = await asyncio.to_thread(self.docker_client.get_container_info, container)
+        if not info:
+            # Inspection failed, so there is nothing to select or check. Keep counting a
+            # container that was counted before; one that never was is left out.
+            if container.id in self._monitored_ids and self._cycle_monitored is not None:
+                self._cycle_monitored += 1
+                self._cycle_monitored_ids.add(container.id)
+            return
+        self._cycle_inspected += 1
         container_id = info.get("full_id")
         container_name = info.get("name")
 
@@ -341,6 +368,9 @@ class MonitoringEngine:
             # No longer monitored: a wait it started would otherwise linger
             self._recovery.forget_container(container_id)
             return
+        if self._cycle_monitored is not None:
+            self._cycle_monitored += 1
+            self._cycle_monitored_ids.add(container.id)
 
         # Check if container is quarantined (by recovery ID, or a legacy name or ID entry)
         identifiers = self._container_identifiers(info)
@@ -608,6 +638,9 @@ class MonitoringEngine:
             reason,
         )
         success = await asyncio.to_thread(self.docker_client.restart_container, container)
+        # Counted before the bookkeeping below, so a failure there cannot hide a real restart
+        if success:
+            container_restarts.labels(container_name=container_name).inc()
 
         # Record restart (using recovery_id - persists across ID changes and handles all edge cases)
         config_manager.record_restart(recovery_id, config.restart.max_restarts_window_seconds)

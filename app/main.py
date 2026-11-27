@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import uvicorn
-from prometheus_client import Counter, Gauge, start_http_server
+from prometheus_client import start_http_server
 
 from app.api.api import app, init_api
 from app.config.config_manager import AutoHealConfig, config_manager
@@ -77,22 +77,6 @@ def update_log_level(level_name: str) -> None:
     logging.getLogger("uvicorn.error").addFilter(CancelledErrorFilter())
 
     logger.info("Log level set to: %s", level_name)
-
-
-# Prometheus metrics
-container_restarts = Counter(
-    "autoheal_container_restarts_total", "Total container restarts", ["container_name"]
-)
-containers_monitored = Gauge(
-    "autoheal_containers_monitored", "Number of containers being monitored"
-)
-containers_quarantined = Gauge(
-    "autoheal_containers_quarantined", "Number of quarantined containers"
-)
-health_checks_total = Counter("autoheal_health_checks_total", "Total health checks performed")
-health_checks_failed = Counter(
-    "autoheal_health_checks_failed", "Failed health checks", ["container_name"]
-)
 
 
 class AutoHealService:
