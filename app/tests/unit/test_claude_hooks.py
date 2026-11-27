@@ -4,11 +4,14 @@ guard_git_push.py must block force pushes and pushes to main, ask before pushing
 name breaks CLAUDE.md's rule, and let everything else through. check_python_lint.py must report
 Ruff findings without changing the file and never get in the way of an edit. readonly-bash.sh
 must steer read-only agents from the GraphQL-backed gh commands to gh api. The real scripts are
-executed with the hook JSON they receive from Claude Code on stdin.
+executed through their shebangs, as Claude Code runs them, with the hook JSON they receive on
+stdin.
 """
 
+import ast
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -22,9 +25,8 @@ HOOKS = REPO_ROOT / ".claude" / "hooks"
 
 def _run_hook(script, payload, env=None):
     # The repository's own fixed scripts; nothing here is untrusted input.
-    command = [sys.executable, HOOKS / script] if script.endswith(".py") else [HOOKS / script]
     return subprocess.run(  # noqa: S603
-        command,
+        [HOOKS / script],
         input=payload if isinstance(payload, str) else json.dumps(payload),
         env=env,
         capture_output=True,
@@ -93,6 +95,14 @@ def _decision(result):
         "cd . && git push -f origin fix/1-some-fix",
         "git status\ngit push --force origin fix/1-some-fix",
         "echo `git push -f origin fix/1-some-fix`",
+        "# Push the rewritten branch\ngit push --force origin fix/1-some-fix",
+        "git fetch origin  # refresh\ngit push -f origin fix/1-some-fix",
+        "git push origin fix/12-issue#12 --force",
+        "bash -c 'git push --force origin fix/1-some-fix'",
+        'sh -lc "cd . && git push -f origin fix/1-some-fix"',
+        "eval git push -f origin fix/1-some-fix",
+        "cat <<'EOF' > notes.md\ngit push origin main\nEOF\ngit push -f origin fix/1-some-fix",
+        'echo "<<EOF"\ngit push -f origin fix/1-some-fix',
     ],
 )
 def test_force_push_is_blocked(repo, command):
@@ -137,9 +147,11 @@ def test_bare_push_follows_upstream_to_main(repo):
         "git push origin Fix/1-some-fix",
         "git push origin HEAD:wip",
         "git push --all origin",
+        "git push origin --delete ccr-7c111260-nb365r",
+        "git push origin :fix/1-some-fix",
     ],
 )
-def test_non_compliant_branch_asks_the_user(repo, command):
+def test_non_compliant_branch_or_deletion_asks_the_user(repo, command):
     result = _guard(repo, command)
     assert _decision(result) == "ask"
     assert (
@@ -164,13 +176,18 @@ def test_bare_push_of_non_compliant_current_branch_asks(repo):
         "git push --repo origin origin feat/new-thing",
         "git push origin feat/new-thing 2>&1 | tail -3",
         "git push origin HEAD:refs/heads/chore/12-tidy-up",
-        "git push origin --delete ccr-7c111260-nb365r",
-        "git push origin :ccr-7c111260-nb365r",
         "git push origin v1.0.0",
         "git push origin refs/tags/v2.0.0",
         "git push --tags",
         "git push -- origin fix/1-some-fix",
         'git commit -m "never git push --force to main"',
+        "git commit -F - <<'EOF'\nchore: note\n\ngit push -f is blocked\nEOF",
+        "cat > notes.md <<'EOF'\ngit push origin main is blocked\nEOF",
+        "gh pr create --body-file - <<-EOF\n\tgit push origin main\n\tEOF",
+        "git commit -m \"$(cat <<'EOF'\ngit push --force\nEOF\n)\"",
+        "# git push -f is blocked\ngit status",
+        "bash -c 'git push origin fix/1-some-fix'",
+        "bash scripts/push.sh",
         "git log --grep push",
         "echo push",
         "ls",
@@ -191,6 +208,15 @@ def test_block_wins_over_ask(repo):
     assert _decision(result) == "block"
 
 
+def test_deeply_nested_shells_are_blocked(repo):
+    command = "git push origin fix/1-some-fix"
+    for _ in range(5):
+        command = f"bash -c {shlex.quote(command)}"
+    result = _guard(repo, command)
+    assert _decision(result) == "block"
+    assert "too deeply" in result.stderr
+
+
 def test_unbalanced_quotes_still_checked(repo):
     assert _decision(_guard(repo, "git push -f origin fix/1-some-fix 'oops")) == "block"
 
@@ -206,6 +232,14 @@ def test_guard_fails_closed_for_a_push_it_cannot_check():
     result = _run_hook("guard_git_push.py", payload)
     assert _decision(result) == "block"
     assert "could not check" in result.stderr
+
+
+@pytest.mark.parametrize("script", ["guard_git_push.py", "check_python_lint.py"])
+def test_hooks_parse_as_python_3_10(script):
+    # Claude Code runs the hooks with whatever python3 is installed, not the Dockerfile's Python.
+    source = (HOOKS / script).read_text()
+    ast.parse(source, filename=script, feature_version=(3, 10))
+    assert source.startswith("#!/usr/bin/env python3\n")
 
 
 # --- check_python_lint.py -----------------------------------------------------------------------
@@ -274,9 +308,11 @@ def test_lint_ignores_non_python_files(lint_root):
 def test_lint_does_nothing_without_ruff(lint_root, tmp_path):
     target = lint_root / "bad.py"
     target.write_text("import os\n")
-    empty_bin = tmp_path / "empty-bin"
-    empty_bin.mkdir()
-    assert _lint(lint_root, target, env_path=str(empty_bin)).returncode == 0
+    # A PATH with python3, so the shebang resolves, but no ruff.
+    python_only = tmp_path / "python-only"
+    python_only.mkdir()
+    (python_only / "python3").symlink_to(sys.executable)
+    assert _lint(lint_root, target, env_path=str(python_only)).returncode == 0
 
 
 def test_lint_never_blocks_on_bad_input():

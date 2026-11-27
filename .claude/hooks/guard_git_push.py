@@ -3,12 +3,15 @@
 
 - Blocks force pushes (-f, --force, --force-with-lease, --mirror, a `+` refspec) and pushes that
   would update or delete `main`. Exit code 2 blocks the command and returns stderr to Claude.
-- Asks the user before pushing a branch whose name breaks CLAUDE.md's branch rule, so a name the
-  user has explicitly approved can still be pushed.
+- Asks the user before pushing a branch whose name breaks CLAUDE.md's branch rule, or deleting a
+  remote branch, so something the user has explicitly approved can still go ahead.
 - Leaves every other command to the normal permission flow.
 
-Best effort: the command is parsed with shlex, so variables, aliases and scripts are not seen
-through. The deny rules in .claude/settings.json and branch protection on main stay in place.
+Best effort: the command is parsed with shlex, looking inside `sh -c`/`bash -c` strings and
+`eval`, but variables, aliases and scripts are not seen through. The deny rules in
+.claude/settings.json and branch protection on main stay in place.
+
+Claude Code runs this with whatever `python3` is installed, so it must stay valid Python 3.10.
 """
 
 import json
@@ -30,13 +33,36 @@ GIT_OPTIONS_WITH_VALUE = frozenset(
 )
 PUSH_OPTIONS_WITH_VALUE = frozenset({"--repo", "--push-option", "--receive-pack", "--exec"})
 FORCE_OPTIONS = frozenset({"--force", "--force-with-lease", "--mirror"})
+SHELLS = frozenset({"sh", "bash", "zsh", "dash", "ksh"})
+HEREDOC = re.compile(r"(?<!<)<<(-?)\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\2")
+MAX_NESTING = 3
+
+
+def _strip_heredocs(command: str) -> str:
+    """Drop heredoc bodies, which are data rather than commands."""
+    kept: list[str] = []
+    pending: list[tuple[bool, str]] = []
+    for line in command.split("\n"):
+        if pending:
+            strip_tabs, word = pending[0]
+            if (line.lstrip("\t") if strip_tabs else line) == word:
+                pending.pop(0)
+            continue
+        kept.append(line)
+        pending = [(m.group(1) == "-", m.group(3)) for m in HEREDOC.finditer(line)]
+    # An unterminated "heredoc" was probably text inside quotes; keep everything rather than
+    # risk hiding a command.
+    return command if pending else "\n".join(kept)
 
 
 def _tokens(command: str) -> list[str]:
     # Newlines and backticks also separate commands; inside quotes the substitution is harmless.
-    text = command.replace("\n", " ; ").replace("`", " ; ")
+    text = _strip_heredocs(command).replace("\n", " ; ").replace("`", " ; ")
     lexer = shlex.shlex(text, posix=True, punctuation_chars=True)
     lexer.whitespace_split = True
+    # shlex would treat `#` as a comment to the end of the whole text; _segments ends it at the
+    # next separator instead, which includes the end of its line.
+    lexer.commenters = ""
     try:
         return list(lexer)
     except ValueError:
@@ -45,12 +71,15 @@ def _tokens(command: str) -> list[str]:
 
 def _segments(tokens: list[str]) -> list[list[str]]:
     segments: list[list[str]] = [[]]
-    skip_next = False
+    skip_next = in_comment = False
     for token in tokens:
-        if skip_next:
-            skip_next = False
-        elif token in SEPARATORS:
+        if token in SEPARATORS:
             segments.append([])
+            skip_next = in_comment = False
+        elif skip_next:
+            skip_next = False
+        elif in_comment or token.startswith("#"):
+            in_comment = True
         elif token and set(token) <= set("<>&|;()") and ("<" in token or ">" in token):
             # Redirection: drop the operator, its target, and a file-descriptor number before it.
             if segments[-1] and segments[-1][-1].isdigit():
@@ -70,7 +99,11 @@ def _git(directory: Path, *args: str) -> str | None:
             check=False,
             timeout=10,
         )
-    except OSError, subprocess.SubprocessError:
+    # Two clauses rather than a tuple: Ruff's py315 target rewrites `except (A, B):` into
+    # `except A, B:`, which only Python 3.14+ can parse.
+    except OSError:
+        return None
+    except subprocess.SubprocessError:
         return None
     return result.stdout.strip() if result.returncode == 0 else None
 
@@ -200,6 +233,8 @@ def check_push(args: list[str], directory: Path) -> tuple[list[str], list[str]]:
         if name in PROTECTED_BRANCHES:
             action = "delete" if deleting else "push to"
             blocks.append(f"don't {action} `{name}`; push a feature branch and open a PR")
+        elif deleting:
+            asks.append(f"this deletes remote branch `{name}`; CLAUDE.md needs the user's approval")
         elif not deleting and not _is_tag(directory, name) and not BRANCH_RULE.match(name):
             asks.append(
                 f"branch `{name}` doesn't match CLAUDE.md's `<type>/<issue>-<slug>` rule"
@@ -209,12 +244,35 @@ def check_push(args: list[str], directory: Path) -> tuple[list[str], list[str]]:
     return blocks, asks
 
 
-def evaluate(command: str, cwd: Path) -> tuple[list[str], list[str]]:
+def _nested_command(segment: list[str]) -> str | None:
+    """Return the command string run by `sh -c '...'` or `eval ...`, if the segment is one."""
+    for i, token in enumerate(segment):
+        name = Path(token).name
+        if name == "eval":
+            return " ".join(segment[i + 1 :])
+        if name in SHELLS:
+            for j in range(i + 1, len(segment) - 1):
+                option = segment[j]
+                if not option.startswith("-"):
+                    break
+                if not option.startswith("--") and "c" in option:
+                    return segment[j + 1]
+    return None
+
+
+def evaluate(command: str, cwd: Path, depth: int = 0) -> tuple[list[str], list[str]]:
     blocks: list[str] = []
     asks: list[str] = []
     if "push" not in command:
         return blocks, asks
+    if depth > MAX_NESTING:
+        return ["the command nests shells too deeply to check"], asks
     for segment in _segments(_tokens(command)):
+        nested = _nested_command(segment)
+        if nested is not None:
+            nested_blocks, nested_asks = evaluate(nested, cwd, depth + 1)
+            blocks += nested_blocks
+            asks += nested_asks
         parsed = _push_args(segment, cwd)
         if parsed is not None:
             segment_blocks, segment_asks = check_push(*parsed)

@@ -27,6 +27,8 @@ care.
   (issue text, and PR conversation comments), `pulls/<N>` (`title`, `body`, `base.ref`, `head.sha`),
   `pulls/<N>/files`, `pulls/<N>/reviews`, `pulls/<N>/comments` (inline), `commits/<sha>/check-runs`
   (`name`, `status`, `conclusion`), and `commits/<sha>/status` (status contexts such as CodeRabbit).
+  List endpoints return 30 items per page, so add `--paginate` to read comments, reviews, files,
+  and check runs in full.
 - MegaLinter findings: follow `.claude/rules/megalinter.md`. It covers this repository's lint job,
   not application architecture.
 - Linter configs live in `.linter-rules/` (for example `.ruff.toml`, `.markdownlint.jsonc`,
@@ -105,9 +107,9 @@ care.
 - Never push to a protected branch, force-push, or bypass hooks. Don't overwrite unrelated local changes.
 - Hooks in `.claude/settings.json` enforce part of this. `.claude/hooks/guard_git_push.py` blocks
   force pushes and pushes to `main`, and asks the user before pushing a branch whose name breaks
-  the rule above. `.claude/hooks/check_python_lint.py` reports Ruff findings, using
-  `.linter-rules/.ruff.toml`, after each edit to a Python file. Fix what it reports in code you
-  changed.
+  the rule above or deleting a remote branch. `.claude/hooks/check_python_lint.py` reports Ruff
+  findings, using `.linter-rules/.ruff.toml`, after each edit to a Python file. Fix what it reports
+  in code you changed.
 - When branch currency matters, merge `origin/main` as directed by
   `.claude/rules/branch-currency.md`. Don't update merely because `main` moved.
 - PR titles use Conventional Commits (`<type>: <description>`). The title check enforces this.
