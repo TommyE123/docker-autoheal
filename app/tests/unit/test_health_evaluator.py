@@ -61,7 +61,7 @@ class TestUptimeKumaDependency:
 
 @pytest.mark.asyncio
 class TestEngineHandOff:
-    def test_engine_has_no_uptime_kuma_monitor_by_default(self, engine):
+    async def test_engine_has_no_uptime_kuma_monitor_by_default(self, engine):
         assert engine.uptime_kuma_monitor is None
 
     async def test_monitor_passed_to_the_engine_constructor_reaches_the_evaluator(
