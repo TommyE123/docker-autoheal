@@ -12,13 +12,45 @@ curl http://localhost:9090/metrics
 
 Metrics defined by the service:
 
-| Metric                                | Type    | Labels           | Description                                |
-|---------------------------------------|---------|------------------|--------------------------------------------|
-| `autoheal_container_restarts_total`   | Counter | `container_name` | Total restarts performed                   |
-| `autoheal_containers_monitored`       | Gauge   | —                | Number of containers currently monitored   |
-| `autoheal_containers_quarantined`     | Gauge   | —                | Number of containers currently quarantined |
-| `autoheal_health_checks_total`        | Counter | —                | Total health checks performed              |
-| `autoheal_health_checks_failed_total` | Counter | `container_name` | Failed health checks                       |
+| Metric                                | Type    | Labels           | Description                                       |
+|---------------------------------------|---------|------------------|---------------------------------------------------|
+| `autoheal_container_restarts_total`   | Counter | `container_name` | Successful restarts performed by Autoheal         |
+| `autoheal_containers_monitored`       | Gauge   | —                | Containers monitored in the last monitoring cycle |
+| `autoheal_containers_quarantined`     | Gauge   | —                | Containers currently quarantined                  |
+| `autoheal_health_checks_total`        | Counter | —                | Health checks that produced a result              |
+| `autoheal_health_checks_failed_total` | Counter | `container_name` | Health checks that reported the container failing |
+
+When each metric changes:
+
+- **`autoheal_container_restarts_total`** goes up by one each time Autoheal restarts a
+  container to recover it and Docker reports the restart succeeded. Failed restarts,
+  restarts skipped for cooldown or backoff, quarantines, and restarts you trigger from the
+  web UI or `POST /api/containers/{id}/restart` are not counted. `container_name` is the
+  container's Docker name.
+- **`autoheal_health_checks_total`** goes up by one for each custom health check that
+  runs and each Docker native health status of `healthy` or `unhealthy` that Autoheal reads
+  (see [Health checks](health-checks.md)). Health checks run only in the `health` and
+  `both` restart modes. Nothing is counted for a container that is still starting, a
+  stopped container whose exit code alone decides the outcome (a clean manual stop, or an
+  exit-code restart in `both` mode), a Docker status of `starting`, a custom HTTP or TCP
+  check skipped for host networking, or an Uptime Kuma DOWN status. A custom check of type
+  `docker` reads the same Docker status, so it is counted once, not twice.
+- **`autoheal_health_checks_failed_total`** goes up by one, with the container's name in
+  `container_name`, for each of those checks that fails: a custom check that reports the
+  container unhealthy or errors, or a Docker status of `unhealthy`. A failed custom check
+  ends that container's evaluation, so its Docker status is not read that cycle.
+- **`autoheal_containers_monitored`** is set at the end of each monitoring cycle to the
+  number of containers selected for monitoring, quarantined ones included. It keeps its
+  last value while maintenance mode is on, when Docker cannot be reached, lists no
+  containers or fails to list them, and when Autoheal can read the details of none of the
+  listed containers. Listing inspects each container, so one failed inspection there fails
+  the whole listing and no container is checked that cycle. If the listing succeeds but one
+  container's details then cannot be read (for example, its image lookup fails), that
+  container still counts if it was in the last count the gauge was set from, and is left
+  out if it was not. It reads 0 until the first cycle completes.
+- **`autoheal_containers_quarantined`** is read from the quarantine list each time
+  Prometheus scrapes, so it matches the quarantined count on the Dashboard and in
+  `GET /api/status`.
 
 The metrics server runs on its own port, separate from the web UI/API port (`3131`), so
 you can restrict access to it independently (for example, only exposing it to your

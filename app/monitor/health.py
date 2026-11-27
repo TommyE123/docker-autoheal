@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from app.config.config_manager import AutoHealEvent, config_manager
+from app.monitor.metrics import record_health_check
 
 if TYPE_CHECKING:
     from docker.models.containers import Container
@@ -19,6 +20,14 @@ if TYPE_CHECKING:
     from app.monitor.uptime_kuma_monitor import UptimeKumaMonitor
 
 logger = logging.getLogger(__name__)
+
+# Docker native health statuses that are the result of a check
+_NATIVE_HEALTH_RESULTS = ("healthy", "unhealthy")
+
+
+def _metric_label(info: dict) -> str:
+    """The container name for metric labels, or its Docker ID when the name is unknown"""
+    return info.get("name") or info["full_id"]
 
 
 @dataclass(frozen=True)
@@ -248,6 +257,8 @@ class HealthEvaluator:
     ) -> str | None:
         """
         The reason a custom or Docker native health check fails, or None when both pass
+
+        Each check that produces a result is counted once in the health check metrics.
         Args:
             container: Container object
             info: Container information dict
@@ -266,16 +277,36 @@ class HealthEvaluator:
         if custom_hc:
             result = await self.perform_custom_health_check(container, custom_hc)
             self._note_custom_check_result(info, custom_hc.check_type, skipped=result is None)
+            # A check that could not run says nothing about health, so it is not counted. A
+            # passing "docker" check reads the Docker status that is counted below instead.
+            if result is not None and (custom_hc.check_type != "docker" or result is False):
+                record_health_check(_metric_label(info), failed=not result)
             if result is False:
                 return f"Custom health check failed ({custom_hc.check_type})"
         else:
             self._skipped_checks.pop(info["full_id"], None)
 
         # Then check Docker native health
-        health = info.get("health")
-        if health and health.get("status") == "unhealthy":
+        if self._record_native_health(info):
             return "Docker health check reports unhealthy"
         return None
+
+    @staticmethod
+    def _record_native_health(info: dict) -> bool:
+        """
+        Count the Docker native health status as one check, when it is a check result
+        Args:
+            info: Container information dict
+        Returns:
+            True when the status is unhealthy. "starting" means Docker has no result yet.
+        """
+        health = info.get("health")
+        status = health.get("status") if health else None
+        if status not in _NATIVE_HEALTH_RESULTS:
+            return False
+        unhealthy = status == "unhealthy"
+        record_health_check(_metric_label(info), failed=unhealthy)
+        return unhealthy
 
     def forget_absent(self, listed_ids: set[str | None]) -> None:
         """
@@ -373,7 +404,9 @@ class HealthEvaluator:
                 status = await asyncio.to_thread(
                     self.docker_client.get_docker_native_health, container
                 )
-                return status == "healthy" if status else True  # Assume healthy if no check
+                # Only an explicit "unhealthy" fails. "starting" has no result yet, and a container
+                # without a health check is assumed healthy, as without a custom check
+                return status != "unhealthy"
             logger.warning("Unknown health check type: %s", check_type)
         except Exception as e:
             logger.error("Error performing health check: %s", e)

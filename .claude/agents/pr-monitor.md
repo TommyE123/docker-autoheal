@@ -29,4 +29,7 @@ pending, not green.
 
 Read-only: do not edit files, comment on the PR, trigger reviews, rerun jobs, push, or change
 workflows. Do not sleep, poll, retry indefinitely, or launch a persistent monitor. A hook limits
-Bash to read-only `gh` and `git` commands such as `gh pr view`, `gh pr checks`, and `gh run view`.
+Bash to read-only `gh` and `git` commands. Read the PR and its checks with the `gh api` forms listed
+in `CLAUDE.md` (`pulls/<PR>` for `head.sha`, then `commits/<sha>/check-runs --paginate` and
+`commits/<sha>/status`); the hook doesn't allow `gh pr view`, `gh pr checks`, or `gh pr list`,
+which return a 403 in cloud sessions. `gh run view` and `gh pr diff` work.
