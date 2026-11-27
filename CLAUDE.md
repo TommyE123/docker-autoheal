@@ -56,6 +56,9 @@ care.
 - Work within the requested scope and follow existing patterns.
 - Prefer existing mechanisms over new infrastructure. Use the `simplification-review` skill before
   adding tooling, automation, dependencies, or infrastructure.
+- When you propose an approach or write an issue, give a rough size (files and lines) and the
+  cheapest alternative. If the diff grows to about twice that size, stop and check with the user
+  before continuing.
 - Add regression tests for behaviour fixes where practical.
 - Update documentation when a change makes it inaccurate.
 - Don't fix unrelated failures, and never weaken validation to make CI green.
@@ -150,6 +153,8 @@ care.
   it found. If you skipped it, say so and why. Before any later push, rerun it on the unpushed
   commits only when they change behaviour, add real scope, or touch an area it already flagged; skip
   it for small fixes. It does not replace CodeRabbit.
+- If successive review rounds keep finding new problems in the same code, stop patching. Treat it
+  as a sign the approach is wrong, and reconsider it with the user before the next fix.
 - `REVIEW.md` defines the evidence standard for local reviews. GitHub automatic CodeRabbit reviews
   stay disabled; chat replies are enabled.
 
