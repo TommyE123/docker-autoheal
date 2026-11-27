@@ -109,7 +109,8 @@ database — all state is JSON files under `/data`.
    `clear_restart_history()`, and still applies the cooldown, records the event and sends the
    notification. If saving the quarantine list fails, the engine stops that container's cycle:
    it does not quarantine or restart it, and records no event and sends no notification. The
-   next cycle tries again.
+   next cycle tries again. If the health evaluator cannot save a `health_check_skipped` event,
+   it logs the failure and still runs the Docker native health check.
 
    Auto-discovery distinguishes two cases. If saving a new selection to `config.json` fails,
    the selection is rolled back and it returns before recording the event or sending the
