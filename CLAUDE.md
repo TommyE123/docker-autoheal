@@ -20,10 +20,11 @@ care.
 - Validation scope: follow `.claude/rules/testing.md`. CI is authoritative for repository-wide checks.
 - Checks around a push (fetch first, linters per file type, coverage, SonarCloud, docs search, PR
   descriptions): follow `.claude/rules/prepush-checks.md`.
-- In Claude Code cloud sessions the GraphQL-backed `gh issue view`, `gh pr view`, `gh pr checks`,
-  and `gh pr list` return a 403 (`gh pr diff` and `gh run list` still work). Use
-  `gh api repos/<owner>/<repo>/...` instead: `issues/<N>` and `issues/<N>/comments` (issue text, and
-  PR conversation comments), `pulls/<N>` (`title`, `body`, `base.ref`, `head.sha`),
+- Read GitHub with `gh api repos/<owner>/<repo>/...`, which works both locally and in cloud
+  sessions. In Claude Code cloud sessions the GraphQL-backed `gh issue view`, `gh pr view`,
+  `gh pr checks`, and `gh pr list` return a 403, and the read-only agents' hook doesn't allow them
+  (`gh pr diff` and `gh run list` still work). Endpoints: `issues/<N>` and `issues/<N>/comments`
+  (issue text, and PR conversation comments), `pulls/<N>` (`title`, `body`, `base.ref`, `head.sha`),
   `pulls/<N>/files`, `pulls/<N>/reviews`, `pulls/<N>/comments` (inline), `commits/<sha>/check-runs`
   (`name`, `status`, `conclusion`), and `commits/<sha>/status` (status contexts such as CodeRabbit).
 - MegaLinter findings: follow `.claude/rules/megalinter.md`. It covers this repository's lint job,
@@ -102,6 +103,11 @@ care.
   operation preserves labels already on the PR. Don't use `issue_write` (`update`) to apply PR
   labels because it replaces the full label set.
 - Never push to a protected branch, force-push, or bypass hooks. Don't overwrite unrelated local changes.
+- Hooks in `.claude/settings.json` enforce part of this. `.claude/hooks/guard_git_push.py` blocks
+  force pushes and pushes to `main`, and asks the user before pushing a branch whose name breaks
+  the rule above. `.claude/hooks/check_python_lint.py` reports Ruff findings, using
+  `.linter-rules/.ruff.toml`, after each edit to a Python file. Fix what it reports in code you
+  changed.
 - When branch currency matters, merge `origin/main` as directed by
   `.claude/rules/branch-currency.md`. Don't update merely because `main` moved.
 - PR titles use Conventional Commits (`<type>: <description>`). The title check enforces this.

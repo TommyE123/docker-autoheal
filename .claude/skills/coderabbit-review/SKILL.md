@@ -13,9 +13,9 @@ automatic reviews stay disabled. Never merge; the owner decides.
 - Never post `@coderabbitai full review` or `@coderabbitai review`, including follow-up reviews
   after fix pushes, unless the user has told you to. Without that instruction, stop and report that
   no CodeRabbit review has been requested.
-- All evidence must be for the current pushed head (`gh pr view <PR> --json headRefOid`). Recheck
-  the head and its checks immediately before requesting a review or reporting the PR ready. If the
-  head changed, go back to the CI gate.
+- All evidence must be for the current pushed head (`head.sha` from
+  `gh api repos/<owner>/<repo>/pulls/<PR>`). Recheck the head and its checks immediately before
+  requesting a review or reporting the PR ready. If the head changed, go back to the CI gate.
 - A verified, intentionally skipped job (such as the Docker smoke test on a fork PR) is not
   applicable, not passing. Investigate any unexpected skipped, neutral, or missing check.
 - Read new PR comments and submitted reviews from people and bots. Act on actionable in-scope
@@ -30,8 +30,9 @@ automatic reviews stay disabled. Never merge; the owner decides.
 
 1. Confirm the PR targets `main`, the head is pushed, and GitHub access works. Follow
    `.claude/rules/branch-currency.md` only when being behind `main` matters.
-2. Run `gh pr checks <PR>`. While checks are pending, `sleep 60` and run it again, at most 10 times
-   per pushed head.
+2. Read the head's checks with `gh api repos/<owner>/<repo>/commits/<sha>/check-runs` and
+   `.../commits/<sha>/status`. While checks are pending, `sleep 60` and read them again, at most 10
+   times per pushed head.
 3. Every applicable check must pass.
 4. Inspect MegaLinter findings even if its job passed. Fix findings this PR introduced or worsened,
    including nonblocking warnings, under `.claude/rules/megalinter.md`. Leave unrelated pre-existing
@@ -59,8 +60,8 @@ Report the blocker to the user and stop, without requesting a review, in any of 
 
 ## 3. Wait for the review
 
-- Run `gh pr view <PR> --json reviews,comments` every 60 seconds, at most 10 times. You are looking
-  for a CodeRabbit review of the requested head.
+- Read `gh api repos/<owner>/<repo>/pulls/<PR>/reviews` and `.../issues/<PR>/comments` every 60
+  seconds, at most 10 times. You are looking for a CodeRabbit review of the requested head.
 - These do not count as completion: an acknowledgment, silence, a skipped review, or a review of an
   older head. Re-read the bot's reply to your command each time, because an acknowledgment may be
   edited into a rate-limit notice.
@@ -77,9 +78,10 @@ Report the blocker to the user and stop, without requesting a review, in any of 
 ## 4. Handle findings
 
 1. Read inline comments with `gh api repos/<owner>/<repo>/pulls/<PR>/comments --paginate`;
-   `gh pr view` does not return them. The endpoint also returns older reviews and replies, so keep
-   top-level comments (no `in_reply_to_id`) and skip only threads already handled (resolved, or
-   answered with the fix and its commit). The REST comments don't say whether a thread is resolved.
+   the reviews endpoint does not return them. This endpoint also returns older reviews and replies,
+   so keep top-level comments (no `in_reply_to_id`) and skip only threads already handled
+   (resolved, or answered with the fix and its commit). The REST comments don't say whether a
+   thread is resolved.
    In Claude Code cloud sessions, where GraphQL returns a 403, read `resolved` from the
    session-provided route `gh api repos/<owner>/<repo>/pulls/<PR>/ccr/review_threads` (it is not
    part of GitHub's REST API). It returns one entry per thread with `comment_ids` (the REST comment

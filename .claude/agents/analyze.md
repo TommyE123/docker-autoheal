@@ -17,7 +17,8 @@ hooks:
 
 Understand the request and its acceptance criteria before implementation.
 
-1. Read the issue with `gh issue view <N> --comments`, or use the issue text the caller provided.
+1. Read the issue with `gh api repos/<owner>/<repo>/issues/<N>` and
+   `gh api repos/<owner>/<repo>/issues/<N>/comments`, or use the issue text the caller provided.
    Then read the relevant code, tests, configuration, and repository guidance. Locate the owning
    path in `app/`, `frontend/src/`, Docker/Compose, or `.github/` as appropriate.
 2. Identify expected behaviour, failure conditions, affected files, existing patterns, and likely

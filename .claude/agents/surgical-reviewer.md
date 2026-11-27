@@ -21,23 +21,26 @@ model is sonnet. The caller passes `model: opus` for complex changes and for edi
 Gather evidence first. Choose the path by what you were asked to review, not by whether a PR exists.
 If reviewing the pushed PR head:
 
-- `gh pr view <PR> --json title,body,baseRefName,headRefOid,files`, `gh pr diff <PR>`, and
-  `gh issue view <N> --comments`.
-- `gh pr checks <PR>`. Pending is not green.
+- `gh api repos/<owner>/<repo>/pulls/<PR>` (`title`, `body`, `base.ref`, `head.sha`),
+  `gh api repos/<owner>/<repo>/pulls/<PR>/files`, `gh pr diff <PR>`, and
+  `gh api repos/<owner>/<repo>/issues/<N>` with its `/comments`.
+- `gh api repos/<owner>/<repo>/commits/<head-sha>/check-runs` and `.../commits/<head-sha>/status`.
+  Pending is not green.
 
 If reviewing local commits that are not pushed yet (a pre-push review, whether or not a PR exists),
 use the local branch instead. `gh pr diff` returns only the pushed head and would miss them:
 
-- `git diff origin/main...HEAD` and `git log origin/main..HEAD`, plus `gh issue view <N> --comments`
-  when there is a linked issue (with no issue, use the PR description if one exists, and the request
-  you were given). Run `git diff` and `git log` as separate commands, since the read-only hook
-  blocks chaining.
+- `git diff origin/main...HEAD` and `git log origin/main..HEAD`, plus
+  `gh api repos/<owner>/<repo>/issues/<N>` with its `/comments` when there is a linked issue
+  (with no issue, use the PR description if one exists, and the request you were given). Run
+  `git diff` and `git log` as separate commands, since the read-only hook blocks chaining.
 - The pushed head's checks don't cover these commits. Say so in the report, and don't count CI as verified.
 
 In both cases:
 
-- If the `gh` GraphQL commands fail with a 403, use the `gh api` equivalents listed in `CLAUDE.md`,
-  with no `--jq` or write flags.
+- Use the `gh api` forms listed in `CLAUDE.md`, with no `--jq` or write flags. The hook doesn't
+  allow the GraphQL-backed `gh issue view`, `gh pr view`, `gh pr checks`, or `gh pr list`, which
+  return a 403 in cloud sessions.
 
 - Read every changed file in full at the head being reviewed.
 - For changes to `CLAUDE.md` or `.claude/`, check frontmatter fields, tool names, and model aliases

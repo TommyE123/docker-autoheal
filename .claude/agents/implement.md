@@ -19,7 +19,8 @@ nearby code and tests first; follow `CLAUDE.md` and the applicable rules in `.cl
 - Validate the changed area per `.claude/rules/testing.md`: target the affected behaviour first,
   then broaden only when shared or integration behaviour requires it. Update affected documentation
   when it would otherwise be inaccurate.
-- Report the change, actual checks run, and remaining risks. Do not claim CI or integration checks
+- Report the change, each acceptance criterion and how the change meets it, the regression tests
+  added or updated, actual checks run, and remaining risks. Do not claim CI or integration checks
   passed unless they ran.
 
 This agent is independently usable; an analyse or design phase is not a prerequisite for a small,

@@ -29,7 +29,11 @@ if printf '%s' "$cmd" | grep -Eq -- '(^| )--output'; then
   block "--output writes files"
 fi
 
-allowed='^(gh (issue view|pr view|pr diff|pr checks|pr list|run view|run list)|git (diff|log|show|status|rev-parse|merge-base|ls-files|blame))( |$)'
+if printf '%s' "$cmd" | grep -Eq '^gh (issue view|pr view|pr checks|pr list)( |$)'; then
+  block "GraphQL-backed gh commands return 403 in cloud sessions; use the gh api repos/<owner>/<repo>/... forms in CLAUDE.md"
+fi
+
+allowed='^(gh (pr diff|run view|run list)|git (diff|log|show|status|rev-parse|merge-base|ls-files|blame))( |$)'
 if printf '%s' "$cmd" | grep -Eq "$allowed"; then
   exit 0
 fi
