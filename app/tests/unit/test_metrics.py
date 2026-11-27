@@ -611,9 +611,11 @@ class TestMonitoredGauge:
 
         assert sample(MONITORED) == 7
 
+    @pytest.mark.parametrize("include_all", [False, True])
     async def test_failed_inspection_of_a_counted_container_keeps_it_counted(
-        self, engine, docker_client
+        self, engine, docker_client, update_config, include_all
     ):
+        update_config(lambda c: setattr(c.monitor, "include_all", include_all))
         self.add(docker_client, "metrics-mon-inspect-a", "1" * 64)
         self.add(docker_client, "metrics-mon-inspect-b", "2" * 64)
         await engine._check_containers()
@@ -624,9 +626,11 @@ class TestMonitoredGauge:
 
         assert sample(MONITORED) == 2
 
+    @pytest.mark.parametrize("include_all", [False, True])
     async def test_container_that_always_fails_inspection_does_not_freeze_the_count(
-        self, engine, docker_client
+        self, engine, docker_client, update_config, include_all
     ):
+        update_config(lambda c: setattr(c.monitor, "include_all", include_all))
         self.add(docker_client, "metrics-mon-always-a", "1" * 64)
         self.add(docker_client, "metrics-mon-always-bad", "3" * 64)
         del docker_client._info["3" * 64]  # never counted, because it never inspects

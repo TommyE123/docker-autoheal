@@ -352,13 +352,14 @@ class MonitoringEngine:
 
         # Get container info
         info = await asyncio.to_thread(self.docker_client.get_container_info, container)
-        if info:
-            self._cycle_inspected += 1
-        elif container.id in self._monitored_ids and self._cycle_monitored is not None:
-            # Inspection failed, so keep counting a container that was counted before. One
-            # that never was, such as a container that always fails, is left out.
-            self._cycle_monitored += 1
-            self._cycle_monitored_ids.add(container.id)
+        if not info:
+            # Inspection failed, so there is nothing to select or check. Keep counting a
+            # container that was counted before; one that never was is left out.
+            if container.id in self._monitored_ids and self._cycle_monitored is not None:
+                self._cycle_monitored += 1
+                self._cycle_monitored_ids.add(container.id)
+            return
+        self._cycle_inspected += 1
         container_id = info.get("full_id")
         container_name = info.get("name")
 

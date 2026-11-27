@@ -41,11 +41,13 @@ When each metric changes:
   ends that container's evaluation, so its Docker status is not read that cycle.
 - **`autoheal_containers_monitored`** is set at the end of each monitoring cycle to the
   number of containers selected for monitoring, quarantined ones included. It keeps its
-  last value while maintenance mode is on, when Docker cannot be reached or lists no
-  containers, and when Docker fails to inspect every container that cycle. A container that
-  Docker fails to inspect still counts if it was counted the cycle before. One that was
-  never counted, such as a container Docker cannot inspect at all, is left out. It reads 0
-  until the first cycle completes.
+  last value while maintenance mode is on, when Docker cannot be reached, lists no
+  containers or fails to list them, and when Autoheal cannot read the details of any listed
+  container. Listing inspects each container, so one failed inspection there fails the whole
+  listing and no container is checked that cycle. If the listing succeeds but one
+  container's details then cannot be read (for example, its image lookup fails), that
+  container still counts if it was counted the cycle before, and is left out if it never
+  was. It reads 0 until the first cycle completes.
 - **`autoheal_containers_quarantined`** is read from the quarantine list each time
   Prometheus scrapes, so it matches the quarantined count on the Dashboard and in
   `GET /api/status`.
