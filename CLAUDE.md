@@ -59,9 +59,9 @@ care.
 - When you propose an approach or write an issue, give a rough size (files and lines) and the
   cheapest alternative. If the diff grows to about twice that size, stop and check with the user
   before continuing.
-- Run `analyze` before choosing an approach for a change that adds tooling, automation, or
-  governance, or spans several components. Its report gives the size estimate and cheapest
-  alternative that the rule above asks for.
+- Run `analyze` before choosing an approach for a change that adds tooling, automation,
+  dependencies, or infrastructure, or spans several components. Its report gives the size estimate
+  and cheapest alternative that the rule above asks for.
 - Add regression tests for behaviour fixes where practical.
 - Update documentation when a change makes it inaccurate.
 - Don't fix unrelated failures, and never weaken validation to make CI green.
