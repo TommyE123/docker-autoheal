@@ -18,6 +18,7 @@ docker-autoheal/
 │   ├── monitor/
 │   │   ├── auto_discovery.py     # Adds labelled containers to monitoring (startup scan, start-event listener)
 │   │   ├── health.py             # Whether a container needs a restart (exit status, health checks)
+│   │   ├── metrics.py            # Prometheus metric definitions the monitor updates
 │   │   ├── monitoring_engine.py  # Core monitoring loop, restarts and quarantine
 │   │   ├── recovery.py           # In-memory cooldown, backoff, restart-wait and quarantine-release state
 │   │   ├── selection.py          # Which containers are monitored (selected/excluded, labels, filters)
@@ -103,6 +104,8 @@ suites (see [Testing](testing.md#legacy-script-triage) for what happened to each
 - **`app/monitor/health.py`** — `HealthEvaluator`, which decides from a container's exit status,
   custom health checks, Docker's native health and the Uptime Kuma monitor whether it needs a
   restart.
+- **`app/monitor/metrics.py`** — the Prometheus metric definitions, registered on import.
+  The monitoring engine and `HealthEvaluator` update them; `app/main.py` only serves them.
 - **`app/monitor/selection.py`** — the pure function that decides, from configuration and
   container information, whether a container is monitored.
 - **`app/notifications/notification_manager.py`** — async, queue-based notification

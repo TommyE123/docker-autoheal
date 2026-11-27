@@ -37,9 +37,10 @@ for, since a test can keep passing and no longer exercise its error path.
 
 SonarCloud only analyses the pushed head, so check it after each push once a PR exists (the first
 push comes before the PR is opened, so check right after opening it) instead of waiting for CI to
-fail. Wait until the SonarCloud check on the pushed head has completed (`gh pr checks <N>`). The
-issues query returns `"total":0` with HTTP 200 for an unanalysed head, a wrong PR number or a wrong
-key, so an empty result means nothing until you confirm the analysed commit is the pushed head:
+fail. Wait until the SonarCloud check on the pushed head has completed
+(`gh api repos/<owner>/<repo>/commits/<sha>/check-runs --paginate`). The issues query returns `"total":0`
+with HTTP 200 for an unanalysed head, a wrong PR number or a wrong key, so an empty result means
+nothing until you confirm the analysed commit is the pushed head:
 
 ```bash
 curl -sS "https://sonarcloud.io/api/project_pull_requests/list?project=TommyE123_docker-autoheal"

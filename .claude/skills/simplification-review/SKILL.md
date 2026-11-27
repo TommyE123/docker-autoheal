@@ -13,7 +13,8 @@ Before designing custom machinery, check these in order:
 
 1. Existing Autoheal code
 2. Existing dependencies
-3. GitHub / GitHub Actions
+3. GitHub / GitHub Actions, including repository settings such as rulesets. A setting only the
+   owner can change is still an option: propose it rather than replacing it with code.
 4. Docker / Compose
 5. The language or runtime standard library
 6. Established third-party tools or actions
@@ -31,3 +32,6 @@ For non-trivial tooling choices, weigh:
 Don't add a dependency merely to remove a small amount of code, and don't assume third-party
 software is automatically better. Recommend the smallest maintainable approach with a brief
 rationale and any material trade-offs. Don't change files as part of this review.
+
+A best-effort guard, such as a hook or a deny pattern, stays best effort: list its known gaps
+rather than growing it to cover every case.

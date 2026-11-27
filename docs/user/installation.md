@@ -78,6 +78,40 @@ If `/data` isn't writable, the service falls back to `./data` relative to its wo
 directory inside the container — but without a volume mount, that state is lost when the
 container is removed.
 
+## Shutdown
+
+`docker stop` sends `SIGTERM`, then `SIGKILL` once the stop timeout runs out (10 seconds by
+default). Docker Autoheal shuts down in two steps, one after the other:
+
+1. The web server stops accepting connections and gives requests already in progress up to
+   3 seconds to finish, then cancels the rest.
+2. The service stops the Uptime Kuma monitor, then stops the monitoring and delivers queued
+   notifications side by side. Two operations have a 5 second timeout of their own: waiting for
+   the Docker event-reader thread to exit, and delivering the queued notifications. The delivery
+   window starts as soon as the stop begins, so a notification already being sent can be cut off
+   earlier than if the two ran one after the other. The thread wait is queued on the same worker
+   pool as other Docker calls, so when that pool is busy it can take longer than its timeout.
+
+That adds up to about 8 seconds, as an estimate, which normally fits in Docker's default once
+startup has finished. If the stop arrives while the service is still starting, for example while
+it waits on an unreachable Uptime Kuma server, the service first gives startup up to 5 more
+seconds, so the total can reach about 13 seconds and exceed the default (tracked in
+[#342](https://github.com/TommyE123/docker-autoheal/issues/342)). The log line
+`Docker Autoheal stopped` marks the end of the service's cleanup, not proof that it was clean:
+check the warnings logged before it for any step that failed. Notifications still queued when
+the 5 seconds run out are dropped, with a warning in the log.
+
+The deadline is not guaranteed. Some work runs in background worker threads, for example a
+manual container restart from the web UI or a Docker call made by a monitoring check. Cancelling
+the request or the monitoring does not stop that thread, and the Python runtime waits for those
+threads before the process exits, so the process can still outlive the stop timeout and be
+killed by Docker. This is a known limitation of the current shutdown, tracked in
+[#343](https://github.com/TommyE123/docker-autoheal/issues/343).
+
+To give it more time, set `stop_grace_period` in Compose to a value above the 10 second default
+(the commented example in `docker-compose.yml` shows the setting; `10s` is the default, so use a
+larger value) or pass `docker stop --time <seconds>`.
+
 ## Try it with a sample container
 
 ```bash

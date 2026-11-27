@@ -23,6 +23,7 @@ from unittest.mock import patch
 import pytest
 import requests
 import uvicorn
+from fastapi import FastAPI
 
 import app.main as main_module
 
@@ -63,6 +64,52 @@ async def _wait_until(predicate, timeout_seconds, failure_message):
         await asyncio.sleep(_POLL_INTERVAL_SECONDS)
 
 
+async def _wait_for_server():
+    """Wait for ``run_api_server()`` to build and start its server; return it and its URL."""
+    await _wait_until(
+        lambda: bool(_RecordingServer.instances),
+        _STARTUP_TIMEOUT_SECONDS,
+        "uvicorn.Server was never constructed by run_api_server()",
+    )
+    server = _RecordingServer.instances[0]
+
+    await _wait_until(
+        lambda: server.started and bool(server.servers),
+        _STARTUP_TIMEOUT_SECONDS,
+        "uvicorn server did not start listening in time",
+    )
+    port = server.servers[0].sockets[0].getsockname()[1]
+    return server, f"http://127.0.0.1:{port}"
+
+
+async def _shut_down(server_task):
+    """Ask the recorded server to exit, escalating to force exit and then cancellation."""
+    if _RecordingServer.instances:
+        _RecordingServer.instances[0].should_exit = True
+    # asyncio.shield() keeps server_task running if this wait
+    # times out, instead of cancelling it and skipping Uvicorn's
+    # own socket-closing shutdown sequence.
+    with suppress(TimeoutError):
+        await asyncio.wait_for(asyncio.shield(server_task), timeout=_SHUTDOWN_TIMEOUT_SECONDS)
+    if not server_task.done() and _RecordingServer.instances:
+        _RecordingServer.instances[0].force_exit = True
+        with suppress(TimeoutError):
+            await asyncio.wait_for(
+                asyncio.shield(server_task),
+                timeout=_SHUTDOWN_TIMEOUT_SECONDS,
+            )
+    if not server_task.done():
+        server_task.cancel()
+        try:
+            await asyncio.wait_for(server_task, timeout=_SHUTDOWN_TIMEOUT_SECONDS)
+        except asyncio.CancelledError:
+            pass
+        except TimeoutError:
+            raise AssertionError(
+                "server_task did not finish even after cancellation -- a socket may have leaked"
+            ) from None
+
+
 class TestRunApiServerRealUvicornSmoke:
     """Starts the real production ``run_api_server()`` path end to end."""
 
@@ -88,20 +135,7 @@ class TestRunApiServerRealUvicornSmoke:
         ):
             server_task = asyncio.create_task(main_module.run_api_server())
             try:
-                await _wait_until(
-                    lambda: bool(_RecordingServer.instances),
-                    _STARTUP_TIMEOUT_SECONDS,
-                    "uvicorn.Server was never constructed by run_api_server()",
-                )
-                server = _RecordingServer.instances[0]
-
-                await _wait_until(
-                    lambda: server.started and bool(server.servers),
-                    _STARTUP_TIMEOUT_SECONDS,
-                    "uvicorn server did not start listening in time",
-                )
-                port = server.servers[0].sockets[0].getsockname()[1]
-                base_url = f"http://127.0.0.1:{port}"
+                server, base_url = await _wait_for_server()
 
                 health_response = await asyncio.to_thread(
                     requests.get, f"{base_url}/health", timeout=5
@@ -110,33 +144,7 @@ class TestRunApiServerRealUvicornSmoke:
                     requests.get, f"{base_url}/api/status", timeout=5
                 )
             finally:
-                if _RecordingServer.instances:
-                    _RecordingServer.instances[0].should_exit = True
-                # asyncio.shield() keeps server_task running if this wait
-                # times out, instead of cancelling it and skipping Uvicorn's
-                # own socket-closing shutdown sequence.
-                with suppress(TimeoutError):
-                    await asyncio.wait_for(
-                        asyncio.shield(server_task), timeout=_SHUTDOWN_TIMEOUT_SECONDS
-                    )
-                if not server_task.done() and _RecordingServer.instances:
-                    _RecordingServer.instances[0].force_exit = True
-                    with suppress(TimeoutError):
-                        await asyncio.wait_for(
-                            asyncio.shield(server_task),
-                            timeout=_SHUTDOWN_TIMEOUT_SECONDS,
-                        )
-                if not server_task.done():
-                    server_task.cancel()
-                    try:
-                        await asyncio.wait_for(server_task, timeout=_SHUTDOWN_TIMEOUT_SECONDS)
-                    except asyncio.CancelledError:
-                        pass
-                    except TimeoutError:
-                        raise AssertionError(
-                            "server_task did not finish even after cancellation "
-                            "-- a socket may have leaked"
-                        ) from None
+                await _shut_down(server_task)
 
             assert health_response.status_code == 200
             health_json = health_response.json()
@@ -153,3 +161,90 @@ class TestRunApiServerRealUvicornSmoke:
             # Clean shutdown: the server task exited and released its sockets.
             assert server_task.done()
             assert server.should_exit is True
+
+
+def _get_status(url: str) -> int | Exception:
+    """GET ``url``; return the status code, or the error if no response arrived."""
+    try:
+        return requests.get(url, timeout=10).status_code
+    except requests.RequestException as error:
+        return error
+
+
+class TestRunApiServerGracefulShutdownBound:
+    """In-flight requests get ``UVICORN_GRACEFUL_SHUTDOWN_SECONDS``, then are cancelled."""
+
+    @pytest.mark.asyncio
+    async def test_slow_request_is_cancelled_while_fast_one_completes(
+        self, update_config, monkeypatch, caplog
+    ):
+        update_config(lambda config: setattr(config.ui, "listen_address", "127.0.0.1"))
+        update_config(lambda config: setattr(config.ui, "listen_port", 0))
+        monkeypatch.setattr(main_module, "UVICORN_GRACEFUL_SHUTDOWN_SECONDS", 0.3)
+        _RecordingServer.instances.clear()
+
+        fast_entered = asyncio.Event()
+        fast_release = asyncio.Event()
+        slow_entered = asyncio.Event()
+        slow_cancelled = asyncio.Event()
+        api = FastAPI()
+
+        @api.get("/fast")
+        async def fast():
+            fast_entered.set()
+            await fast_release.wait()
+            return {"done": True}
+
+        @api.get("/slow")
+        async def slow():
+            slow_entered.set()
+            try:
+                await asyncio.Event().wait()  # never finishes on its own
+            except asyncio.CancelledError:
+                slow_cancelled.set()
+                raise
+
+        with (
+            patch("app.main.app", api),
+            patch("app.main.uvicorn.Server", _RecordingServer),
+            patch("asyncio.sleep", _real_asyncio_sleep),
+        ):
+            server_task = asyncio.create_task(main_module.run_api_server())
+            try:
+                server, base_url = await _wait_for_server()
+                fast_response = asyncio.create_task(
+                    asyncio.to_thread(_get_status, f"{base_url}/fast")
+                )
+                slow_response = asyncio.create_task(
+                    asyncio.to_thread(_get_status, f"{base_url}/slow")
+                )
+                await asyncio.wait_for(fast_entered.wait(), timeout=_STARTUP_TIMEOUT_SECONDS)
+                await asyncio.wait_for(slow_entered.wait(), timeout=_STARTUP_TIMEOUT_SECONDS)
+
+                server.should_exit = True
+                await _wait_until(
+                    lambda: not server.servers[0].is_serving(),
+                    _SHUTDOWN_TIMEOUT_SECONDS,
+                    "uvicorn did not begin shutting down",
+                )
+                # Shutdown has begun: an in-flight request may still finish normally
+                fast_release.set()
+
+                await asyncio.wait_for(
+                    asyncio.shield(server_task), timeout=_SHUTDOWN_TIMEOUT_SECONDS
+                )
+            finally:
+                await _shut_down(server_task)
+
+            fast_status = await asyncio.wait_for(fast_response, timeout=_SHUTDOWN_TIMEOUT_SECONDS)
+            slow_status = await asyncio.wait_for(slow_response, timeout=_SHUTDOWN_TIMEOUT_SECONDS)
+
+        assert server_task.exception() is None  # serve() returned on its own
+        assert fast_status == 200
+        assert slow_cancelled.is_set()
+        assert slow_status != 200
+        assert any(
+            record.name == "uvicorn.error"
+            and record.getMessage().startswith("Cancel 1 running task(s)")
+            for record in caplog.records
+        )

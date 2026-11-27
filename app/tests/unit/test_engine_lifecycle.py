@@ -955,6 +955,36 @@ class TestMonitorLoop:
         assert engine._task.cancelled()
         assert engine._event_task.cancelled()
 
+    async def test_stop_cancels_both_tasks_before_awaiting_either(self, engine):
+        # Both tasks send notifications; the service stops the notification manager
+        # concurrently, so neither may still be running while the monitor loop unwinds
+        unwind = asyncio.Event()
+
+        async def slow_to_unwind():
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                await unwind.wait()
+                raise
+
+        async def forever():
+            await asyncio.Event().wait()
+
+        engine._running = True
+        engine._task = asyncio.create_task(slow_to_unwind())
+        engine._event_task = asyncio.create_task(forever())
+        await asyncio.sleep(0)
+
+        stop_task = asyncio.create_task(engine.stop())
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        assert not engine._task.done()
+        assert engine._event_task.cancelled()
+
+        unwind.set()
+        await asyncio.wait_for(stop_task, timeout=5)
+        assert engine._task.cancelled()
+
     async def test_stop_without_background_tasks(self, engine, caplog):
         engine._running = True
         engine._task = None
