@@ -236,8 +236,15 @@ class MonitoringEngine:
         logger.info("Stopping monitoring engine...")
         self._running = False
 
+        # Cancel both tasks before awaiting either: they send notifications, and
+        # `AutoHealService._shutdown()` relies on neither resuming once this first await
+        # yields (the notification manager stops concurrently with the engine)
         if self._task:
             self._task.cancel()
+        if self._event_task:
+            self._event_task.cancel()
+
+        if self._task:
             try:
                 await self._task
             except asyncio.CancelledError:
@@ -246,7 +253,6 @@ class MonitoringEngine:
                 logger.warning("Error stopping monitor loop: %s", e)
 
         if self._event_task:
-            self._event_task.cancel()
             try:
                 await self._event_task
             except asyncio.CancelledError:
