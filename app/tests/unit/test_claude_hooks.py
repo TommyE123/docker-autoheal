@@ -33,11 +33,12 @@ def _run_hook(script, payload, env=None, cwd=None):
     )
 
 
-def test_lint_hook_parses_as_python_3_10():
-    # Claude Code runs the hook with whatever python3 is installed, not the Dockerfile's Python,
-    # and Ruff's py315 target can rewrite code into syntax older versions reject.
+def test_lint_hook_parses_as_python_3_13():
+    # Claude Code runs the hook with whatever python3 is installed, not the Dockerfile's Python:
+    # 3.13 in Claude Code cloud sessions. Ruff's py315 target can rewrite code into syntax that
+    # 3.13 rejects.
     source = (HOOKS / "check_python_lint.py").read_text()
-    ast.parse(source, feature_version=(3, 10))
+    ast.parse(source, feature_version=(3, 13))
     assert source.startswith("#!/usr/bin/env python3\n")
 
 
