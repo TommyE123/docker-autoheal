@@ -47,14 +47,36 @@ def lint(file_path: Path, root: Path) -> str | None:
     return report
 
 
+def checkout_root(file_path: Path, fallback: Path) -> Path:
+    """Return the git checkout that contains file_path, or fallback outside any checkout.
+
+    CLAUDE_PROJECT_DIR stays on the original checkout when Claude works in another worktree, so
+    the edited file's own checkout decides which config and working directory apply.
+    """
+    try:
+        result = subprocess.run(  # noqa: S603
+            ["git", "-C", str(file_path.parent), "rev-parse", "--show-toplevel"],  # noqa: S607
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+        )
+    except OSError:
+        return fallback
+    except subprocess.SubprocessError:
+        return fallback
+    toplevel = result.stdout.strip()
+    return Path(toplevel) if result.returncode == 0 and toplevel else fallback
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
         file_path = payload.get("tool_input", {}).get("file_path")
         if not file_path:
             return 0
-        root = Path(os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or ".")
-        report = lint(Path(file_path), root)
+        fallback = Path(os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or ".")
+        report = lint(Path(file_path), checkout_root(Path(file_path), fallback))
     except Exception:
         # A broken lint hook must never get in the way of editing.
         return 0

@@ -95,6 +95,19 @@ def test_lint_applies_path_based_ignores_from_a_subdirectory(lint_root):
 
 
 @requires_ruff
+def test_lint_checks_files_in_another_worktree(lint_root, tmp_path):
+    # CLAUDE_PROJECT_DIR stays on the original checkout when Claude works in another worktree.
+    worktree = tmp_path / "worktree"
+    shutil.copytree(lint_root, worktree)
+    subprocess.run(["git", "init", "-q", str(worktree)], check=True)  # noqa: S603, S607
+    target = worktree / "bad.py"
+    target.write_text("import os\n")
+    result = _lint(lint_root, target)
+    assert result.returncode == 2
+    assert "F401" in result.stderr
+
+
+@requires_ruff
 def test_lint_truncates_long_reports(lint_root):
     target = lint_root / "many.py"
     target.write_text("".join(f"import mod{i}\n" for i in range(300)))
