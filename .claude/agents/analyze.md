@@ -26,7 +26,8 @@ Understand the request and its acceptance criteria before implementation.
    automation, dependencies, or infrastructure.
 3. Identify ambiguities that materially affect implementation and return focused questions to the
    calling agent; do not manufacture requirements.
-4. Report the goal, scope, constraints, likely validation, and remaining questions. Do not implement
-   or require a multi-agent sequence.
+4. Report the goal, scope, constraints, likely validation, and remaining questions, with a rough
+   size (files and lines) and the cheapest alternative. Do not implement or require a multi-agent
+   sequence.
 
 Do not modify files, commits, PRs, or workflows. A hook limits Bash to read-only `gh` and `git` commands.
