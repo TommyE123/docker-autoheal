@@ -29,6 +29,9 @@ def lint(file_path: Path, root: Path) -> str | None:
     for args in (["check", "--no-fix"], ["format", "--check", "--diff"]):
         result = subprocess.run(  # noqa: S603
             [ruff, *args, "--config", str(config), str(file_path)],
+            # Path-based per-file-ignores resolve against the working directory, and a hook runs
+            # in the session's current directory, which may be a subdirectory.
+            cwd=root,
             capture_output=True,
             text=True,
             check=False,

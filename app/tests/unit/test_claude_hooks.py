@@ -20,12 +20,13 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 HOOKS = REPO_ROOT / ".claude" / "hooks"
 
 
-def _run_hook(script, payload, env=None):
+def _run_hook(script, payload, env=None, cwd=None):
     # The repository's own fixed scripts; nothing here is untrusted input.
     return subprocess.run(  # noqa: S603
         [HOOKS / script],
         input=payload if isinstance(payload, str) else json.dumps(payload),
         env=env,
+        cwd=cwd,
         capture_output=True,
         text=True,
         check=False,
@@ -53,12 +54,12 @@ def lint_root(tmp_path):
     return root
 
 
-def _lint(root, file_path, env_path=None):
+def _lint(root, file_path, env_path=None, cwd=None):
     env = {**os.environ, "CLAUDE_PROJECT_DIR": str(root)}
     if env_path is not None:
         env["PATH"] = env_path
     payload = {"tool_input": {"file_path": str(file_path)}, "cwd": str(root)}
-    return _run_hook("check_python_lint.py", payload, env=env)
+    return _run_hook("check_python_lint.py", payload, env=env, cwd=cwd)
 
 
 @requires_ruff
@@ -78,6 +79,17 @@ def test_lint_is_silent_for_a_clean_file(lint_root):
     target = lint_root / "clean.py"
     target.write_text('"""Clean module."""\n\nVALUE = 1\n')
     result = _lint(lint_root, target)
+    assert (result.returncode, result.stderr) == (0, "")
+
+
+@requires_ruff
+def test_lint_applies_path_based_ignores_from_a_subdirectory(lint_root):
+    # .ruff.toml ignores ANN201 under app/api/routes/; Claude Code may run the hook from app/.
+    routes = lint_root / "app" / "api" / "routes"
+    routes.mkdir(parents=True)
+    target = routes / "handlers.py"
+    target.write_text('"""Routes."""\n\n\ndef handler():\n    return 1\n')
+    result = _lint(lint_root, target, cwd=lint_root / "app")
     assert (result.returncode, result.stderr) == (0, "")
 
 

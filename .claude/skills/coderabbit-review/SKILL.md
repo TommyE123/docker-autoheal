@@ -30,9 +30,9 @@ automatic reviews stay disabled. Never merge; the owner decides.
 
 1. Confirm the PR targets `main`, the head is pushed, and GitHub access works. Follow
    `.claude/rules/branch-currency.md` only when being behind `main` matters.
-2. Read the head's checks with `gh api repos/<owner>/<repo>/commits/<sha>/check-runs` and
-   `.../commits/<sha>/status`. While checks are pending, `sleep 60` and read them again, at most 10
-   times per pushed head.
+2. Read the head's checks with `gh api repos/<owner>/<repo>/commits/<sha>/check-runs --paginate`
+   and `.../commits/<sha>/status`. While checks are pending, `sleep 60` and read them again, at
+   most 10 times per pushed head.
 3. Every applicable check must pass.
 4. Inspect MegaLinter findings even if its job passed. Fix findings this PR introduced or worsened,
    including nonblocking warnings, under `.claude/rules/megalinter.md`. Leave unrelated pre-existing
@@ -60,8 +60,9 @@ Report the blocker to the user and stop, without requesting a review, in any of 
 
 ## 3. Wait for the review
 
-- Read `gh api repos/<owner>/<repo>/pulls/<PR>/reviews` and `.../issues/<PR>/comments` every 60
-  seconds, at most 10 times. You are looking for a CodeRabbit review of the requested head.
+- Read `gh api repos/<owner>/<repo>/pulls/<PR>/reviews --paginate` and
+  `.../issues/<PR>/comments --paginate` every 60 seconds, at most 10 times. You are looking for a
+  CodeRabbit review of the requested head.
 - These do not count as completion: an acknowledgment, silence, a skipped review, or a review of an
   older head. Re-read the bot's reply to your command each time, because an acknowledgment may be
   edited into a rate-limit notice.
