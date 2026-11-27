@@ -611,14 +611,33 @@ class TestMonitoredGauge:
 
         assert sample(MONITORED) == 7
 
-    async def test_failed_inspection_keeps_the_last_count(self, engine, docker_client):
+    async def test_failed_inspection_of_a_counted_container_keeps_it_counted(
+        self, engine, docker_client
+    ):
         self.add(docker_client, "metrics-mon-inspect-a", "1" * 64)
         self.add(docker_client, "metrics-mon-inspect-b", "2" * 64)
-        del docker_client._info["1" * 64]  # listed, but inspecting it returns {}
+        await engine._check_containers()
+        assert sample(MONITORED) == 2
+        del docker_client._info["1" * 64]  # still listed, but inspecting it returns {}
 
         await engine._check_containers()
 
-        assert sample(MONITORED) == 7
+        assert sample(MONITORED) == 2
+
+    async def test_container_that_always_fails_inspection_does_not_freeze_the_count(
+        self, engine, docker_client
+    ):
+        self.add(docker_client, "metrics-mon-always-a", "1" * 64)
+        self.add(docker_client, "metrics-mon-always-bad", "3" * 64)
+        del docker_client._info["3" * 64]  # never counted, because it never inspects
+
+        await engine._check_containers()
+        assert sample(MONITORED) == 1
+
+        self.add(docker_client, "metrics-mon-always-b", "2" * 64)
+        await engine._check_containers()
+
+        assert sample(MONITORED) == 2
 
     async def test_failed_inspection_of_every_container_does_not_publish_zero(
         self, engine, docker_client

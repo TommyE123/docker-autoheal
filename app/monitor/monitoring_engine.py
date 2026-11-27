@@ -105,6 +105,12 @@ class MonitoringEngine:
         # Containers selected for monitoring so far this cycle, or None once maintenance
         # mode has skipped a check, since the cycle then says nothing about the count
         self._cycle_monitored: int | None = 0
+        # IDs counted this cycle and in the last published cycle, and how many containers
+        # Docker inspected this cycle. A container that cannot be inspected keeps its place
+        # in the count only if it was counted before.
+        self._cycle_monitored_ids: set[str | None] = set()
+        self._monitored_ids: set[str | None] = set()
+        self._cycle_inspected = 0
 
     @property
     def uptime_kuma_monitor(self) -> UptimeKumaMonitor | None:
@@ -314,6 +320,8 @@ class MonitoringEngine:
                 self._health_evaluator.forget_absent(listed_ids)
 
             self._cycle_monitored = 0
+            self._cycle_monitored_ids = set()
+            self._cycle_inspected = 0
             for container in containers:
                 try:
                     await self._check_single_container(container)
@@ -321,8 +329,9 @@ class MonitoringEngine:
                     logger.error("Error checking container %s: %s", container.name, e)
 
             # An empty listing may be a failed Docker call, so the last count is kept
-            if containers and self._cycle_monitored is not None:
+            if containers and self._cycle_monitored is not None and self._cycle_inspected:
                 containers_monitored.set(self._cycle_monitored)
+                self._monitored_ids = self._cycle_monitored_ids
 
         except Exception as e:
             logger.exception("Error checking containers: %s", e)
@@ -343,9 +352,13 @@ class MonitoringEngine:
 
         # Get container info
         info = await asyncio.to_thread(self.docker_client.get_container_info, container)
-        if not info:
-            # Inspection failed, so this cycle cannot say how many containers are monitored
-            self._cycle_monitored = None
+        if info:
+            self._cycle_inspected += 1
+        elif container.id in self._monitored_ids and self._cycle_monitored is not None:
+            # Inspection failed, so keep counting a container that was counted before. One
+            # that never was, such as a container that always fails, is left out.
+            self._cycle_monitored += 1
+            self._cycle_monitored_ids.add(container.id)
         container_id = info.get("full_id")
         container_name = info.get("name")
 
@@ -356,6 +369,7 @@ class MonitoringEngine:
             return
         if self._cycle_monitored is not None:
             self._cycle_monitored += 1
+            self._cycle_monitored_ids.add(container.id)
 
         # Check if container is quarantined (by recovery ID, or a legacy name or ID entry)
         identifiers = self._container_identifiers(info)
