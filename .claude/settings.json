@@ -15,7 +15,22 @@
       "Bash(git push * --force-with-lease:*)",
       "Bash(git push * -f:*)",
       "Bash(git push * --force*)",
-      "Bash(git push * --force-with-lease=*)"
+      "Bash(git push * --force-with-lease=*)",
+      "Bash(git push * +*)",
+      "Bash(git push -uf*)",
+      "Bash(git push -fu*)",
+      "Bash(git push * -uf*)",
+      "Bash(git push * -fu*)",
+      "Bash(git -C * push *--force*)",
+      "Bash(git -C * push * -f*)",
+      "Bash(git push * HEAD:main*)",
+      "Bash(git push * :main*)",
+      "Bash(git -C * push -f*)",
+      "Bash(git -C * push -uf*)",
+      "Bash(git -C * push -fu*)",
+      "Bash(git -C * push * +*)",
+      "Bash(git push --mirror*)",
+      "Bash(git push * --mirror*)"
     ],
     "ask": ["Bash(git reset --hard:*)"],
     "allow": [
@@ -23,6 +38,20 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(gh pr create:*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check_python_lint.py",
+            "timeout": 120
+          }
+        ]
+      }
     ]
   }
 }

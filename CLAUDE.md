@@ -20,12 +20,15 @@ care.
 - Validation scope: follow `.claude/rules/testing.md`. CI is authoritative for repository-wide checks.
 - Checks around a push (fetch first, linters per file type, coverage, SonarCloud, docs search, PR
   descriptions): follow `.claude/rules/prepush-checks.md`.
-- In Claude Code cloud sessions the GraphQL-backed `gh issue view`, `gh pr view`, `gh pr checks`,
-  and `gh pr list` return a 403 (`gh pr diff` and `gh run list` still work). Use
-  `gh api repos/<owner>/<repo>/...` instead: `issues/<N>` and `issues/<N>/comments` (issue text, and
-  PR conversation comments), `pulls/<N>` (`title`, `body`, `base.ref`, `head.sha`),
+- Read GitHub with `gh api repos/<owner>/<repo>/...`, which works both locally and in cloud
+  sessions. In Claude Code cloud sessions the GraphQL-backed `gh issue view`, `gh pr view`,
+  `gh pr checks`, and `gh pr list` return a 403, and the read-only agents' hook doesn't allow them
+  (`gh pr diff` and `gh run list` still work). Endpoints: `issues/<N>` and `issues/<N>/comments`
+  (issue text, and PR conversation comments), `pulls/<N>` (`title`, `body`, `base.ref`, `head.sha`),
   `pulls/<N>/files`, `pulls/<N>/reviews`, `pulls/<N>/comments` (inline), `commits/<sha>/check-runs`
   (`name`, `status`, `conclusion`), and `commits/<sha>/status` (status contexts such as CodeRabbit).
+  List endpoints return 30 items per page, so add `--paginate` to read comments, reviews, files,
+  and check runs in full.
 - MegaLinter findings: follow `.claude/rules/megalinter.md`. It covers this repository's lint job,
   not application architecture.
 - Linter configs live in `.linter-rules/` (for example `.ruff.toml`, `.markdownlint.jsonc`,
@@ -53,6 +56,12 @@ care.
 - Work within the requested scope and follow existing patterns.
 - Prefer existing mechanisms over new infrastructure. Use the `simplification-review` skill before
   adding tooling, automation, dependencies, or infrastructure.
+- When you propose an approach or write an issue, give a rough size (files and lines) and the
+  cheapest alternative. If the diff grows to about twice that size, stop and check with the user
+  before continuing.
+- Run `analyze` before choosing an approach for a change that adds tooling, automation,
+  dependencies, or infrastructure, or spans several components. Its report gives the size estimate
+  and cheapest alternative that the rule above asks for.
 - Add regression tests for behaviour fixes where practical.
 - Update documentation when a change makes it inaccurate.
 - Don't fix unrelated failures, and never weaken validation to make CI green.
@@ -102,6 +111,10 @@ care.
   operation preserves labels already on the PR. Don't use `issue_write` (`update`) to apply PR
   labels because it replaces the full label set.
 - Never push to a protected branch, force-push, or bypass hooks. Don't overwrite unrelated local changes.
+- `.claude/hooks/check_python_lint.py`, registered in `.claude/settings.json`, reports Ruff
+  findings, using `.linter-rules/.ruff.toml`, after each edit to a Python file when Ruff is
+  installed; silence without Ruff is not a clean result. Fix what it reports
+  in code you changed.
 - When branch currency matters, merge `origin/main` as directed by
   `.claude/rules/branch-currency.md`. Don't update merely because `main` moved.
 - PR titles use Conventional Commits (`<type>: <description>`). The title check enforces this.
@@ -144,6 +157,8 @@ care.
   it found. If you skipped it, say so and why. Before any later push, rerun it on the unpushed
   commits only when they change behaviour, add real scope, or touch an area it already flagged; skip
   it for small fixes. It does not replace CodeRabbit.
+- If successive review rounds keep finding new problems in the same code, stop patching. Treat it
+  as a sign the approach is wrong, and reconsider it with the user before the next fix.
 - `REVIEW.md` defines the evidence standard for local reviews. GitHub automatic CodeRabbit reviews
   stay disabled; chat replies are enabled.
 
@@ -174,5 +189,5 @@ changes. Never invent an issue or PR number. If the number is unknown, ask inste
 ## Agents and skills
 
 The agents (`analyze`, `implement`, `pr-monitor`, `surgical-reviewer`, `test-validator`) and skills
-are optional tools chosen per task, not a mandatory sequence, except the pre-push
-`surgical-reviewer` run required under Review gate.
+are optional tools chosen per task, not a mandatory sequence, except the `analyze` run required
+under Working rules and the pre-push `surgical-reviewer` run required under Review gate.
