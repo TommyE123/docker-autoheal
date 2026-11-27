@@ -15,7 +15,6 @@ import runpy
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import prometheus_client
 import pytest
 from fastapi import FastAPI
 
@@ -29,9 +28,6 @@ def sandboxed_import(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(logging, "basicConfig", MagicMock())
     monkeypatch.setattr(logging, "FileHandler", MagicMock())
-    # app.main registers its metrics at import time; a second run would collide.
-    monkeypatch.setattr(prometheus_client, "Counter", MagicMock())
-    monkeypatch.setattr(prometheus_client, "Gauge", MagicMock())
 
     real_mkdir = Path.mkdir
 
