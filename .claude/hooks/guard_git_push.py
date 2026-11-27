@@ -34,34 +34,89 @@ GIT_OPTIONS_WITH_VALUE = frozenset(
 PUSH_OPTIONS_WITH_VALUE = frozenset({"--repo", "--push-option", "--receive-pack", "--exec"})
 FORCE_OPTIONS = frozenset({"--force", "--force-with-lease", "--mirror"})
 SHELLS = frozenset({"sh", "bash", "zsh", "dash", "ksh"})
-HEREDOC = re.compile(r"(?<!<)<<(-?)\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\2")
+# Commands that run a heredoc's body as shell code, so the body must still be checked.
+SHELL_RUNNERS = SHELLS | {"eval", "source", "."}
+HEREDOC = re.compile(r"<<(-?)[ \t]*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\2")
+WORD_START = frozenset(" \t;&|()")
 MAX_NESTING = 3
 
 
-def _strip_heredocs(command: str) -> str:
-    """Drop heredoc bodies, which are data rather than commands."""
+def _scan_line(line: str, quote: str | None) -> tuple[str, str | None, list[tuple[bool, str]]]:
+    """Strip an unquoted `#` comment and find unquoted heredoc markers in one line.
+
+    `quote` is the quote character open at the start of the line, if any; the one open at its end
+    is returned, so quoted text spanning lines is tracked.
+    """
     kept: list[str] = []
-    pending: list[tuple[bool, str]] = []
-    for line in command.split("\n"):
-        if pending:
-            strip_tabs, word = pending[0]
-            if (line.lstrip("\t") if strip_tabs else line) == word:
-                pending.pop(0)
+    markers: list[tuple[bool, str]] = []
+    i = 0
+    while i < len(line):
+        char = line[i]
+        if quote == "'":
+            quote = None if char == "'" else quote
+        elif char == "\\":
+            kept.append(line[i : i + 2])
+            i += 2
             continue
-        kept.append(line)
-        pending = [(m.group(1) == "-", m.group(3)) for m in HEREDOC.finditer(line)]
-    # An unterminated "heredoc" was probably text inside quotes; keep everything rather than
-    # risk hiding a command.
-    return command if pending else "\n".join(kept)
+        elif quote == '"':
+            quote = None if char == '"' else quote
+        elif char in "'\"":
+            quote = char
+        elif char == "#" and (i == 0 or line[i - 1] in WORD_START):
+            break
+        elif char == "<" and (i == 0 or line[i - 1] != "<"):
+            match = HEREDOC.match(line, i)
+            if match:
+                markers.append((match.group(1) == "-", match.group(3)))
+                kept.append(match.group(0))
+                i = match.end()
+                continue
+        kept.append(char)
+        i += 1
+    return "".join(kept), quote, markers
+
+
+def _heredoc_end(lines: list[str], start: int, markers: list[tuple[bool, str]]) -> int | None:
+    """Return the index of the first line after the heredoc bodies, or None if one is unclosed."""
+    index = start
+    for strip_tabs, word in markers:
+        while (
+            index < len(lines)
+            and (lines[index].lstrip("\t") if strip_tabs else lines[index]) != word
+        ):
+            index += 1
+        if index == len(lines):
+            return None
+        index += 1
+    return index
+
+
+def _runs_shell(text: str) -> bool:
+    return any(Path(word).name in SHELL_RUNNERS for word in re.split(r"[\s;&|()<>]+", text))
+
+
+def _preprocess(command: str) -> str:
+    """Remove comments, and heredoc bodies that are data rather than shell code."""
+    lines = command.split("\n")
+    kept: list[str] = []
+    quote = None
+    index = 0
+    while index < len(lines):
+        text, quote, markers = _scan_line(lines[index], quote)
+        kept.append(text)
+        index += 1
+        if markers and quote is None and not _runs_shell(text):
+            # An unclosed marker is checked as ordinary lines rather than risk hiding a command.
+            index = _heredoc_end(lines, index, markers) or index
+    return "\n".join(kept)
 
 
 def _tokens(command: str) -> list[str]:
     # Newlines and backticks also separate commands; inside quotes the substitution is harmless.
-    text = _strip_heredocs(command).replace("\n", " ; ").replace("`", " ; ")
+    text = _preprocess(command).replace("\n", " ; ").replace("`", " ; ")
     lexer = shlex.shlex(text, posix=True, punctuation_chars=True)
     lexer.whitespace_split = True
-    # shlex would treat `#` as a comment to the end of the whole text; _segments ends it at the
-    # next separator instead, which includes the end of its line.
+    # _preprocess has already removed comments; a `#` left over is quoted or inside a word.
     lexer.commenters = ""
     try:
         return list(lexer)
@@ -71,15 +126,13 @@ def _tokens(command: str) -> list[str]:
 
 def _segments(tokens: list[str]) -> list[list[str]]:
     segments: list[list[str]] = [[]]
-    skip_next = in_comment = False
+    skip_next = False
     for token in tokens:
         if token in SEPARATORS:
             segments.append([])
-            skip_next = in_comment = False
+            skip_next = False
         elif skip_next:
             skip_next = False
-        elif in_comment or token.startswith("#"):
-            in_comment = True
         elif token and set(token) <= set("<>&|;()") and ("<" in token or ">" in token):
             # Redirection: drop the operator, its target, and a file-descriptor number before it.
             if segments[-1] and segments[-1][-1].isdigit():
@@ -155,6 +208,7 @@ class PushOptions:
     positional: list[str] = field(default_factory=list)
     force: list[str] = field(default_factory=list)
     delete: bool = False
+    prune: bool = False
     all_branches: bool = False
     tags: bool = False
 
@@ -166,6 +220,8 @@ def _parse_long_option(arg: str, options: PushOptions) -> bool:
         options.force.append(arg)
     elif name == "--delete":
         options.delete = True
+    elif name == "--prune":
+        options.prune = True
     elif name in {"--all", "--branches"}:
         options.all_branches = True
     elif name in {"--tags", "--follow-tags"}:
@@ -226,6 +282,8 @@ def check_push(args: list[str], directory: Path) -> tuple[list[str], list[str]]:
         if refspec.startswith("+")
     ]
     asks: list[str] = []
+    if options.prune:
+        asks.append("`--prune` deletes remote branches; CLAUDE.md needs the user's approval")
     if options.all_branches and not options.positional[1:]:
         asks.append("`--all`/`--branches` pushes every local branch")
         return blocks, asks
@@ -234,8 +292,9 @@ def check_push(args: list[str], directory: Path) -> tuple[list[str], list[str]]:
             action = "delete" if deleting else "push to"
             blocks.append(f"don't {action} `{name}`; push a feature branch and open a PR")
         elif deleting:
-            asks.append(f"this deletes remote branch `{name}`; CLAUDE.md needs the user's approval")
-        elif not deleting and not _is_tag(directory, name) and not BRANCH_RULE.match(name):
+            kind = "tag" if name.startswith("refs/tags/") else "branch"
+            asks.append(f"this deletes remote {kind} `{name}`; CLAUDE.md needs the user's approval")
+        elif not _is_tag(directory, name) and not BRANCH_RULE.match(name):
             asks.append(
                 f"branch `{name}` doesn't match CLAUDE.md's `<type>/<issue>-<slug>` rule"
                 " (for example `fix/353-restart-handling`); push it only if the user approved"
@@ -251,11 +310,11 @@ def _nested_command(segment: list[str]) -> str | None:
         if name == "eval":
             return " ".join(segment[i + 1 :])
         if name in SHELLS:
+            # Options such as `-o pipefail` take values, so look at every short-option cluster;
+            # checking an extra string is harmless.
             for j in range(i + 1, len(segment) - 1):
                 option = segment[j]
-                if not option.startswith("-"):
-                    break
-                if not option.startswith("--") and "c" in option:
+                if option[:1] in "-+" and option[1:2] != "-" and "c" in option:
                     return segment[j + 1]
     return None
 

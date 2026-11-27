@@ -103,6 +103,15 @@ def _decision(result):
         "eval git push -f origin fix/1-some-fix",
         "cat <<'EOF' > notes.md\ngit push origin main\nEOF\ngit push -f origin fix/1-some-fix",
         'echo "<<EOF"\ngit push -f origin fix/1-some-fix',
+        'echo "a <<EOF"\ngit push -f origin fix/1-some-fix\nEOF',
+        "bash <<'EOF'\ngit push --force origin fix/1-some-fix\nEOF",
+        "cat <<EOF | sh\ngit push -f origin fix/1-some-fix\nEOF",
+        "bash -o pipefail -c 'git push -f origin fix/1-some-fix'",
+        "bash -O extglob -c 'git push -f origin fix/1-some-fix'",
+        "bash --rcfile /dev/null -c 'git push -f origin fix/1-some-fix'",
+        'git push origin "#tag" --force',
+        'git commit -m "fix #12" && git push -f origin fix/1-some-fix',
+        "git commit -m 'multi\nline # not a comment'\ngit push -f origin fix/1-some-fix",
     ],
 )
 def test_force_push_is_blocked(repo, command):
@@ -120,6 +129,7 @@ def test_force_push_is_blocked(repo, command):
         "git push origin :main",
         "git push origin --delete main",
         "git push -d origin main",
+        "sh -s <<EOF\ngit push origin main\nEOF",
         "git push",
     ],
 )
@@ -149,6 +159,8 @@ def test_bare_push_follows_upstream_to_main(repo):
         "git push --all origin",
         "git push origin --delete ccr-7c111260-nb365r",
         "git push origin :fix/1-some-fix",
+        "git push origin :refs/tags/v9",
+        "git push --prune origin fix/1-some-fix",
     ],
 )
 def test_non_compliant_branch_or_deletion_asks_the_user(repo, command):
