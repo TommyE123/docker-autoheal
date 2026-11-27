@@ -22,7 +22,8 @@ def resolve_log_level(level_name: str) -> int:
 
 
 def apply_log_level(level_name: str) -> int:
-    """Set the root logger and the uvicorn loggers to the configured level and return it"""
+    """Set the root logger to the configured level, hold uvicorn and urllib3 at WARNING, and
+    return the level"""
     level = resolve_log_level(level_name)
 
     # Set root logger level
@@ -32,5 +33,9 @@ def apply_log_level(level_name: str) -> int:
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
     logging.getLogger("uvicorn").setLevel(logging.WARNING)
+
+    # urllib3 (under requests and the Docker SDK) logs each request line at DEBUG, and a webhook
+    # URL's path and query can hold a token.
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
 
     return level
