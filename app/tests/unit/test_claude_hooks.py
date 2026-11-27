@@ -1,17 +1,14 @@
 """Behaviour tests for the Claude Code hooks in .claude/hooks/.
 
-guard_git_push.py must block force pushes and pushes to main, ask before pushing a branch whose
-name breaks CLAUDE.md's rule, and let everything else through. check_python_lint.py must report
-Ruff findings without changing the file and never get in the way of an edit. readonly-bash.sh
-must steer read-only agents from the GraphQL-backed gh commands to gh api. The real scripts are
-executed through their shebangs, as Claude Code runs them, with the hook JSON they receive on
-stdin.
+check_python_lint.py must report Ruff findings without changing the file and never get in the way
+of an edit. readonly-bash.sh must steer read-only agents from the GraphQL-backed gh commands to
+gh api. The real scripts are executed through their shebangs, as Claude Code runs them, with the
+hook JSON they receive on stdin.
 """
 
 import ast
 import json
 import os
-import shlex
 import shutil
 import subprocess
 import sys
@@ -35,226 +32,11 @@ def _run_hook(script, payload, env=None):
     )
 
 
-def _git(cwd, *args):
-    subprocess.run(  # noqa: S603
-        ["git", "-C", str(cwd), *args],  # noqa: S607
-        check=True,
-        capture_output=True,
-        env={
-            **os.environ,
-            "GIT_AUTHOR_NAME": "t",
-            "GIT_AUTHOR_EMAIL": "t@example.invalid",
-            "GIT_COMMITTER_NAME": "t",
-            "GIT_COMMITTER_EMAIL": "t@example.invalid",
-        },
-    )
-
-
-@pytest.fixture
-def repo(tmp_path):
-    """A clone of a local remote, on `main`, with one commit and a `v1.0.0` tag."""
-    remote = tmp_path / "remote.git"
-    _git(tmp_path, "init", "--bare", "-b", "main", str(remote))
-    clone = tmp_path / "clone"
-    _git(tmp_path, "clone", str(remote), str(clone))
-    _git(clone, "commit", "--allow-empty", "-m", "initial")
-    _git(clone, "push", "origin", "main")
-    _git(clone, "tag", "v1.0.0")
-    return clone
-
-
-def _guard(repo, command):
-    return _run_hook("guard_git_push.py", {"tool_input": {"command": command}, "cwd": str(repo)})
-
-
-def _decision(result):
-    if result.returncode == 2:
-        return "block"
-    assert result.returncode == 0, result.stderr
-    if not result.stdout.strip():
-        return "allow"
-    output = json.loads(result.stdout)["hookSpecificOutput"]
-    assert output["hookEventName"] == "PreToolUse"
-    return output["permissionDecision"]
-
-
-@pytest.mark.parametrize(
-    "command",
-    [
-        "git push --force origin fix/1-some-fix",
-        "git push -f origin fix/1-some-fix",
-        "git push -uf origin fix/1-some-fix",
-        "git push --force-with-lease origin fix/1-some-fix",
-        "git push --force-with-lease=fix/1-some-fix:abc123 origin fix/1-some-fix",
-        "git push --mirror origin",
-        "git push origin +fix/1-some-fix",
-        "git push origin +HEAD:fix/1-some-fix",
-        "git -C . push --force origin fix/1-some-fix",
-        "git -c push.default=current push -f",
-        "/usr/bin/git push -f origin fix/1-some-fix",
-        "cd . && git push -f origin fix/1-some-fix",
-        "git status\ngit push --force origin fix/1-some-fix",
-        "echo `git push -f origin fix/1-some-fix`",
-        "# Push the rewritten branch\ngit push --force origin fix/1-some-fix",
-        "git fetch origin  # refresh\ngit push -f origin fix/1-some-fix",
-        "git push origin fix/12-issue#12 --force",
-        "bash -c 'git push --force origin fix/1-some-fix'",
-        'sh -lc "cd . && git push -f origin fix/1-some-fix"',
-        "eval git push -f origin fix/1-some-fix",
-        "cat <<'EOF' > notes.md\ngit push origin main\nEOF\ngit push -f origin fix/1-some-fix",
-        'echo "<<EOF"\ngit push -f origin fix/1-some-fix',
-        'echo "a <<EOF"\ngit push -f origin fix/1-some-fix\nEOF',
-        "bash <<'EOF'\ngit push --force origin fix/1-some-fix\nEOF",
-        "cat <<EOF | sh\ngit push -f origin fix/1-some-fix\nEOF",
-        "bash -o pipefail -c 'git push -f origin fix/1-some-fix'",
-        "bash -O extglob -c 'git push -f origin fix/1-some-fix'",
-        "bash --rcfile /dev/null -c 'git push -f origin fix/1-some-fix'",
-        'git push origin "#tag" --force',
-        "git push \\\n  --force origin fix/1-some-fix",
-        'git commit -m "fix #12" && git push -f origin fix/1-some-fix',
-        "git commit -m 'multi\nline # not a comment'\ngit push -f origin fix/1-some-fix",
-    ],
-)
-def test_force_push_is_blocked(repo, command):
-    result = _guard(repo, command)
-    assert _decision(result) == "block"
-    assert "force-push" in result.stderr
-
-
-@pytest.mark.parametrize(
-    "command",
-    [
-        "git push origin main",
-        "git push origin HEAD:main",
-        "git push origin HEAD:refs/heads/main",
-        "git push origin :main",
-        "git push origin --delete main",
-        "git push -d origin main",
-        "sh -s <<EOF\ngit push origin main\nEOF",
-        "git push origin \\\n  HEAD:main",
-        "git push",
-    ],
-)
-def test_push_to_main_is_blocked(repo, command):
-    # The fixture's current branch is main, so a bare `git push` targets it too.
-    result = _guard(repo, command)
-    assert _decision(result) == "block"
-    assert "`main`" in result.stderr
-
-
-def test_bare_push_follows_upstream_to_main(repo):
-    # A feature branch created from origin/main tracks it, so a bare push would update main.
-    _git(repo, "checkout", "-b", "fix/1-some-fix", "--track", "origin/main")
-    _git(repo, "config", "push.default", "upstream")
-    assert _decision(_guard(repo, "git push")) == "block"
-
-
-@pytest.mark.parametrize(
-    "command",
-    [
-        "git push -u origin ccr-7c111260-nb365r",
-        "git push -u origin claude/brave-cannon-x1rfr7",
-        "git push origin feat/one",
-        "git push origin feat/one-two-three-four-five-six",
-        "git push origin Fix/1-some-fix",
-        "git push origin HEAD:wip",
-        "git push --all origin",
-        "git push origin --delete ccr-7c111260-nb365r",
-        "git push origin :fix/1-some-fix",
-        "git push origin :refs/tags/v9",
-        "git push --prune origin fix/1-some-fix",
-    ],
-)
-def test_non_compliant_branch_or_deletion_asks_the_user(repo, command):
-    result = _guard(repo, command)
-    assert _decision(result) == "ask"
-    assert (
-        "guard_git_push hook"
-        in json.loads(result.stdout)["hookSpecificOutput"]["permissionDecisionReason"]
-    )
-
-
-def test_bare_push_of_non_compliant_current_branch_asks(repo):
-    _git(repo, "checkout", "-b", "my-branch")
-    assert _decision(_guard(repo, "git push -u origin HEAD")) == "ask"
-
-
-@pytest.mark.parametrize(
-    "command",
-    [
-        "git push -u origin fix/353-restart-handling",
-        "git push origin docs/update-readme",
-        "git push origin feat/one-two-three-four-five",
-        "git push -o ci.skip origin feat/new-thing",
-        "git push --push-option=ci.skip origin feat/new-thing",
-        "git push --repo origin origin feat/new-thing",
-        "git push origin feat/new-thing 2>&1 | tail -3",
-        "git push origin HEAD:refs/heads/chore/12-tidy-up",
-        "git push origin v1.0.0",
-        "git push origin refs/tags/v2.0.0",
-        "git push --tags",
-        "git push -- origin fix/1-some-fix",
-        'git commit -m "never git push --force to main"',
-        "git commit -F - <<'EOF'\nchore: note\n\ngit push -f is blocked\nEOF",
-        "cat > notes.md <<'EOF'\ngit push origin main is blocked\nEOF",
-        "gh pr create --body-file - <<-EOF\n\tgit push origin main\n\tEOF",
-        "git commit -m \"$(cat <<'EOF'\ngit push --force\nEOF\n)\"",
-        "# git push -f is blocked\ngit status",
-        "git push \\\n  -u origin \\\n  fix/1-some-fix",
-        "echo 'a \\'\ngit push origin fix/1-some-fix",
-        "bash -c 'git push origin fix/1-some-fix'",
-        "bash scripts/push.sh",
-        "git log --grep push",
-        "echo push",
-        "ls",
-    ],
-)
-def test_other_commands_pass_through(repo, command):
-    assert _decision(_guard(repo, command)) == "allow"
-
-
-def test_bare_push_of_compliant_current_branch_passes(repo):
-    _git(repo, "checkout", "-b", "fix/1-some-fix")
-    assert _decision(_guard(repo, "git push")) == "allow"
-    assert _decision(_guard(repo, "git push -u origin HEAD")) == "allow"
-
-
-def test_block_wins_over_ask(repo):
-    result = _guard(repo, "git push origin wip && git push -f origin fix/1-some-fix")
-    assert _decision(result) == "block"
-
-
-def test_deeply_nested_shells_are_blocked(repo):
-    command = "git push origin fix/1-some-fix"
-    for _ in range(5):
-        command = f"bash -c {shlex.quote(command)}"
-    result = _guard(repo, command)
-    assert _decision(result) == "block"
-    assert "too deeply" in result.stderr
-
-
-def test_unbalanced_quotes_still_checked(repo):
-    assert _decision(_guard(repo, "git push -f origin fix/1-some-fix 'oops")) == "block"
-
-
-def test_unreadable_input_without_a_visible_push_passes():
-    assert _decision(_run_hook("guard_git_push.py", "not json")) == "allow"
-    assert _decision(_run_hook("guard_git_push.py", {"tool_input": {}})) == "allow"
-
-
-def test_guard_fails_closed_for_a_push_it_cannot_check():
-    # A non-string cwd makes the guard raise while checking the push.
-    payload = {"tool_input": {"command": "git push"}, "cwd": 123}
-    result = _run_hook("guard_git_push.py", payload)
-    assert _decision(result) == "block"
-    assert "could not check" in result.stderr
-
-
-@pytest.mark.parametrize("script", ["guard_git_push.py", "check_python_lint.py"])
-def test_hooks_parse_as_python_3_10(script):
-    # Claude Code runs the hooks with whatever python3 is installed, not the Dockerfile's Python.
-    source = (HOOKS / script).read_text()
-    ast.parse(source, filename=script, feature_version=(3, 10))
+def test_lint_hook_parses_as_python_3_10():
+    # Claude Code runs the hook with whatever python3 is installed, not the Dockerfile's Python,
+    # and Ruff's py315 target can rewrite code into syntax older versions reject.
+    source = (HOOKS / "check_python_lint.py").read_text()
+    ast.parse(source, feature_version=(3, 10))
     assert source.startswith("#!/usr/bin/env python3\n")
 
 

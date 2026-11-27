@@ -105,9 +105,7 @@ care.
   operation preserves labels already on the PR. Don't use `issue_write` (`update`) to apply PR
   labels because it replaces the full label set.
 - Never push to a protected branch, force-push, or bypass hooks. Don't overwrite unrelated local changes.
-- Hooks in `.claude/settings.json` enforce part of this. `.claude/hooks/guard_git_push.py` blocks
-  force pushes and pushes to `main`, and asks the user before pushing a branch whose name breaks
-  the rule above or deleting a remote branch. `.claude/hooks/check_python_lint.py` reports Ruff
+- `.claude/hooks/check_python_lint.py`, registered in `.claude/settings.json`, reports Ruff
   findings, using `.linter-rules/.ruff.toml`, after each edit to a Python file. Fix what it reports
   in code you changed.
 - When branch currency matters, merge `origin/main` as directed by

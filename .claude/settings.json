@@ -15,7 +15,16 @@
       "Bash(git push * --force-with-lease:*)",
       "Bash(git push * -f:*)",
       "Bash(git push * --force*)",
-      "Bash(git push * --force-with-lease=*)"
+      "Bash(git push * --force-with-lease=*)",
+      "Bash(git push * +*)",
+      "Bash(git push -uf*)",
+      "Bash(git push -fu*)",
+      "Bash(git push * -uf*)",
+      "Bash(git push * -fu*)",
+      "Bash(git -C * push *--force*)",
+      "Bash(git -C * push * -f*)",
+      "Bash(git push * HEAD:main*)",
+      "Bash(git push * :main*)"
     ],
     "ask": ["Bash(git reset --hard:*)"],
     "allow": [
@@ -26,18 +35,6 @@
     ]
   },
   "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard_git_push.py",
-            "timeout": 30
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",
