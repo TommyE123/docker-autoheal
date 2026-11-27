@@ -7,11 +7,11 @@ custom health checks and health-check failure paths.
 """
 
 import logging
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.config.config_manager import HealthCheckConfig, config_manager
+from app.config.config_manager import HealthCheckConfig, PersistenceError, config_manager
 from app.monitor.health import CustomCheckLookup, find_custom_health_check
 from app.tests.unit.conftest import make_container
 
@@ -394,6 +394,25 @@ class TestSkippedCustomHealthChecks:
 
         assert needs_restart is True
         assert reason == "Docker health check reports unhealthy"
+
+    async def test_docker_unhealthy_still_restarts_when_skip_event_save_fails(
+        self, engine, docker_client, caplog
+    ):
+        container, info = make_container(name="web", health={"status": "unhealthy"})
+        docker_client.add_container(container, info)
+        docker_client.health_results["web"] = None
+        self._add_check("http")
+
+        with patch.object(
+            config_manager, "_save_events", side_effect=PersistenceError("Failed to save events")
+        ):
+            needs_restart, reason = await engine._evaluate_container_health(container, info)
+
+        assert needs_restart is True
+        assert reason == "Docker health check reports unhealthy"
+        events = [e for e in config_manager.get_events() if e.event_type == "health_check_skipped"]
+        assert len(events) == 1
+        assert "Could not save the health_check_skipped event for container web" in caplog.text
 
     async def test_skip_is_logged_and_recorded_once_per_container(
         self, engine, docker_client, caplog
