@@ -112,7 +112,8 @@ care.
   labels because it replaces the full label set.
 - Never push to a protected branch, force-push, or bypass hooks. Don't overwrite unrelated local changes.
 - `.claude/hooks/check_python_lint.py`, registered in `.claude/settings.json`, reports Ruff
-  findings, using `.linter-rules/.ruff.toml`, after each edit to a Python file. Fix what it reports
+  findings, using `.linter-rules/.ruff.toml`, after each edit to a Python file when Ruff is
+  installed; silence without Ruff is not a clean result. Fix what it reports
   in code you changed.
 - When branch currency matters, merge `origin/main` as directed by
   `.claude/rules/branch-currency.md`. Don't update merely because `main` moved.

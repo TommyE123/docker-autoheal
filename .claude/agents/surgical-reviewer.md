@@ -22,16 +22,17 @@ Gather evidence first. Choose the path by what you were asked to review, not by 
 If reviewing the pushed PR head:
 
 - `gh api repos/<owner>/<repo>/pulls/<PR>` (`title`, `body`, `base.ref`, `head.sha`),
-  `gh api repos/<owner>/<repo>/pulls/<PR>/files`, `gh pr diff <PR>`, and
-  `gh api repos/<owner>/<repo>/issues/<N>` with its `/comments`.
-- `gh api repos/<owner>/<repo>/commits/<head-sha>/check-runs` and `.../commits/<head-sha>/status`.
+  `gh api repos/<owner>/<repo>/pulls/<PR>/files --paginate`, `gh pr diff <PR>`, and
+  `gh api repos/<owner>/<repo>/issues/<N>` with its `/comments --paginate`.
+- `gh api repos/<owner>/<repo>/commits/<head-sha>/check-runs --paginate` and
+  `.../commits/<head-sha>/status`.
   Pending is not green.
 
 If reviewing local commits that are not pushed yet (a pre-push review, whether or not a PR exists),
 use the local branch instead. `gh pr diff` returns only the pushed head and would miss them:
 
 - `git diff origin/main...HEAD` and `git log origin/main..HEAD`, plus
-  `gh api repos/<owner>/<repo>/issues/<N>` with its `/comments` when there is a linked issue
+  `gh api repos/<owner>/<repo>/issues/<N>` with its `/comments --paginate` when there is a linked issue
   (with no issue, use the PR description if one exists, and the request you were given). Run
   `git diff` and `git log` as separate commands, since the read-only hook blocks chaining.
 - The pushed head's checks don't cover these commits. Say so in the report, and don't count CI as verified.
