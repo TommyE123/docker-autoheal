@@ -37,7 +37,8 @@ def lint(file_path: Path, root: Path) -> str | None:
     else:
         return None
     result = subprocess.run(  # noqa: S603
-        [*command, "--config", str(config), str(file_path)],
+        # The ":" prefix makes markdownlint-cli2 treat the path literally, not as a glob.
+        [*command, "--config", str(config), f":{file_path.resolve()}"],
         cwd=root,
         # Without this npm retries for about a minute when the registry is unreachable.
         env={**os.environ, "npm_config_fetch_retries": "0"},

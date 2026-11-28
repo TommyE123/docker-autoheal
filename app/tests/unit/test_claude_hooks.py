@@ -181,6 +181,16 @@ def test_markdown_lint_reports_findings_without_changing_the_file(md_root):
 
 
 @requires_markdownlint
+@pytest.mark.parametrize("name", ["release{a,b}.md", "notes (draft).md"])
+def test_markdown_lint_treats_glob_characters_in_the_filename_literally(md_root, name):
+    target = md_root / name
+    target.write_text("# Title\n\n" + "word " * 30 + "\n")
+    result = _md_lint(md_root, target)
+    assert result.returncode == 2
+    assert "MD013" in result.stderr
+
+
+@requires_markdownlint
 def test_markdown_lint_is_silent_for_a_clean_file(md_root):
     target = md_root / "clean.md"
     target.write_text("# Title\n\nShort line.\n")
