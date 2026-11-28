@@ -115,6 +115,10 @@ care.
   findings, using `.linter-rules/.ruff.toml`, after each edit to a Python file when Ruff is
   installed; silence without Ruff is not a clean result. Fix what it reports
   in code you changed.
+- `.claude/hooks/check_markdown_lint.py`, registered in `.claude/settings.json`, does the same for
+  Markdown files with `markdownlint-cli2` and `.linter-rules/.markdownlint.jsonc`, falling back to
+  `npx` when it isn't installed. Silence is not a clean result: it doesn't run the table formatter
+  or run at all when the linter can't. Fix what it reports in lines you changed.
 - When branch currency matters, merge `origin/main` as directed by
   `.claude/rules/branch-currency.md`. Don't update merely because `main` moved.
 - PR titles use Conventional Commits (`<type>: <description>`). The title check enforces this.
