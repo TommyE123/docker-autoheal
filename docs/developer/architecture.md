@@ -95,6 +95,34 @@ database — all state is JSON files under `/data`.
    out other coroutines on the event loop thread); awaited work comes first. `update_config()`
    always keeps the live `containers.restart_counts` and `containers.restart_history`.
 
+   A write that fails (full disk, read-only or wrongly permissioned `/data`) is logged and
+   raised as `PersistenceError`, and the file keeps its previous contents. Maintenance
+   mode, quarantine, `update_config()`, `mutate()`, `import_config()`, `clear_events()` and
+   the custom health check setters then restore the previous in-memory state, so the failed
+   change is not applied, and an API request gets a 500. That restored state can still differ
+   from disk if an earlier save failed and kept its change in memory only.
+   `record_restart()`, `add_event()` and `clear_restart_history()` keep the new value in
+   memory and raise, because the restart or release already happened; the next successful
+   save writes it out.
+
+   The monitoring engine logs failures from `record_restart()`, `add_event()` and
+   `clear_restart_history()`, and still applies the cooldown, records the event and sends the
+   notification. If saving the quarantine list fails, the engine stops that container's cycle:
+   it does not quarantine or restart it, and records no event and sends no notification. The
+   next cycle tries again. If the health evaluator cannot save a `health_check_skipped` event,
+   it logs the failure and still runs the Docker native health check.
+
+   Auto-discovery distinguishes two cases. If saving a new selection to `config.json` fails,
+   the selection is rolled back and it returns before recording the event or sending the
+   notification. Nothing retries it on a schedule: the container stays unmonitored until its
+   next start event or the next Autoheal start, whose startup scan selects it again. If the
+   selection is saved but the event cannot be written, the event stays in memory and the
+   notification is still sent.
+
+   The manual unquarantine route is not best-effort: if clearing the restart history fails
+   after the release was saved, it returns a 500, the container stays released, and
+   `config.json` keeps its old restart counts until the next save.
+
 5. **Shutdown** (`app/main.py`): on `SIGTERM`, uvicorn's signal handler runs first. It waits up
    to `UVICORN_GRACEFUL_SHUTDOWN_SECONDS` for in-flight requests, cancels the rest, and only then
    re-raises the signal, which starts `AutoHealService.stop()`. That stops the Uptime Kuma monitor,

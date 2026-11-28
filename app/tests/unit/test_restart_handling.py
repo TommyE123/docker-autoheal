@@ -12,7 +12,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from app.config.config_manager import config_manager
+from app.config.config_manager import PersistenceError, config_manager
 from app.tests.unit.conftest import (
     INCOMPLETE_INFO_CASES,
     after_backoff,
@@ -1173,3 +1173,112 @@ class TestStaleRestartWait:
         await engine._check_containers()
 
         assert engine._recovery.restart_wait_seen == {}
+
+
+def break_file(monkeypatch, attribute: str) -> None:
+    """Point one of the config manager's files into a missing directory, so saving it fails."""
+    path = getattr(config_manager, attribute)
+    monkeypatch.setattr(config_manager, attribute, path.parent / "missing-parent" / path.name)
+
+
+@pytest.mark.asyncio
+class TestPersistenceFailures:
+    """A failed save after a restart is logged; the restart is still fully accounted for."""
+
+    async def test_failed_restart_count_save_still_applies_cooldown_event_and_notification(
+        self, engine, docker_client, mock_notification_manager, monkeypatch, caplog
+    ):
+        container, info = make_container(name="web")
+        docker_client.add_container(container, info)
+        break_file(monkeypatch, "CONFIG_FILE")
+
+        await after_backoff(engine, engine._handle_container_restart, container, info, "unhealthy")
+
+        assert docker_client.restart_calls == ["web"]
+        assert config_manager.get_restart_count("web", 600) == 1
+        assert "web" in engine._recovery.last_restart_times
+        (restart,) = events_of_type("restart")
+        assert restart.restart_count == 1
+        mock_notification_manager.send_event_notification.assert_awaited_once_with(restart)
+        assert (
+            "Could not save restart count for container web; it is kept in memory only"
+            in caplog.text
+        )
+
+    async def test_failed_restart_event_save_still_notifies(
+        self, engine, docker_client, mock_notification_manager, monkeypatch, caplog
+    ):
+        container, info = make_container(name="web")
+        docker_client.add_container(container, info)
+        break_file(monkeypatch, "EVENTS_FILE")
+
+        await after_backoff(engine, engine._handle_container_restart, container, info, "unhealthy")
+
+        assert "web" in engine._recovery.last_restart_times
+        (restart,) = events_of_type("restart")
+        mock_notification_manager.send_event_notification.assert_awaited_once_with(restart)
+        assert "Could not save event for container web; it is kept in memory only" in caplog.text
+
+    async def test_failed_quarantine_event_save_still_notifies(
+        self, engine, docker_client, mock_notification_manager, monkeypatch
+    ):
+        container, info = make_container(name="web")
+        docker_client.add_container(container, info)
+        for _ in range(3):
+            config_manager.record_restart("web")
+        break_file(monkeypatch, "EVENTS_FILE")
+
+        await engine._handle_container_restart(container, info, "unhealthy")
+
+        assert config_manager.is_quarantined("web") is True
+        (quarantine,) = events_of_type("quarantine")
+        mock_notification_manager.send_event_notification.assert_awaited_once_with(quarantine)
+
+    async def test_failed_quarantine_save_leaves_the_container_unquarantined(
+        self, engine, docker_client, mock_notification_manager, monkeypatch
+    ):
+        """Nothing was restarted yet, so the error reaches the per-container handler."""
+        container, info = make_container(name="web")
+        docker_client.add_container(container, info)
+        for _ in range(3):
+            config_manager.record_restart("web")
+        break_file(monkeypatch, "QUARANTINE_FILE")
+
+        with pytest.raises(PersistenceError):
+            await engine._handle_container_restart(container, info, "unhealthy")
+
+        assert config_manager.is_quarantined("web") is False
+        assert docker_client.restart_calls == []
+        assert events_of_type("quarantine") == []
+        mock_notification_manager.send_event_notification.assert_not_awaited()
+
+    @pytest.mark.parametrize("broken_file", ["CONFIG_FILE", "EVENTS_FILE"])
+    async def test_failed_save_after_auto_unquarantine_still_releases_and_notifies(
+        self, engine, mock_notification_manager, monkeypatch, broken_file
+    ):
+        config_manager.quarantine_container("web")
+        config_manager.record_restart("web")
+        engine._recovery.backoff_delays["web"] = 999
+        break_file(monkeypatch, broken_file)
+
+        await engine._auto_unquarantine_container(["web"], "web", "web", "a" * 64)
+
+        assert config_manager.is_quarantined("web") is False
+        assert config_manager.get_total_restart_count("web") == 0
+        assert engine._recovery.backoff_delays["web"] == 10  # reset to the default initial delay
+        (released,) = events_of_type("auto_unquarantine")
+        mock_notification_manager.send_event_notification.assert_awaited_once_with(released)
+
+    async def test_failed_unquarantine_save_keeps_the_container_quarantined(
+        self, engine, mock_notification_manager, monkeypatch
+    ):
+        config_manager.quarantine_container("web")
+        config_manager.record_restart("web")
+        break_file(monkeypatch, "QUARANTINE_FILE")
+
+        await engine._auto_unquarantine_container(["web"], "web", "web", "a" * 64)
+
+        assert config_manager.is_quarantined("web") is True
+        assert config_manager.get_total_restart_count("web") == 1
+        assert events_of_type("auto_unquarantine") == []
+        mock_notification_manager.send_event_notification.assert_not_awaited()

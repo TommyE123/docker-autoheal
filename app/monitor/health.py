@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from app.config.config_manager import AutoHealEvent, config_manager
+from app.config.config_manager import AutoHealEvent, PersistenceError, config_manager
 from app.monitor.metrics import record_health_check
 
 if TYPE_CHECKING:
@@ -339,17 +339,24 @@ class HealthEvaluator:
             "so Autoheal cannot reach it. Use an exec or Docker health check instead"
         )
         logger.warning("Container %s: %s", name, message)
-        config_manager.add_event(
-            AutoHealEvent(
-                timestamp=datetime.now(UTC),
-                container_name=name,
-                container_id=container_id,
-                event_type="health_check_skipped",
-                restart_count=0,
-                status="skipped",
-                message=message,
-            )
+        event = AutoHealEvent(
+            timestamp=datetime.now(UTC),
+            container_name=name,
+            container_id=container_id,
+            event_type="health_check_skipped",
+            restart_count=0,
+            status="skipped",
+            message=message,
         )
+        # A failed save must not stop the Docker native health check that follows
+        try:
+            config_manager.add_event(event)
+        except PersistenceError:
+            logger.error(
+                "Could not save the health_check_skipped event for container %s; "
+                "it is kept in memory only",
+                name,
+            )
 
     async def perform_custom_health_check(
         self, container: Container, health_check: HealthCheckConfig

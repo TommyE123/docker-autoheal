@@ -11,7 +11,7 @@ import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from app.config.config_manager import AutoHealEvent, config_manager
+from app.config.config_manager import AutoHealEvent, PersistenceError, config_manager
 from app.notifications.notification_manager import notification_manager
 
 if TYPE_CHECKING:
@@ -213,7 +213,8 @@ class AutoDiscovery:
         Log and record the ``auto_monitor`` event for a container that was just selected.
 
         Runs after ``_select_labelled_container`` has saved the selection, so a failure
-        here cannot lose it. The caller sends the notification afterwards.
+        here cannot lose it. If the event cannot be written to disk it is kept in memory
+        only and the failure is logged, so the caller still sends the notification.
 
         Args:
             stable_id: Stable identifier the container was selected under
@@ -244,7 +245,14 @@ class AutoDiscovery:
             status="enabled",
             message=f"Automatically added to monitoring{' on startup' if startup else ''} due to {label} label (stable_id: {stable_id})",
         )
-        config_manager.add_event(event)
+        try:
+            config_manager.add_event(event)
+        except PersistenceError:
+            logger.error(
+                "Could not save the auto_monitor event for container '%s'; "
+                "it is kept in memory only",
+                container_name,
+            )
         return event
 
     async def listen(
