@@ -33,6 +33,12 @@ router = APIRouter()
 # Config import allows a little more than the app-wide 1 MiB body limit, for large exports.
 MAX_IMPORT_BODY_BYTES = 2 * 1024 * 1024
 
+# The import takes exactly one file and no other form fields.
+import_router = APIRouter(
+    max_body_size=MAX_IMPORT_BODY_BYTES,
+    form_limits={"max_files": 1, "max_fields": 0},
+)
+
 
 @router.get("/api/config", response_model=AutoHealConfig)
 async def get_config():
@@ -100,11 +106,8 @@ async def export_config():
     )
 
 
-@router.post(
+@import_router.post(
     "/api/config/import",
-    max_body_size=MAX_IMPORT_BODY_BYTES,
-    # The import takes exactly one file and no other form fields.
-    form_limits={"max_files": 1, "max_fields": 0},
     responses={
         400: {"description": "More than one file, or any other form field, was uploaded"},
         403: {"description": "Import is disabled (ui.allow_import_json is false)"},
@@ -157,3 +160,7 @@ async def update_observability_config(observability_config: dict):
 
     config_manager.update_config(config)
     return {"status": "success", "message": "Observability configuration updated"}
+
+
+# Included last so the import route keeps its own limits while living under this router.
+router.include_router(import_router)
