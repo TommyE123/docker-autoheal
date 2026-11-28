@@ -2,8 +2,8 @@
 
 check_python_lint.py and check_markdown_lint.py must report Ruff and markdownlint findings
 without changing the file and never get in the way of an edit. readonly-bash.sh must steer
-read-only agents from the GraphQL-backed gh commands to gh api. The real scripts are executed through their shebangs, as Claude Code runs them, with
-the hook JSON they receive on stdin.
+read-only agents from the GraphQL-backed gh commands to gh api. The real scripts are executed
+through their shebangs, as Claude Code runs them, with the hook JSON they receive on stdin.
 """
 
 import ast
