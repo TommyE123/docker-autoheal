@@ -12,10 +12,12 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
+from types import SimpleNamespace
 from typing import Any, Protocol
 from urllib.parse import urlsplit
 
 import aiohttp
+import requests
 
 from app.config.config_manager import AutoHealEvent, NotificationService, config_manager
 
@@ -69,6 +71,29 @@ def _mask_secrets(text: str, service: Any) -> str:
         text = re.sub(re.escape(secret), "***", text, flags=re.IGNORECASE)
     # Any other URL in an error can carry a token in its path or query.
     return _URL_IN_TEXT.sub("***", text)
+
+
+def _target_variants(url: str) -> set[str]:
+    """Path-and-query spellings of ``url`` that an error message can print."""
+    variants: set[str] = set()
+    with suppress(ValueError):  # a malformed URL must not hide the failure reason
+        parts = urlsplit(url)
+        variants.add(parts.path + (f"?{parts.query}" if parts.query else ""))
+    # requests prints the form it prepares (%7E -> ~, %2f -> %2F), which can differ from the config.
+    with suppress(ValueError):  # requests' URL errors are ValueErrors
+        prepared = requests.models.PreparedRequest()
+        prepared.prepare_url(url, None)
+        variants.add(prepared.path_url)
+    return variants
+
+
+def mask_url_secrets(text: str, url: str | None) -> str:
+    """Mask ``url`` (and any other URL) in ``text``, for logging a webhook failure."""
+    # requests prints only the path and query of the URL ("Max retries exceeded with url: /...").
+    for variant in _target_variants(url) if url else ():
+        if len(variant) > 1:
+            text = text.replace(variant, "***")
+    return _mask_secrets(text, SimpleNamespace(url=url))
 
 
 def _origin(url: str | None) -> str:

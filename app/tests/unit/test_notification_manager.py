@@ -24,6 +24,7 @@ from app.config.config_manager import AutoHealEvent, NotificationService
 from app.notifications.notification_manager import (
     NotificationManager,
     NotificationPriority,
+    mask_url_secrets,
 )
 
 _ACCEPTED_BODY = {"ok": True, "status": 1}
@@ -2058,3 +2059,48 @@ async def test_send_test_reports_the_reason_when_the_url_is_malformed(
 
     assert result["message"] == "Test notification to 'svc' failed: could not connect to the server"
     assert "ClientConnectionError: cannot connect" in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("url", "text", "hidden"),
+    [
+        (
+            "http://hooks.invalid/a/SECRET?k=QUERYSECRET",
+            "bad url: /a/SECRET?k=QUERYSECRET",
+            "SECRET",
+        ),
+        ("http://hooks.invalid", "failed: hooks.invalid", "hooks.invalid"),
+        ("http://hooks.invalid/%7E/SECRET", "bad url: /~/SECRET", "SECRET"),
+        ("http://hooks.invalid/%7E/SECRET", "bad url: /%7E/SECRET", "SECRET"),
+        ("http://hooks.invalid/a/b%2fSECRET", "bad url: /a/b%2FSECRET", "SECRET"),
+        ("http://hooks.invalid/", "failed: hooks.invalid", "hooks.invalid"),
+        ("http://[bad/SECRET", "failed: http://[bad/SECRET", "SECRET"),
+        (None, "failed: http://other.invalid/SECRET", "SECRET"),
+    ],
+)
+def test_mask_url_secrets_hides_url_parts(url, text, hidden):
+    """A webhook failure message never keeps the URL path, query, host or any other URL."""
+    masked = mask_url_secrets(text, url)
+
+    assert hidden not in masked
+    assert masked.startswith(text.split(":")[0])
+
+
+@pytest.mark.parametrize(
+    ("url", "text", "expected"),
+    [
+        # A one-character target ("/") is not a secret, so it must not be masked.
+        ("http://hooks.invalid/", "keep/this", "keep/this"),
+        # The shortest real target ("/a") is masked, and replaced by exactly "***".
+        ("http://hooks.invalid/a", "bad url: /a", "bad url: ***"),
+        # With no URL configured the text is left alone, not matched against a placeholder.
+        (None, "XXXX stays", "XXXX stays"),
+        # A URL requests rejects (bad port) still has its raw path and query masked.
+        ("http://hooks.invalid:bad/p?q=SECRET", "oops: /p?q=SECRET", "oops: ***"),
+        # A URL that urlsplit accepts but requests rejects still masks the full URL.
+        ("http:///SECRET", "failed: http:///SECRET", "failed: ***"),
+    ],
+)
+def test_mask_url_secrets_masks_exactly(url, text, expected):
+    """The masked text is exactly the original with each target replaced by ``***``."""
+    assert mask_url_secrets(text, url) == expected

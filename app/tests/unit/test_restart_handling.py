@@ -969,6 +969,30 @@ class TestQuarantineAlerts:
 
         assert config_manager.is_quarantined("web") is True
 
+    async def test_alert_failure_does_not_log_the_webhook_token(
+        self, engine, docker_client, update_config, monkeypatch, caplog
+    ):
+        url = "http://alerts.invalid/api/webhooks/123/SECRETTOKEN"
+
+        def fake_post(*args, **kwargs):
+            raise RuntimeError(
+                f"Max retries exceeded with url: /api/webhooks/123/SECRETTOKEN ({url})"
+            )
+
+        monkeypatch.setattr("requests.post", fake_post)
+        update_config(lambda c: setattr(c.alerts, "webhook", url))
+
+        container, info = make_container(name="web")
+        docker_client.add_container(container, info)
+        for _ in range(3):
+            config_manager.record_restart("web")
+
+        with caplog.at_level("ERROR"):
+            await engine._handle_container_restart(container, info, "unhealthy")
+
+        assert "Failed to send alert" in caplog.text
+        assert "SECRETTOKEN" not in caplog.text
+
     async def test_no_alert_when_alerts_disabled(
         self, engine, docker_client, update_config, monkeypatch
     ):
