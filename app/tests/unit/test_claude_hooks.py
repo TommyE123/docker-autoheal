@@ -1,7 +1,7 @@
 """Behaviour tests for the Claude Code hooks in .claude/hooks/.
 
-check_python_lint.py must report Ruff findings without changing the file and never get in the way
-of an edit. readonly-bash.sh must steer read-only agents from the GraphQL-backed gh commands to
+check_python_lint.py and check_markdown_lint.py must report Ruff and markdownlint findings without
+changing the file and never get in the way of an edit. readonly-bash.sh must steer read-only agents from the GraphQL-backed gh commands to
 gh api. The real scripts are executed through their shebangs, as Claude Code runs them, with the
 hook JSON they receive on stdin.
 """
@@ -33,11 +33,12 @@ def _run_hook(script, payload, env=None, cwd=None):
     )
 
 
-def test_lint_hook_parses_as_python_3_13():
+@pytest.mark.parametrize("script", ["check_python_lint.py", "check_markdown_lint.py"])
+def test_lint_hook_parses_as_python_3_13(script):
     # Claude Code runs the hook with whatever python3 is installed, not the Dockerfile's Python:
     # 3.13 in Claude Code cloud sessions. Ruff's py315 target can rewrite code into syntax that
     # 3.13 rejects.
-    source = (HOOKS / "check_python_lint.py").read_text()
+    source = (HOOKS / script).read_text()
     ast.parse(source, feature_version=(3, 13))
     assert source.startswith("#!/usr/bin/env python3\n")
 
@@ -142,6 +143,85 @@ def test_lint_does_nothing_without_ruff(lint_root, tmp_path):
 def test_lint_never_blocks_on_bad_input():
     assert _run_hook("check_python_lint.py", "not json").returncode == 0
     assert _run_hook("check_python_lint.py", {"tool_input": {}}).returncode == 0
+
+
+# --- check_markdown_lint.py ---------------------------------------------------------------------
+
+requires_markdownlint = pytest.mark.skipif(
+    shutil.which("markdownlint-cli2") is None, reason="markdownlint-cli2 is required"
+)
+
+
+@pytest.fixture
+def md_root(tmp_path):
+    root = tmp_path / "project"
+    (root / ".linter-rules").mkdir(parents=True)
+    config = ".linter-rules/.markdownlint.jsonc"
+    shutil.copy(REPO_ROOT / config, root / config)
+    return root
+
+
+def _md_lint(root, file_path, env_path=None):
+    env = {**os.environ, "CLAUDE_PROJECT_DIR": str(root)}
+    if env_path is not None:
+        env["PATH"] = env_path
+    payload = {"tool_input": {"file_path": str(file_path)}, "cwd": str(root)}
+    return _run_hook("check_markdown_lint.py", payload, env=env, cwd=root)
+
+
+@requires_markdownlint
+def test_markdown_lint_reports_findings_without_changing_the_file(md_root):
+    source = "# Title\n\n" + "word " * 30 + "\n"
+    target = md_root / "long.md"
+    target.write_text(source)
+    result = _md_lint(md_root, target)
+    assert result.returncode == 2
+    assert "MD013" in result.stderr
+    assert target.read_text() == source
+
+
+@requires_markdownlint
+def test_markdown_lint_is_silent_for_a_clean_file(md_root):
+    target = md_root / "clean.md"
+    target.write_text("# Title\n\nShort line.\n")
+    result = _md_lint(md_root, target)
+    assert (result.returncode, result.stderr) == (0, "")
+
+
+@requires_markdownlint
+def test_markdown_lint_truncates_long_reports(md_root):
+    target = md_root / "many.md"
+    target.write_text("# Title\n\n" + "".join(f"{'word ' * 30}\n\n" for _ in range(60)))
+    result = _md_lint(md_root, target)
+    assert result.returncode == 2
+    assert result.stderr.rstrip().endswith("(truncated)")
+
+
+@requires_markdownlint
+def test_markdown_lint_ignores_files_outside_the_project(md_root, tmp_path):
+    outside = tmp_path / "outside.md"
+    outside.write_text("# Title\n\n" + "word " * 30 + "\n")
+    assert _md_lint(md_root, outside).returncode == 0
+
+
+def test_markdown_lint_ignores_non_markdown_files(md_root):
+    target = md_root / "notes.txt"
+    target.write_text("word " * 30)
+    assert _md_lint(md_root, target).returncode == 0
+
+
+def test_markdown_lint_does_nothing_without_a_linter_or_npx(md_root, tmp_path):
+    target = md_root / "long.md"
+    target.write_text("# Title\n\n" + "word " * 30 + "\n")
+    python_only = tmp_path / "python-only"
+    python_only.mkdir()
+    (python_only / "python3").symlink_to(sys.executable)
+    assert _md_lint(md_root, target, env_path=str(python_only)).returncode == 0
+
+
+def test_markdown_lint_never_blocks_on_bad_input():
+    assert _run_hook("check_markdown_lint.py", "not json").returncode == 0
+    assert _run_hook("check_markdown_lint.py", {"tool_input": {}}).returncode == 0
 
 
 # --- readonly-bash.sh ---------------------------------------------------------------------------
