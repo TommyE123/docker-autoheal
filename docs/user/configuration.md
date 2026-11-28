@@ -37,6 +37,10 @@ curl -X PUT http://localhost:3131/api/config/monitor \
 JSON) and Import (uploads a JSON file to replace it) — useful for backups or moving
 configuration between environments.
 
+**Request size limits:** the API rejects request bodies over 1 MiB with HTTP 413, and
+the Import upload is limited to 2 MiB. Import accepts exactly one file; more files or any
+other form field return HTTP 400.
+
 ## Configuration reference
 
 ### `monitor`

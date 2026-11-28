@@ -20,6 +20,10 @@ from app.api.state import init_api  # noqa: F401  (re-exported for app/main.py)
 
 logger = logging.getLogger(__name__)
 
+# Largest request body any endpoint accepts (1 MiB). The API is unauthenticated, so an
+# unbounded body could exhaust memory; real config and notification payloads are a few KB.
+MAX_REQUEST_BODY_BYTES = 1024 * 1024
+
 # Initialize FastAPI app. The API documentation lives under /api/, with the rest of the API.
 app = FastAPI(
     title="Docker Autoheal",
@@ -28,6 +32,7 @@ app = FastAPI(
     docs_url="/api/swagger",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
+    max_body_size=MAX_REQUEST_BODY_BYTES,
 )
 
 register_exception_handlers(app)
