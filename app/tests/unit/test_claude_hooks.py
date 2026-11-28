@@ -1,8 +1,8 @@
 """Behaviour tests for the Claude Code hooks in .claude/hooks/.
 
-check_python_lint.py and check_markdown_lint.py must report Ruff and markdownlint findings without
-changing the file and never get in the way of an edit. readonly-bash.sh must steer read-only agents from the GraphQL-backed gh commands to
-gh api. The real scripts are executed through their shebangs, as Claude Code runs them, with the
+check_python_lint.py and check_markdown_lint.py must report Ruff and markdownlint findings
+without changing the file and never get in the way of an edit. readonly-bash.sh must steer
+read-only agents from the GraphQL-backed gh commands to gh api. The real scripts are executed through their shebangs, as Claude Code runs them, with the
 hook JSON they receive on stdin.
 """
 
@@ -217,6 +217,19 @@ def test_markdown_lint_does_nothing_without_a_linter_or_npx(md_root, tmp_path):
     python_only.mkdir()
     (python_only / "python3").symlink_to(sys.executable)
     assert _md_lint(md_root, target, env_path=str(python_only)).returncode == 0
+
+
+def test_markdown_lint_is_silent_when_npx_cannot_fetch_the_linter(md_root, tmp_path):
+    target = md_root / "long.md"
+    target.write_text("# Title\n\n" + "word " * 30 + "\n")
+    fake = tmp_path / "fake-bin"
+    fake.mkdir()
+    (fake / "python3").symlink_to(sys.executable)
+    npx = fake / "npx"
+    npx.write_text("#!/bin/sh\necho 'npm error network' >&2\nexit 1\n")
+    npx.chmod(0o755)
+    result = _md_lint(md_root, target, env_path=str(fake))
+    assert (result.returncode, result.stderr) == (0, "")
 
 
 def test_markdown_lint_never_blocks_on_bad_input():

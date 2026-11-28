@@ -39,13 +39,16 @@ def lint(file_path: Path, root: Path) -> str | None:
     result = subprocess.run(  # noqa: S603
         [*command, "--config", str(config), str(file_path)],
         cwd=root,
+        # Without this npm retries for about a minute when the registry is unreachable.
+        env={**os.environ, "npm_config_fetch_retries": "0"},
         capture_output=True,
         text=True,
         check=False,
         timeout=90,
     )
-    # Exit 1 means findings. Anything else is a linter that couldn't run, such as npx offline.
-    if result.returncode != 1:
+    # Exit 1 with markdownlint-cli2's banner means findings. Anything else is a linter that
+    # couldn't run: npx also exits 1 when it can't fetch the package.
+    if result.returncode != 1 or "markdownlint-cli2 v" not in result.stdout:
         return None
     report = result.stderr.strip() or result.stdout.strip()
     if len(report) > MAX_OUTPUT:
