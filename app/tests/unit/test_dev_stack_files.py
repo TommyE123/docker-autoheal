@@ -227,7 +227,8 @@ def test_image_health_check_probes_without_curl():
     """The image's HEALTHCHECK uses the image's Python, so curl is not installed for it."""
     lines = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8").splitlines()
 
-    assert lines[0] == "# syntax=docker/dockerfile:1"
+    # Renovate pins the frontend image by digest, so the digest is allowed but its value is not fixed.
+    assert re.fullmatch(r"# syntax=docker/dockerfile:1(@sha256:[0-9a-f]{64})?", lines[0])
     assert lines[1] == "# check=error=true"
     dockerfile = "\n".join(lines)
     assert "curl" not in dockerfile
