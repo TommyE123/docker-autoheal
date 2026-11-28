@@ -242,6 +242,82 @@ def test_markdown_lint_is_silent_when_npx_cannot_fetch_the_linter(md_root, tmp_p
     assert (result.returncode, result.stderr) == (0, "")
 
 
+def _fake_linter(directory, name, stderr="fake finding"):
+    """Put a fake `name` on a PATH directory: it records its arguments and reports findings."""
+    directory.mkdir(exist_ok=True)
+    if not (directory / "python3").exists():
+        (directory / "python3").symlink_to(sys.executable)
+    script = directory / name
+    script.write_text(
+        "#!/bin/sh\n"
+        'printf \'%s\\n\' "$@" > "${0%/*}/args.txt"\n'
+        "echo 'markdownlint-cli2 v0.0.0 (markdownlint v0.0.0)'\n"
+        f"printf '%s' '{stderr}' >&2\n"
+        "exit 1\n"
+    )
+    script.chmod(0o755)
+    return directory
+
+
+def _recorded_args(directory):
+    return (directory / "args.txt").read_text().splitlines()
+
+
+@pytest.mark.parametrize("name", ["release{a,b}.md", "notes (draft).md", "plain.md"])
+def test_markdown_lint_passes_the_edited_file_as_a_literal_path(md_root, tmp_path, name):
+    target = md_root / name
+    target.write_text("# Title\n")
+    fake = _fake_linter(tmp_path / "bin", "markdownlint-cli2")
+    result = _md_lint(md_root, target, env_path=str(fake))
+    assert result.returncode == 2
+    assert "fake finding" in result.stderr
+    config = md_root / ".linter-rules" / ".markdownlint.jsonc"
+    assert _recorded_args(fake) == ["--config", str(config), f":{target.resolve()}"]
+
+
+def test_markdown_lint_truncates_long_reports_from_a_fake_linter(md_root, tmp_path):
+    target = md_root / "doc.md"
+    target.write_text("# Title\n")
+    fake = _fake_linter(tmp_path / "bin", "markdownlint-cli2", stderr="x" * 6000)
+    result = _md_lint(md_root, target, env_path=str(fake))
+    assert result.returncode == 2
+    assert result.stderr.rstrip().endswith("(truncated)")
+
+
+def test_markdown_lint_uses_npx_when_the_linter_is_not_installed(md_root, tmp_path):
+    target = md_root / "doc.md"
+    target.write_text("# Title\n")
+    fake = _fake_linter(tmp_path / "bin", "npx")
+    result = _md_lint(md_root, target, env_path=str(fake))
+    assert result.returncode == 2
+    config = md_root / ".linter-rules" / ".markdownlint.jsonc"
+    assert _recorded_args(fake) == [
+        "--yes",
+        "markdownlint-cli2",
+        "--config",
+        str(config),
+        f":{target.resolve()}",
+    ]
+
+
+def test_markdown_lint_prefers_the_installed_linter_over_npx(md_root, tmp_path):
+    target = md_root / "doc.md"
+    target.write_text("# Title\n")
+    fake = _fake_linter(tmp_path / "bin", "markdownlint-cli2")
+    _fake_linter(fake, "npx", stderr="npx should not run")
+    result = _md_lint(md_root, target, env_path=str(fake))
+    assert result.returncode == 2
+    assert "npx should not run" not in result.stderr
+
+
+def test_markdown_lint_ignores_files_outside_the_project_with_a_fake_linter(md_root, tmp_path):
+    outside = tmp_path / "outside.md"
+    outside.write_text("# Title\n")
+    fake = _fake_linter(tmp_path / "bin", "markdownlint-cli2")
+    assert _md_lint(md_root, outside, env_path=str(fake)).returncode == 0
+    assert not (fake / "args.txt").exists()
+
+
 def test_markdown_lint_never_blocks_on_bad_input():
     assert _run_hook("check_markdown_lint.py", "not json").returncode == 0
     assert _run_hook("check_markdown_lint.py", {"tool_input": {}}).returncode == 0

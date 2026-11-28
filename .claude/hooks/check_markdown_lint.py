@@ -17,8 +17,8 @@ from pathlib import Path
 
 from check_python_lint import MAX_OUTPUT, checkout_root
 
-# Used only when markdownlint-cli2 isn't installed.
-NPX_PACKAGE = "markdownlint-cli2@0.24.2"
+# Used only when markdownlint-cli2 isn't installed. Unpinned, so npx runs the latest release.
+NPX_PACKAGE = "markdownlint-cli2"
 
 
 def lint(file_path: Path, root: Path) -> str | None:
